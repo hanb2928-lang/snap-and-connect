@@ -313,12 +313,12 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var stickerStyle=${JSON.stringify(stickerStyle)};
   var stickerSize=${stickerSize};
   var episodeMode=${episodeMode};
-  var narrationAudioDataUrl=${JSON.stringify(narrationAudioDataUrl)};
+  var narrationAudioDataUrl=(window.__comicNarrationUrl!==undefined?window.__comicNarrationUrl:${JSON.stringify(narrationAudioDataUrl&&narrationAudioDataUrl.length>1000?'__INLINE__':narrationAudioDataUrl)});
   var punchMarkers=${JSON.stringify(punchMarkers)};
   var punchAudioDataUrl=${JSON.stringify(punchAudioDataUrl)};
   var mbtiCommentary=${JSON.stringify(mbtiCommentary)};
   var emotionOverlay=${emotionOverlay};
-  var imageUrl=${JSON.stringify(imageUrl)};
+  var imageUrl=(window.__comicImageUrl!==undefined?window.__comicImageUrl:${JSON.stringify(imageUrl.length>1000?'__INLINE__':imageUrl)});
   var panelEmotions=${JSON.stringify(panels.map(p => p.emotion || ''))};
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
   var emotionColors={'\uACE0\uBBFC':'#FFD600','\uB188\uB78C':'#FF6B6B','\uD589\uBCF5':'#10B981','\uD655\uC2E0':'#3B82F6','\uC124\uB808':'#EC4899','\uC2AC\uD544':'#6366F1','\uBD84\uB178':'#F59E0B','\uB3C4\uC804':'#EF4444','\uD589\uB3D9':'#8B5CF6','\uC9C0\uB8CC':'#64748B','\uC218\uB2E4':'#06B6D4','\uAC10\uB3D9':'#F43F5E'};
@@ -660,16 +660,11 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var punchAudioEl=null;
   function startGeneration(){
     var primaryAudioUrl=narrationAudioDataUrl||punchAudioDataUrl;
+    var audioConnected=false;
     if(primaryAudioUrl){
       try{
         narrationAudio=new Audio(primaryAudioUrl);
         narrationAudio.play().catch(function(){});
-      }catch(e){}
-    }
-    if(punchAudioDataUrl&&narrationAudioDataUrl){
-      try{
-        punchAudioEl=new Audio(punchAudioDataUrl);
-        punchAudioEl.play().catch(function(){});
       }catch(e){}
     }
 
@@ -686,19 +681,21 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       var tracks=canvasStream.getVideoTracks();
       var audioStream=null;
 
-      if(primaryAudioUrl){
+      if(primaryAudioUrl&&narrationAudio){
         try{
           var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+          if(audioCtx.state==='suspended'){audioCtx.resume().catch(function(){});}
           var audioDest=audioCtx.createMediaStreamDestination();
           var sourceNode=audioCtx.createMediaElementSource(narrationAudio);
           sourceNode.connect(audioDest);
           sourceNode.connect(audioCtx.destination);
           audioStream=audioDest.stream;
-        }catch(e){}
+          audioConnected=true;
+        }catch(e){audioConnected=false;}
       }
 
       var combinedStream=canvasStream;
-      if(audioStream&&audioStream.getAudioTracks().length>0){
+      if(audioConnected&&audioStream&&audioStream.getAudioTracks().length>0){
         var allTracks=canvasStream.getVideoTracks().concat(audioStream.getAudioTracks());
         combinedStream=new MediaStream(allTracks);
       }
@@ -914,6 +911,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
 
       if(t<1){setTimeout(drawFrame,16);}
       else{
+        clearTimeout(watchdog);
         setTimeout(function(){
           if(narrationAudio){try{narrationAudio.pause();}catch(e){}}
           if(punchAudioEl){try{punchAudioEl.pause();}catch(e){}}
@@ -921,14 +919,22 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         },300);
       }
       }catch(e){
+        clearTimeout(watchdog);
         if(recorder&&recorder.state!=='inactive')recorder.stop();
         postMsg('error',{msg:'frame render failed: '+(e&&e.message||'unknown')});
       }
     }
     setTimeout(drawFrame,0);
 
+    var watchdog=setTimeout(function(){
+      if(lastPct<0||lastPct===0){
+        postMsg('error',{msg:'generation watchdog: no progress within 10s'});
+      }
+    },10000);
+
     if(donePromise){
       donePromise.then(function(blob){
+        clearTimeout(watchdog);
         var reader=new FileReader();
         reader.onloadend=function(){
           var base64=reader.result.split(',')[1];
@@ -938,6 +944,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       });
     } else {
       setTimeout(function(){
+        clearTimeout(watchdog);
         try{
           var dataUrl=canvas.toDataURL('image/png');
           var base64=dataUrl.split(',')[1];
@@ -1134,12 +1141,18 @@ export function ComicShortGenerator({
     return () => window.removeEventListener('message', handler);
   }, [handleWebViewMessage]);
 
-  const runWebComicGeneration = useCallback((scriptBody: string) => {
+  const runWebComicGeneration = useCallback((scriptBody: string, imageUrl: string, narrationUrl: string | null) => {
     if (webGenCleanupRef.current) {
       webGenCleanupRef.current();
       webGenCleanupRef.current = null;
     }
     const prevCallback = (window as any).__comicPostMsg;
+    const prevImageUrl = (window as any).__comicImageUrl;
+    const prevNarrationUrl = (window as any).__comicNarrationUrl;
+
+    (window as any).__comicImageUrl = imageUrl;
+    (window as any).__comicNarrationUrl = narrationUrl;
+
     const canvas = document.createElement('canvas');
     canvas.id = 'cv';
     canvas.width = 1080;
@@ -1157,6 +1170,8 @@ export function ComicShortGenerator({
 
     webGenCleanupRef.current = () => {
       (window as any).__comicPostMsg = prevCallback;
+      (window as any).__comicImageUrl = prevImageUrl;
+      (window as any).__comicNarrationUrl = prevNarrationUrl;
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
     };
@@ -1319,7 +1334,7 @@ export function ComicShortGenerator({
         mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
         emotionOverlay,
       });
-      runWebComicGeneration(scriptBody);
+      runWebComicGeneration(scriptBody, finalImageUrl, finalNarrationAudioDataUrl);
     } else {
       setWebviewKey((k) => k + 1);
     }
@@ -1332,7 +1347,7 @@ export function ComicShortGenerator({
         }
         return prev;
       });
-    }, 60000);
+    }, 90000);
   }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, runWebComicGeneration]);
 
 
