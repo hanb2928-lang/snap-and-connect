@@ -61,7 +61,6 @@ import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch'
 import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
-import { MultiverseComicGenerator } from '@/components/MultiverseComicGenerator';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
@@ -1077,30 +1076,6 @@ export default function ResultScreen() {
               hashtags={allDisplayHashtags}
               accentColor={td?.accentColor || theme.colors.accent[400]}
               fileName={`snap-connect-comic-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-              stickerPosition={stickerPosition}
-              stickerStyle={stickerStyle}
-              stickerSize={stickerSize}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              priceEstimate={activePriceEstimate || ''}
-              oneLiner={activeOneLiner || ''}
-              productAdvantages={td?.productAdvantages || []}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <MultiverseComicGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.accent[400]}
-              fileName={`snap-connect-mv-${scan.id}.png`}
               affiliatePlatforms={affiliatePlatforms}
               platform={activePlatform}
               shortUrl={shortUrl || ''}
