@@ -11,7 +11,7 @@ import {
   Dimensions,
   type LayoutChangeEvent,
 } from 'react-native';
-import { Instagram, Youtube, FileText, Download, Loader2, Check, Zap, Image as ImageIcon, MessageCircle, Send, Share, Crop, RotateCcw, Check as CheckIcon } from 'lucide-react-native';
+import { Instagram, Youtube, FileText, Download, Loader as Loader2, Check, Zap, Image as ImageIcon, MessageCircle, Send, Share, Crop, RotateCcw, Check as CheckIcon } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { uploadAssetBlob, uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
@@ -60,6 +60,7 @@ const PLATFORM_FORMAT_PRIORITY: Record<PlatformKey, string[]> = {
   threads: ['threads', 'instagram', 'reels'],
   twitter: ['twitter', 'instagram', 'reels'],
   pinterest: ['pinterest', 'instagram', 'blog'],
+  smartstore: ['smartstore', 'naver', 'shopping'],
 };
 
 function getFormatsForPlatform(platform?: PlatformKey): ExportFormat[] {
@@ -77,6 +78,7 @@ const PLATFORM_LABELS_SHORT: Record<PlatformKey, string> = {
   threads: '스레드',
   twitter: 'X(트위터)',
   pinterest: '핀터레스트',
+  smartstore: '스마트스토어',
 };
 
 function platformLabelShort(platform: PlatformKey): string {

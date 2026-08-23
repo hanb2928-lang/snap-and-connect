@@ -9,8 +9,8 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-type CopyType = "deal" | "info" | "viral";
-type CopyPlatform = "shortform" | "instagram" | "blog" | "x" | "threads" | "naverBlog" | "twitter";
+type CopyType = "deal" | "info" | "viral" | "all";
+type CopyPlatform = "shortform" | "instagram" | "blog" | "x" | "threads" | "naverBlog" | "twitter" | "smartstore" | "pinterest";
 
 interface CopyItem {
   hook: string;
@@ -27,6 +27,12 @@ interface CopyRequest {
   copyType: CopyType;
   platform: CopyPlatform;
   count: number;
+}
+
+interface CopyGroup {
+  type: CopyType;
+  label: string;
+  copies: CopyItem[];
 }
 
 Deno.serve(async (req: Request) => {
@@ -46,6 +52,35 @@ Deno.serve(async (req: Request) => {
 
     const count = Math.min(Math.max(body.count || 3, 1), 5);
     const openaiKey = await resolveOpenAIKey();
+    const isAllMode = body.copyType === "all";
+
+    if (isAllMode) {
+      const types: CopyType[] = ["viral", "info", "deal"];
+      const groups: CopyGroup[] = [];
+      let isFallback = false;
+
+      for (const ct of types) {
+        const reqBody = { ...body, copyType: ct };
+        let copies: CopyItem[];
+        if (openaiKey) {
+          try {
+            copies = await generateWithOpenAI(reqBody, openaiKey, count);
+          } catch {
+            copies = generateLocalCopies(reqBody, count);
+            isFallback = true;
+          }
+        } else {
+          copies = generateLocalCopies(reqBody, count);
+          isFallback = true;
+        }
+        groups.push({ type: ct, label: typeLabel(ct), copies });
+      }
+
+      return new Response(
+        JSON.stringify({ groups, isFallback }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     let copies: CopyItem[];
     let isFallback = false;
@@ -102,9 +137,9 @@ async function resolveOpenAIKey(): Promise<string | null> {
 }
 
 function typeLabel(copyType: CopyType): string {
-  if (copyType === "deal") return "공구용 (할인/한정/가치 강조)";
-  if (copyType === "info") return "정보성 (꿀팁/비교/리뷰 형식)";
-  return "바이럴용 (호기심/논란/공감 유발)";
+  if (copyType === "deal") return "파격할인형 (할인/한정/가치 강조)";
+  if (copyType === "info") return "정보형 (꿀팁/비교/리뷰 형식)";
+  return "감성형 (호기심/공감/후킹 유발)";
 }
 
 function platformLabel(platform: CopyPlatform): string {
@@ -112,12 +147,17 @@ function platformLabel(platform: CopyPlatform): string {
   if (platform === "blog" || platform === "naverBlog") return "네이버 블로그";
   if (platform === "x" || platform === "twitter") return "X(트위터)";
   if (platform === "threads") return "스레드";
+  if (platform === "smartstore") return "스마트스토어 상세페이지";
+  if (platform === "pinterest") return "핀터레스트";
   return "쇼츠/릴스/틱톡";
 }
 
 function platformTone(platform: CopyPlatform): string {
   if (platform === "threads") {
     return "스레드는 반말투로 써. '해요', '습니다', '세요' 같은 존댓말은 빼고 '한다', '임', '드라고', '거든' 같은 반말로 자연스럽게. 마치 혼자 중얼거리거나 친구한테 툭 던지듯이.";
+  }
+  if (platform === "smartstore") {
+    return "스마트스토어 상세페이지용이니까 구매 결정을 돮는 방향으로 써. 상품명, 장점, 가격을 명확히 전달하고 '지금 구매하기', '한정 수량' 같은 구매 유도 문구를 자연스럽게 포함해.";
   }
   return "말투는 친근한 존댓말('해요', '요')를 기본으로 하되 너무 격식 차리지 마.";
 }
@@ -320,6 +360,10 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
     if (data.platform === "threads") {
       hook = toBanmal(hook);
       caption = toBanmal(caption);
+    }
+    if (data.platform === "smartstore") {
+      const ctaTags = ["스마트스토어", "네이버쇼핑", "오늘의딜", "구매하기"];
+      hashtags = [...hashtags, ...ctaTags];
     }
     return {
       hook,

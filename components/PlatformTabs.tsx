@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon } from 'lucide-react-native';
+import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
 
@@ -15,6 +15,7 @@ const PLATFORMS: { key: PlatformKey; label: string; icon: typeof FileText; color
   { key: 'threads', label: '스레드', icon: MessageCircle, color: '#0F0F0F' },
   { key: 'twitter', label: 'X(트위터)', icon: Send, color: '#1DA1F2' },
   { key: 'pinterest', label: '핀터레스트', icon: ImageIcon, color: '#E60023' },
+  { key: 'smartstore', label: '스마트스토어', icon: ShoppingBag, color: '#00C73C' },
 ];
 
 export function PlatformTabs({ selected, onSelect }: PlatformTabsProps) {

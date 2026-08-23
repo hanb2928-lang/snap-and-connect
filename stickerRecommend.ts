@@ -84,6 +84,7 @@ export function getCardStyleForPlatform(
     instagram: 'feed',
     threads: 'minimal',
     pinterest: 'magazine',
+    smartstore: 'magazine',
   };
   return fallback[platform];
 }

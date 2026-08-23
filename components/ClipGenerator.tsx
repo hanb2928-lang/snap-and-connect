@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Film, Download, Loader2, Play, RefreshCw, AlertCircle, Music, Volume2, VolumeX, CloudUpload, Lightbulb, Mic, Sparkles, ChevronDown } from 'lucide-react-native';
+import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Music, Volume2, VolumeX, CloudUpload, Lightbulb, Mic, Sparkles, ChevronDown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
@@ -79,6 +79,7 @@ const PLATFORM_FORMAT_DEFAULT: Record<PlatformKey, VideoFormat> = {
   threads: 'vertical',
   twitter: 'horizontal',
   pinterest: 'vertical',
+  smartstore: 'horizontal',
 };
 
 const FORMAT_PRESETS: { label: string; value: VideoFormat; aspect: string }[] = [
@@ -100,6 +101,7 @@ const PLATFORM_STYLE_MAP: Record<PlatformKey, CardStyleKey> = {
   instagram: 'feed',
   threads: 'minimal',
   pinterest: 'magazine',
+  smartstore: 'magazine',
 };
 
 const MUSIC_PRESETS: { label: string; value: MusicMood }[] = [

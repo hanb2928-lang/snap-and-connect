@@ -25,7 +25,7 @@ export interface CustomAffiliateLink {
   productIndex: number;
 }
 
-export type PlatformKey = 'naverBlog' | 'shortform' | 'twitter' | 'instagram' | 'threads' | 'pinterest';
+export type PlatformKey = 'naverBlog' | 'shortform' | 'twitter' | 'instagram' | 'threads' | 'pinterest' | 'smartstore';
 
 export interface PlatformVariant {
   hook: string;

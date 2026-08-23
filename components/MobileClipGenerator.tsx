@@ -64,6 +64,7 @@ const PLATFORM_FORMAT_DEFAULT: Record<PlatformKey, VideoFormat> = {
   threads: 'vertical',
   twitter: 'horizontal',
   pinterest: 'vertical',
+  smartstore: 'horizontal',
 };
 
 const FORMAT_PRESETS: { label: string; value: VideoFormat; aspect: string }[] = [
@@ -85,6 +86,7 @@ const PLATFORM_STYLE_MAP: Record<PlatformKey, CardStyleKey> = {
   instagram: 'feed',
   threads: 'minimal',
   pinterest: 'magazine',
+  smartstore: 'magazine',
 };
 
 const MUSIC_PRESETS: { label: string; value: MusicMood }[] = [

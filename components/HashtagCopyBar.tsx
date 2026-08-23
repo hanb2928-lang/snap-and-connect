@@ -28,6 +28,7 @@ const PLATFORM_TAG_LIMITS: Record<PlatformKey, number> = {
   threads: 6,
   twitter: 5,
   pinterest: 10,
+  smartstore: 8,
 };
 
 function matchCategoryKey(category: string): string | null {
