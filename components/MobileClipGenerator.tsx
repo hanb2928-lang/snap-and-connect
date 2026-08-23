@@ -235,11 +235,11 @@ function buildWebViewHTML(params: {
   }
 
   var img=new Image();
-  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},30000);
+  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},45000);
   img.onload=function(){
     clearTimeout(imgLoadTimeout);
     postMsg('ready',{});
-    startGeneration();
+    try{startGeneration();}catch(e){postMsg('error',{msg:'generation failed: '+(e&&e.message||'unknown')});}
   };
   img.onerror=function(){
     clearTimeout(imgLoadTimeout);
@@ -349,10 +349,11 @@ function buildWebViewHTML(params: {
         ctx.textAlign='left';ctx.globalAlpha=1;
       }
 
-      if(t<1){requestAnimationFrame(drawFrame);}
+      if(t<1){setTimeout(drawFrame,16);}
       else{setTimeout(function(){if(recorder&&recorder.state!=='inactive')recorder.stop();if(bgmResult)bgmResult.stop();},150);}
     }
-    requestAnimationFrame(drawFrame);
+    setTimeout(drawFrame,0);
+    var watchdog=setTimeout(function(){if(lastPct<0||lastPct===0){postMsg('error',{msg:'generation watchdog: no progress within '+(Math.round(duration/1000)+15)+'s'});}},duration+15000);
 
     if(donePromise){
       donePromise.then(function(blob){
@@ -425,20 +426,28 @@ export function MobileClipGenerator({
   useEffect(() => {
     return () => {
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+      if (videoUri && Platform.OS !== 'web') {
+        FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => {});
+      }
     };
-  }, []);
+  }, [videoUri]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   }, []);
 
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+
   const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'progress') {
+        if (stateRef.current !== 'generating') return;
         setProgress(msg.data.progress);
       } else if (msg.type === 'done') {
+        if (stateRef.current !== 'generating') return;
         if (generateTimeoutRef.current) { clearTimeout(generateTimeoutRef.current); generateTimeoutRef.current = null; }
         const { base64, size, mimeType } = msg.data;
         const isImage = msg.data.isImage === true;
@@ -459,6 +468,7 @@ export function MobileClipGenerator({
           showToast('동영상 파일 저장에 실패했어요');
         }
       } else if (msg.type === 'error') {
+        if (stateRef.current !== 'generating') return;
         if (generateTimeoutRef.current) { clearTimeout(generateTimeoutRef.current); generateTimeoutRef.current = null; }
         setState('error');
         const errMsg = msg.data?.msg || '';
@@ -558,10 +568,13 @@ export function MobileClipGenerator({
 
   const handleReset = useCallback(() => {
     if (generateTimeoutRef.current) { clearTimeout(generateTimeoutRef.current); generateTimeoutRef.current = null; }
+    if (videoUri && Platform.OS !== 'web') {
+      FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => {});
+    }
     setVideoUri(null);
     setState('idle');
     setProgress(0);
-  }, []);
+  }, [videoUri]);
 
   const html = useMemo(() => buildWebViewHTML({
     imageUrl: safeImageUrl,
@@ -823,6 +836,12 @@ export function MobileClipGenerator({
             ref={webViewRef}
             source={{ html }}
             onMessage={handleWebViewMessage}
+            onError={() => {
+              if (stateRef.current === 'generating') {
+                setState('error');
+                showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
+              }
+            }}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback

@@ -11,7 +11,7 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Zap, Download, RefreshCw, AlertCircle, CloudUpload, Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown } from 'lucide-react-native';
+import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
@@ -1066,6 +1066,9 @@ export function ComicShortGenerator({
       if (resultUri && Platform.OS === 'web' && resultUri.startsWith('blob:')) {
         URL.revokeObjectURL(resultUri);
       }
+      if (resultUri && Platform.OS !== 'web') {
+        FileSystem.deleteAsync(resultUri, { idempotent: true }).catch(() => {});
+      }
     };
   }, [resultUri]);
 
@@ -1506,6 +1509,9 @@ export function ComicShortGenerator({
       webGenCleanupRef.current = null;
     }
     if (resultUri && Platform.OS === 'web') URL.revokeObjectURL(resultUri);
+    if (resultUri && Platform.OS !== 'web') {
+      FileSystem.deleteAsync(resultUri, { idempotent: true }).catch(() => {});
+    }
     setResultUri(null);
     setResultBlob(null);
     setState('idle');
@@ -1898,6 +1904,12 @@ export function ComicShortGenerator({
             ref={webViewRef}
             source={webViewSource}
             onMessage={handleWebViewMessage}
+            onError={() => {
+              if (stateRef.current === 'generating') {
+                setState('error');
+                showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
+              }
+            }}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
