@@ -850,7 +850,6 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       }
 
       var ctaT=0;
-      if(false){
 
       if(mbtiCommentary.length>0){
         var mbtiStart=0.55;
