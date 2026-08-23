@@ -52,6 +52,15 @@ export interface CustomReview {
   updatedAt: string;
 }
 
+export interface LocalStoreInfo {
+  enabled: boolean;
+  storeName: string;
+  address: string;
+  region: string;
+  phone: string;
+  todayOffer: string;
+}
+
 export interface Scan {
   id: string;
   image_url: string;
@@ -72,6 +81,7 @@ export interface Scan {
   edited_image_url?: string | null;
   additional_image_urls?: string[] | null;
   custom_review?: CustomReview | null;
+  local_store_info?: LocalStoreInfo | null;
 }
 
 export interface DetectedProduct {

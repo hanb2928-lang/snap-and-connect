@@ -18,6 +18,15 @@ interface CopyItem {
   hashtags: string[];
 }
 
+interface LocalStoreInfo {
+  enabled: boolean;
+  storeName: string;
+  address: string;
+  region: string;
+  phone: string;
+  todayOffer: string;
+}
+
 interface CopyRequest {
   productName: string;
   productCategory: string;
@@ -27,6 +36,7 @@ interface CopyRequest {
   copyType: CopyType;
   platform: CopyPlatform;
   count: number;
+  localStoreInfo?: LocalStoreInfo | null;
 }
 
 interface CopyGroup {
@@ -178,7 +188,23 @@ async function generateWithOpenAI(
     "각 변형은 'hook'(10~30자, 첫 줄부터 자연스럽게 호기심 유발), " +
     "'caption'(50~200자, 진짜 후기처럼 줄바꿈 있는 본문), " +
     "'hashtags'(5~12개, # 없이 문자열 배열)를 가져야 해.\n" +
-    "해시태그도 너무 상업적인 건 빼고 실제 SNS에서 많이 쓰는 자연스러운 걸로.\n" +
+    "해시태그도 너무 상업적인 건 빼고 실제 SNS에서 많이 쓰는 자연스러운 걸로.\n";
+
+  if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) {
+    const ls = data.localStoreInfo;
+    systemPrompt +=
+      "\n" +
+      "이 카피는 오프라인 매장 홍보용이야. 다음 매장 정보를 카피에 자연스럽게 반영해:\n" +
+      `- 매장명: ${ls.storeName}\n` +
+      `- 주소: ${ls.address}\n` +
+      `- 전화번호: ${ls.phone || '없음'}\n` +
+      `- 오늘의 혜택: ${ls.todayOffer || '없음'}\n` +
+      `지역 해시태그(${ls.region}맛집, ${ls.region}카페, ${ls.region}스토어 등)를 반드시 2~3개 포함해.\n` +
+      "방문 유도 문구(\"오늘 방문 시 서비스\", \"선착순 할인\", \"매장에서 직접 확인\" 등)를 후킹이나 캡션에 자연스럽게 넣어.\n" +
+      "온라인 구매 링크 대신 매장 방문을 유도하는 방향으로 작성해.\n";
+  }
+
+  systemPrompt +=
     "결과는 JSON만 반환: { \"copies\": [{ \"hook\": \"...\", \"caption\": \"...\", \"hashtags\": [...] }] }";
 
   const userPrompt =
@@ -190,6 +216,17 @@ async function generateWithOpenAI(
     `카피 타입: ${typeLabel(data.copyType)}\n` +
     `플랫폼: ${platformLabel(data.platform)}\n\n` +
     `${count}개 만들어줘. 서로 다른 말투와 구성으로.`;
+
+  if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) {
+    const ls = data.localStoreInfo;
+    userPrompt +=
+      `\n매장명: ${ls.storeName}\n` +
+      `매장 주소: ${ls.address}\n` +
+      `전화번호: ${ls.phone || ''}\n` +
+      `오늘의 혜택: ${ls.todayOffer || ''}\n` +
+      `지역: ${ls.region}\n` +
+      `오프라인 매장 홍보 모드이므로 방문 유도형으로 작성해줘.`;
+  }
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -351,6 +388,31 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
     hooks = viralHooks;
     captions = viralCaptions;
     hashtags = [...baseHashtags, "바이럴", "인생템", "SNS난리", "럭키템", "공감", ...catHashtags];
+  }
+
+  if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) {
+    const ls = data.localStoreInfo;
+    const regionTag = ls.region || '';
+    const localHashtags = regionTag
+      ? [`${regionTag}맛집`, `${regionTag}카페`, `${regionTag}스토어`, `${regionTag}핫플`, `${regionTag}추천`].slice(0, 3)
+      : [];
+    const storeNameTag = ls.storeName.replace(/\s/g, '');
+    localHashtags.push(storeNameTag, '매장방문', '오늘의혜택');
+
+    const offerSuffix = ls.todayOffer ? `\n${ls.todayOffer}` : '';
+    const addrLine = ls.address ? `\n📍 ${ls.address}${ls.phone ? ` · ${ls.phone}` : ''}` : '';
+
+    dealHooks.unshift(`${ls.storeName} 오늘 방문하면 혜택이 있는 거 아셨나요`);
+    dealHooks.unshift(`${regionTag} 이거 먹으러 오신 분들 여기로 오세요`);
+    dealCaptions.unshift(`${ls.storeName}에서 ${ls.todayOffer || '오늘 특별한 혜택'} 준비했어요.${addrLine}${offerSuffix}\n직접 매장에서 만나보세요!`);
+
+    viralHooks.unshift(`${ls.storeName} 요즘 ${regionTag}에서 난리난 곳`);
+    viralCaptions.unshift(`${ls.storeName} 소문 난 이유가 있더라고요.\n${ls.todayOffer || '직접 와서 확인해보세요'}${addrLine}\n${regionTag} 방문하면 꼭 들르세요.`);
+
+    infoHooks.unshift(`${ls.storeName} 방문 전에 알면 더 좋은 팁`);
+    infoCaptions.unshift(`${ls.storeName}에서 ${ls.todayOffer || '오늘의 추천 메뉴'}(을)를 준비했어요.${addrLine}\n${regionTag} 계시면 한 번쯤 들러보세요.`);
+
+    hashtags = [...hashtags, ...localHashtags];
   }
 
   const indices = pickUniqueIndices(hooks.length, count);

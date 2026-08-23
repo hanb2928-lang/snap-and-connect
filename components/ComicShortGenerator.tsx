@@ -18,7 +18,7 @@ import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
-import type { PlatformKey } from '@/types/database';
+import type { PlatformKey, LocalStoreInfo } from '@/types/database';
 import type { StickerStyle } from '@/components/StickerLink';
 import type { StickerPosition } from '@/components/TemplateCard';
 
@@ -53,6 +53,7 @@ interface ComicShortGeneratorProps {
   priceEstimate?: string;
   oneLiner?: string;
   productAdvantages?: string[];
+  localStoreInfo?: LocalStoreInfo | null;
 }
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';
@@ -276,10 +277,11 @@ type ComicBuildParams = {
   punchAudioDataUrl: string | null;
   mbtiCommentary: MbtiCommentary[];
   emotionOverlay?: boolean;
+  localStoreInfo?: LocalStoreInfo | null;
 };
 
 function buildComicScriptBody(params: ComicBuildParams): string {
-  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false } = params;
+  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null } = params;
   const hashtagStr = hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
 
   const mood = MOOD_TEMPLATES[moodTemplate] || MOOD_TEMPLATES['energetic-popart'];
@@ -318,6 +320,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var punchAudioDataUrl=${JSON.stringify(punchAudioDataUrl)};
   var mbtiCommentary=${JSON.stringify(mbtiCommentary)};
   var emotionOverlay=${emotionOverlay};
+  var localStoreInfo=${JSON.stringify(localStoreInfo)};
   var imageUrl=${JSON.stringify(imageUrl)};
   var panelEmotions=${JSON.stringify(panels.map(p => p.emotion || ''))};
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
@@ -897,14 +900,29 @@ function buildComicScriptBody(params: ComicBuildParams): string {
 
       ctx.restore();
 
-      // Disclosure text (last ~2 seconds)
+      // Ending credits: store info + disclosure (last ~2 seconds)
       if(t>=0.667){
         var dT2=Math.min((t-0.667)/0.1,1);
         ctx.save();
         ctx.globalAlpha=dT2;ctx.fillStyle='#0a0f1e';ctx.fillRect(0,0,W,H);
+        var endY=H/2-20;
+        if(localStoreInfo&&localStoreInfo.enabled&&localStoreInfo.storeName){
+          ctx.fillStyle=effectiveAccent;ctx.font='700 28px sans-serif';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          drawTextLines(ctx,localStoreInfo.storeName,W/2,endY-80,W-80,36);
+          ctx.fillStyle='rgba(255,255,255,0.9)';ctx.font='500 20px sans-serif';
+          var addrLine=localStoreInfo.address||'';
+          if(localStoreInfo.phone)addrLine+='  ·  '+localStoreInfo.phone;
+          drawTextLines(ctx,addrLine,W/2,endY-30,W-80,28);
+          if(localStoreInfo.todayOffer){
+            ctx.fillStyle='rgba(255,214,0,0.95)';ctx.font='700 22px sans-serif';
+            drawTextLines(ctx,localStoreInfo.todayOffer,W/2,endY+20,W-80,30);
+          }
+          endY+=70;
+        }
         ctx.fillStyle='rgba(255,255,255,0.85)';ctx.font='400 18px sans-serif';
         ctx.textAlign='center';ctx.textBaseline='middle';
-        drawTextLines(ctx,disclosureText,W/2,H/2-20,W-80,26);
+        drawTextLines(ctx,disclosureText,W/2,endY,W-80,26);
         ctx.textAlign='left';ctx.globalAlpha=1;
         ctx.restore();
       }
@@ -988,6 +1006,7 @@ export function ComicShortGenerator({
   priceEstimate = '',
   oneLiner = '',
   productAdvantages = [],
+  localStoreInfo = null,
 }: ComicShortGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
@@ -1332,6 +1351,7 @@ export function ComicShortGenerator({
         punchAudioDataUrl: null,
         mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
         emotionOverlay,
+        localStoreInfo,
       });
       runWebComicGeneration(scriptBody);
     } else {
@@ -1347,7 +1367,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, runWebComicGeneration]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, runWebComicGeneration]);
 
 
 
@@ -1545,7 +1565,8 @@ export function ComicShortGenerator({
     punchAudioDataUrl: null,
     mbtiCommentary: mbtiMode ? mbtiCommentary : [],
     emotionOverlay,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay]);
+    localStoreInfo,
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 

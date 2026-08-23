@@ -58,9 +58,11 @@ import { ClipGenerator } from '@/components/ClipGenerator';
 import { CarouselGenerator } from '@/components/CarouselGenerator';
 import { MultiPlatformExport } from '@/components/MultiPlatformExport';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
+import type { LocalStoreInfo } from '@/types/database';
 import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
+import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
@@ -111,6 +113,7 @@ export default function ResultScreen() {
   const [productNameInput, setProductNameInput] = useState('');
   const [productCategoryInput, setProductCategoryInput] = useState('');
   const [savingProduct, setSavingProduct] = useState(false);
+  const [localStoreInfo, setLocalStoreInfo] = useState<LocalStoreInfo | null>(null);
 
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
@@ -135,6 +138,7 @@ export default function ResultScreen() {
       } else {
         setScan(scanResult.data as Scan);
         setCustomAffiliateLinks((scanResult.data as Scan).custom_affiliate_links ?? []);
+        setLocalStoreInfo((scanResult.data as Scan).local_store_info ?? null);
       }
       setSettings(settingsResult);
     } catch (err) {
@@ -1083,6 +1087,24 @@ export default function ResultScreen() {
 
           <LazySection delayMs={200}>
           <View style={styles.section}>
+            <LocalStoreCard
+              value={localStoreInfo}
+              onChange={(info) => {
+                setLocalStoreInfo(info);
+                if (scan) {
+                  supabase
+                    .from('scans')
+                    .update({ local_store_info: info })
+                    .eq('id', scan.id)
+                    .then(() => {});
+                }
+              }}
+            />
+          </View>
+          </LazySection>
+
+          <LazySection delayMs={200}>
+          <View style={styles.section}>
             <ComicShortGenerator
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
               hook={activeHook}
@@ -1101,6 +1123,7 @@ export default function ResultScreen() {
               priceEstimate={activePriceEstimate || ''}
               oneLiner={activeOneLiner || ''}
               productAdvantages={td?.productAdvantages || []}
+              localStoreInfo={localStoreInfo}
             />
           </View>
           </LazySection>
