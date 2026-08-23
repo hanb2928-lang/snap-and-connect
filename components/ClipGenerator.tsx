@@ -396,7 +396,7 @@ function WebClipGenerator({
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const duration = 6000;
+  const [clipDuration, setClipDuration] = useState(15000);
   const [format, setFormat] = useState<VideoFormat>(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
   const [cardStyle, setCardStyle] = useState<CardStyleKey>(PLATFORM_STYLE_MAP[platform] || 'bold');
   const [musicMood, setMusicMood] = useState<MusicMood>('upbeat');
@@ -497,7 +497,7 @@ function WebClipGenerator({
 
         let bgmResult: { stream: any; stop: () => void } | null = null;
         if (musicMood !== 'none') {
-          bgmResult = createBgmStream(musicMood, duration, false);
+          bgmResult = createBgmStream(musicMood, clipDuration, false);
         }
 
         let combinedStream: any = canvasStream;
@@ -563,7 +563,7 @@ function WebClipGenerator({
 
       const drawFrame = () => {
         const elapsed = performance.now() - startTime;
-        const t = Math.min(elapsed / duration, 1);
+        const t = Math.min(elapsed / clipDuration, 1);
         const pct = Math.round(t * 100);
         if (pct !== lastPct) {
           lastPct = pct;
@@ -698,7 +698,7 @@ function WebClipGenerator({
         setVideoUrl(url);
         setVideoMime(mimeType);
       } else {
-        await new Promise<void>((resolve) => setTimeout(resolve, duration + 200));
+        await new Promise<void>((resolve) => setTimeout(resolve, clipDuration + 200));
         const dataUrl = canvas.toDataURL('image/png');
         const blob = await (await fetch(dataUrl)).blob();
         const url = URL.createObjectURL(blob);
@@ -716,7 +716,7 @@ function WebClipGenerator({
         showToast('동영상 생성에 실패했어요: ' + msg);
       }
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, duration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime]);
+  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;
@@ -1024,6 +1024,32 @@ function WebClipGenerator({
                   </Text>
                 </View>
               )}
+
+              <View style={styles.optionRow}>
+                <Text style={styles.optionLabel}>영상 길이</Text>
+                <View style={styles.toggleGroup}>
+                  {[10000, 15000, 20000, 30000].map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[
+                        styles.togglePill,
+                        clipDuration === d && styles.togglePillActive,
+                      ]}
+                      onPress={() => setClipDuration(d)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.togglePillText,
+                          clipDuration === d && styles.togglePillTextActive,
+                        ]}
+                      >
+                        {d / 1000}초
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
           )}
 

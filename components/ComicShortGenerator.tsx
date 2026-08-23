@@ -232,7 +232,7 @@ function autoDecideConfig(category: string, advantages: string[]): AutoConfig {
   const mood = CATEGORY_MOOD_MAP[category] || 'energetic-popart';
   const hasRichStory = advantages.length >= 3;
   const panelCount = hasRichStory ? 3 : category === '뷰티' || category === '패션' ? 2 : 1;
-  const duration: ComicDuration = 6000;
+  const duration: ComicDuration = panelCount >= 3 ? 20000 : panelCount === 2 ? 15000 : 10000;
   return { mood, duration, panelCount };
 }
 
@@ -252,7 +252,7 @@ const FPS = 30;
 const W = 1080;
 const H = 1920;
 
-type ComicDuration = 6000;
+type ComicDuration = 10000 | 15000 | 20000 | 30000;
 
 
 type ComicBuildParams = {
@@ -993,7 +993,7 @@ export function ComicShortGenerator({
   const [toast, setToast] = useState<string | null>(null);
   const [moodTemplate, setMoodTemplate] = useState<MoodTemplate>('energetic-popart');
   const [panelLayout, setPanelLayout] = useState<PanelLayout>('single');
-  const [comicDuration, setComicDuration] = useState<ComicDuration>(6000);
+  const [comicDuration, setComicDuration] = useState<ComicDuration>(15000);
   const [resultUri, setResultUri] = useState<string | null>(null);
   const [resultMime, setResultMime] = useState<string>('video/webm');
   const [resultSize, setResultSize] = useState<number>(0);
@@ -1624,7 +1624,7 @@ export function ComicShortGenerator({
             <View>
               <Text style={styles.optionLabel}>영상 길이</Text>
               <View style={styles.durationGroup}>
-                {[3000, 6000].map((d) => (
+                {[10000, 15000, 20000, 30000].map((d) => (
                   <TouchableOpacity
                     key={d}
                     style={[styles.durationPill, comicDuration === d && styles.durationPillActive]}
@@ -1632,7 +1632,7 @@ export function ComicShortGenerator({
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.durationPillText, comicDuration === d && styles.durationPillTextActive]}>
-                      {d === 3000 ? '3초' : '6초'}
+                      {d / 1000}초
                     </Text>
                   </TouchableOpacity>
                 ))}
