@@ -28,7 +28,7 @@ type MoodTemplate = 'cute-webtoon' | 'noir' | 'sale-popup' | 'retro' | 'premium-
 
 interface AutoConfig {
   mood: MoodTemplate;
-  duration: 3000 | 6000;
+  duration: 10000 | 15000 | 20000;
   panelCount: number;
 }
 
@@ -49,7 +49,7 @@ function autoDecideConfig(category: string, advantages: string[]): AutoConfig {
   const mood = CATEGORY_MOOD_MAP[category] || 'energetic-popart';
   const hasRichStory = advantages.length >= 3;
   const panelCount = hasRichStory ? 3 : category === '뷰티' || category === '패션' ? 2 : 1;
-  const duration: 3000 | 6000 = panelCount >= 2 ? 6000 : 3000;
+  const duration: 10000 | 15000 | 20000 = panelCount >= 3 ? 20000 : panelCount === 2 ? 15000 : 10000;
   return { mood, duration, panelCount };
 }
 

@@ -596,7 +596,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   }
 
   var img=new Image();
-  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},30000);
+  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},45000);
   img.onload=function(){
     clearTimeout(imgLoadTimeout);
     postMsg('ready',{});
@@ -693,6 +693,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
           audioConnected=true;
         }catch(e){audioConnected=false;}
       }
+      if(narrationAudio){try{narrationAudio.play().catch(function(){});}catch(e){}}
 
       var combinedStream=canvasStream;
       if(audioConnected&&audioStream&&audioStream.getAudioTracks().length>0){
@@ -927,9 +928,9 @@ function buildComicScriptBody(params: ComicBuildParams): string {
 
     var watchdog=setTimeout(function(){
       if(lastPct<0||lastPct===0){
-        postMsg('error',{msg:'generation watchdog: no progress within 10s'});
+        postMsg('error',{msg:'generation watchdog: no progress within '+(Math.round(duration/1000)+15)+'s'});
       }
-    },10000);
+    },duration+15000);
 
     if(donePromise){
       donePromise.then(function(blob){
@@ -1062,13 +1063,19 @@ export function ComicShortGenerator({
         webGenCleanupRef.current();
         webGenCleanupRef.current = null;
       }
+      if (resultUri && Platform.OS === 'web' && resultUri.startsWith('blob:')) {
+        URL.revokeObjectURL(resultUri);
+      }
     };
-  }, []);
+  }, [resultUri]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
@@ -1126,9 +1133,6 @@ export function ComicShortGenerator({
       // ignore parse errors
     }
   }, [fileName, showToast, narrationAudioDataUrl]);
-
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -1339,7 +1343,7 @@ export function ComicShortGenerator({
         }
         return prev;
       });
-    }, 90000);
+    }, finalDuration + 60000);
   }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, runWebComicGeneration]);
 
 
