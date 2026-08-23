@@ -11,7 +11,7 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Film, Download, RefreshCw, AlertCircle, CloudUpload, Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
+import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
@@ -229,11 +229,9 @@ function buildWebViewHTML(params: {
   }
 
   function postMsg(type,data){
-  function postMsg(type,data){
     var msg=JSON.stringify({type:type,data:data||{}});
     if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg);}
     else if(window.parent&&window.parent!==window){window.parent.postMessage(msg,'*');}
-  }
   }
 
   var img=new Image();
