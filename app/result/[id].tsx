@@ -81,6 +81,7 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { LazySection } from '@/components/LazySection';
 import { ShortFormGuideCard } from '@/components/ShortFormGuideCard';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
+import { VirtualCutGallery } from '@/components/VirtualCutGallery';
 import { getItem } from '@/lib/storage';
 
 export default function ResultScreen() {
@@ -626,6 +627,16 @@ export default function ResultScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {captureImageUrl ? (
+          <View style={styles.section}>
+            <VirtualCutGallery
+              imageDataUrl={captureImageUrl}
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
