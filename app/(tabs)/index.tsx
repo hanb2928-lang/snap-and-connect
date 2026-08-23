@@ -698,7 +698,7 @@ export default function CameraScreen() {
       )}
 
       {recognitionMode === 'multi' && multiShots.length > 0 && (
-        <View style={styles.multiShotStrip}>
+        <View style={styles.multiShotStrip} pointerEvents="auto">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
             {multiShots.map((shot, i) => (
               <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
@@ -729,7 +729,7 @@ export default function CameraScreen() {
       )}
 
       {error && (
-        <View style={styles.errorBanner}>
+        <View style={styles.errorBanner} pointerEvents="none">
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -1158,14 +1158,17 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
   },
   errorBanner: {
+    position: 'absolute',
+    bottom: 200,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
     backgroundColor: theme.colors.error[500] + '20',
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.sm,
     borderLeftWidth: 3,
     borderLeftColor: theme.colors.error[400],
+    zIndex: 15,
   },
   errorText: {
     color: theme.colors.error[400],
@@ -1360,12 +1363,15 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   multiShotStrip: {
+    position: 'absolute',
+    bottom: 200,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.md,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+    zIndex: 15,
   },
   multiShotScroll: {
     gap: 8,
