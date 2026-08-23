@@ -17,6 +17,7 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
+import type { StyleRecommendation } from '@/lib/styleRecommend';
 
 interface MobileClipGeneratorProps {
   imageUrl: string;
@@ -35,6 +36,8 @@ interface MobileClipGeneratorProps {
   } | null;
   customReview?: CustomReview | null;
   shortUrl?: string;
+  recommendedStyle?: StyleRecommendation | null;
+  styleAppliedKey?: string | null;
 }
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';

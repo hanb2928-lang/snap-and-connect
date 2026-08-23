@@ -83,6 +83,8 @@ import { ShortFormGuideCard } from '@/components/ShortFormGuideCard';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { VirtualCutGallery } from '@/components/VirtualCutGallery';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
+import { AIStyleCard } from '@/components/AIStyleCard';
+import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 
 export default function ResultScreen() {
@@ -116,6 +118,8 @@ export default function ResultScreen() {
   const [productCategoryInput, setProductCategoryInput] = useState('');
   const [savingProduct, setSavingProduct] = useState(false);
   const [localStoreInfo, setLocalStoreInfo] = useState<LocalStoreInfo | null>(null);
+  const [recommendedStyle, setRecommendedStyle] = useState<StyleRecommendation | null>(null);
+  const [styleAppliedKey, setStyleAppliedKey] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
@@ -1076,6 +1080,23 @@ export default function ResultScreen() {
 
           <LazySection delayMs={200}>
           <View style={styles.section}>
+            <AIStyleCard
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              accentColor={td?.accentColor || theme.colors.primary[400]}
+              hook={activeHook}
+              oneLiner={activeOneLiner || scan?.one_liner || ''}
+              platform={activePlatform}
+              onApply={(rec) => {
+                setRecommendedStyle(rec);
+                setStyleAppliedKey(`${Date.now()}`);
+              }}
+            />
+          </View>
+          </LazySection>
+
+          <LazySection delayMs={200}>
+          <View style={styles.section}>
             <ClipGenerator
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
               hook={activeHook}
@@ -1089,6 +1110,8 @@ export default function ResultScreen() {
               templateData={td ?? null}
               customReview={scan.custom_review?.text ? scan.custom_review : null}
               shortUrl={shortUrl || ''}
+              recommendedStyle={recommendedStyle}
+              styleAppliedKey={styleAppliedKey}
             />
           </View>
           </LazySection>

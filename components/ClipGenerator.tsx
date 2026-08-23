@@ -8,6 +8,7 @@ import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
+import type { StyleRecommendation } from '@/lib/styleRecommend';
 
 interface ClipGeneratorProps {
   imageUrl: string;
@@ -26,6 +27,8 @@ interface ClipGeneratorProps {
   } | null;
   customReview?: CustomReview | null;
   shortUrl?: string;
+  recommendedStyle?: StyleRecommendation | null;
+  styleAppliedKey?: string | null;
 }
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';
@@ -393,6 +396,8 @@ function WebClipGenerator({
   templateData = null,
   customReview = null,
   shortUrl = '',
+  recommendedStyle = null,
+  styleAppliedKey = null,
 }: ClipGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
@@ -404,6 +409,7 @@ function WebClipGenerator({
   const [musicMood, setMusicMood] = useState<MusicMood>('upbeat');
   const [motionPreset, setMotionPreset] = useState<MotionPreset>('kenburns');
   const [hybridMode, setHybridMode] = useState<HybridMode>('off');
+  const lastAppliedKey = useRef<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [cloudSaving, setCloudSaving] = useState(false);
@@ -421,6 +427,19 @@ function WebClipGenerator({
     setCardStyle(PLATFORM_STYLE_MAP[platform] || 'bold');
     setFormat(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
   }, [platform]);
+
+  useEffect(() => {
+    if (!recommendedStyle || !styleAppliedKey) return;
+    if (lastAppliedKey.current === styleAppliedKey) return;
+    lastAppliedKey.current = styleAppliedKey;
+    setCardStyle(recommendedStyle.cardStyle);
+    setMusicMood(recommendedStyle.musicMood);
+    setMotionPreset(recommendedStyle.motionPreset);
+    setFormat(recommendedStyle.format);
+    setClipDuration(recommendedStyle.duration);
+    setHybridMode(recommendedStyle.hybridMode);
+    showToast('AI 추천 스타일이 적용되었습니다!');
+  }, [recommendedStyle, styleAppliedKey]);
 
   useEffect(() => {
     return () => {
