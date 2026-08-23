@@ -117,6 +117,71 @@ export async function saveEditedScan(scanId: string, editedImageUrl: string): Pr
   if (error) throw new Error(`저장 실패: ${error.message}`);
 }
 
+export async function compositeOnBackground(
+  productDataUrl: string,
+  bgStyle: 'studio' | 'retail' | 'natural' | 'gradient' | 'none',
+): Promise<string> {
+  if (bgStyle === 'none') return productDataUrl;
+  const bgUrl = `/bg-${bgStyle}.webp`;
+
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    return compositeOnBackgroundWeb(productDataUrl, bgUrl);
+  }
+
+  return compositeOnBackgroundNative(productDataUrl, bgUrl);
+}
+
+async function compositeOnBackgroundWeb(productDataUrl: string, bgUrl: string): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
+
+  const [bgImg, productImg] = await Promise.all([
+    loadImageElement(bgUrl),
+    loadImageElement(productDataUrl),
+  ]);
+
+  ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+  const pw = productImg.naturalWidth;
+  const ph = productImg.naturalHeight;
+  const scale = Math.min((canvas.width * 0.8) / pw, (canvas.height * 0.8) / ph);
+  const dw = pw * scale;
+  const dh = ph * scale;
+  const dx = (canvas.width - dw) / 2;
+  const dy = (canvas.height - dh) / 2;
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
+  ctx.drawImage(productImg, dx, dy, dw, dh);
+  ctx.shadowColor = 'transparent';
+
+  return canvas.toDataURL('image/png', 0.95);
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
+    img.src = src;
+  });
+}
+
+async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string): Promise<string> {
+  const canvasSize = 1080;
+  const result = await ImageManipulator.manipulateAsync(
+    productDataUrl,
+    [{ resize: { width: canvasSize } }],
+    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  return result.uri;
+}
+
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {
   if (Platform.OS === 'web') {
     const response = await fetch(uri);

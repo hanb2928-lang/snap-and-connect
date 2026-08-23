@@ -33,7 +33,9 @@ import {
   saveEditedScan,
   readUriAsBase64,
   compressImage,
+  compositeOnBackground,
 } from '@/lib/imageEdit';
+import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundPicker';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { getHtml2Canvas } from '@/lib/html2canvas';
 import { captureRef } from 'react-native-view-shot';
@@ -85,6 +87,8 @@ export default function EditorScreen() {
   const [progressText, setProgressText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [bgPickerVisible, setBgPickerVisible] = useState(false);
+  const [bgProcessing, setBgProcessing] = useState(false);
   const undoStack = useRef<string[]>([]);
   const imageWrapRef = useRef<View | null>(null);
 
@@ -216,11 +220,47 @@ export default function EditorScreen() {
       const base64 = cleanBase64(editedDataUrl);
       const newUri = await uploadEditedImage(base64, 'image/png');
       updateImage(newUri);
+      setBgPickerVisible(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '배경 제거 실패');
     }
     setProcessing(false);
   }, [imageUri, processing, updateImage]);
+
+  const handleBgSelect = useCallback(async (style: BackgroundStyle) => {
+    if (bgProcessing) return;
+    setBgProcessing(true);
+    setError(null);
+    try {
+      let dataUrl: string;
+      if (Platform.OS === 'web') {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        dataUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('이미지를 변환할 수 없습니다'));
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        const { base64, mimeType: detectedMime } = await readUriAsBase64(imageUri);
+        dataUrl = `data:${detectedMime};base64,${base64}`;
+      }
+
+      const compositeDataUrl = await compositeOnBackground(dataUrl, style);
+      const compositeBase64 = cleanBase64(compositeDataUrl);
+      const newUri = await uploadEditedImage(compositeBase64, 'image/png');
+      updateImage(newUri);
+      setBgPickerVisible(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '배경 합성 실패');
+    }
+    setBgProcessing(false);
+  }, [imageUri, bgProcessing, updateImage]);
+
+  const handleBgSkip = useCallback(() => {
+    setBgPickerVisible(false);
+  }, []);
 
   const handleAddText = useCallback(() => {
     setTempText('');
@@ -486,6 +526,13 @@ export default function EditorScreen() {
           </View>
         </View>
       )}
+
+      <BackgroundPicker
+        visible={bgPickerVisible}
+        onSelect={handleBgSelect}
+        onSkip={handleBgSkip}
+        processing={bgProcessing}
+      />
 
       {(textOverlays.length > 0 || stickers.length > 0) && editMode === 'none' && (
         <View style={styles.overlaySummary}>
