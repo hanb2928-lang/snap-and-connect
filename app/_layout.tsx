@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady'import { useEffect, useRef, useState } from 'react';
+import { View, Text, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SplashScreen } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -57,6 +58,24 @@ export default function RootLayout() {
     })();
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      if (!url) return;
+      if (url.includes('auth/callback') || url.includes('access_token') || url.includes('error=')) {
+        WebBrowser.dismissBrowser();
+      }
+    };
+
+    const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   if (!fontsLoaded && !fontError) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.dark.bg, gap: theme.spacing.md }}>
@@ -104,6 +123,7 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="editor" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="light" />

@@ -44,7 +44,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "origin": "snapconnect://"
+        }
+      ],
       "expo-font",
       "expo-web-browser",
       [
