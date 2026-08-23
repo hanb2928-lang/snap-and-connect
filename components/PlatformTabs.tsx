@@ -1,0 +1,81 @@
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon } from 'lucide-react-native';
+import { theme } from '@/lib/theme';
+import type { PlatformKey } from '@/types/database';
+
+interface PlatformTabsProps {
+  selected: PlatformKey;
+  onSelect: (key: PlatformKey) => void;
+}
+
+const PLATFORMS: { key: PlatformKey; label: string; icon: typeof FileText; color: string }[] = [
+  { key: 'naverBlog', label: '네이버 블로그', icon: FileText, color: '#03C75A' },
+  { key: 'shortform', label: '숏폼·틱톡', icon: Smartphone, color: '#E1306C' },
+  { key: 'instagram', label: '인스타그램', icon: Instagram, color: '#C13584' },
+  { key: 'threads', label: '스레드', icon: MessageCircle, color: '#0F0F0F' },
+  { key: 'twitter', label: 'X(트위터)', icon: Send, color: '#1DA1F2' },
+  { key: 'pinterest', label: '핀터레스트', icon: ImageIcon, color: '#E60023' },
+];
+
+export function PlatformTabs({ selected, onSelect }: PlatformTabsProps) {
+  return (
+    <View style={styles.container}>
+      {PLATFORMS.map(({ key, label, icon: Icon, color }) => {
+        const isActive = selected === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={[styles.tab, isActive && styles.tabActive]}
+            onPress={() => onSelect(key)}
+            activeOpacity={0.7}
+          >
+            <Icon
+              size={16}
+              color={isActive ? color : theme.colors.dark.textDim}
+              strokeWidth={2}
+            />
+            <Text
+              style={[
+                styles.tabText,
+                isActive && { color },
+              ]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: theme.spacing.md,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  tabActive: {
+    backgroundColor: theme.colors.dark.surface,
+  },
+  tabText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    flexShrink: 1,
+  },
+});

@@ -1,0 +1,1617 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+  Linking,
+  TextInput,
+  Alert,
+  Modal,
+  KeyboardAvoidingView,
+} from 'react-native';
+import {
+  Camera,
+  Sparkles,
+  Info,
+  ExternalLink,
+  Link2,
+  Check,
+  Send,
+  Zap,
+  ChevronDown,
+  ChevronRight,
+  BarChart3,
+  Flame,
+  FolderOpen,
+  ClipboardList,
+  CalendarDays,
+  MessageSquare,
+  Bug,
+  Wallet,
+  Plus,
+  Trash2,
+  TrendingUp,
+  Film,
+  LayoutTemplate,
+  BookOpen,
+  PenLine,
+  ImageIcon,
+  Scissors,
+  Type,
+  Stamp,
+  Upload,
+  Share2,
+  Lightbulb,
+  Smartphone,
+  Clapperboard,
+} from 'lucide-react-native';
+import { theme } from '@/lib/theme';
+import { getUserSettings, updateUserSettings } from '@/lib/settings';
+import { uploadAssetBlob } from '@/lib/savedAssets';
+import { clearLogoCache } from '@/lib/logoWatermark';
+import type { UserSettings, RevenueRecord } from '@/types/database';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useSafeTop } from '@/hooks/useSafeTop';
+import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
+import { formatKRW } from '@/lib/dashboard';
+
+export default function SettingsScreen() {
+  const tabBarHeight = useTabBarHeight();
+  const safeTop = useSafeTop();
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [coupangId, setCoupangId] = useState('');
+  const [naverId, setNaverId] = useState('');
+  const [tossId, setTossId] = useState('');
+  const [savingIds, setSavingIds] = useState(false);
+  const [savedIds, setSavedIds] = useState(false);
+
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  const [revenues, setRevenues] = useState<RevenueRecord[]>([]);
+  const [revModalVisible, setRevModalVisible] = useState(false);
+  const [revPlatform, setRevPlatform] = useState('Coupang');
+  const [revAmount, setRevAmount] = useState('');
+  const [revMonth, setRevMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [revNote, setRevNote] = useState('');
+  const [revSaving, setRevSaving] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await getUserSettings();
+      setSettings(data);
+      setCoupangId(data?.coupang_partners_id || '');
+      setNaverId(data?.naver_shopping_id || '');
+      setTossId(data?.toss_share_id || '');
+      setLogoUrl(data?.logo_url || null);
+    } catch {
+      setSettings(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadRevenues = useCallback(async () => {
+    try {
+      const data = await fetchRevenueRecords(20);
+      setRevenues(data);
+    } catch {
+      setRevenues([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+    loadRevenues();
+  }, [loadSettings, loadRevenues]);
+
+  const handleSaveIds = async () => {
+    setSavingIds(true);
+    setSavedIds(false);
+    try {
+      await updateUserSettings({
+        coupang_partners_id: coupangId || null,
+        naver_shopping_id: naverId || null,
+        toss_share_id: tossId || null,
+      });
+      setSavedIds(true);
+      setTimeout(() => setSavedIds(false), 2500);
+    } catch (err) {
+      Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+    }
+    setSavingIds(false);
+  };
+
+  const handleUploadLogo = async () => {
+    if (Platform.OS !== 'web') {
+      Alert.alert('안내', '로고 업로드는 웹에서 지원됩니다. 곧 모바일도 지원될 예정이에요');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg';
+    input.onchange = async (e: any) => {
+      const file = e.target?.files?.[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        Alert.alert('파일 크기', '로고 이미지는 2MB 이하의 PNG 또는 JPG 파일을 사용해주세요');
+        return;
+      }
+      setLogoUploading(true);
+      try {
+        const fileName = `logo-${Date.now()}.png`;
+        const fileUrl = await uploadAssetBlob(file, fileName, file.type || 'image/png');
+        if (!fileUrl) {
+          Alert.alert('업로드 실패', '이미지 업로드에 실패했어요. 다시 시도해주세요');
+          setLogoUploading(false);
+          return;
+        }
+        await updateUserSettings({ logo_url: fileUrl });
+        setLogoUrl(fileUrl);
+        clearLogoCache();
+      } catch {
+        Alert.alert('업로드 실패', '로고 업로드 중 오류가 발생했어요');
+      }
+      setLogoUploading(false);
+    };
+    input.click();
+  };
+
+  const handleRemoveLogo = async () => {
+    Alert.alert('로고 삭제', '등록된 로고를 삭제하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await updateUserSettings({ logo_url: null });
+            setLogoUrl(null);
+            clearLogoCache();
+          } catch {
+            Alert.alert('오류', '로고 삭제 중 오류가 발생했어요');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSaveRevenue = async () => {
+    const amount = parseInt(revAmount, 10);
+    if (!amount || amount <= 0) {
+      Alert.alert('입력 오류', '수익 금액을 정확히 입력해주세요');
+      return;
+    }
+    setRevSaving(true);
+    try {
+      await addRevenueRecord(revPlatform, amount, revMonth, revNote || undefined);
+      setRevModalVisible(false);
+      setRevAmount('');
+      setRevNote('');
+      await loadRevenues();
+    } catch (err) {
+      Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+    }
+    setRevSaving(false);
+  };
+
+  const handleDeleteRevenue = (id: string) => {
+    Alert.alert('삭제', '이 수익 기록을 삭제하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteRevenueRecord(id);
+            await loadRevenues();
+          } catch (err) {
+            Alert.alert('삭제 실패', err instanceof Error ? err.message : '오류');
+          }
+        },
+      },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+    >
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
+        <View style={styles.logoWrap}>
+          <Camera size={32} color={theme.colors.primary[400]} strokeWidth={2} />
+        </View>
+        <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>숏커넥트</Text>
+        <Text style={styles.appVersion}>Version 1.0.0</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>네이버 쇼핑커넥트 안내</Text>
+        <Text style={styles.sectionDesc}>
+          네이버 쇼핑커넥트는 브랜드커넥트(banner.naver.com)에서 크리에이터로 가입 후, 상품별로 전용 수수료 링크를 직접 발급받는 시스템입니다. 단순한 ID 입력으로는 자동 추적 링크를 만들 수 없습니다.
+        </Text>
+
+        <View style={styles.guideCard}>
+          <Text style={styles.guideStepTitle} numberOfLines={2}>이용 방법</Text>
+          <Text style={styles.guideStepText}>
+            1. 네이버 브랜드커넥트에 크리에이터로 가입합니다{'\n'}
+            2. 채널(블로그/인스타/유튜브)을 연동합니다{'\n'}
+            3. 상품 찾기에서 홍보할 상품을 선택합니다{'\n'}
+            4. 링크 발급 버튼으로 전용 수수료 링크를 받습니다{'\n'}
+            5. 발급받은 링크를 콘텐츠에 삽입합니다
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.guideLinkButton}
+          onPress={() => Linking.openURL('https://brandconnect.naver.com/about/creator/').catch(() => {})}
+          activeOpacity={0.8}
+        >
+          <ExternalLink size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+          <Text style={styles.guideLinkText}>네이버 브랜드커넥트 바로가기</Text>
+        </TouchableOpacity>
+
+        <View style={styles.noticeCard}>
+          <Info size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+          <Text style={styles.noticeText}>
+            본 앱은 AI가 상품을 식별하고 네이버 쇼핑 검색 링크를 자동 생성합니다. 정확한 수수료 추적을 위해서는 브랜드커넥트에서 발급받은 개별 링크를 직접 사용하세요.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>제휴 파트너스 ID 설정</Text>
+        <Text style={styles.sectionDesc}>
+          각 플랫폼의 파트너스 ID를 입력하면 상품 분석 시 자동으로 수수료 링크가 생성됩니다. ID는 안전하게 저장됩니다.
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: '#FF3E3E20' }]}>
+              <Text style={[styles.idIconText, { color: '#FF3E3E' }]}>C</Text>
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>쿠팡 파트너스 ID</Text>
+              <TextInput
+                style={styles.idInput}
+                value={coupangId}
+                onChangeText={setCoupangId}
+                placeholder="예: ATTP1234567"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+          <Divider />
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: '#03C75A20' }]}>
+              <Text style={[styles.idIconText, { color: '#03C75A' }]}>N</Text>
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>네이버 쇼핑 ID</Text>
+              <TextInput
+                style={styles.idInput}
+                value={naverId}
+                onChangeText={setNaverId}
+                placeholder="예: naver_shop_123"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+          <Divider />
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: '#0064FF20' }]}>
+              <Text style={[styles.idIconText, { color: '#0064FF' }]}>T</Text>
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>토스 쉐어링크 ID</Text>
+              <TextInput
+                style={styles.idInput}
+                value={tossId}
+                onChangeText={setTossId}
+                placeholder="예: toss_share_abc"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.tossSignupLink}
+                onPress={() => {
+                  const tossUrl = 'https://business.toss.im/account/sign-in?client_id=ajvm9wq2t0p1ttet13y3qzb3rvjxhacn&redirect_uri=https%3A%2F%2Fsharelink.toss.im%2Fsignup-start';
+                  if (Platform.OS === 'web') {
+                    window.open(tossUrl, '_blank');
+                  } else {
+                    Linking.openURL(tossUrl).catch(() => {});
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <ExternalLink size={13} color="#0064FF" strokeWidth={2} />
+                <Text style={styles.tossSignupLinkText}>토스 제휴링크 가입하기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.saveIdButton, savedIds && styles.saveIdButtonDone]}
+          onPress={handleSaveIds}
+          disabled={savingIds}
+          activeOpacity={0.8}
+        >
+          {savingIds ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : savedIds ? (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.saveIdButtonText}>저장됨</Text>
+            </>
+          ) : (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>파트너스 ID 저장</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>내 가게 로고 / 스탬프</Text>
+        <Text style={styles.sectionDesc}>
+          매장 로고(PNG)를 등록하면 생성되는 템플릿 카드, 숏폼 영상, 만화 콘텐츠 구석에 자동으로 워터마크처럼 박힙니다. 공유되어도 내 매장 브랜드가 홍보됩니다.
+        </Text>
+        <View style={styles.card}>
+          {logoUrl ? (
+            <View style={styles.logoPreviewWrap}>
+              {Platform.OS === 'web' ? (
+                // @ts-ignore img element on web
+                <img src={logoUrl} style={styles.logoPreviewImg as any} />
+              ) : null}
+              <View style={styles.logoInfo}>
+                <Text style={styles.logoRegisteredText}>로고가 등록되어 있어요</Text>
+                <Text style={styles.logoHintText}>모든 콘텐츠에 자동으로 워터마크가 적용됩니다</Text>
+              </View>
+              <TouchableOpacity style={styles.logoRemoveBtn} onPress={handleRemoveLogo} activeOpacity={0.7}>
+                <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                <Text style={styles.logoRemoveText}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.logoEmptyWrap}>
+              <View style={styles.logoEmptyIcon}>
+                <Stamp size={28} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={styles.logoEmptyText}>등록된 로고가 없어요</Text>
+              <Text style={styles.logoEmptyHint}>PNG 파일을 업로드하면 자동으로 적용됩니다</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.logoUploadBtn, logoUploading && { opacity: 0.5 }]}
+          onPress={handleUploadLogo}
+          disabled={logoUploading}
+          activeOpacity={0.8}
+        >
+          {logoUploading ? (
+            <ActivityIndicator size="small" color={theme.colors.primary[300]} />
+          ) : (
+            <Upload size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+          )}
+          <Text style={styles.logoUploadBtnText}>
+            {logoUploading ? '업로드 중...' : logoUrl ? '로고 변경하기' : '로고 업로드하기'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>수익 기록</Text>
+        <Text style={styles.sectionDesc}>
+          제휴 수수료 수익을 직접 기록하면 분석 대시보드에 자동 반영됩니다. 어떤 콘텐츠가 얼마를 벌었는지 추적하세요.
+        </Text>
+        <TouchableOpacity
+          style={styles.addRevenueButton}
+          onPress={() => setRevModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Plus size={18} color="#fff" strokeWidth={2.5} />
+          <Text style={styles.addRevenueButtonText}>수익 추가 기록</Text>
+        </TouchableOpacity>
+
+        {revenues.length > 0 && (
+          <View style={styles.revenueList}>
+            {revenues.map((rev) => (
+              <View key={rev.id} style={styles.revenueRow}>
+                <View style={styles.revenueInfo}>
+                  <Text style={styles.revenuePlatform}>{rev.platform}</Text>
+                  <Text style={styles.revenueAmount}>{formatKRW(Number(rev.amount))}</Text>
+                  <Text style={styles.revenueMeta}>{rev.period_month}{rev.note ? ` · ${rev.note}` : ''}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.revenueDeleteBtn}
+                  onPress={() => handleDeleteRevenue(rev.id)}
+                  activeOpacity={0.7}
+                >
+                  <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>AI 분석</Text>
+        <View style={styles.aiBuiltInCard}>
+          <View style={styles.aiBuiltInIcon}>
+            <Zap size={22} color="#fff" strokeWidth={2} />
+          </View>
+          <View style={styles.aiBuiltInBody}>
+            <Text style={styles.aiBuiltInTitle}>AI 분석 내장됨</Text>
+            <Text style={styles.aiBuiltInDesc}>
+              별도 설정 없이 사진을 찍으면 AI가 자동으로 제품을 식별하고 마케팅 카피를 생성합니다.
+            </Text>
+          </View>
+          <Check size={18} color={theme.colors.success[400]} strokeWidth={2} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>콘텐츠 제작 순서 가이드</Text>
+        <Text style={styles.sectionDesc}>
+          앱에서 만들 수 있는 콘텐츠의 전체 제작 흐름을 한눈에 보여줍니다
+        </Text>
+        <View style={styles.flowContainer}>
+          {/* Step 1: 촬영 & 분석 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.primary[500] }]}>
+              <Camera size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 1</Text>
+              <Text style={styles.flowStepTitle}>촬영 & AI 분석</Text>
+              <Text style={styles.flowStepDesc}>
+                상품을 촬영하면 AI가 제품명, 카테고리, 가격대를 자동 식별합니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 2: 매칭 & 링크 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.accent[500] }]}>
+              <Link2 size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 2</Text>
+              <Text style={styles.flowStepTitle}>쇼핑 매칭 & 제휴 링크</Text>
+              <Text style={styles.flowStepDesc}>
+                네이버/쿠팡에서 동일 상품을 찾고 제휴 수수료 링크를 자동 생성합니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 3: 템플릿 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.warning[400] }]}>
+              <LayoutTemplate size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 3</Text>
+              <Text style={styles.flowStepTitle}>숏폼 카드 & 템플릿</Text>
+              <Text style={styles.flowStepDesc}>
+                사진 위에 가격, 한줄평 스티커를 합성한 카드를 만듭니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 4: 캐러셀/영상 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.error[400] }]}>
+              <Film size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 4</Text>
+              <Text style={styles.flowStepTitle}>캐러셀 & 숏폼 영상</Text>
+              <Text style={styles.flowStepDesc}>
+                여러 장의 카드를 슬라이드 캐러셀이나 숏폼 영상으로 제작합니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 5: 만화 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.success[500] }]}>
+              <BookOpen size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 5</Text>
+              <Text style={styles.flowStepTitle}>만화 콘텐츠 제작</Text>
+              <Text style={styles.flowStepDesc}>
+                상품을 활용한 4컷 만화 시나리오를 AI로 생성하고 이미지로 완성합니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 6: 공유 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.primary[400] }]}>
+              <Send size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 6</Text>
+              <Text style={styles.flowStepTitle}>공유 & 수익 추적</Text>
+              <Text style={styles.flowStepDesc}>
+                인스타, 틱톡, 카카오톡으로 공유하고 클릭수와 수익을 추적합니다
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>콘텐츠 제작 기능 설명서</Text>
+        <Text style={styles.sectionDesc}>
+          각 제작 기능을 탭하면 상세 사용법이 펼쳐집니다
+        </Text>
+        <View style={styles.card}>
+          <UsageGuide
+            icon={<ImageIcon size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="숏폼 카드 (템플릿) 만들기"
+            steps={[
+              '결과 화면에서 "숏폼 카드" 버튼을 탭합니다',
+              'AI가 제공한 한줄평과 가격이 사진 위에 스티커로 자동 합성됩니다',
+              '스타일(매거진/볼드/미니멀/피드)을 선택해 디자인을 바꿀 수 있습니다',
+              '가격, 한줄평, 해시태그 텍스트를 직접 수정할 수 있습니다',
+              '배경 제거 버튼으로 깔끔한 상품 이미지를 만들 수 있습니다',
+              '색상 테마를 변경해 브랜드에 맞는 디자인을 적용합니다',
+              '완성된 카드를 저장하거나 바로 공유할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<LayoutTemplate size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="캐러셀 (여러 장 슬라이드) 만들기"
+            steps={[
+              '결과 화면에서 "캐러셀" 버튼을 탭합니다',
+              '여러 상품이나 여러 각도의 사진을 순서대로 배치합니다',
+              '각 슬라이드마다 개별 텍스트와 가격을 입력할 수 있습니다',
+              '슬라이드 순서를 드래그하여 변경할 수 있습니다',
+              '전체 슬라이드에 통일된 스타일을 적용합니다',
+              '인스타그램 게시물용으로 세로 크기에 맞춰 자동 조정됩니다',
+              '완성된 캐러셀을 이미지로 저장하거나 공유합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Film size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="숏폼 영상 (클립) 만들기"
+            steps={[
+              '결과 화면에서 "숏폼 영상" 버튼을 탭합니다',
+              '상품 사진과 텍스트를 이어붙여 짧은 영상을 만듭니다',
+              '화면 전환 효과와 텍스트 애니메이션이 자동 적용됩니다',
+              '배경 음악이나 음향 효과를 선택할 수 있습니다',
+              '영상 길이(5초/10초/15초)를 선택합니다',
+              '세로(9:16) 비율로 틱톡/인스타 릴스에 최적화됩니다',
+              '완성된 영상을 갤러리에 저장하거나 직접 공유합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<BookOpen size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="만화 콘텐츠 (4컷 만화) 만들기"
+            steps={[
+              '결과 화면에서 "만화 만들기" 버튼을 탭합니다',
+              'AI가 상품을 활용한 4컷 만화 시나리오를 자동 생성합니다',
+              '각 컷의 대사와 상황을 직접 수정할 수 있습니다',
+              '캐릭터 스타일과 색상 톤을 선택합니다',
+              'AI가 각 컷의 이미지를 순차적으로 생성합니다',
+              '완성된 4컷 만화를 하나의 이미지로 합성합니다',
+              '저장하거나 인스타/스레드/카카오톡으로 바로 공유합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<PenLine size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="카피라이팅 (글 자동 생성)"
+            steps={[
+              '결과 화면에서 "카피 작성" 버튼을 탭합니다',
+              'AI가 상품 분석 결과를 바탕으로 마케팅 문구를 생성합니다',
+              '톤앤매너(캐주얼/전문/감성/유머)를 선택할 수 있습니다',
+              '생성된 카피를 그대로 복사하거나 수정 후 사용합니다',
+              '해시태그 추천도 함께 제공됩니다',
+              '여러 버전의 카피를 비교하고 가장 좋은 것을 선택합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Type size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+            title="리뷰 & 한줄평 작성"
+            steps={[
+              '결과 화면에서 "리뷰 입력" 버튼을 탭합니다',
+              '직접 상품에 대한 한줄평을 작성하거나 AI 추천을 받습니다',
+              '작성한 리뷰는 숏폼 카드와 캐러셀에 자동 반영됩니다',
+              '리뷰를 수정하면 연결된 모든 콘텐츠가 업데이트됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Scissors size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="배경 제거 & 이미지 편집"
+            steps={[
+              '결과 화면에서 "배경 제거" 버튼을 탭합니다',
+              'AI가 상품의 배경을 자동으로 감지하고 제거합니다',
+              '투명 배경 이미지로 저장되어 다양한 디자인에 활용 가능합니다',
+              '제거된 이미지는 숏폼 카드, 캐러셀, 만화에 자동 적용됩니다',
+              '필요시 배경 색상을 직접 변경할 수 있습니다',
+            ]}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>기능 소개</Text>
+        <View style={styles.card}>
+          <FeatureRow
+            icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="실물 촬영 & 쇼핑 매칭"
+            desc="신발, 조명, 옷 등을 촬영하면 AI가 제품을 식별하고 네이버 쇼핑 상품을 매칭합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="제휴 링크 자동 생성"
+            desc="설정한 파트너스 ID로 수수료 링크를 즉시 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Sparkles size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="숏폼 템플릿 자동 완성"
+            desc="사진 위에 가격과 추천 한줄평 스티커가 합성된 카드를 자동 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Send size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="SNS 원터치 공유 (아코디언)"
+            desc="공유 버튼을 탭하면 네이버클립·네이버TV·인스타·카카오톡·블로그 버튼이 펼쳐집니다. 한 번 더 탭하면 접혀서 화면을 깔끔하게 유지합니다"
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>기능별 앱 사용법</Text>
+        <Text style={styles.sectionDesc}>
+          각 기능을 탭하면 단계별 사용 방법이 펼쳐집니다
+        </Text>
+        <View style={styles.card}>
+          <UsageGuide
+            icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="실물 촬영 & 제품 분석"
+            steps={[
+              '카메라 탭에서 제품을 촬영하거나 갤러리에서 사진을 선택합니다',
+              'AI가 자동으로 제품명, 카테고리, 가격대를 식별합니다',
+              '네이버 쇼핑에서 동일 상품을 검색하고 매칭 결과를 보여줍니다',
+              '원하는 상품을 선택하면 제휴 링크가 자동 생성됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Sparkles size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="숏폼 카드 & 캐러셀 만들기"
+            steps={[
+              '결과 화면에서 "숏폼 카드" 또는 "캐러셀" 버튼을 탭합니다',
+              'AI가 제공한 한줄평과 가격이 사진 위에 스티커로 합성됩니다',
+              '스타일(매거진/볼드/미니멀/피드)을 선택해 디자인을 바꿀 수 있습니다',
+              '배경 제거 버튼으로 깔끔한 상품 이미지를 만들 수 있습니다',
+              '완성된 카드를 저장하거나 바로 공유할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="제휴 링크 적용 & 공유"
+            steps={[
+              '결과 화면에서 "내 수수료 링크 붙여넣기" 버튼을 탭합니다',
+              '브랜드커넥트에서 발급받은 개별 링크를 붙여넣습니다',
+              '적용하면 숏폼 카드, 공유 링크, 단축 URL에 자동 반영됩니다',
+              '하단 "SNS 원터치 공유" 헤더를 탭하면 공유 버튼들이 아코디언으로 펼쳐집니다',
+              '네이버클립, 네이버TV, 인스타, 카카오톡, 블로그 중 원하는 플랫폼을 탭합니다',
+              '홍보 문구와 이미지가 클립보드에 복사되고 해당 SNS가 새 창에서 열립니다',
+              '다시 헤더를 탭하면 버튼이 접혀서 화면을 깔끔하게 유지합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Link2 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="단축 URL"
+            steps={[
+              '결과 화면에서 단축 URL이 자동 생성되어 제휴 링크가 인코딩됩니다',
+              '단축 URL은 공유하기 편리하고 링크 클릭수를 추적할 수 있습니다',
+              '링크 클릭수는 분석 탭에 자동으로 집계됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Clapperboard size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="만화 숏폼 & 멀티 업로드 꿀팁"
+            steps={[
+              '결과 화면에서 "만화 숏폼" 버튼을 탭합니다',
+              '만화 스타일(웹툰 선화/팝아트/카툰)과 컷 분할(싱글/2컷/3컷)을 선택합니다',
+              '영상 길이(3초/6초)를 선택하고 AI 내레이션 추가 여부를 결정합니다',
+              '생성 버튼을 탭하면 AI가 만화 숏폼을 자동으로 완성합니다',
+              '완성 화면에서 틱톡·인스타·쇼츠 버튼으로 각 플랫폼에 바로 공유할 수 있습니다',
+              '완성 화면의 멀티 업로드 꿀팁 박스에서 화면 비율(9:16), 핵심 텍스트 위치, 영상 길이(60초 이하) 조언을 확인하세요',
+              '갤러리 저장 또는 클라우드 저장 후 세 플랫폼에 동시 업로드하면 최고의 마케팅 효과를 얻을 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Share2 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="SNS 공유 아코디언 사용법"
+            steps={[
+              '결과 화면 하단의 "SNS 원터치 공유" 헤더를 탭합니다',
+              '버튼들이 부드러운 애니메이션과 함께 펼쳐집니다 (기본은 접혀 있음)',
+              '네이버클립, 네이버TV, 인스타, 카카오톡, 블로그 버튼 중 하나를 탭합니다',
+              '홍보 문구와 캡처 이미지가 클립보드에 복사되고 해당 SNS가 열립니다',
+              'SNS에서 붙여넣기(Ctrl+V)만 하면 글과 이미지가 한 번에 업로드됩니다',
+              '제휴 링크 복사, 갤러리 저장, 클라우드 저장 버튼은 항상 보이는 상태로 유지됩니다',
+              '헤더를 다시 탭하면 공유 버튼이 접혀서 화면을 깔끔하게 만듭니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Lightbulb size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="멀티 업로드 꿀팁"
+            steps={[
+              '화면 비율 9:16: 1080x1920 세로 비율로 스마트폰 전체 화면에 딱 맞습니다',
+              '핵심 텍스트 위치: 릴스·틱톡·쇼츠는 좋아요 버튼과 댓글창이 하단에 겹쳐 표시되므로, 중요한 상품명이나 후킹 문구는 상단·정중앙에 배치하는 것이 좋습니다',
+              '영상 길이 60초 이하: 세 플랫폼에 동시 업로드할 때 60초 이하로 유지하면 알고리즘 노출에 유리합니다',
+              '만화 숏폼 완성 화면에서 이 꿀팁이 자동으로 표시됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Flame size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="인기 상품 탭"
+            steps={[
+              '인기 상품 탭에서 현재 트렌드인 키워드를 확인합니다',
+              '네이버 쇼핑 인기 검색어와 실시간 트렌드를 볼 수 있습니다',
+              '트렌드 키워드를 탭하면 관련 상품을 바로 검색합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<FolderOpen size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="내 제작물 관리"
+            steps={[
+              '내 제작물 탭에서 저장한 모든 카드와 캐러셀을 확인합니다',
+              '제작물을 탭하면 원본 결과 페이지로 이동합니다',
+              '불필요한 제작물은 스와이프 또는 삭제 버튼으로 제거할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<BarChart3 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+            title="통합 분석 대시보드"
+            steps={[
+              '분석 탭에서 제품 분석부터 수익까지 전체 성과를 한눈에 봅니다',
+              '성과 퍼널에서 각 단계별 전환율과 이탈률을 확인합니다',
+              '일별 클릭 추이 차트로 트래픽 패턴을 파악합니다',
+              '플랫폼별 수익과 클릭수를 비교합니다',
+              '성과가 높은 콘텐츠를 탭하면 해당 결과 페이지로 이동합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<CalendarDays size={20} color={theme.colors.success[400]} strokeWidth={2} />}
+            title="계정 육성 (웜업)"
+            steps={[
+              '육성 탭에서 "웜업 스케줄 만들기" 버튼을 탭합니다',
+              '플랫폼(인스타/틱톡/트위터/블로그)과 계정 이름, 웜업 기간(7~30일)을 선택합니다',
+              '스케줄을 생성하면 일자별 체크리스트가 자동으로 만들어집니다',
+              '1~3일차는 게시물 없이 좋아요와 댓글로 활동을 알립니다 (안정화 단계)',
+              '4~7일차는 게시물 업로드를 시작하고 관련 계정과 소통합니다 (기초 체력 단계)',
+              '8일차 이후부터 본격적으로 게시물에 제휴 링크를 포함합니다 (본격 활동 단계)',
+              '매일 완료한 활동을 체크하면 진행률이 자동으로 업데이트됩니다',
+              '일시정지/재개 버튼으로 스케줄을 잠시 멈추거나 다시 시작할 수 있습니다',
+              '하단 웜업 가이드라인에서 계정 성장 팁을 확인하세요',
+            ]}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>도움말</Text>
+        <View style={styles.card}>
+          <FeatureRow
+            icon={<Info size={20} color={theme.colors.dark.textDim} strokeWidth={2} />}
+            title="사용 방법"
+            desc="사진을 찍거나 업로드하면 AI가 제품을 분석합니다. 결과 화면에서 쇼핑 매칭, 숏폼 카드, 공유를 한 번에 이용하세요."
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="수수료 링크 적용"
+            desc="결과 화면에서 '내 수수료 링크 붙여넣기' 버튼으로 브랜드커넥트 링크를 적용하세요. 공유와 카드에 자동 반영됩니다."
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>피드백 & 오류 신고</Text>
+        <Text style={styles.sectionDesc}>
+          사용 중 불편한 점이나 오류를 발견하면 알려주세요. 여러분의 의견이 앱을 더 좋게 만듭니다.
+        </Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.feedbackRow}
+            onPress={() => Linking.openURL('https://forms.gle/shortconnect-feedback').catch(() => {})}
+            activeOpacity={0.7}
+          >
+            <View style={styles.featureIconWrap}>
+              <MessageSquare size={20} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.featureBody}>
+              <Text style={styles.featureTitle}>의견 보내기</Text>
+              <Text style={styles.featureDesc}>구글 설문지로 피드백을 남겨주세요</Text>
+            </View>
+            <ExternalLink size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+          </TouchableOpacity>
+          <Divider />
+          <TouchableOpacity
+            style={styles.feedbackRow}
+            onPress={() => Linking.openURL('https://open.kakao.com/o/shortconnect').catch(() => {})}
+            activeOpacity={0.7}
+          >
+            <View style={styles.featureIconWrap}>
+              <Bug size={20} color={theme.colors.error[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.featureBody}>
+              <Text style={styles.featureTitle}>오류 신고 & 오픈채팅</Text>
+              <Text style={styles.featureDesc}>카카오톡 오픈채팅방에서 빠르게 도움받기</Text>
+            </View>
+            <ExternalLink size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Text style={styles.footer}>숏커넥트 (ShortConnect) - 촬영하고 연결하고 공유하세요</Text>
+
+      <Modal
+        visible={revModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRevModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%' }}
+          >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Wallet size={18} color={theme.colors.success[400]} strokeWidth={2} />
+                <Text style={styles.modalTitle}>수익 기록 추가</Text>
+              </View>
+              <TouchableOpacity onPress={() => setRevModalVisible(false)} activeOpacity={0.7}>
+                <Text style={styles.modalCloseText}>취소</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalLabel}>플랫폼</Text>
+            <View style={styles.platformPickerRow}>
+              {['Coupang', 'BrandConnect', 'Toss', '기타'].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.platformChip, revPlatform === p && styles.platformChipActive]}
+                  onPress={() => setRevPlatform(p)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.platformChipText, revPlatform === p && styles.platformChipTextActive]}>
+                    {p}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalLabel}>금액 (원)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={revAmount}
+              onChangeText={setRevAmount}
+              placeholder="예: 15000"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.modalLabel}>정산 월</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={revMonth}
+              onChangeText={setRevMonth}
+              placeholder="YYYY-MM"
+              placeholderTextColor={theme.colors.dark.textFaint}
+            />
+
+            <Text style={styles.modalLabel}>메모 (선택)</Text>
+            <TextInput
+              style={[styles.modalInput, { minHeight: 60 }]}
+              value={revNote}
+              onChangeText={setRevNote}
+              placeholder="어떤 콘텐츠 수익인지 메모"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={styles.modalSaveButton}
+              onPress={handleSaveRevenue}
+              disabled={revSaving}
+              activeOpacity={0.8}
+            >
+              {revSaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.modalSaveButtonText}>기록 저장</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function FeatureRow({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  return (
+    <View style={styles.featureRow}>
+      <View style={styles.featureIconWrap}>{icon}</View>
+      <View style={styles.featureBody}>
+        <Text style={styles.featureTitle} numberOfLines={2}>{title}</Text>
+        <Text style={styles.featureDesc}>{desc}</Text>
+      </View>
+    </View>
+  );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+function UsageGuide({
+  icon,
+  title,
+  steps,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  steps: string[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View>
+      <TouchableOpacity
+        style={styles.usageHeader}
+        onPress={() => setExpanded((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.featureIconWrap}>{icon}</View>
+        <Text style={styles.featureTitle} numberOfLines={2}>{title}</Text>
+        <ChevronDown
+          size={18}
+          color={theme.colors.dark.textDim}
+          strokeWidth={2}
+          style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
+        />
+      </TouchableOpacity>
+      {expanded && (
+        <View style={styles.usageSteps}>
+          {steps.map((step, i) => (
+            <View key={i} style={styles.usageStepRow}>
+              <View style={styles.usageStepBadge}>
+                <Text style={styles.usageStepNum}>{i + 1}</Text>
+              </View>
+              <Text style={styles.usageStepText}>{step}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.dark.bg,
+  },
+  centerContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.dark.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    paddingBottom: 140,
+    maxWidth: 600,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: theme.spacing.xl,
+  },
+  logoWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  appName: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  appVersion: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 4,
+  },
+  section: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: theme.spacing.sm,
+  },
+  sectionDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+    marginBottom: theme.spacing.md,
+  },
+  card: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    paddingVertical: theme.spacing.sm,
+  },
+  featureIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  featureBody: {
+    flex: 1,
+    marginLeft: theme.spacing.md,
+  },
+  featureTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  featureDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+    marginVertical: theme.spacing.sm,
+  },
+  usageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+  },
+  usageSteps: {
+    paddingLeft: 48,
+    paddingBottom: theme.spacing.sm,
+    gap: 8,
+  },
+  usageStepRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  usageStepBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.colors.primary[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  usageStepNum: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[400],
+  },
+  usageStepText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+  },
+  flowContainer: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  flowStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  flowStepIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flowStepBody: {
+    flex: 1,
+  },
+  flowStepNum: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.textFaint,
+    letterSpacing: 1,
+  },
+  flowStepTitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: 2,
+  },
+  flowStepDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  flowConnector: {
+    width: 2,
+    height: 20,
+    backgroundColor: theme.colors.dark.border,
+    marginLeft: 21,
+    marginVertical: 2,
+  },
+  aiBuiltInCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  aiBuiltInIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiBuiltInBody: {
+    flex: 1,
+  },
+  aiBuiltInTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  aiBuiltInDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  footer: {
+    textAlign: 'center',
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  guideCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  guideStepTitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: theme.spacing.sm,
+  },
+  guideStepText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 22,
+  },
+  guideLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    marginBottom: theme.spacing.md,
+  },
+  guideLinkText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[400],
+  },
+  noticeCard: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning[400],
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+  },
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+  },
+  idInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+  },
+  idIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  idIconText: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  idInputBody: {
+    flex: 1,
+    marginLeft: theme.spacing.md,
+  },
+  idInputLabel: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 4,
+  },
+  idInput: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+  },
+  tossSignupLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: '#0064FF10',
+  },
+  tossSignupLinkText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#0064FF',
+  },
+  saveIdButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600],
+    marginTop: theme.spacing.md,
+  },
+  saveIdButtonDone: {
+    backgroundColor: theme.colors.success[500],
+  },
+  saveIdButtonText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  logoPreviewWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  logoPreviewImg: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.radius.md,
+    objectFit: 'contain',
+    backgroundColor: theme.colors.dark.bg,
+  },
+  logoInfo: {
+    flex: 1,
+  },
+  logoRegisteredText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  logoHintText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  logoRemoveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.error[500] + '15',
+  },
+  logoRemoveText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.error[400],
+  },
+  logoEmptyWrap: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+  },
+  logoEmptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  logoEmptyText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  logoEmptyHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 2,
+  },
+  logoUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    marginTop: theme.spacing.sm,
+  },
+  logoUploadBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  addRevenueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  addRevenueButtonText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  revenueList: {
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  revenueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+  },
+  revenueInfo: {
+    flex: 1,
+  },
+  revenuePlatform: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  revenueAmount: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
+    marginTop: 2,
+  },
+  revenueMeta: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 2,
+  },
+  revenueDeleteBtn: {
+    padding: theme.spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  modalContainer: {
+    width: '100%',
+    maxHeight: '85%',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  modalCloseText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  modalLabel: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 6,
+    marginTop: theme.spacing.sm,
+  },
+  platformPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  platformChip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  platformChipActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[600],
+  },
+  platformChipText: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  platformChipTextActive: {
+    color: '#fff',
+  },
+  modalInput: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+  },
+  modalSaveButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+    marginTop: theme.spacing.lg,
+  },
+  modalSaveButtonText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+});

@@ -1,0 +1,232 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+interface GuideTip {
+  title: string;
+  description: string;
+}
+
+interface GuideHook {
+  text: string;
+  angle: string;
+}
+
+interface ShortFormGuide {
+  tips: GuideTip[];
+  hooks: GuideHook[];
+  concept: string;
+}
+
+interface GuideRequest {
+  productName: string;
+  productCategory: string;
+  priceEstimate: string;
+  oneLiner: string;
+  productAdvantages: string[];
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const body: GuideRequest = await req.json();
+
+    if (!body.productName) {
+      return new Response(
+        JSON.stringify({ error: "Product name is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const openaiKey = await resolveOpenAIKey();
+
+    let guide: ShortFormGuide;
+
+    if (openaiKey) {
+      try {
+        guide = await generateWithOpenAI(body, openaiKey);
+      } catch {
+        guide = generateLocalGuide(body);
+      }
+    } else {
+      guide = generateLocalGuide(body);
+    }
+
+    return new Response(
+      JSON.stringify(guide),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Guide generation failed" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});
+
+async function resolveOpenAIKey(): Promise<string | null> {
+  const serverKey = Deno.env.get("OPENAI_API_KEY");
+  if (serverKey) return serverKey;
+
+  if (supabaseUrl && serviceRoleKey) {
+    try {
+      const resp = await fetch(
+        `${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        },
+      );
+      if (resp.ok) {
+        const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
+        const dbKey = rows[0]?.openai_api_key;
+        if (dbKey) return dbKey;
+      }
+    } catch {
+      // no fallback beyond env
+    }
+  }
+  return null;
+}
+
+async function generateWithOpenAI(
+  data: GuideRequest,
+  apiKey: string,
+): Promise<ShortFormGuide> {
+  const systemPrompt =
+    "너는 숏폼 콘텐츠 제작 전문가야. 상품 정보를 받으면 그 상품에 맞는 숏폼 제작 가이드를 만들어.\n" +
+    "결과는 JSON만 반환: { \"concept\": \"이 상품에 어울리는 숏폼 콘셉트 한 줄\", \"tips\": [{ \"title\": \"팁 제목(10자 이내)\", \"description\": \"구체적인 제작 팁(30-60자)\" }], \"hooks\": [{ \"text\": \"후킹 문구(10-25자)\", \"angle\": \"이 문구가 왜 효과적인지 한 줄 설명\" }] }\n" +
+    "tips는 3개, hooks는 3개를 만들어. 각각 서로 다른 각도(예: 호기심 유발, 가격 어필, 감정 자극, 사용 후기형 등)로.\n" +
+    "한국어로 자연스럽게 작성하고, 실제 숏폼 크리에이터가 쓸 법한 표현을 사용해.";
+
+  const userPrompt =
+    `제품명: ${data.productName}\n` +
+    `카테고리: ${data.productCategory}\n` +
+    `가격: ${data.priceEstimate || "알 수 없음"}\n` +
+    `한 줄 소개: ${data.oneLiner || ""}\n` +
+    `장점: ${(data.productAdvantages || []).join(", ")}`;
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 1200,
+      temperature: 0.8,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+  }
+
+  const result = await response.json();
+  const content = result.choices?.[0]?.message?.content;
+  if (!content) throw new Error("No content returned from OpenAI");
+
+  const parsed = JSON.parse(content);
+  return normalizeGuide(parsed);
+}
+
+function normalizeGuide(raw: Record<string, unknown>): ShortFormGuide {
+  const tips: GuideTip[] = Array.isArray(raw.tips)
+    ? (raw.tips as Record<string, unknown>[]).slice(0, 3).map((t) => ({
+        title: String(t.title || "").slice(0, 20),
+        description: String(t.description || "").slice(0, 100),
+      }))
+    : [];
+
+  const hooks: GuideHook[] = Array.isArray(raw.hooks)
+    ? (raw.hooks as Record<string, unknown>[]).slice(0, 3).map((h) => ({
+        text: String(h.text || "").slice(0, 40),
+        angle: String(h.angle || "").slice(0, 80),
+      }))
+    : [];
+
+  return {
+    concept: String(raw.concept || "").slice(0, 80),
+    tips,
+    hooks,
+  };
+}
+
+function generateLocalGuide(data: GuideRequest): ShortFormGuide {
+  const name = data.productName || "이 제품";
+  const nameShort = name.length > 10 ? name.slice(0, 10) + "…" : name;
+  const advantages = data.productAdvantages?.length ? data.productAdvantages : ["가성비"];
+  const price = data.priceEstimate || "";
+  const category = (data.productCategory || "").toLowerCase();
+
+  const conceptByCategory: Record<string, string> = {
+    sneakers: "신발의 핏과 디테일을 클로즈업으로 보여주는 언박싱 숏폼",
+    clothing: "착용 전후 비교로 코디 완성도를 보여주는 스타일링 숏폼",
+    lighting: "조명 켜기 전후로 분위기 변화를 극대화하는 비포애프터 숏폼",
+    electronics: "기능을 실사용 장면으로 보여주는 리뷰형 숏폼",
+    beauty: "사용 전후 피부 변화를 클로즈업하는 뷰티 숏폼",
+    food: "먹는 순간의 반응을 담는 먹방형 숏폼",
+    furniture: "배치 전후 공간 변화를 보여주는 인테리어 숏폼",
+  };
+
+  const tipsByCategory: Record<string, GuideTip[]> = {
+    sneakers: [
+      { title: "클로즈업", description: "신발의 텍스처와 디테일을 3초간 클로즈업으로 보여주세요" },
+      { title: "착용샷", description: "실제 신었을 때의 핏을 풀샷으로 2초간 담아주세요" },
+      { title: "사운드", description: "바닥에 닿는 소리나 박스 여는 소리를 ASMR처럼 살려주세요" },
+    ],
+    clothing: [
+      { title: "전후비교", description: "코디 전 평범한 착장과 후를 분할화면으로 비교해보세요" },
+      { title: "소재클로즈", description: "원단의 질감을 손으로 만지며 클로즈업으로 보여주세요" },
+      { title: "회전샷", description: "착용 후 360도 천천히 돌아 핏을 전체적으로 보여주세요" },
+    ],
+    lighting: [
+      { title: "비포애프터", description: "조명 OFF 상태와 ON 상태를 1초 컷으로 전환해보세요" },
+      { title: "어분위기", description: "조명이 켜진 공간 전체를 어두운 배경에서 촬영하세요" },
+      { title: "디테일", description: "조명의 스위치나 디자인 디테일을 2초간 보여주세요" },
+    ],
+  };
+
+  const defaultTips: GuideTip[] = [
+    { title: "오프닝", description: "첫 1초에 가장 시선을 끄는 장면을 배치하세요" },
+    { title: "클로즈업", description: "제품의 핵심 특징을 2-3초 클로즈업으로 보여주세요" },
+    { title: "사용장면", description: "실제 사용하는 장면을 자연스럽게 3초간 담아주세요" },
+  ];
+
+  const tips = tipsByCategory[category] || defaultTips;
+
+  const hookPool: GuideHook[] = [
+    { text: `이거 모르면 손해인 ${nameShort}`, angle: "호기심 유발 — 정보 부재에 대한 불안 자극" },
+    { text: price ? `${price}라서 바로 담은 ${nameShort}` : `다들 이거 사느라 난리남`, angle: "가격 어필 — 비용 대비 가치 강조" },
+    { text: `${advantages[0]} 인정? ${nameShort} 실화인가`, angle: "감정 자극 — 공감과 반응 유도" },
+    { text: `${nameShort} 쓰고 나서 삶이 바뀜`, angle: "사용 후기형 — 경험담으로 신뢰 구축" },
+    { text: `이거 왜 이제 알았지 ${nameShort}`, angle: "뒤늦은 발견 — 자연스러운 추천 톤" },
+  ];
+
+  const hooks = hookPool.slice(0, 3);
+
+  return {
+    concept: conceptByCategory[category] || `${nameShort}의 핵심 장점을 15초에 담는 숏폼`,
+    tips,
+    hooks,
+  };
+}
