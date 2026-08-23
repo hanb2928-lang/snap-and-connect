@@ -45,3 +45,4 @@ export const VIRAL_PREDICT_FUNCTION_URL = `${supabaseUrl}/functions/v1/viral-pre
 export const LOCALIZE_FUNCTION_URL = `${supabaseUrl}/functions/v1/translate-localize`;
 export const SHORTFORM_GUIDE_URL = `${supabaseUrl}/functions/v1/generate-shortform-guide`;
 export const PERSONA_SIMULATOR_URL = `${supabaseUrl}/functions/v1/persona-simulator`;
+export const TREND_MATCH_URL = `${supabaseUrl}/functions/v1/trend-match`;

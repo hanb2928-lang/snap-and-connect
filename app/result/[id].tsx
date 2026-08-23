@@ -78,6 +78,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { LazySection } from '@/components/LazySection';
 import { ShortFormGuideCard } from '@/components/ShortFormGuideCard';
+import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { getItem } from '@/lib/storage';
 
 export default function ResultScreen() {
@@ -1011,6 +1012,17 @@ export default function ResultScreen() {
                 textPosition={textPosition}
               />
             </View>
+          </View>
+          </LazySection>
+
+          <LazySection delayMs={120}>
+          <View style={styles.section}>
+            <TrendMatchCard
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              productName={activeProductName || scan?.product_name || ''}
+              platform={activePlatform}
+              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
+            />
           </View>
           </LazySection>
 
