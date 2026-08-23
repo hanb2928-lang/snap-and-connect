@@ -320,41 +320,41 @@ export function ShoppingMatchCard({
       {expanded && (
         <>
           <Text style={styles.label}>제휴 플랫폼 선택</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.platformScroll}>
-            <View style={styles.platformRow}>
-              {PLATFORM_META.map(({ key, label, icon: Icon, color }) => {
-                const isActive = selectedAffiliate === key;
-                const isAvailable = availablePlatforms.includes(key);
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.platformTab,
-                      isActive && styles.platformTabActive,
-                      isActive && { borderColor: color + '60' },
-                    ]}
-                    onPress={() => onSelectAffiliate(key)}
-                    activeOpacity={0.7}
-                  >
+          <View style={styles.platformGrid}>
+            {PLATFORM_META.map(({ key, label, icon: Icon, color }) => {
+              const isActive = selectedAffiliate === key;
+              const isAvailable = availablePlatforms.includes(key);
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.platformTab,
+                    isActive && styles.platformTabActive,
+                    isActive && { borderColor: color + '60' },
+                  ]}
+                  onPress={() => onSelectAffiliate(key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.platformTabIcon, isActive && { backgroundColor: color + '15' }]}>
                     <Icon
-                      size={15}
+                      size={18}
                       color={isActive ? color : theme.colors.dark.textDim}
                       strokeWidth={2}
                     />
-                    <Text
-                      style={[styles.platformTabText, isActive && { color }]}
-                      numberOfLines={1}
-                    >
-                      {label}
-                    </Text>
-                    {isAvailable && (
-                      <View style={[styles.platformDot, { backgroundColor: color }]} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
+                  </View>
+                  <Text
+                    style={[styles.platformTabText, isActive && { color }]}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+                  {isAvailable && (
+                    <View style={[styles.platformDot, { backgroundColor: color }]} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           {selectedMeta && selectedAffiliate !== 'Custom' && (
             <View style={styles.selectedPlatformInfo}>
@@ -657,34 +657,37 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     marginTop: theme.spacing.lg,
   },
-  platformScroll: {
-    paddingBottom: 4,
-  },
-  platformRow: {
+  platformGrid: {
     flexDirection: 'row',
-    gap: 6,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   platformTab: {
-    minWidth: 64,
-    flexDirection: 'row',
+    width: 72,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
     paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
+  platformTabIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   platformTabActive: {
     backgroundColor: theme.colors.dark.surface,
   },
   platformTabText: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
-    flexShrink: 1,
+    textAlign: 'center',
   },
   platformDot: {
     position: 'absolute',
