@@ -1030,6 +1030,8 @@ export default function ResultScreen() {
               selectedAffiliate={selectedAffiliate}
               onSelectAffiliate={setSelectedAffiliate}
               availablePlatforms={availablePlatforms}
+              shortUrl={shortUrl}
+              scanId={scan.id}
             />
           </View>
           </LazySection>

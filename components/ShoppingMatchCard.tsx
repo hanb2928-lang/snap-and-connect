@@ -11,26 +11,7 @@ import {
   UIManager,
   ScrollView,
 } from 'react-native';
-import {
-  ShoppingBag,
-  ExternalLink,
-  Link2,
-  Check,
-  X,
-  Edit3,
-  Sparkles,
-  Zap,
-  ChevronDown,
-  ChevronUp,
-  ShoppingBasket,
-  Globe,
-  Send,
-  Home,
-  Palmtree,
-  Ticket,
-  Plus,
-  Store,
-} from 'lucide-react-native';
+import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl } from '@/lib/affiliateLinkSmart';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
@@ -51,6 +32,8 @@ interface ShoppingMatchCardProps {
   selectedAffiliate: AffiliatePlatformKey;
   onSelectAffiliate: (key: AffiliatePlatformKey) => void;
   availablePlatforms: AffiliatePlatformKey[];
+  shortUrl?: string | null;
+  scanId?: string;
 }
 
 const PLATFORM_META: {
@@ -89,6 +72,8 @@ export function ShoppingMatchCard({
   selectedAffiliate,
   onSelectAffiliate,
   availablePlatforms,
+  shortUrl: propShortUrl,
+  scanId,
 }: ShoppingMatchCardProps) {
   const [editing, setEditing] = useState(false);
   const [inputUrl, setInputUrl] = useState('');
@@ -96,6 +81,9 @@ export function ShoppingMatchCard({
   const [inputPlatformName, setInputPlatformName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(!!customAffiliateLinks.find((l) => l.productIndex === selectedProductIndex));
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [generatingShortUrl, setGeneratingShortUrl] = useState(false);
+  const [localShortUrl, setLocalShortUrl] = useState<string | null>(null);
   const { showAffiliateToast } = useAffiliateToast();
 
   const liveDetection = useMemo(() => {
@@ -105,6 +93,24 @@ export function ShoppingMatchCard({
     if (!isKnownAffiliateUrl(url)) return null;
     return generateMarketingCopy(url, productName, priceLabel);
   }, [inputUrl, productName, priceLabel]);
+
+  const effectiveShortUrl = propShortUrl ?? localShortUrl;
+
+  const handleCopyShortUrl = async () => {
+    if (!effectiveShortUrl) return;
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(effectiveShortUrl);
+      } else {
+        const { default: Clipboard } = await import('expo-clipboard');
+        await Clipboard.setStringAsync(effectiveShortUrl);
+      }
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // clipboard copy failed silently
+    }
+  };
 
   const toggleExpanded = () => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -231,6 +237,18 @@ export function ShoppingMatchCard({
     }
     if (onMarketingCopyGenerated && detected.isAffiliate) {
       onMarketingCopyGenerated(detected.marketingCopy);
+    }
+    if (!propShortUrl) {
+      setGeneratingShortUrl(true);
+      try {
+        const { createShortLink } = await import('@/lib/shortUrl');
+        const short = await createShortLink(trimmed, scanId);
+        setLocalShortUrl(short);
+      } catch {
+        // short link generation failed silently
+      } finally {
+        setGeneratingShortUrl(false);
+      }
     }
     setEditing(false);
     setInputUrl('');
@@ -426,6 +444,39 @@ export function ShoppingMatchCard({
               <Edit3 size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={styles.editCustomText}>수수료 링크 수정</Text>
             </TouchableOpacity>
+          )}
+
+          {!editing && customLinkForProduct && (
+            <View style={styles.shortLinkBox}>
+              <View style={styles.shortLinkHeader}>
+                <Link2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={styles.shortLinkTitle}>단축 링크</Text>
+              </View>
+              <Text style={styles.shortLinkUrl} numberOfLines={1}>
+                {generatingShortUrl
+                  ? '생성 중...'
+                  : effectiveShortUrl || '단축 링크를 생성할 수 없어요'}
+              </Text>
+              {effectiveShortUrl && !generatingShortUrl && (
+                <TouchableOpacity
+                  style={[styles.shortLinkCopyBtn, linkCopied && styles.shortLinkCopyBtnDone]}
+                  onPress={handleCopyShortUrl}
+                  activeOpacity={0.7}
+                >
+                  {linkCopied ? (
+                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                  ) : (
+                    <Copy size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                  )}
+                  <Text style={[styles.shortLinkCopyText, linkCopied && { color: theme.colors.success[400] }]}>
+                    {linkCopied ? '복사됨' : '복사하기'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {generatingShortUrl && (
+                <Loader2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              )}
+            </View>
           )}
 
           {editing && (
@@ -782,6 +833,52 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.micro,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  shortLinkBox: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[500] + '20',
+  },
+  shortLinkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 6,
+  },
+  shortLinkTitle: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  shortLinkUrl: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    marginBottom: 8,
+  },
+  shortLinkCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary[500] + '15',
+    alignSelf: 'flex-start',
+  },
+  shortLinkCopyBtnDone: {
+    backgroundColor: theme.colors.success[500] + '15',
+  },
+  shortLinkCopyText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   editorBox: {
     marginTop: theme.spacing.md,
