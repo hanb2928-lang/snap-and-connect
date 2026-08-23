@@ -347,7 +347,17 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
     },
   ];
 
-  const matchedKey = Object.keys(templatePool).find((key) => category.includes(key));
+  const categoryMap: Record<string, string[]> = {
+    fashion: ['fashion', '패션', '의류', '옷', '신발', 'sneakers', 'shoes', 'apparel', '의류'],
+    beauty: ['beauty', '뷰티', '화장품', 'skincare', 'cosmetics', '메이크업', '피부'],
+    electronics: ['electronics', '디지털', '전자', '가전', 'tech', 'gadget', '기기'],
+    home: ['home', '홈', '인테리어', '가구', 'living', '주방', 'kitchen', '생활'],
+    food: ['food', '식품', '음식', '먹방', '요리', 'kitchen', 'snack'],
+  };
+
+  const matchedKey = Object.keys(categoryMap).find((key) =>
+    categoryMap[key].some((kw) => category.includes(kw))
+  );
   const templates = matchedKey ? templatePool[matchedKey] : defaultTemplates;
 
   const insightMap: Record<string, string> = {

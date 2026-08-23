@@ -51,8 +51,18 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
         },
         body: JSON.stringify({ productCategory, productName, platform }),
       });
-      if (!resp.ok) throw new Error('트렌드 분석에 실패했습니다');
+      if (!resp.ok) {
+        let errDetail = '';
+        try {
+          const errBody = await resp.json();
+          errDetail = errBody?.error || '';
+        } catch {
+          // response body wasn't JSON
+        }
+        throw new Error(errDetail || `트렌드 분석에 실패했습니다 (${resp.status})`);
+      }
       const data = await resp.json();
+      if (data.error) throw new Error(data.error);
       setTemplates(data.templates || []);
       setInsight(data.categoryInsight || '');
     } catch (err) {

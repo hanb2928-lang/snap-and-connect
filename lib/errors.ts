@@ -3,7 +3,7 @@ export function friendlyError(err: unknown, fallback: string): string {
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
 
-  if (lower.includes('network') || lower.includes('failed to fetch') || lower.includes('fetch') && lower.includes('error')) {
+  if (lower.includes('network') || lower.includes('failed to fetch') || (lower.includes('fetch') && lower.includes('error'))) {
     return '인터넷 연결을 확인해주세요. 네트워크가 일시적으로 불안정합니다.';
   }
   if (lower.includes('timeout') || lower.includes('timed out')) {
