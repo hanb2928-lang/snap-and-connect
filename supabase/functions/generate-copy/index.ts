@@ -177,7 +177,7 @@ async function generateWithOpenAI(
   apiKey: string,
   count: number,
 ): Promise<CopyItem[]> {
-  const systemPrompt =
+  let systemPrompt =
     "너는 한국인 SNS 유저야. 마케터가 아니라 실제로 제품을 써본 사람처럼 글을 써.\n" +
     "절대로 '놓치면 후회합니다', '지금 바로 확인하세요', '강력 추천합니다' 같은 상투적인 마케팅 문구는 쓰지 마.\n" +
     "진짜 친구한테 문자 보내듯이, 쓸데없는 수식어 빼고 핵심만 자연스럽게 말해.\n" +
@@ -207,7 +207,7 @@ async function generateWithOpenAI(
   systemPrompt +=
     "결과는 JSON만 반환: { \"copies\": [{ \"hook\": \"...\", \"caption\": \"...\", \"hashtags\": [...] }] }";
 
-  const userPrompt =
+  let userPrompt =
     `제품명: ${data.productName}\n` +
     `카테고리: ${data.productCategory}\n` +
     `가격: ${data.priceEstimate || "알 수 없음"}\n` +
@@ -423,14 +423,15 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
       hook = toBanmal(hook);
       caption = toBanmal(caption);
     }
+    let iterHashtags = hashtags;
     if (data.platform === "smartstore") {
       const ctaTags = ["스마트스토어", "네이버쇼핑", "오늘의딜", "구매하기"];
-      hashtags = [...hashtags, ...ctaTags];
+      iterHashtags = [...iterHashtags, ...ctaTags];
     }
     return {
       hook,
       caption,
-      hashtags: shuffle(hashtags).slice(0, 10),
+      hashtags: shuffle(iterHashtags).slice(0, 10),
     };
   });
   return result;

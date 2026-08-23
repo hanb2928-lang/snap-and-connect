@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking } from 'react-native';
-import { Copy, Check, PlayCircle, Clapperboard, Download, CloudUpload, Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2 } from 'lucide-react-native';
+import { Copy, Check, CirclePlay as PlayCircle, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2 } from 'lucide-react-native';
 import { useRef, useState, useCallback } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -133,13 +133,13 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
 
   const handleNaverShare = useCallback(async (platform: 'naverclip' | 'navertv') => {
     setSharing(true);
-    const uri = await captureCard();
-    setSharing(false);
+    try {
+      const uri = await captureCard();
 
-    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
-    const shareLink = shortUrl || affiliateUrl;
-    const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-    const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
+      const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
+      const shareLink = shortUrl || affiliateUrl;
+      const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
+      const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
 
     const siteUrls: Record<string, string> = {
       naverclip: 'https://clip.naver.com',
@@ -190,6 +190,9 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       window.open(siteUrls[platform], '_blank');
     } else {
       Linking.openURL(siteUrls[platform]).catch(() => {});
+    }
+    } finally {
+      setSharing(false);
     }
   }, [captureCard, shareText, affiliateUrl, shortUrl, affiliatePlatforms, copyImageToClipboard, copyTextToClipboard, showToast]);
 

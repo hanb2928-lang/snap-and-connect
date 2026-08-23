@@ -409,6 +409,13 @@ function WebClipGenerator({
   const [cloudSaving, setCloudSaving] = useState(false);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     setCardStyle(PLATFORM_STYLE_MAP[platform] || 'bold');
@@ -684,7 +691,7 @@ function WebClipGenerator({
         }
 
         if (t < 1) {
-          requestAnimationFrame(drawFrame);
+          rafRef.current = requestAnimationFrame(drawFrame);
         } else {
           setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') recorder.stop();
@@ -692,7 +699,7 @@ function WebClipGenerator({
         }
       };
 
-      requestAnimationFrame(drawFrame);
+      rafRef.current = requestAnimationFrame(drawFrame);
 
       if (hasRecorder) {
         const blob = await done;

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
-import { Film, Download, Loader2, Play, RefreshCw, AlertCircle, Upload, Type, X, Check, Sparkles, Scissors } from 'lucide-react-native';
+import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Upload, Type, X, Check, Sparkles, Scissors } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -100,13 +100,16 @@ export function VideoImportGenerator({ affiliatePlatforms = [], onClose }: Video
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
 
+  const urlsRef = useRef({ videoUrl, originalVideoUrl, outputUrl });
+  urlsRef.current = { videoUrl, originalVideoUrl, outputUrl };
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
-      if (outputUrl) URL.revokeObjectURL(outputUrl);
+      const { videoUrl: v, originalVideoUrl: ov, outputUrl: o } = urlsRef.current;
+      if (v) URL.revokeObjectURL(v);
+      if (ov) URL.revokeObjectURL(ov);
+      if (o) URL.revokeObjectURL(o);
     };
-  }, [videoUrl, originalVideoUrl, outputUrl]);
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);

@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Lightbulb, Zap, Wand2, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Lightbulb, Zap, Wand as Wand2, Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { friendlyError } from '@/lib/errors';
 import { SHORTFORM_GUIDE_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -74,8 +74,10 @@ export function ShortFormGuideCard({
         },
       );
       if (!resp.ok) throw new Error('가이드 생성에 실패했습니다');
-      const data: ShortFormGuide = await resp.json();
-      setGuide(data);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      if (!data.tips || !Array.isArray(data.tips)) throw new Error('가이드 응답 형식이 올바르지 않습니다');
+      setGuide(data as ShortFormGuide);
     } catch (err) {
       setError(friendlyError(err, '가이드를 불러오지 못했습니다.'));
     } finally {

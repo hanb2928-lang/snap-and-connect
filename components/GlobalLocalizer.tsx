@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 
-import { Globe, Zap, AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info } from 'lucide-react-native';
+import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 
@@ -142,11 +142,15 @@ export function GlobalLocalizer({
     setTtsLoading(null);
   }, []);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const handlePlayTTS = useCallback(async (langCode: string) => {
     const dataUrl = ttsResults[langCode];
     if (!dataUrl) return;
+    if (Platform.OS !== 'web') return;
     try {
+      if (audioRef.current) { audioRef.current.pause(); }
       const audio = new Audio(dataUrl);
+      audioRef.current = audio;
       audio.play().catch(() => {});
     } catch {
       // playback failed

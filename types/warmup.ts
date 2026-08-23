@@ -105,7 +105,8 @@ export function generateTaskTemplates(day: number): TaskTemplate[] {
 }
 
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const korea = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return korea.toISOString().split('T')[0];
 }
 
 export function addDays(date: Date, days: number): Date {

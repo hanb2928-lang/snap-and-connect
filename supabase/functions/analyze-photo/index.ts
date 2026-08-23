@@ -359,9 +359,12 @@ async function callOpenAIWithRetry(
             const retryData = await retryResponse.json();
             const retryContent = retryData.choices?.[0]?.message?.content;
             if (retryContent) {
-              const combined = content + retryContent;
-              const parsed = JSON.parse(combined);
-              return normalizeResult(parsed);
+              try {
+                const parsed = JSON.parse(retryContent);
+                return normalizeResult(parsed);
+              } catch {
+                // retry content wasn't valid JSON either
+              }
             }
           }
         } catch {
@@ -371,8 +374,12 @@ async function callOpenAIWithRetry(
         }
       }
 
-      const parsed = JSON.parse(content);
-      return normalizeResult(parsed);
+      try {
+        const parsed = JSON.parse(content);
+        return normalizeResult(parsed);
+      } catch {
+        return normalizeResult({});
+      }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         lastError = new Error("AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");

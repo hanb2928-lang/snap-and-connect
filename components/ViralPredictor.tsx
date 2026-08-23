@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { TrendingUp, Zap, Sparkles, AlertCircle, ChevronDown, ChevronUp, Lightbulb, Info } from 'lucide-react-native';
+import { TrendingUp, Zap, Sparkles, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Lightbulb, Info } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { VIRAL_PREDICT_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 
@@ -93,6 +93,8 @@ export function ViralPredictor({
       clearTimeout(timeoutId);
       if (response.ok) {
         const data = await response.json();
+        if (data.error) { setError(data.error); return; }
+        if (!data.score || !data.factors || !Array.isArray(data.factors)) { setError('예측 응답 형식이 올바르지 않습니다'); return; }
         setPrediction(data);
       } else {
         setError('예측에 실패했어요. 다시 시도해주세요');

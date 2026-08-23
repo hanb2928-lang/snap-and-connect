@@ -7,19 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import {
-  Users,
-  Zap,
-  MessageCircle,
-  ShoppingCart,
-  TrendingUp,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Lightbulb,
-  Trophy,
-} from 'lucide-react-native';
+import { Users, Zap, MessageCircle, ShoppingCart, TrendingUp, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Sparkles, Lightbulb, Trophy } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { friendlyError } from '@/lib/errors';
 import { PERSONA_SIMULATOR_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -90,8 +78,10 @@ export function PersonaSimulator({
       });
       clearTimeout(timeoutId);
       if (!response.ok) throw new Error('시뮬레이션 실패');
-      const data: SimulationResult = await response.json();
-      setSimulation(data);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      if (!data.personas || !Array.isArray(data.personas)) throw new Error('시뮬레이션 응답 형식이 올바르지 않습니다');
+      setSimulation(data as SimulationResult);
     } catch (err) {
       setError(friendlyError(err, '시뮬레이션을 실행하지 못했습니다.'));
     } finally {

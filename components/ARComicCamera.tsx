@@ -9,7 +9,7 @@ import {
   Animated as RNAnimated,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Sparkles, Camera as CameraIcon, Zap, RefreshCw, X, AlertCircle, Wand2 } from 'lucide-react-native';
+import { Sparkles, Camera as CameraIcon, Zap, RefreshCw, X, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

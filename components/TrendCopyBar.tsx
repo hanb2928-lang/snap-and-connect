@@ -60,7 +60,7 @@ export function TrendCopyBar({ productName, productCategory, tags, platform, onA
     if (productName || productCategory) {
       fetchTrends();
     }
-  }, [productName, productCategory, tags, platform, fetchTrends]);
+  }, [fetchTrends]);
 
   const handleApply = useCallback((phrase: string, index: number) => {
     onApplyTrend?.(phrase);

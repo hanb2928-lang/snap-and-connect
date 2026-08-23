@@ -118,6 +118,7 @@ function buildMultipartForm(imageDataUrl: string): FormData {
   const blob = new Blob([bytes], { type: `image/${ext}` });
   formData.append("image", blob, `input.${ext}`);
   formData.append("model", "gpt-image-1");
+  formData.append("prompt", "Remove the background from this image, leaving the subject on a fully transparent background.");
   formData.append("size", "auto");
   formData.append("background", "transparent");
 

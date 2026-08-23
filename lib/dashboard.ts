@@ -71,7 +71,8 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
 
   const totalScans = scansRes.count ?? scans.length;
   const totalAssets = assets.length;
-  const totalClicks = links.reduce((s, l) => s + (l.click_count || 0), 0) || clickEvents.length;
+  const linkClicks = links.reduce((s, l) => s + (l.click_count || 0), 0);
+  const totalClicks = links.length > 0 ? linkClicks : clickEvents.length;
   const totalRevenue = revenues.reduce((s, r) => s + Number(r.amount), 0);
   const avgCtr = totalScans > 0 ? (totalClicks / totalScans) * 100 : 0;
 
@@ -163,11 +164,13 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
 
   // Daily clicks (14 days, Korea timezone)
   const now = new Date();
+  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const baseDay = koreaNow.toISOString().split('T')[0];
+  const [by, bm, bd] = baseDay.split('-').map(Number);
   const dailyClickMap = new Map<string, number>();
   for (let i = 13; i >= 0; i--) {
-    const korea = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    korea.setDate(korea.getDate() - i);
-    dailyClickMap.set(korea.toISOString().split('T')[0], 0);
+    const dt = new Date(Date.UTC(by, bm - 1, bd - i));
+    dailyClickMap.set(dt.toISOString().split('T')[0], 0);
   }
   for (const e of clickEvents) {
     if (!e.clicked_at) continue;
@@ -183,9 +186,8 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   // Daily revenue (14 days, Korea timezone)
   const dailyRevMap = new Map<string, number>();
   for (let i = 13; i >= 0; i--) {
-    const korea = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    korea.setDate(korea.getDate() - i);
-    dailyRevMap.set(korea.toISOString().split('T')[0], 0);
+    const dt = new Date(Date.UTC(by, bm - 1, bd - i));
+    dailyRevMap.set(dt.toISOString().split('T')[0], 0);
   }
   for (const r of revenues) {
     if (!r.created_at) continue;

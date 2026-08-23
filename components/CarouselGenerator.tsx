@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { Layers, Download, ChevronLeft, ChevronRight, Check, Loader2, Film, RefreshCw } from 'lucide-react-native';
+import { Layers, Download, ChevronLeft, ChevronRight, Check, Loader as Loader2, Film, RefreshCw } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
@@ -65,6 +65,13 @@ export function CarouselGenerator({
   const cardRefs = useRef<(View | null)[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
   const lastScrollUpdate = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -252,9 +259,9 @@ export function CarouselGenerator({
           ctx.fill();
         }
 
-        requestAnimationFrame(drawFrame);
+        rafRef.current = requestAnimationFrame(drawFrame);
       };
-      requestAnimationFrame(drawFrame);
+      rafRef.current = requestAnimationFrame(drawFrame);
 
       const blob = await done;
       const url = URL.createObjectURL(blob);
