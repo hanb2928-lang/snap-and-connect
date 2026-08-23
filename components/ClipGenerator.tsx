@@ -417,6 +417,11 @@ function WebClipGenerator({
   const bgmStopRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
 
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -426,6 +431,7 @@ function WebClipGenerator({
   useEffect(() => {
     setCardStyle(PLATFORM_STYLE_MAP[platform] || 'bold');
     setFormat(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
+    lastAppliedKey.current = null;
   }, [platform]);
 
   useEffect(() => {
@@ -439,7 +445,7 @@ function WebClipGenerator({
     setClipDuration(recommendedStyle.duration);
     setHybridMode(recommendedStyle.hybridMode);
     showToast('AI 추천 스타일이 적용되었습니다!');
-  }, [recommendedStyle, styleAppliedKey]);
+  }, [recommendedStyle, styleAppliedKey, showToast]);
 
   useEffect(() => {
     return () => {
@@ -454,11 +460,6 @@ function WebClipGenerator({
         return null;
       });
     };
-  }, []);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
   }, []);
 
   const stopPreview = useCallback(() => {

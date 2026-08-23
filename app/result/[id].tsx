@@ -124,6 +124,7 @@ export default function ResultScreen() {
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
   const cardRef = useRef<View>(null);
+  const styleApplyCounter = useRef(0);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -1089,7 +1090,8 @@ export default function ResultScreen() {
               platform={activePlatform}
               onApply={(rec) => {
                 setRecommendedStyle(rec);
-                setStyleAppliedKey(`${Date.now()}`);
+                styleApplyCounter.current += 1;
+                setStyleAppliedKey(`style-${styleApplyCounter.current}`);
               }}
             />
           </View>

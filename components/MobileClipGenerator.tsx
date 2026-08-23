@@ -399,11 +399,13 @@ export function MobileClipGenerator({
   templateData = null,
   customReview: _customReview = null,
   shortUrl = '',
+  recommendedStyle = null,
+  styleAppliedKey = null,
 }: MobileClipGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
-  const duration = 6000;
+  const [duration, setDuration] = useState(6000);
   const [format, setFormat] = useState<VideoFormat>(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
   const [cardStyle, setCardStyle] = useState<CardStyleKey>(PLATFORM_STYLE_MAP[platform] || 'bold');
   const [musicMood, setMusicMood] = useState<MusicMood>('none');
@@ -411,6 +413,7 @@ export function MobileClipGenerator({
   const [hybridMode, setHybridMode] = useState<HybridMode>('off');
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const lastAppliedKey = useRef<string | null>(null);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const [videoSize, setVideoSize] = useState<number>(0);
   const [cloudSaving, setCloudSaving] = useState(false);
@@ -418,6 +421,11 @@ export function MobileClipGenerator({
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [webviewKey, setWebviewKey] = useState(0);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -429,6 +437,25 @@ export function MobileClipGenerator({
   }, [imageUrl]);
 
   useEffect(() => {
+    setCardStyle(PLATFORM_STYLE_MAP[platform] || 'bold');
+    setFormat(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
+    lastAppliedKey.current = null;
+  }, [platform]);
+
+  useEffect(() => {
+    if (!recommendedStyle || !styleAppliedKey) return;
+    if (lastAppliedKey.current === styleAppliedKey) return;
+    lastAppliedKey.current = styleAppliedKey;
+    setCardStyle(recommendedStyle.cardStyle);
+    setMusicMood(recommendedStyle.musicMood);
+    setMotionPreset(recommendedStyle.motionPreset);
+    setFormat(recommendedStyle.format);
+    setDuration(recommendedStyle.duration);
+    setHybridMode(recommendedStyle.hybridMode);
+    showToast('AI 추천 스타일이 적용되었습니다!');
+  }, [recommendedStyle, styleAppliedKey, showToast]);
+
+  useEffect(() => {
     return () => {
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
       if (videoUri && Platform.OS !== 'web') {
@@ -436,11 +463,6 @@ export function MobileClipGenerator({
       }
     };
   }, [videoUri]);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
-  }, []);
 
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);

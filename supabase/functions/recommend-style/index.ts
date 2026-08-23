@@ -77,6 +77,8 @@ async function resolveOpenAIKey(): Promise<string | null> {
 
   if (supabaseUrl && serviceRoleKey) {
     try {
+      // Row id=1 is the shared/global OpenAI key for this project. All users
+      // share this key when no per-user key is configured via environment.
       const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
         headers: {
           apikey: serviceRoleKey,
