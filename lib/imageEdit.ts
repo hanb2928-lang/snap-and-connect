@@ -203,9 +203,17 @@ export async function prepareImageForApi(
     return canvas.toDataURL('image/jpeg', quality);
   }
 
+  const { width: origW, height: origH } = await getImageSize(dataUrl);
+  const longer = Math.max(origW, origH);
+  const actions =
+    longer > maxDimension
+      ? origW >= origH
+        ? [{ resize: { width: maxDimension } }]
+        : [{ resize: { height: maxDimension } }]
+      : [];
   const manipulated = await ImageManipulator.manipulateAsync(
     dataUrl,
-    [{ resize: { width: maxDimension } }],
+    actions,
     { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
   );
 
@@ -233,9 +241,17 @@ export async function prepareImageForEdit(
     return canvas.toDataURL('image/png');
   }
 
+  const { width: origW, height: origH } = await getImageSize(dataUrl);
+  const longer = Math.max(origW, origH);
+  const actions =
+    longer > maxDimension
+      ? origW >= origH
+        ? [{ resize: { width: maxDimension } }]
+        : [{ resize: { height: maxDimension } }]
+      : [];
   const manipulated = await ImageManipulator.manipulateAsync(
     dataUrl,
-    [{ resize: { width: maxDimension } }],
+    actions,
     { compress: 1, format: ImageManipulator.SaveFormat.PNG },
   );
 
