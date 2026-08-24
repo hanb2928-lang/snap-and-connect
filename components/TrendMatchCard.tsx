@@ -72,14 +72,18 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
   const fetchTrends = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const resp = await fetch(TREND_MATCH_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
         },
         body: JSON.stringify({ productCategory, productName, platform }),
+        signal: controller.signal,
       });
       if (!resp.ok) {
         let errDetail = '';
@@ -111,8 +115,12 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
     } catch (err) {
       setTemplates(DEFAULT_TEMPLATES);
       setInsight('기본 트렌드 템플릿을 표시하고 있어요.');
-      setError(friendlyError(err, '트렌드 분석에 실패했습니다. 잠시 후 다시 시도해주세요.'));
+      const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+      setError(isTimeout
+        ? '트렌드 분석 응답이 지연되었습니다. 잠시 후 다시 시도해주세요.'
+        : friendlyError(err, '트렌드 분석에 실패했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [productCategory, productName, platform]);

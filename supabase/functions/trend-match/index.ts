@@ -114,7 +114,7 @@ async function generateWithOpenAI(
     `플랫폼: ${data.platform || "종합"}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
