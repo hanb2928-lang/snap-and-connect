@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "숏커넥트",
+    "name": "ShortConnect",
     "slug": "snap-and-connect",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -55,21 +55,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow 숏커넥트 to access your photos to upload and analyze them."
+          "photosPermission": "Allow ShortConnect to access your photos to upload and analyze them."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow 숏커넥트 to access your camera to capture and analyze photos.",
+          "cameraPermission": "Allow ShortConnect to access your camera to capture and analyze photos.",
           "shutterSound": false
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow 숏커넥트 to save template cards to your photo gallery.",
-          "savePhotosPermission": "Allow 숏커넥트 to save template cards to your photo gallery."
+          "photosPermission": "Allow ShortConnect to save template cards to your photo gallery.",
+          "savePhotosPermission": "Allow ShortConnect to save template cards to your photo gallery."
         }
       ],
       [

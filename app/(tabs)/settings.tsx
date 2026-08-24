@@ -203,7 +203,8 @@ export default function SettingsScreen() {
         <View style={styles.logoWrap}>
           <Camera size={32} color={theme.colors.primary[400]} strokeWidth={2} />
         </View>
-        <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>숏커넥트</Text>
+        <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>ShortConnect</Text>
+        <Text style={styles.appTagline}>사진 한 장으로 끝내는 숏폼 마케팅</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
       </View>
 
@@ -953,7 +954,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <Text style={styles.footer}>숏커넥트 (ShortConnect) - 촬영하고 연결하고 공유하세요</Text>
+      <Text style={styles.footer}>ShortConnect (숏커넥트) — 온·오프라인 셀러를 위한 올인원 AI 커머스</Text>
 
       <Modal
         visible={revModalVisible}
@@ -1136,6 +1137,12 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.heading,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
+  },
+  appTagline: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[400],
+    marginTop: 4,
   },
   appVersion: {
     fontSize: theme.typography.caption,
