@@ -83,6 +83,10 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     setLoading(true);
     setError(null);
     setCuts([]);
+    setSelectedCut(null);
+    setDownloaded(null);
+    setShared(null);
+    setBatchDone(false);
     setExpanded(true);
     startProgressCycle();
     try {
@@ -132,8 +136,8 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       setError(err instanceof Error ? err.message : '가상 컷 생성 실패');
     } finally {
       stopProgressCycle();
+      setLoading(false);
     }
-    setLoading(false);
   }, [imageDataUrl, loading, productName, productCategory]);
 
   const handleUseCut = useCallback(
@@ -378,7 +382,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                             <Share2 size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
                           )}
                           <Text style={[styles.tileActionText, shared === idx && styles.tileActionTextShared]}>
-                            {shared === idx ? '공유' : '공유'}
+                            {shared === idx ? '공유됨' : '공유'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity

@@ -88,6 +88,10 @@ export function VirtualFittingGallery({
     setLoading(true);
     setError(null);
     setResults([]);
+    setSelected(null);
+    setDownloaded(null);
+    setShared(null);
+    setBatchDone(false);
     setExpanded(true);
     startProgressCycle();
     try {
@@ -384,7 +388,7 @@ export function VirtualFittingGallery({
                             <Share2 size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
                           )}
                           <Text style={[styles.tileActionText, shared === idx && styles.tileActionTextShared]}>
-                            {shared === idx ? '공유' : '공유'}
+                            {shared === idx ? '공유됨' : '공유'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
