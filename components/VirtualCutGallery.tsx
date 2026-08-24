@@ -9,7 +9,6 @@ import {
   ScrollView,
   Platform,
   Modal,
-  Dimensions,
   Pressable,
   Share,
 } from 'react-native';
@@ -39,8 +38,6 @@ const PROGRESS_MESSAGES = [
   '정면, 측면, 디테일, 전체 샷을 만들고 있어요...',
   '거의 완성되었습니다. 조금만 기다려주세요...',
 ];
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export function VirtualCutGallery({ imageDataUrl, productName, productCategory, onUseImage }: VirtualCutGalleryProps) {
   const [cuts, setCuts] = useState<VirtualCut[]>([]);
@@ -169,12 +166,16 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const handleDownload = useCallback(async (url: string, index: number) => {
     try {
       if (Platform.OS === 'web') {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+        a.href = objectUrl;
         a.download = `virtual-cut-${index + 1}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
       } else {
         await Share.share({ url, message: '가상 컷 이미지' });
       }
@@ -327,7 +328,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
             <View style={styles.previewHeaderSpacer} />
           </View>
 
-          <Pressable style={styles.previewImageWrap} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.previewImageWrap} onPress={() => {}}>
             {!imageLoaded && (
               <View style={styles.previewLoadingWrap}>
                 <ActivityIndicator size="large" color={theme.colors.accent[400]} />
@@ -362,7 +363,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
             )}
           </Pressable>
 
-          <Pressable style={styles.previewFooter} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.previewFooter} onPress={() => {}}>
             {cuts.length > 1 && (
               <View style={styles.previewDots}>
                 {cuts.map((c, i) => (
@@ -639,8 +640,8 @@ const styles = StyleSheet.create({
     width: 36,
   },
   previewImageWrap: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH,
+    width: '100%',
+    aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -654,8 +655,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH,
+    width: '100%',
+    height: '100%',
   },
   previewNavBtn: {
     position: 'absolute',

@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   ScrollView,
   Modal,
-  Dimensions,
   Pressable,
   Platform,
   Share,
@@ -40,8 +39,6 @@ const PROGRESS_MESSAGES = [
   '아시아 여성, 남성, 서양 여성 등 다양한 모델을 만들고 있어요...',
   '거의 완성되었습니다. 조금만 기다려주세요...',
 ];
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export function VirtualFittingGallery({
   imageDataUrl,
@@ -175,12 +172,16 @@ export function VirtualFittingGallery({
   const handleDownload = useCallback(async (url: string, index: number) => {
     try {
       if (Platform.OS === 'web') {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+        a.href = objectUrl;
         a.download = `virtual-fitting-${index + 1}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
       } else {
         await Share.share({ url, message: '가상 피팅 이미지' });
       }
@@ -334,7 +335,7 @@ export function VirtualFittingGallery({
             <View style={styles.previewHeaderSpacer} />
           </View>
 
-          <Pressable style={styles.previewImageWrap} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.previewImageWrap} onPress={() => {}}>
             {!imageLoaded && (
               <View style={styles.previewLoadingWrap}>
                 <ActivityIndicator size="large" color={theme.colors.success[400]} />
@@ -369,7 +370,7 @@ export function VirtualFittingGallery({
             )}
           </Pressable>
 
-          <Pressable style={styles.previewFooter} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.previewFooter} onPress={() => {}}>
             {results.length > 1 && (
               <View style={styles.previewDots}>
                 {results.map((r, i) => (
@@ -653,8 +654,8 @@ const styles = StyleSheet.create({
     width: 36,
   },
   previewImageWrap: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH,
+    width: '100%',
+    aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -668,8 +669,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewImage: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_WIDTH,
+    width: '100%',
+    height: '100%',
   },
   previewNavBtn: {
     position: 'absolute',
