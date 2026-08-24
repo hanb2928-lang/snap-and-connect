@@ -35,6 +35,7 @@ import {
   MoveUp,
   MoveVertical,
   MoveDown,
+  CircleAlert,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -109,6 +110,7 @@ export default function ResultScreen() {
   const [addedHashtags, setAddedHashtags] = useState<string[]>([]);
   const [selectedAffiliate, setSelectedAffiliate] = useState<AffiliatePlatformKey>('Coupang');
   const [captureImageUrl, setCaptureImageUrl] = useState<string>('');
+  const [captureImageError, setCaptureImageError] = useState(false);
   const [heroAspect, setHeroAspect] = useState<number>(1);
   const [autoMarketingCopy, setAutoMarketingCopy] = useState<string | null>(null);
   const [hookOverride, setHookOverride] = useState<string | null>(null);
@@ -173,9 +175,15 @@ export default function ResultScreen() {
       try {
         const dataUrl = await urlToDataUrl(url);
         const compressed = await prepareImageForApi(dataUrl, 1024, 0.8);
-        if (!cancelled) setCaptureImageUrl(compressed);
+        if (!cancelled) {
+          setCaptureImageUrl(compressed);
+          setCaptureImageError(false);
+        }
       } catch {
-        if (!cancelled) setCaptureImageUrl(url);
+        if (!cancelled) {
+          setCaptureImageUrl(url);
+          setCaptureImageError(true);
+        }
       }
     })();
     (async () => {
@@ -636,6 +644,15 @@ export default function ResultScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {captureImageError && captureImageUrl ? (
+          <View style={styles.captureErrorBanner}>
+            <CircleAlert size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.captureErrorText}>
+              이미지 변환 실패: 일부 캔버스 기능(가상 컷·피팅)이 동작하지 않을 수 있어요.
+            </Text>
+          </View>
+        ) : null}
 
         {captureImageUrl ? (
           <View style={styles.section}>
@@ -1455,6 +1472,26 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
+  },
+  captureErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  captureErrorText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.warning[400],
+    lineHeight: 20,
   },
   sectionHeader: {
     flexDirection: 'row',

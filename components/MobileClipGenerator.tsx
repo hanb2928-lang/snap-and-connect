@@ -263,7 +263,25 @@ function buildWebViewHTML(params: {
       reader.onerror=function(){clearTimeout(imgLoadTimeout);postMsg('error',{msg:'image blob read failed'});};
       reader.readAsDataURL(blob);
     }).catch(function(){
-      postMsg('error',{msg:'image load failed (CORS or network)'});
+      img.crossOrigin='anonymous';
+      img.onload=function(){
+        clearTimeout(imgLoadTimeout);
+        try{
+          var testCanvas=document.createElement('canvas');
+          testCanvas.width=1;testCanvas.height=1;
+          var testCtx=testCanvas.getContext('2d');
+          if(testCtx){testCtx.drawImage(img,0,0,1,1);testCtx.getImageData(0,0,1,1);}
+          postMsg('ready',{});
+          try{startGeneration();}catch(e){postMsg('error',{msg:'generation failed: '+(e&&e.message||'unknown')});}
+        }catch(e){
+          postMsg('error',{msg:'canvas tainted (CORS): '+(e&&e.message||'unknown')});
+        }
+      };
+      img.onerror=function(){
+        clearTimeout(imgLoadTimeout);
+        postMsg('error',{msg:'image load failed (CORS or network)'});
+      };
+      img.src=imageUrl;
     });
   }
 
