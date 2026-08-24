@@ -43,15 +43,19 @@ Deno.serve(async (req: Request) => {
     let recommendation: StyleRecommendation;
 
     if (openaiKey) {
-      recommendation = await recommendWithOpenAI(
-        String(productName || ""),
-        String(productCategory || "product"),
-        String(accentColor || "#2f9dff"),
-        String(hook || ""),
-        String(oneLiner || ""),
-        String(platform || "shortform"),
-        openaiKey,
-      );
+      try {
+        recommendation = await recommendWithOpenAI(
+          String(productName || ""),
+          String(productCategory || "product"),
+          String(accentColor || "#2f9dff"),
+          String(hook || ""),
+          String(oneLiner || ""),
+          String(platform || "shortform"),
+          openaiKey,
+        );
+      } catch {
+        recommendation = fallbackRecommendation(String(productCategory || "product"), String(platform || "shortform"));
+      }
     } else {
       recommendation = fallbackRecommendation(String(productCategory || "product"), String(platform || "shortform"));
     }

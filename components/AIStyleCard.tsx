@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Sparkles, Check, RefreshCw, CircleAlert as AlertCircle, Film, Music, Move, Monitor, Clock } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { friendlyError } from '@/lib/errors';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { fetchStyleRecommendation } from '@/lib/styleRecommend';
 import type { PlatformKey } from '@/types/database';
@@ -77,7 +78,7 @@ export function AIStyleCard({
       });
       setRecommendation(rec);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '추천을 불러올 수 없습니다.');
+      setError(friendlyError(err, 'AI 스타일 추천을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
       setLoading(false);
     }
