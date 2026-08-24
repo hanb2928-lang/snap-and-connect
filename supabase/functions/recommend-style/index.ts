@@ -198,14 +198,19 @@ function normalizeRecommendation(
     ? String(raw.motionPreset) as StyleRecommendation["motionPreset"]
     : "kenburns";
 
-  const format = VALID_FORMAT.has(String(raw.format))
-    ? String(raw.format) as StyleRecommendation["format"]
-    : (platform === "naverBlog" || platform === "twitter" || platform === "smartstore" ? "horizontal" : "vertical");
+  const platformHorizontal = platform === "naverBlog" || platform === "twitter" || platform === "smartstore";
+  const format: StyleRecommendation["format"] = platformHorizontal
+    ? "horizontal"
+    : VALID_FORMAT.has(String(raw.format))
+      ? String(raw.format) as StyleRecommendation["format"]
+      : "vertical";
 
   const rawDuration = Number(raw.duration);
-  const duration = Number.isFinite(rawDuration) && rawDuration >= 8000 && rawDuration <= 20000
-    ? Math.round(rawDuration)
-    : 15000;
+  let duration = 15000;
+  if (Number.isFinite(rawDuration)) {
+    const ms = rawDuration < 100 ? rawDuration * 1000 : rawDuration;
+    if (ms >= 8000 && ms <= 20000) duration = Math.round(ms);
+  }
 
   const hybridMode = VALID_HYBRID.has(String(raw.hybridMode))
     ? String(raw.hybridMode) as StyleRecommendation["hybridMode"]
