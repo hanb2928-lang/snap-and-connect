@@ -263,8 +263,7 @@ function buildWebViewHTML(params: {
       reader.onerror=function(){clearTimeout(imgLoadTimeout);postMsg('error',{msg:'image blob read failed'});};
       reader.readAsDataURL(blob);
     }).catch(function(){
-      img.crossOrigin='anonymous';
-      img.src=imageUrl;
+      postMsg('error',{msg:'image load failed (CORS or network)'});
     });
   }
 
@@ -431,8 +430,12 @@ export function MobileClipGenerator({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const converted = await urlToDataUrl(imageUrl);
-      if (!cancelled) setSafeImageUrl(converted);
+      try {
+        const converted = await urlToDataUrl(imageUrl);
+        if (!cancelled) setSafeImageUrl(converted);
+      } catch {
+        if (!cancelled) setSafeImageUrl(imageUrl);
+      }
     })();
     return () => { cancelled = true; };
   }, [imageUrl]);

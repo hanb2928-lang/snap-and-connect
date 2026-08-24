@@ -177,8 +177,12 @@ export default function ResultScreen() {
     const url = scan.edited_image_url || scan.image_url;
     let cancelled = false;
     (async () => {
-      const dataUrl = await urlToDataUrl(url);
-      if (!cancelled) setCaptureImageUrl(dataUrl);
+      try {
+        const dataUrl = await urlToDataUrl(url);
+        if (!cancelled) setCaptureImageUrl(dataUrl);
+      } catch {
+        if (!cancelled) setCaptureImageUrl(url);
+      }
     })();
     (async () => {
       try {
