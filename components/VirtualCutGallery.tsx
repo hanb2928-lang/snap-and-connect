@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,12 +30,45 @@ interface VirtualCutGalleryProps {
   onUseImage?: (url: string) => void;
 }
 
+const PROGRESS_MESSAGES = [
+  '이미지를 준비하는 중...',
+  'AI 모델이 각도별 컷을 생성 중입니다...',
+  '정면, 측면, 디테일, 전체 샷을 만들고 있어요...',
+  '거의 완성되었습니다. 조금만 기다려주세요...',
+];
+
 export function VirtualCutGallery({ imageDataUrl, productName, productCategory, onUseImage }: VirtualCutGalleryProps) {
   const [cuts, setCuts] = useState<VirtualCut[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [selectedCut, setSelectedCut] = useState<VirtualCut | null>(null);
+  const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressStepRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, []);
+
+  const startProgressCycle = useCallback(() => {
+    progressStepRef.current = 0;
+    setProgressMessage(PROGRESS_MESSAGES[0]);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      progressStepRef.current = Math.min(progressStepRef.current + 1, PROGRESS_MESSAGES.length - 1);
+      setProgressMessage(PROGRESS_MESSAGES[progressStepRef.current]);
+    }, 4000);
+  }, []);
+
+  const stopProgressCycle = useCallback(() => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  }, []);
 
   const generateCuts = useCallback(async () => {
     if (loading || !imageDataUrl) return;
@@ -43,6 +76,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     setError(null);
     setCuts([]);
     setExpanded(true);
+    startProgressCycle();
     try {
       const preparedImage = await prepareImageForApi(imageDataUrl);
       const response = await fetch(VIRTUAL_CUTS_FUNCTION_URL, {
@@ -79,6 +113,8 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       setCuts(uploadedCuts);
     } catch (err) {
       setError(err instanceof Error ? err.message : '가상 컷 생성 실패');
+    } finally {
+      stopProgressCycle();
     }
     setLoading(false);
   }, [imageDataUrl, loading, productName, productCategory]);
@@ -135,15 +171,21 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       {expanded && (
         <View style={styles.gallerySection}>
           {loading && cuts.length === 0 && (
-            <View style={styles.loadingRow}>
-              {[0, 1, 2, 3].map((i) => (
-                <View key={i} style={styles.skeletonCard}>
-                  <View style={styles.skeletonImage}>
-                    <ActivityIndicator size="small" color={theme.colors.dark.textDim} />
+            <View style={styles.loadingContainer}>
+              <View style={styles.loadingRow}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View key={i} style={styles.skeletonCard}>
+                    <View style={styles.skeletonImage}>
+                      <ActivityIndicator size="small" color={theme.colors.dark.textDim} />
+                    </View>
+                    <View style={styles.skeletonLabel} />
                   </View>
-                  <View style={styles.skeletonLabel} />
-                </View>
-              ))}
+                ))}
+              </View>
+              <View style={styles.progressWrap}>
+                <ActivityIndicator size="small" color={theme.colors.accent[400]} />
+                <Text style={styles.progressText}>{progressMessage}</Text>
+              </View>
             </View>
           )}
 
@@ -287,10 +329,24 @@ const styles = StyleSheet.create({
   gallerySection: {
     paddingBottom: theme.spacing.md,
   },
+  loadingContainer: {
+    gap: theme.spacing.md,
+  },
   loadingRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
+  },
+  progressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+  },
+  progressText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[400],
   },
   skeletonCard: {
     width: 100,
