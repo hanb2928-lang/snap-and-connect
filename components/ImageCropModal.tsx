@@ -1,0 +1,373 @@
+import { useState, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Dimensions,
+  Image as RNImage,
+  LayoutChangeEvent,
+  GestureResponderEvent,
+} from 'react-native';
+import { Check, X, RotateCw, Crop } from 'lucide-react-native';
+import { theme } from '@/lib/theme';
+import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+
+const { width: screenWidth } = Dimensions.get('window');
+
+interface ImageCropModalProps {
+  visible: boolean;
+  imageBase64: string;
+  mimeType: string;
+  onConfirm: (base64: string, mimeType: string) => void;
+  onCancel: () => void;
+}
+
+interface CropRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+const MIN_CROP_SIZE = 60;
+
+export function ImageCropModal({
+  visible,
+  imageBase64,
+  mimeType,
+  onConfirm,
+  onCancel,
+}: ImageCropModalProps) {
+  const [rotation, setRotation] = useState(0);
+  const [layout, setLayout] = useState({ w: 0, h: 0 });
+  const [imageDim, setImageDim] = useState({ w: 0, h: 0 });
+  const [crop, setCrop] = useState<CropRect>({ x: 0, y: 0, w: 0, h: 0 });
+  const [dragStart, setDragStart] = useState<{ x: number; y: number; rect: CropRect } | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const dataUrl = buildDataUrl(imageBase64, mimeType);
+
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setLayout({ w: width, h: height });
+    if (imageDim.w === 0 && width > 0) {
+      setCrop({ x: 0, y: 0, w: width, h: height });
+    }
+  }, [imageDim.w]);
+
+  const handleImageLoad = useCallback((e: { nativeEvent: { source: { width: number; height: number } } }) => {
+    const { width, height } = e.nativeEvent.source;
+    setImageDim({ w: width, h: height });
+  }, []);
+
+  const handleRotate = () => {
+    setRotation((r) => (r + 90) % 360);
+    if (layout.w > 0 && layout.h > 0) {
+      setCrop({ x: 0, y: 0, w: layout.h, h: layout.w });
+    }
+  };
+
+  const handleDragStart = (e: GestureResponderEvent) => {
+    if (layout.w === 0) return;
+    setDragStart({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, rect: crop });
+  };
+
+  const handleDragMove = (e: GestureResponderEvent) => {
+    if (!dragStart) return;
+    const dx = e.nativeEvent.locationX - dragStart.x;
+    const dy = e.nativeEvent.locationY - dragStart.y;
+    const newW = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.w + dx, layout.w - dragStart.rect.x));
+    const newH = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.h + dy, layout.h - dragStart.rect.y));
+    setCrop({ ...dragStart.rect, w: newW, h: newH });
+  };
+
+  const handleDragEnd = () => {
+    setDragStart(null);
+  };
+
+  const handleConfirm = async () => {
+    if (processing) return;
+    setProcessing(true);
+    try {
+      const result = await cropOnWeb(dataUrl, crop, layout, rotation, imageDim);
+      const b64 = cleanBase64(result);
+      onConfirm(b64, result.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg');
+    } catch {
+      onConfirm(imageBase64, mimeType);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setCrop({ x: 0, y: 0, w: layout.w, h: layout.h });
+    setRotation(0);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.overlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.header}>
+            <Text style={styles.title}>사진 자르기</Text>
+            <TouchableOpacity onPress={onCancel} style={styles.closeBtn} activeOpacity={0.7}>
+              <X size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.imageArea} onLayout={handleLayout}>
+            {layout.w > 0 && (
+              <RNImage
+                source={{ uri: dataUrl }}
+                style={[
+                  styles.previewImage,
+                  {
+                    width: layout.w,
+                    height: layout.h,
+                    transform: [{ rotate: `${rotation}deg` }],
+                  },
+                ]}
+                resizeMode="contain"
+                onLoad={handleImageLoad}
+              />
+            )}
+            <View
+              style={[
+                styles.cropBox,
+                {
+                  left: crop.x,
+                  top: crop.y,
+                  width: crop.w,
+                  height: crop.h,
+                },
+              ]}
+              onStartShouldSetResponder={() => true}
+              onResponderGrant={handleDragStart}
+              onResponderMove={handleDragMove}
+              onResponderRelease={handleDragEnd}
+            >
+              <View style={styles.cropCornerTL} />
+              <View style={styles.cropCornerTR} />
+              <View style={styles.cropCornerBL} />
+              <View style={styles.cropCornerBR} />
+              <View style={styles.cropHandle} />
+            </View>
+          </View>
+
+          <Text style={styles.hint}>사각형을 드래그하여 영역을 조절하세요</Text>
+
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleReset} activeOpacity={0.7}>
+              <Crop size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.actionBtnText}>초기화</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleRotate} activeOpacity={0.7}>
+              <RotateCw size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.actionBtnText}>회전</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} disabled={processing} activeOpacity={0.8}>
+              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.confirmBtnText}>{processing ? '처리 중...' : '확인'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function cropOnWeb(
+  dataUrl: string,
+  crop: CropRect,
+  layout: { w: number; h: number },
+  rotation: number,
+  imageDim: { w: number; h: number },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scaleX = img.naturalWidth / layout.w;
+      const scaleY = img.naturalHeight / layout.h;
+
+      const sourceX = crop.x * scaleX;
+      const sourceY = crop.y * scaleY;
+      const sourceW = crop.w * scaleX;
+      const sourceH = crop.h * scaleY;
+
+      const isRotated = rotation === 90 || rotation === 270;
+      const outW = isRotated ? sourceH : sourceW;
+      const outH = isRotated ? sourceW : sourceH;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(outW);
+      canvas.height = Math.round(outH);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('canvas error'));
+        return;
+      }
+
+      if (rotation > 0) {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-sourceW / 2, -sourceH / 2);
+        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, sourceW, sourceH);
+      } else {
+        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, outW, outH);
+      }
+
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => reject(new Error('image load error'));
+    img.src = dataUrl;
+  });
+}
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 500,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    ...theme.shadows.card,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageArea: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#000',
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    position: 'absolute',
+  },
+  cropBox: {
+    position: 'absolute',
+    borderColor: theme.colors.primary[400],
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  cropCornerTL: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: theme.colors.primary[300],
+  },
+  cropCornerTR: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderColor: theme.colors.primary[300],
+  },
+  cropCornerBL: {
+    position: 'absolute',
+    bottom: -2,
+    left: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderColor: theme.colors.primary[300],
+  },
+  cropCornerBR: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderColor: theme.colors.primary[300],
+  },
+  cropHandle: {
+    position: 'absolute',
+    bottom: -16,
+    right: -16,
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[400],
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  hint: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  actionBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  confirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[400],
+    marginLeft: 'auto',
+  },
+  confirmBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+});

@@ -428,7 +428,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
         disabled={sharing}
         activeOpacity={0.7}
       >
-        <Download size={16} color={theme.colors.dark.text} strokeWidth={2} />
+        <Download size={18} color="#fff" strokeWidth={2.5} />
         <Text style={styles.galleryButtonText}>
           {sharing ? '저장 중...' : '갤러리에 저장'}
         </Text>
@@ -586,14 +586,15 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
     paddingVertical: theme.spacing.md,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '20',
-    borderWidth: 1,
-    borderColor: theme.colors.primary[400] + '40',
+    backgroundColor: theme.colors.primary[500],
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400],
+    ...theme.shadows.card,
   },
   galleryButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   cloudButton: {
     flexDirection: 'row',

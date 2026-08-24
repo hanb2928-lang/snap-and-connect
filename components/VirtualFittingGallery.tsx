@@ -259,6 +259,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[500] + '40',
+    borderRadius: theme.radius.lg,
+    margin: 4,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -293,9 +297,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: theme.colors.success[500],
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
     borderRadius: theme.radius.full,
+    ...theme.shadows.card,
   },
   generateBadgeText: {
     fontSize: theme.typography.micro,

@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -34,6 +34,7 @@ import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
+import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
@@ -886,6 +887,8 @@ function WebUploadScreen() {
   const [error, setError] = useState<string | null>(null);
   const [progressText, setProgressText] = useState('');
   const [progressStep, setProgressStep] = useState(0);
+  const [cropState, setCropState] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [showMultiTip, setShowMultiTip] = useState(true);
   const fadeAnim = useSharedValue(0);
   const spinnerRotate = useSharedValue(0);
   const progressWidth = useSharedValue(0);
@@ -953,18 +956,13 @@ function WebUploadScreen() {
       if (recognitionMode === 'multi') {
         const newShots = images.map((img) => cleanBase64(img.base64));
         setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
+        setShowMultiTip(false);
         return;
       }
 
-      setProcessing(true);
-      setProgressStep(0);
-      setProgressText('사진 업로드 중...');
-      progressWidth.value = withTiming(0.1, { duration: 200 });
-      fadeAnim.value = 0;
-
       const img = images[0];
       const cleanB64 = cleanBase64(img.base64);
-      await processImage(cleanB64, img.mimeType);
+      setCropState({ base64: cleanB64, mimeType: img.mimeType });
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -1134,6 +1132,18 @@ function WebUploadScreen() {
           </View>
         )}
 
+        {recognitionMode === 'single' && showMultiTip && (
+          <View style={styles.multiTipBox}>
+            <Layers size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.multiTipText}>
+              앞/옆/뒤 등 2장 이상 올리면 더 정교한 결과를 받을 수 있어요. 상단에서 '다각도' 모드를 선택해 보세요.
+            </Text>
+            <TouchableOpacity onPress={() => setShowMultiTip(false)} activeOpacity={0.7}>
+              <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.webNoteBox}>
           <CircleAlert size={16} color={theme.colors.warning[400]} strokeWidth={2} />
           <Text style={styles.webNoteText}>
@@ -1149,6 +1159,24 @@ function WebUploadScreen() {
       </ScrollView>
 
       <RecentWorkButton />
+
+      {cropState && (
+        <ImageCropModal
+          visible={!!cropState}
+          imageBase64={cropState.base64}
+          mimeType={cropState.mimeType}
+          onConfirm={(b64, mt) => {
+            setCropState(null);
+            setProcessing(true);
+            setProgressStep(0);
+            setProgressText('사진 업로드 중...');
+            progressWidth.value = withTiming(0.1, { duration: 200 });
+            fadeAnim.value = 0;
+            processImage(b64, mt);
+          }}
+          onCancel={() => setCropState(null)}
+        />
+      )}
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
@@ -1886,6 +1914,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+    lineHeight: 18,
+  },
+  multiTipBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.accent[500] + '14',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  multiTipText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[300],
     lineHeight: 18,
   },
 });
