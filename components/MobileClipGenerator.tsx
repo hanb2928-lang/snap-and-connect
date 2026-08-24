@@ -12,6 +12,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
+import { VideoPreview } from '@/components/VideoPreview';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
@@ -804,9 +805,17 @@ export function MobileClipGenerator({
         <View style={styles.resultWrap}>
           <Text style={styles.doneNotice}>
             {videoMime.includes('png')
-              ? '템플릿 이미지가 생성됐어요. 아래 버튼으로 갤러리나 클라우드에 저장하세요.'
-              : '동영상이 생성됐어요. 아래 버튼으로 갤러리나 클라우드에 저장하세요.'}
+              ? '템플릿 이미지가 생성됐어요. 미리보기 후 저장하세요.'
+              : '동영상이 생성됐어요. 미리보기 후 저장하세요.'}
           </Text>
+          <View style={styles.previewWrap}>
+            <VideoPreview
+              uri={videoUri}
+              mimeType={videoMime}
+              isVertical={format === 'vertical'}
+              maxHeight={380}
+            />
+          </View>
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
               <Download size={18} color="#fff" strokeWidth={2} />
@@ -1103,6 +1112,11 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     gap: theme.spacing.md,
+  },
+  previewWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: theme.spacing.sm,
   },
   doneNotice: {
     fontSize: theme.typography.caption,

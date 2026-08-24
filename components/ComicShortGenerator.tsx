@@ -12,6 +12,7 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown } from 'lucide-react-native';
+import { VideoPreview } from '@/components/VideoPreview';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
@@ -1791,11 +1792,20 @@ export function ComicShortGenerator({
         <View style={styles.resultWrap}>
           <Text style={styles.doneNotice}>
             {resultMime.includes('png')
-              ? '만화 숏폼 이미지가 완성됐어요. 갤러리나 클라우드에 저장하세요.'
+              ? '만화 숏폼 이미지가 완성됐어요. 미리보기 후 저장하세요.'
               : narrationAudioDataUrl
-                ? 'AI 내레이션 만화 숏폼이 완성됐어요. 갤러리나 클라우드에 저장하세요.'
-                : '만화 숏폼 동영상이 완성됐어요. 갤러리나 클라우드에 저장하세요.'}
+                ? 'AI 내레이션 만화 숏폼이 완성됐어요. 미리보기 후 저장하세요.'
+                : '만화 숏폼 동영상이 완성됐어요. 미리보기 후 저장하세요.'}
           </Text>
+
+          <View style={styles.previewWrap}>
+            <VideoPreview
+              uri={resultUri}
+              mimeType={resultMime}
+              isVertical
+              maxHeight={380}
+            />
+          </View>
 
           <View style={styles.directShareBox}>
             <Text style={styles.directShareLabel}>SNS 원터치 공유</Text>
@@ -2152,6 +2162,11 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     gap: theme.spacing.md,
+  },
+  previewWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: theme.spacing.sm,
   },
   doneNotice: {
     fontSize: theme.typography.caption,
