@@ -8,11 +8,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
-import { Camera, Sparkles, Download, RefreshCw, ChevronRight } from 'lucide-react-native';
+import { Camera, Sparkles, RefreshCw, ChevronRight } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { supabaseUrl, supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
+import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { cleanBase64 } from '@/lib/base64';
 import { uploadEditedImage, prepareImageForApi } from '@/lib/imageEdit';
 

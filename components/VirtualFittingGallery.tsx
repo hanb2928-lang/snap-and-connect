@@ -7,7 +7,6 @@ import {
   Image,
   ActivityIndicator,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { User, Sparkles, RefreshCw, ChevronRight, Shirt } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
