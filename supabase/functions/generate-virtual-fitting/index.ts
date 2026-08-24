@@ -191,23 +191,31 @@ async function editWithOpenAI(
 ): Promise<string> {
   const formData = buildMultipartForm(imageDataUrl, prompt);
 
-  const response = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error("No image returned from OpenAI");
+    return b64;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await response.json();
-  const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error("No image returned from OpenAI");
-  return b64;
 }
 
 function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
@@ -216,6 +224,10 @@ function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
   const base64Match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!base64Match) throw new Error("Invalid image data URL");
 
+  const imgFormat = base64Match[1];
+  const mimeType = `image/${imgFormat}`;
+  const ext = imgFormat === "jpeg" ? "jpg" : imgFormat;
+
   const base64Data = base64Match[2];
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
@@ -223,8 +235,8 @@ function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
     bytes[i] = binary.charCodeAt(i);
   }
 
-  const blob = new Blob([bytes], { type: "image/png" });
-  formData.append("image", blob, "input.png");
+  const blob = new Blob([bytes], { type: mimeType });
+  formData.append("image", blob, `input.${ext}`);
   formData.append("model", "gpt-image-1");
   formData.append("size", "1024x1024");
   formData.append("prompt", prompt);

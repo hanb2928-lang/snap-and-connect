@@ -86,19 +86,27 @@ export function VirtualFittingGallery({
         ? imageDataUrl
         : await urlToDataUrl(imageDataUrl);
       const preparedImage = await prepareImageForApi(dataUrl);
-      const response = await fetch(VIRTUAL_FITTING_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({
-          imageDataUrl: preparedImage,
-          mimeType: 'image/png',
-          productName,
-          productCategory,
-        }),
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180000);
+      let response: Response;
+      try {
+        response = await fetch(VIRTUAL_FITTING_FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            imageDataUrl: preparedImage,
+            mimeType: 'image/png',
+            productName,
+            productCategory,
+          }),
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         const errText = await response.text().catch(() => 'Unknown error');
