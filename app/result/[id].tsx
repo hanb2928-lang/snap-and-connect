@@ -72,7 +72,7 @@ import { HashtagCopyBar } from '@/components/HashtagCopyBar';
 import { createShortLink } from '@/lib/shortUrl';
 import { recommendStickerStyle, recommendStickerSize, getCardStyleForPlatform } from '@/lib/stickerRecommend';
 import { urlToDataUrl } from '@/lib/base64';
-import { getImageSize } from '@/lib/imageEdit';
+import { getImageSize, prepareImageForApi } from '@/lib/imageEdit';
 import { fetchMatchedTrendingHashtags, getTrendingSuggestions } from '@/lib/trendingHashtags';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { friendlyError } from '@/lib/errors';
@@ -179,7 +179,8 @@ export default function ResultScreen() {
     (async () => {
       try {
         const dataUrl = await urlToDataUrl(url);
-        if (!cancelled) setCaptureImageUrl(dataUrl);
+        const compressed = await prepareImageForApi(dataUrl, 1024, 0.8);
+        if (!cancelled) setCaptureImageUrl(compressed);
       } catch {
         if (!cancelled) setCaptureImageUrl(url);
       }
@@ -578,6 +579,7 @@ export default function ResultScreen() {
             source={{ uri: scan.edited_image_url || scan.image_url }}
             style={[styles.heroImage, { aspectRatio: heroAspect }]}
             resizeMode="contain"
+            onError={() => setHeroAspect(1)}
           />
           {editingProduct ? (
             <View style={styles.productEditOverlay}>
