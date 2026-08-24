@@ -30,6 +30,7 @@ import Animated, {
 import { theme } from '@/lib/theme';
 import { uploadImage, analyzeImage, analyzeMultiShot, saveScan, saveManualScan } from '@/lib/analysis';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { prepareImageForApi } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
@@ -199,13 +200,15 @@ export default function CameraScreen() {
         throw new Error('Failed to capture image data');
       }
       const cleanB64 = cleanBase64(photo.base64);
+      const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1280, 0.7);
+      const compressedB64 = cleanBase64(compressedDataUrl);
 
       if (recognitionMode === 'multi') {
         if (multiShots.length >= 4) {
           setError('최대 4장까지 촬영할 수 있습니다. 분석을 시작하거나 사진을 삭제해주세요.');
           return;
         }
-        setMultiShots((prev) => [...prev, cleanB64]);
+        setMultiShots((prev) => [...prev, compressedB64]);
         return;
       }
 
@@ -215,7 +218,7 @@ export default function CameraScreen() {
       setProgressText('사진 촬영 중...');
       progressWidth.value = withTiming(0.15, { duration: 300 });
       fadeAnim.value = 0;
-      await processImage(cleanB64, photo.uri, 'image/jpeg');
+      await processImage(compressedB64, photo.uri, 'image/jpeg');
     } catch (err) {
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -297,7 +300,11 @@ export default function CameraScreen() {
         if (images.length === 0) return;
 
         if (recognitionMode === 'multi') {
-          const newShots = images.map((img) => cleanBase64(img.base64));
+          const newShots: string[] = [];
+          for (const img of images) {
+            const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+            newShots.push(cleanBase64(compressed));
+          }
           setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
           return;
         }
@@ -310,8 +317,8 @@ export default function CameraScreen() {
         fadeAnim.value = 0;
 
         const img = images[0];
-        const cleanB64 = cleanBase64(img.base64);
-        await processImage(cleanB64, img.uri, img.mimeType);
+        const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+        await processImage(cleanBase64(compressed), img.uri, img.mimeType);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
         setProcessing(false);
@@ -333,10 +340,14 @@ export default function CameraScreen() {
       }
 
       if (recognitionMode === 'multi') {
-        const newShots = result.assets
-          .map((a) => (a.base64 ? cleanBase64(a.base64) : null))
-          .filter((b): b is string => b !== null)
-          .slice(0, 4 - multiShots.length);
+        const newShots: string[] = [];
+        for (const a of result.assets) {
+          if (!a.base64) continue;
+          const mt = a.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+          const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(a.base64), mt), 1280, 0.7);
+          newShots.push(cleanBase64(compressed));
+          if (newShots.length >= 4 - multiShots.length) break;
+        }
         setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
         return;
       }
@@ -355,8 +366,8 @@ export default function CameraScreen() {
         return;
       }
       const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      const cleanB64 = cleanBase64(b64);
-      await processImage(cleanB64, asset.uri, mimeType);
+      const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(b64), mimeType), 1280, 0.7);
+      await processImage(cleanBase64(compressed), asset.uri, mimeType);
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -1006,6 +1017,7 @@ function WebUploadScreen() {
           try {
             const url = await uploadImage(multiShots[i], 'image/jpeg');
             additionalUrls.push(url);
+            await new Promise((r) => setTimeout(r, 100));
           } catch {
             // individual angle upload failure shouldn't block the whole scan
           }
