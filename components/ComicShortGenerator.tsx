@@ -1823,7 +1823,7 @@ export function ComicShortGenerator({
             {fittingResultUrl && (
               <View style={styles.fittingResultBadge}>
                 <Check size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
-                <Text style={styles.fittingResultText}>피팅 완료 — 갤러리에서 확인</Text>
+                <Text style={styles.fittingResultText}>피팅 완료 — 결과 이미지가 적용됐어요</Text>
               </View>
             )}
           </View>
