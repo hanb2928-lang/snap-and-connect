@@ -255,7 +255,7 @@ export default function CameraScreen() {
       let imageUrl: string, analysis: AnalysisResult;
       try {
         [imageUrl, analysis] = await Promise.all([
-          uploadImage(firstB64, 'image/png'),
+          uploadImage(firstB64, 'image/jpeg'),
           analyzeMultiShot(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
@@ -266,7 +266,7 @@ export default function CameraScreen() {
       if (multiShots.length > 1) {
         for (let i = 1; i < multiShots.length; i++) {
           try {
-            const url = await uploadImage(multiShots[i], 'image/png');
+            const url = await uploadImage(multiShots[i], 'image/jpeg');
             additionalUrls.push(url);
           } catch {
             // individual angle upload failure shouldn't block the whole scan
@@ -767,7 +767,7 @@ export default function CameraScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
             {multiShots.map((shot, i) => (
               <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
-                <Image source={{ uri: `data:image/png;base64,${shot}` }} style={styles.multiShotImage} />
+                <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
                 <Text style={styles.multiShotBadge}>{i + 1}</Text>
                 <TouchableOpacity
                   style={styles.multiShotRemove}
@@ -1024,7 +1024,7 @@ function WebUploadScreen() {
       let imageUrl: string, analysis: AnalysisResult;
       try {
         [imageUrl, analysis] = await Promise.all([
-          uploadImage(multiShots[0], 'image/png'),
+          uploadImage(multiShots[0], 'image/jpeg'),
           analyzeMultiShot(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
@@ -1035,7 +1035,7 @@ function WebUploadScreen() {
       if (multiShots.length > 1) {
         for (let i = 1; i < multiShots.length; i++) {
           try {
-            const url = await uploadImage(multiShots[i], 'image/png');
+            const url = await uploadImage(multiShots[i], 'image/jpeg');
             additionalUrls.push(url);
             await new Promise((r) => setTimeout(r, 100));
           } catch {
@@ -1151,7 +1151,7 @@ function WebUploadScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
               {multiShots.map((shot, i) => (
                 <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
-                  <Image source={{ uri: `data:image/png;base64,${shot}` }} style={styles.multiShotImage} />
+                  <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
                   <Text style={styles.multiShotBadge}>{i + 1}</Text>
                   <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
                     <X size={12} color="#fff" strokeWidth={3} />
