@@ -198,6 +198,10 @@ export default function ResultScreen() {
     return () => { cancelled = true; };
   }, [scan]);
 
+  const handleUseGeneratedImage = useCallback((url: string) => {
+    setCaptureImageUrl(url);
+  }, []);
+
   const handleDelete = async () => {
     if (!scan) return;
     try {
@@ -646,6 +650,7 @@ export default function ResultScreen() {
               imageDataUrl={captureImageUrl}
               productName={activeProductName}
               productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              onUseImage={handleUseGeneratedImage}
             />
           </View>
         ) : null}
@@ -656,6 +661,7 @@ export default function ResultScreen() {
               imageDataUrl={captureImageUrl}
               productName={activeProductName}
               productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              onUseImage={handleUseGeneratedImage}
             />
           </View>
         ) : null}
