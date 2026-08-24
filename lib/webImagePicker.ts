@@ -40,7 +40,8 @@ function resizeImage(file: File, maxSize = 1280, quality = 0.7): Promise<{ base6
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        const isWebpSupported = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+        const mimeType = isWebpSupported ? 'image/webp' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
         const dataUrl = canvas.toDataURL(mimeType, quality);
         const commaIdx = dataUrl.indexOf(',');
         const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;

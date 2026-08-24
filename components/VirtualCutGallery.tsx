@@ -12,8 +12,7 @@ import {
 import { Camera, Sparkles, RefreshCw, ChevronRight } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
-import { cleanBase64 } from '@/lib/base64';
-import { uploadEditedImage, prepareImageForApi } from '@/lib/imageEdit';
+import { prepareImageForApi } from '@/lib/imageEdit';
 
 type CutAngle = 'front' | 'side' | 'detail' | 'full';
 
@@ -101,16 +100,14 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      const rawCuts: Array<{ angle: CutAngle; label: string; imageBase64: string; mimeType: string }> = data.cuts || [];
-      const uploadedCuts: VirtualCut[] = [];
+      const cutsFromServer: Array<{ angle: CutAngle; label: string; imageUrl: string }> = data.cuts || [];
+      const validCuts: VirtualCut[] = cutsFromServer.filter((c) => c.imageUrl);
 
-      for (const cut of rawCuts) {
-        const base64 = cleanBase64(cut.imageBase64);
-        const url = await uploadEditedImage(base64, cut.mimeType || 'image/png');
-        uploadedCuts.push({ angle: cut.angle, label: cut.label, imageUrl: url });
+      if (validCuts.length === 0) {
+        throw new Error('가상 컷을 생성하지 못했습니다. 다시 시도해주세요.');
       }
 
-      setCuts(uploadedCuts);
+      setCuts(validCuts);
     } catch (err) {
       setError(err instanceof Error ? err.message : '가상 컷 생성 실패');
     } finally {

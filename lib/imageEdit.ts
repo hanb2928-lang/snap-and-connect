@@ -81,11 +81,11 @@ function base64ToBlob(base64: string, mimeType: string): any {
   return new (global as any).Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
 }
 
-export async function compressImage(uri: string, maxWidth = 1280): Promise<string> {
+export async function compressImage(uri: string, maxWidth = 1280, quality = 0.8): Promise<string> {
   const result = await ImageManipulator.manipulateAsync(
     uri,
     [{ resize: { width: maxWidth } }],
-    { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+    { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
   );
   return result.uri;
 }
@@ -185,7 +185,7 @@ async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string
 export async function prepareImageForApi(
   dataUrl: string,
   maxDimension = 1024,
-  quality = 0.85,
+  quality = 0.8,
 ): Promise<string> {
   if (Platform.OS === 'web') {
     const img = await loadImageElement(dataUrl);
@@ -196,13 +196,13 @@ export async function prepareImageForApi(
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('canvas 컨텍스트 생성 실패');
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png', quality);
+    return canvas.toDataURL('image/webp', quality);
   }
 
   const manipulated = await ImageManipulator.manipulateAsync(
     dataUrl,
     [{ resize: { width: maxDimension } }],
-    { compress: quality, format: ImageManipulator.SaveFormat.PNG },
+    { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
   );
 
   const fileInfo = await FileSystem.getInfoAsync(manipulated.uri);
@@ -210,21 +210,29 @@ export async function prepareImageForApi(
   const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
     encoding: FileSystem.EncodingType.Base64,
   });
-  return `data:image/png;base64,${base64}`;
+  return `data:image/jpeg;base64,${base64}`;
 }
 
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {
   if (Platform.OS === 'web') {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const reader = new FileReader();
-    const dataUrl: string = await new Promise((resolve, reject) => {
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('이미지를 변환할 수 없습니다'));
-      reader.readAsDataURL(blob);
-    });
-    const mimeType = dataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
-    return { base64: cleanBase64(dataUrl), mimeType };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(uri, { signal: controller.signal });
+      if (!response.ok) throw new Error(`이미지 로드 실패 (${response.status})`);
+      const blob = await response.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('이미지가 아닌 콘텐츠가 반환되었습니다');
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('이미지를 변환할 수 없습니다'));
+        reader.readAsDataURL(blob);
+      });
+      const mimeType = dataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
+      return { base64: cleanBase64(dataUrl), mimeType };
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
   const fileInfo = await FileSystem.getInfoAsync(uri);
   if (!fileInfo.exists) throw new Error('파일을 찾을 수 없습니다');

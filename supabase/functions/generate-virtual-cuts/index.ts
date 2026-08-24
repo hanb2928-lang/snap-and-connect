@@ -18,8 +18,7 @@ type CutAngle = 'front' | 'side' | 'detail' | 'full';
 interface VirtualCut {
   angle: CutAngle;
   label: string;
-  imageBase64: string;
-  mimeType: string;
+  imageUrl: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,6 +60,36 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceRoleKey) throw new Error("Storage not configured");
+
+  const ext = mimeType === "image/png" ? "png" : "jpg";
+  const fileName = `cut-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+
+  const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/scans/${fileName}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": mimeType,
+    },
+    body: blob,
+  });
+
+  if (!uploadResp.ok) {
+    const errText = await uploadResp.text();
+    throw new Error(`Storage upload failed: ${uploadResp.status} ${errText}`);
+  }
+
+  return `${supabaseUrl}/storage/v1/object/public/scans/${fileName}`;
+}
 
 function ensureDataUrl(imageDataUrl: string, mimeType: string): string {
   if (!imageDataUrl) return "";
@@ -130,11 +159,11 @@ async function generateVirtualCuts(
     CUT_PROMPTS.map(async (cut) => {
       try {
         const b64 = await editWithOpenAI(imageDataUrl, apiKey, cut.prompt + contextHint);
+        const imageUrl = await uploadToStorage(b64, 'image/png');
         return {
           angle: cut.angle,
           label: cut.label,
-          imageBase64: b64,
-          mimeType: 'image/png',
+          imageUrl,
         } satisfies VirtualCut;
       } catch (err) {
         console.error(`Cut ${cut.angle} failed:`, err instanceof Error ? err.message : String(err));

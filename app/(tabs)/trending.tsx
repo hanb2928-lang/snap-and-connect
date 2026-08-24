@@ -119,6 +119,9 @@ const TREND_ICON = {
   steady: { icon: Minus, color: theme.colors.dark.textFaint },
 };
 
+const productCache = new Map<Marketplace, { data: TrendingCategory[]; ts: number }>();
+const PRODUCT_CACHE_TTL = 5 * 60 * 1000;
+
 export default function TrendingScreen() {
   const tabBarHeight = useTabBarHeight();
   const router = useRouter();
@@ -146,6 +149,14 @@ export default function TrendingScreen() {
   const [copiedIdea, setCopiedIdea] = useState<number | null>(null);
 
   const fetchTrending = useCallback(async (mp: Marketplace, isRefresh = false) => {
+    if (!isRefresh) {
+      const cached = productCache.get(mp);
+      if (cached && Date.now() - cached.ts < PRODUCT_CACHE_TTL) {
+        setCategories(cached.data);
+        setActiveCategory(0);
+        return;
+      }
+    }
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -161,6 +172,7 @@ export default function TrendingScreen() {
       const fetchedCategories: TrendingCategory[] = data.categories || [];
       if (fetchedCategories.length === 0) throw new Error('인기 상품을 불러올 수 없습니다.');
 
+      productCache.set(mp, { data: fetchedCategories, ts: Date.now() });
       setCategories(fetchedCategories);
       setActiveCategory(0);
     } catch (err) {

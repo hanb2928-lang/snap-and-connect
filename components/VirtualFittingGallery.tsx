@@ -11,8 +11,8 @@ import {
 import { User, Sparkles, RefreshCw, ChevronRight, Shirt } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_FITTING_FUNCTION_URL } from '@/lib/supabase';
-import { cleanBase64, urlToDataUrl } from '@/lib/base64';
-import { uploadEditedImage, prepareImageForApi } from '@/lib/imageEdit';
+import { urlToDataUrl } from '@/lib/base64';
+import { prepareImageForApi } from '@/lib/imageEdit';
 
 type ModelType = 'asian-female-young' | 'asian-male-young' | 'western-female' | 'asian-female-30s';
 
@@ -108,15 +108,9 @@ export function VirtualFittingGallery({
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      const raw: Array<{ modelType: ModelType; label: string; imageBase64: string; mimeType: string }> =
+      const raw: Array<{ modelType: ModelType; label: string; imageUrl: string }> =
         data.results || [];
-      const uploaded: FittingImage[] = [];
-
-      for (const item of raw) {
-        const base64 = cleanBase64(item.imageBase64);
-        const url = await uploadEditedImage(base64, item.mimeType || 'image/png');
-        uploaded.push({ modelType: item.modelType, label: item.label, imageUrl: url });
-      }
+      const uploaded: FittingImage[] = raw.filter((r) => r.imageUrl);
 
       setResults(uploaded);
       if (uploaded.length === 0) {
