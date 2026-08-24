@@ -234,44 +234,44 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
   let hybridMode: StyleRecommendation["hybridMode"] = "off";
   let reason = "이 상품에 가장 적합한 스타일입니다.";
 
-  if (cat.includes("cloth") || cat.includes("fashion") || cat.includes("apparel") || cat.includes("jacket") || cat.includes("shirt")) {
+  if (cat.includes("cloth") || cat.includes("fashion") || cat.includes("apparel") || cat.includes("jacket") || cat.includes("shirt") || cat.includes("패션") || cat.includes("의류") || cat.includes("옷") || cat.includes("자켓") || cat.includes("셔츠")) {
     cardStyle = "feed";
     musicMood = "emotional";
     motionPreset = "slow-motion";
     duration = 14000;
     reason = "패션 상품은 감성적인 음악과 슬로우모션으로 착장 분위기를 살리는 것이 효과적입니다.";
-  } else if (cat.includes("beauty") || cat.includes("cosmetic") || cat.includes("skincare") || cat.includes("makeup")) {
+  } else if (cat.includes("beauty") || cat.includes("cosmetic") || cat.includes("skincare") || cat.includes("makeup") || cat.includes("뷰티") || cat.includes("화장품") || cat.includes("스킨케어") || cat.includes("메이크업")) {
     cardStyle = "feed";
     musicMood = "calm";
     motionPreset = "kenburns";
     duration = 13000;
     reason = "뷰티 상품은 차분한 음악과 부드러운 줌으로 제품 질감을 돋보이게 하는 것이 좋습니다.";
-  } else if (cat.includes("food") || cat.includes("drink") || cat.includes("beverage") || cat.includes("snack")) {
+  } else if (cat.includes("food") || cat.includes("drink") || cat.includes("beverage") || cat.includes("snack") || cat.includes("식품") || cat.includes("음식") || cat.includes("음료") || cat.includes("간식")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "zoom-in";
     duration = 10000;
     reason = "식품은 업비트 음악과 빠른 줌인으로 시선을 즉시 사로잡는 짧은 영상이 효과적입니다.";
-  } else if (cat.includes("tech") || cat.includes("electronic") || cat.includes("gadget") || cat.includes("phone")) {
+  } else if (cat.includes("tech") || cat.includes("electronic") || cat.includes("gadget") || cat.includes("phone") || cat.includes("테크") || cat.includes("전자") || cat.includes("가전") || cat.includes("스마트폰") || cat.includes("휴대폰")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "zoom-in";
     duration = 12000;
     reason = "테크 제품은 업비트 음악과 줌인으로 핵심 기능을 빠르게 보여주는 것이 좋습니다.";
-  } else if (cat.includes("home") || cat.includes("furniture") || cat.includes("interior") || cat.includes("lamp") || cat.includes("light")) {
+  } else if (cat.includes("home") || cat.includes("furniture") || cat.includes("interior") || cat.includes("lamp") || cat.includes("light") || cat.includes("홈") || cat.includes("가구") || cat.includes("인테리어") || cat.includes("조명") || cat.includes("램프")) {
     cardStyle = "magazine";
     musicMood = "calm";
     motionPreset = "zoom-out";
     duration = 16000;
     reason = "홈/인테리어는 매거진 스타일과 차분한 음악으로 공간 분위기를 전달하는 것이 효과적입니다.";
-  } else if (cat.includes("toy") || cat.includes("kid") || cat.includes("fun")) {
+  } else if (cat.includes("toy") || cat.includes("kid") || cat.includes("fun") || cat.includes("장난감") || cat.includes("완구") || cat.includes("유아") || cat.includes("키즈")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "kenburns";
     duration = 12000;
     hybridMode = "photo-to-comic";
     reason = "장난감/유아 상품은 업비트 음악과 만화 전환 효과로 재미를 살리는 것이 좋습니다.";
-  } else if (cat.includes("luxury") || cat.includes("jewel") || cat.includes("watch") || cat.includes("premium")) {
+  } else if (cat.includes("luxury") || cat.includes("jewel") || cat.includes("watch") || cat.includes("premium") || cat.includes("럭셔리") || cat.includes("명품") || cat.includes("주얼리") || cat.includes("시계") || cat.includes("프리미엄")) {
     cardStyle = "minimal";
     musicMood = "emotional";
     motionPreset = "slow-motion";
