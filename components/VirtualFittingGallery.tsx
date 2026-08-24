@@ -212,6 +212,7 @@ export function VirtualFittingGallery({
   const handleBatchDownload = useCallback(async () => {
     if (batchDownloading || results.length === 0) return;
     if (Platform.OS !== 'web') {
+      setBatchDownloading(true);
       for (const item of results) {
         try {
           await Share.share({ url: item.imageUrl, message: `${item.label} - AI 가상 피팅` });
@@ -219,6 +220,9 @@ export function VirtualFittingGallery({
           // share cancelled
         }
       }
+      setBatchDone(true);
+      setBatchDownloading(false);
+      setTimeout(() => setBatchDone(false), 2500);
       return;
     }
     setBatchDownloading(true);

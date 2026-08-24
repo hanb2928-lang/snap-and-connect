@@ -207,6 +207,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const handleBatchDownload = useCallback(async () => {
     if (batchDownloading || cuts.length === 0) return;
     if (Platform.OS !== 'web') {
+      setBatchDownloading(true);
       for (const cut of cuts) {
         try {
           await Share.share({ url: cut.imageUrl, message: `${cut.label} - 가상 컷` });
@@ -214,6 +215,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           // share cancelled
         }
       }
+      setBatchDone(true);
+      setBatchDownloading(false);
+      setTimeout(() => setBatchDone(false), 2500);
       return;
     }
     setBatchDownloading(true);
