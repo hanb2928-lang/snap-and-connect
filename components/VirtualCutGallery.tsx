@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  ScrollView,
   Platform,
   Modal,
   Pressable,
   Share,
 } from 'react-native';
-import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Maximize2 } from 'lucide-react-native';
+import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Maximize2, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { prepareImageForApi } from '@/lib/imageEdit';
@@ -237,9 +236,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
         <View style={styles.gallerySection}>
           {loading && cuts.length === 0 && (
             <View style={styles.loadingContainer}>
-              <View style={styles.loadingRow}>
+              <View style={styles.grid}>
                 {[0, 1, 2, 3].map((i) => (
-                  <View key={i} style={styles.skeletonCard}>
+                  <View key={i} style={styles.tileCard}>
                     <View style={styles.skeletonImage}>
                       <ActivityIndicator size="small" color={theme.colors.dark.textDim} />
                     </View>
@@ -256,41 +255,59 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
 
           {cuts.length > 0 && (
             <>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cutRow}
-              >
-                {cuts.map((cut, idx) => (
-                  <View key={cut.angle} style={styles.cutCardOuter}>
-                    <TouchableOpacity
-                      style={[
-                        styles.cutCard,
-                        selectedCut?.angle === cut.angle && styles.cutCardSelected,
-                      ]}
-                      onPress={() => handleUseCut(cut)}
-                      activeOpacity={0.8}
-                    >
-                      <Image
-                        source={{ uri: cut.imageUrl }}
-                        style={styles.cutImage}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.cutLabelWrap}>
-                        <Text style={styles.cutLabel}>{cut.label}</Text>
+              <View style={styles.grid}>
+                {cuts.map((cut, idx) => {
+                  const isSelected = selectedCut?.angle === cut.angle;
+                  const isDownloaded = downloaded === idx;
+                  return (
+                    <View key={cut.angle} style={styles.tileCard}>
+                      <TouchableOpacity
+                        style={[styles.tileImageWrap, isSelected && styles.tileImageWrapSelected]}
+                        onPress={() => handleUseCut(cut)}
+                        activeOpacity={0.85}
+                      >
+                        <Image
+                          source={{ uri: cut.imageUrl }}
+                          style={styles.tileImage}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.tileBadge}>
+                          <Text style={styles.tileBadgeText}>{cut.label}</Text>
+                        </View>
+                        {isSelected && (
+                          <View style={styles.tileSelectedCheck}>
+                            <Check size={14} color="#fff" strokeWidth={3} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      <View style={styles.tileActions}>
+                        <TouchableOpacity
+                          style={styles.tileActionBtn}
+                          onPress={() => openPreview(idx)}
+                          activeOpacity={0.7}
+                        >
+                          <Maximize2 size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={styles.tileActionText}>미리보기</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.tileActionBtn}
+                          onPress={() => handleDownload(cut.imageUrl, idx)}
+                          activeOpacity={0.7}
+                        >
+                          {isDownloaded ? (
+                            <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+                          ) : (
+                            <Download size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                          )}
+                          <Text style={[styles.tileActionText, isDownloaded && styles.tileActionTextDone]}>
+                            {isDownloaded ? '완료' : '저장'}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.previewBtn}
-                      onPress={() => openPreview(idx)}
-                      activeOpacity={0.7}
-                    >
-                      <Maximize2 size={11} color="#fff" strokeWidth={2.5} />
-                      <Text style={styles.previewBtnText}>미리보기</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
+                    </View>
+                  );
+                })}
+              </View>
 
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -492,29 +509,32 @@ const styles = StyleSheet.create({
   loadingContainer: {
     gap: theme.spacing.md,
   },
-  loadingRow: {
+  grid: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   progressWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
   },
   progressText: {
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.accent[400],
   },
-  skeletonCard: {
-    width: 100,
+  tileCard: {
+    width: '48.5%',
     gap: 6,
   },
   skeletonImage: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
@@ -525,54 +545,66 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.dark.surfaceLight,
   },
-  cutRow: {
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-  },
-  cutCardOuter: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  cutCard: {
-    width: 110,
+  tileImageWrap: {
+    width: '100%',
+    aspectRatio: 1,
     borderRadius: theme.radius.md,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
     backgroundColor: theme.colors.dark.surfaceLight,
+    position: 'relative',
   },
-  cutCardSelected: {
+  tileImageWrapSelected: {
     borderColor: theme.colors.accent[400],
   },
-  cutImage: {
+  tileImage: {
     width: '100%',
-    height: 110,
+    height: '100%',
   },
-  cutLabelWrap: {
-    paddingVertical: 6,
-    paddingHorizontal: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  cutLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  previewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: theme.colors.accent[500] + '30',
+  tileBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.accent[400] + '50',
   },
-  previewBtnText: {
+  tileBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  tileSelectedCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.accent[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tileActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  tileActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 2,
+  },
+  tileActionText: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.accent[400],
+    color: theme.colors.dark.textDim,
+  },
+  tileActionTextDone: {
+    color: theme.colors.success[400],
   },
   actionRow: {
     flexDirection: 'row',
