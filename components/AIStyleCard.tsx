@@ -64,6 +64,10 @@ export function AIStyleCard({
   const [applied, setApplied] = useState(false);
 
   const load = useCallback(async () => {
+    if (!productName && !productCategory) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     setApplied(false);

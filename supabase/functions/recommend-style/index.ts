@@ -34,8 +34,8 @@ Deno.serve(async (req: Request) => {
 
     if (!productName && !productCategory) {
       return new Response(
-        JSON.stringify({ error: "Product name or category is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify(fallbackRecommendation("product", String(platform || "shortform"))),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
