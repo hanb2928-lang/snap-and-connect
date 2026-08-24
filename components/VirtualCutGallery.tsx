@@ -198,32 +198,53 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
 
   const handleBatchDownload = useCallback(async () => {
     if (batchDownloading || cuts.length === 0) return;
+    if (Platform.OS !== 'web') {
+      for (const cut of cuts) {
+        try {
+          await Share.share({ url: cut.imageUrl, message: `${cut.label} - 가상 컷` });
+        } catch {
+          // share cancelled
+        }
+      }
+      return;
+    }
     setBatchDownloading(true);
+    let downloadedCount = 0;
     try {
       for (let i = 0; i < cuts.length; i++) {
-        const res = await fetch(cuts[i].imageUrl);
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = `virtual-cut-${i + 1}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-        if (i < cuts.length - 1) await new Promise((r) => setTimeout(r, 300));
+        try {
+          const res = await fetch(cuts[i].imageUrl);
+          const blob = await res.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = objectUrl;
+          a.download = `virtual-cut-${i + 1}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(objectUrl);
+          downloadedCount++;
+          if (i < cuts.length - 1) await new Promise((r) => setTimeout(r, 400));
+        } catch {
+          // individual download failed, continue with rest
+        }
       }
-      setBatchDone(true);
-      setTimeout(() => setBatchDone(false), 2500);
+      if (downloadedCount > 0) {
+        setBatchDone(true);
+        setTimeout(() => setBatchDone(false), 2500);
+      }
+      if (downloadedCount < cuts.length) {
+        setError(`${cuts.length}장 중 ${downloadedCount}장만 저장되었습니다. 네트워크를 확인 후 다시 시도해주세요.`);
+      }
     } catch {
-      // batch download failed silently
+      setError('일괄 저장 중 오류가 발생했습니다.');
     }
     setBatchDownloading(false);
   }, [batchDownloading, cuts]);
 
   const handleShare = useCallback(async (url: string, label: string, index: number) => {
     try {
-      if (Platform.OS === 'web' && navigator.share) {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.share) {
         const res = await fetch(url);
         const blob = await res.blob();
         const file = new File([blob], `virtual-cut-${index + 1}.png`, { type: 'image/png' });
@@ -239,8 +260,10 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       }
       setShared(index);
       setTimeout(() => setShared(null), 2000);
-    } catch {
-      // share cancelled or failed
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError('공유 중 오류가 발생했습니다.');
+      }
     }
   }, []);
 
@@ -337,7 +360,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                           onPress={() => openPreview(idx)}
                           activeOpacity={0.7}
                         >
-                          <Maximize2 size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                          <Maximize2 size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
                           <Text style={styles.tileActionText}>미리보기</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -346,12 +369,12 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                           activeOpacity={0.7}
                         >
                           {shared === idx ? (
-                            <Check size={13} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                            <Check size={12} color={theme.colors.accent[400]} strokeWidth={2.5} />
                           ) : (
-                            <Share2 size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                            <Share2 size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
                           )}
                           <Text style={[styles.tileActionText, shared === idx && styles.tileActionTextShared]}>
-                            {shared === idx ? '공유됨' : '공유'}
+                            {shared === idx ? '공유' : '공유'}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -360,9 +383,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                           activeOpacity={0.7}
                         >
                           {isDownloaded ? (
-                            <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+                            <Check size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
                           ) : (
-                            <Download size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                            <Download size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
                           )}
                           <Text style={[styles.tileActionText, isDownloaded && styles.tileActionTextDone]}>
                             {isDownloaded ? '완료' : '저장'}
@@ -488,6 +511,20 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                   <>
                     <Download size={15} color="#fff" strokeWidth={2} />
                     <Text style={styles.previewActionText}>저장</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.previewActionBtn}
+                onPress={() => previewCut && handleShare(previewCut.imageUrl, previewCut.label, previewIndex)}
+                activeOpacity={0.7}
+              >
+                {shared === previewIndex ? (
+                  <Text style={styles.previewActionText}>공유됨</Text>
+                ) : (
+                  <>
+                    <Share2 size={15} color="#fff" strokeWidth={2} />
+                    <Text style={styles.previewActionText}>공유</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -674,17 +711,19 @@ const styles = StyleSheet.create({
   },
   tileActions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     paddingHorizontal: 2,
   },
   tileActionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   tileActionText: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
