@@ -8,8 +8,12 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Modal,
+  Dimensions,
+  Pressable,
+  Share,
 } from 'react-native';
-import { Camera, Sparkles, RefreshCw, ChevronRight } from 'lucide-react-native';
+import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Maximize2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { prepareImageForApi } from '@/lib/imageEdit';
@@ -36,12 +40,17 @@ const PROGRESS_MESSAGES = [
   '거의 완성되었습니다. 조금만 기다려주세요...',
 ];
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 export function VirtualCutGallery({ imageDataUrl, productName, productCategory, onUseImage }: VirtualCutGalleryProps) {
   const [cuts, setCuts] = useState<VirtualCut[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [selectedCut, setSelectedCut] = useState<VirtualCut | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number>(-1);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [downloaded, setDownloaded] = useState<number | null>(null);
   const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressStepRef = useRef(0);
@@ -130,12 +139,62 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       if (onUseImage) {
         onUseImage(cut.imageUrl);
       }
-      if (Platform.OS === 'web') {
-        window.open(cut.imageUrl, '_blank');
-      }
     },
     [onUseImage],
   );
+
+  const openPreview = useCallback((index: number) => {
+    setPreviewIndex(index);
+    setImageLoaded(false);
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewIndex(-1);
+    setImageLoaded(false);
+    setDownloaded(null);
+  }, []);
+
+  const goPrev = useCallback(() => {
+    setImageLoaded(false);
+    setDownloaded(null);
+    setPreviewIndex((i) => (i > 0 ? i - 1 : cuts.length - 1));
+  }, [cuts.length]);
+
+  const goNext = useCallback(() => {
+    setImageLoaded(false);
+    setDownloaded(null);
+    setPreviewIndex((i) => (i < cuts.length - 1 ? i + 1 : 0));
+  }, [cuts.length]);
+
+  const handleDownload = useCallback(async (url: string, index: number) => {
+    try {
+      if (Platform.OS === 'web') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `virtual-cut-${index + 1}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        await Share.share({ url, message: '가상 컷 이미지' });
+      }
+      setDownloaded(index);
+      setTimeout(() => setDownloaded(null), 2000);
+    } catch {
+      // download failed silently
+    }
+  }, []);
+
+  const handlePreviewUse = useCallback(() => {
+    if (previewIndex < 0 || previewIndex >= cuts.length) return;
+    const cut = cuts[previewIndex];
+    setSelectedCut(cut);
+    if (onUseImage) onUseImage(cut.imageUrl);
+    closePreview();
+  }, [previewIndex, cuts, onUseImage, closePreview]);
+
+  const previewVisible = previewIndex >= 0 && previewIndex < cuts.length;
+  const previewCut = previewVisible ? cuts[previewIndex] : null;
 
   return (
     <View style={styles.container}>
@@ -201,25 +260,34 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.cutRow}
               >
-                {cuts.map((cut) => (
-                  <TouchableOpacity
-                    key={cut.angle}
-                    style={[
-                      styles.cutCard,
-                      selectedCut?.angle === cut.angle && styles.cutCardSelected,
-                    ]}
-                    onPress={() => handleUseCut(cut)}
-                    activeOpacity={0.8}
-                  >
-                    <Image
-                      source={{ uri: cut.imageUrl }}
-                      style={styles.cutImage}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.cutLabelWrap}>
-                      <Text style={styles.cutLabel}>{cut.label}</Text>
-                    </View>
-                  </TouchableOpacity>
+                {cuts.map((cut, idx) => (
+                  <View key={cut.angle} style={styles.cutCardOuter}>
+                    <TouchableOpacity
+                      style={[
+                        styles.cutCard,
+                        selectedCut?.angle === cut.angle && styles.cutCardSelected,
+                      ]}
+                      onPress={() => handleUseCut(cut)}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={{ uri: cut.imageUrl }}
+                        style={styles.cutImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.cutLabelWrap}>
+                        <Text style={styles.cutLabel}>{cut.label}</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.previewBtn}
+                      onPress={() => openPreview(idx)}
+                      activeOpacity={0.7}
+                    >
+                      <Maximize2 size={11} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.previewBtnText}>미리보기</Text>
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </ScrollView>
 
@@ -248,6 +316,92 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           )}
         </View>
       )}
+
+      <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={closePreview}>
+        <Pressable style={styles.previewOverlay} onPress={closePreview}>
+          <View style={styles.previewHeader}>
+            <TouchableOpacity onPress={closePreview} style={styles.previewHeaderBtn} hitSlop={12}>
+              <X size={22} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <Text style={styles.previewTitle}>{previewCut?.label || '미리보기'}</Text>
+            <View style={styles.previewHeaderSpacer} />
+          </View>
+
+          <Pressable style={styles.previewImageWrap} onPress={(e) => e.stopPropagation()}>
+            {!imageLoaded && (
+              <View style={styles.previewLoadingWrap}>
+                <ActivityIndicator size="large" color={theme.colors.accent[400]} />
+              </View>
+            )}
+            {previewCut && (
+              <Image
+                source={{ uri: previewCut.imageUrl }}
+                style={styles.previewImage}
+                resizeMode="contain"
+                onLoad={() => setImageLoaded(true)}
+              />
+            )}
+
+            {cuts.length > 1 && (
+              <>
+                <TouchableOpacity
+                  style={[styles.previewNavBtn, styles.previewNavLeft]}
+                  onPress={goPrev}
+                  activeOpacity={0.7}
+                >
+                  <ChevronLeft size={26} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.previewNavBtn, styles.previewNavRight]}
+                  onPress={goNext}
+                  activeOpacity={0.7}
+                >
+                  <ChevronRight size={26} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+
+          <Pressable style={styles.previewFooter} onPress={(e) => e.stopPropagation()}>
+            {cuts.length > 1 && (
+              <View style={styles.previewDots}>
+                {cuts.map((c, i) => (
+                  <View
+                    key={c.angle}
+                    style={[styles.previewDot, i === previewIndex && styles.previewDotActive]}
+                  />
+                ))}
+              </View>
+            )}
+            <View style={styles.previewActions}>
+              <TouchableOpacity
+                style={styles.previewActionBtn}
+                onPress={() => previewCut && handleDownload(previewCut.imageUrl, previewIndex)}
+                activeOpacity={0.7}
+              >
+                {downloaded === previewIndex ? (
+                  <Text style={styles.previewActionText}>저장됨</Text>
+                ) : (
+                  <>
+                    <Download size={15} color="#fff" strokeWidth={2} />
+                    <Text style={styles.previewActionText}>저장</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {onUseImage && (
+                <TouchableOpacity
+                  style={[styles.previewActionBtn, styles.previewActionPrimary]}
+                  onPress={handlePreviewUse}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.previewActionText}>이 컷 사용</Text>
+                  <ChevronRight size={15} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -374,6 +528,10 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },
+  cutCardOuter: {
+    alignItems: 'center',
+    gap: 6,
+  },
   cutCard: {
     width: 110,
     borderRadius: theme.radius.md,
@@ -398,6 +556,22 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.micro,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.colors.accent[500] + '30',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '50',
+  },
+  previewBtnText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[400],
   },
   actionRow: {
     flexDirection: 'row',
@@ -426,6 +600,122 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
   },
   useBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+  },
+  previewHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  previewHeaderSpacer: {
+    width: 36,
+  },
+  previewImageWrap: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewLoadingWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+  },
+  previewNavBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewNavLeft: {
+    left: theme.spacing.sm,
+  },
+  previewNavRight: {
+    right: theme.spacing.sm,
+  },
+  previewFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 40,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  previewDots: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  previewDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  previewDotActive: {
+    backgroundColor: theme.colors.accent[400],
+    width: 20,
+    borderRadius: 3.5,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  previewActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+  },
+  previewActionPrimary: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  previewActionText: {
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
