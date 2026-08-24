@@ -6,13 +6,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Modal,
+  ScrollView,
   type ViewStyle,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown } from 'lucide-react-native';
+import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
+import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
@@ -1012,6 +1015,8 @@ export function ComicShortGenerator({
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [fittingModalOpen, setFittingModalOpen] = useState(false);
+  const [fittingResultUrl, setFittingResultUrl] = useState<string | null>(null);
   const [moodTemplate, setMoodTemplate] = useState<MoodTemplate>('energetic-popart');
   const [panelLayout, setPanelLayout] = useState<PanelLayout>('single');
   const [comicDuration, setComicDuration] = useState<ComicDuration>(15000);
@@ -1805,6 +1810,20 @@ export function ComicShortGenerator({
               isVertical
               maxHeight={380}
             />
+            <TouchableOpacity
+              style={styles.fittingFloatBtn}
+              onPress={() => setFittingModalOpen(true)}
+              activeOpacity={0.85}
+            >
+              <Shirt size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.fittingFloatText}>내 몸에 입어보기</Text>
+            </TouchableOpacity>
+            {fittingResultUrl && (
+              <View style={styles.fittingResultBadge}>
+                <Check size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
+                <Text style={styles.fittingResultText}>피팅 완료 — 갤러리에서 확인</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.directShareBox}>
@@ -1919,6 +1938,54 @@ export function ComicShortGenerator({
           <AlertCircle size={16} color={theme.colors.error[400]} strokeWidth={2} />
           <Text style={styles.errorText}>생성 실패. 다시 시도해주세요.</Text>
         </View>
+      )}
+
+      {fittingModalOpen && (
+        <Modal
+          visible
+          animationType="slide"
+          transparent
+          onRequestClose={() => setFittingModalOpen(false)}
+        >
+          <View style={styles.fittingModalBackdrop}>
+            <View style={styles.fittingModalCard}>
+              <View style={styles.fittingModalHeader}>
+                <View style={styles.fittingModalTitleWrap}>
+                  <View style={styles.fittingModalIcon}>
+                    <Shirt size={18} color={theme.colors.success[400]} strokeWidth={2} />
+                  </View>
+                  <View>
+                    <Text style={styles.fittingModalTitle}>내 몸에 입어보기</Text>
+                    <Text style={styles.fittingModalSubtitle}>숏폼 속 상품을 AI 모델에게 입혀보세요</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setFittingModalOpen(false)}
+                  style={styles.fittingCloseBtn}
+                  activeOpacity={0.7}
+                >
+                  <X size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.fittingModalScroll}
+                contentContainerStyle={styles.fittingModalContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <VirtualFittingGallery
+                  imageDataUrl={safeImageUrl}
+                  productName={productName}
+                  productCategory={productCategory}
+                  onUseImage={(url) => {
+                    setFittingResultUrl(url);
+                    setFittingModalOpen(false);
+                    showToast('가상 피팅 결과가 완성됐어요');
+                  }}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       )}
 
       {toast && (
@@ -2167,6 +2234,94 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginVertical: theme.spacing.sm,
+  },
+  fittingFloatBtn: {
+    position: 'absolute',
+    right: theme.spacing.sm,
+    bottom: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.success[500],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.card,
+  },
+  fittingFloatText: {
+    color: '#fff',
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  fittingResultBadge: {
+    position: 'absolute',
+    left: theme.spacing.sm,
+    bottom: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dark.surface,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 7,
+    borderRadius: theme.radius.full,
+  },
+  fittingResultText: {
+    color: theme.colors.success[400],
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.medium,
+  },
+  fittingModalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.68)',
+  },
+  fittingModalCard: {
+    maxHeight: '88%',
+    backgroundColor: theme.colors.dark.bg,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    overflow: 'hidden',
+  },
+  fittingModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.dark.surfaceLight,
+  },
+  fittingModalTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  fittingModalIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fittingModalTitle: {
+    color: theme.colors.dark.text,
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  fittingModalSubtitle: {
+    color: theme.colors.dark.textDim,
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    marginTop: 2,
+  },
+  fittingCloseBtn: {
+    padding: theme.spacing.xs,
+  },
+  fittingModalScroll: {
+    flexGrow: 0,
+  },
+  fittingModalContent: {
+    padding: theme.spacing.md,
   },
   doneNotice: {
     fontSize: theme.typography.caption,
