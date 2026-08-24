@@ -96,8 +96,28 @@ async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
 function ensureDataUrl(imageDataUrl: string, mimeType: string): string {
   if (!imageDataUrl) return "";
   const trimmed = imageDataUrl.trim().replace(/\s/g, "");
-  if (trimmed.startsWith("data:")) return trimmed;
-  return `data:${mimeType};base64,${trimmed}`;
+  if (trimmed.startsWith("data:")) {
+    const match = trimmed.match(/^data:([^;,]+);base64,(.+)$/s);
+    if (match) {
+      const [, declaredMime, b64] = match;
+      if (declaredMime.startsWith("image/")) return trimmed;
+      const detected = detectImageMime(b64);
+      if (detected) return `data:${detected};base64,${b64}`;
+    }
+    return trimmed;
+  }
+  const detected = detectImageMime(trimmed);
+  const finalMime = detected || mimeType;
+  return `data:${finalMime};base64,${trimmed}`;
+}
+
+function detectImageMime(b64: string): string | null {
+  const clean = b64.replace(/\s/g, "");
+  if (clean.startsWith("iVBORw0KGgo")) return "image/png";
+  if (clean.startsWith("/9j/")) return "image/jpeg";
+  if (clean.startsWith("R0lGOD")) return "image/gif";
+  if (clean.startsWith("UklGR")) return "image/webp";
+  return null;
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {
@@ -240,7 +260,7 @@ async function editWithOpenAI(
 function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
   const formData = new FormData();
 
-  const base64Match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  const base64Match = imageDataUrl.match(/^data:image\/([\w+]+);base64,(.+)$/s);
   if (!base64Match) throw new Error("Invalid image data URL");
 
   const imgFormat = base64Match[1];

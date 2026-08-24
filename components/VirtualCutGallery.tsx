@@ -113,6 +113,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${supabaseAnonKey}`,
+            apikey: supabaseAnonKey,
           },
           signal: controller.signal,
           body: JSON.stringify({

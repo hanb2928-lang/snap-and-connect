@@ -191,23 +191,24 @@ export async function prepareImageForApi(
   maxDimension = 1024,
   quality = 0.8,
 ): Promise<string> {
+  const normalizedDataUrl = normalizeImageDataUrl(dataUrl);
   if (Platform.OS === 'web') {
     try {
-      const img = await loadImageElement(dataUrl);
+      const img = await loadImageElement(normalizedDataUrl);
       const canvas = document.createElement('canvas');
       const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
       const ctx = canvas.getContext('2d');
-      if (!ctx) return dataUrl;
+      if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       return canvas.toDataURL('image/jpeg', quality);
     } catch {
-      return dataUrl;
+      return normalizedDataUrl;
     }
   }
 
-  const { width: origW, height: origH } = await getImageSize(dataUrl);
+  const { width: origW, height: origH } = await getImageSize(normalizedDataUrl);
   const longer = Math.max(origW, origH);
   const actions =
     longer > maxDimension
@@ -216,7 +217,7 @@ export async function prepareImageForApi(
         : [{ resize: { height: maxDimension } }]
       : [];
   const manipulated = await ImageManipulator.manipulateAsync(
-    dataUrl,
+    normalizedDataUrl,
     actions,
     { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
   );
@@ -233,23 +234,24 @@ export async function prepareImageForEdit(
   dataUrl: string,
   maxDimension = 1024,
 ): Promise<string> {
+  const normalizedDataUrl = normalizeImageDataUrl(dataUrl);
   if (Platform.OS === 'web') {
     try {
-      const img = await loadImageElement(dataUrl);
+      const img = await loadImageElement(normalizedDataUrl);
       const canvas = document.createElement('canvas');
       const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
       const ctx = canvas.getContext('2d');
-      if (!ctx) return dataUrl;
+      if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       return canvas.toDataURL('image/png');
     } catch {
-      return dataUrl;
+      return normalizedDataUrl;
     }
   }
 
-  const { width: origW, height: origH } = await getImageSize(dataUrl);
+  const { width: origW, height: origH } = await getImageSize(normalizedDataUrl);
   const longer = Math.max(origW, origH);
   const actions =
     longer > maxDimension
@@ -258,7 +260,7 @@ export async function prepareImageForEdit(
         : [{ resize: { height: maxDimension } }]
       : [];
   const manipulated = await ImageManipulator.manipulateAsync(
-    dataUrl,
+    normalizedDataUrl,
     actions,
     { compress: 1, format: ImageManipulator.SaveFormat.PNG },
   );
@@ -269,6 +271,26 @@ export async function prepareImageForEdit(
     encoding: FileSystem.EncodingType.Base64,
   });
   return `data:image/png;base64,${base64}`;
+}
+
+function normalizeImageDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:([^;,]+);base64,(.+)$/s);
+  if (!match) return dataUrl;
+  const [, mimeType, base64] = match;
+  if (mimeType.startsWith('image/')) return dataUrl;
+
+  const normalizedBase64 = base64.replace(/\s/g, '');
+  const detectedMime = normalizedBase64.startsWith('iVBORw0KGgo')
+    ? 'image/png'
+    : normalizedBase64.startsWith('/9j/')
+      ? 'image/jpeg'
+      : normalizedBase64.startsWith('R0lGOD')
+        ? 'image/gif'
+        : normalizedBase64.startsWith('UklGR')
+          ? 'image/webp'
+          : null;
+
+  return detectedMime ? `data:${detectedMime};base64,${normalizedBase64}` : dataUrl;
 }
 
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {
