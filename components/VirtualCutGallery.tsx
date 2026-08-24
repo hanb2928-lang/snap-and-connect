@@ -11,7 +11,7 @@ import {
   Pressable,
   Share,
 } from 'react-native';
-import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Maximize2, Check } from 'lucide-react-native';
+import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Maximize2, Check, PackageCheck, Share2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { prepareImageForApi } from '@/lib/imageEdit';
@@ -47,6 +47,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const [previewIndex, setPreviewIndex] = useState<number>(-1);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [downloaded, setDownloaded] = useState<number | null>(null);
+  const [batchDownloading, setBatchDownloading] = useState(false);
+  const [batchDone, setBatchDone] = useState(false);
+  const [shared, setShared] = useState<number | null>(null);
   const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressStepRef = useRef(0);
@@ -193,6 +196,54 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     closePreview();
   }, [previewIndex, cuts, onUseImage, closePreview]);
 
+  const handleBatchDownload = useCallback(async () => {
+    if (batchDownloading || cuts.length === 0) return;
+    setBatchDownloading(true);
+    try {
+      for (let i = 0; i < cuts.length; i++) {
+        const res = await fetch(cuts[i].imageUrl);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `virtual-cut-${i + 1}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+        if (i < cuts.length - 1) await new Promise((r) => setTimeout(r, 300));
+      }
+      setBatchDone(true);
+      setTimeout(() => setBatchDone(false), 2500);
+    } catch {
+      // batch download failed silently
+    }
+    setBatchDownloading(false);
+  }, [batchDownloading, cuts]);
+
+  const handleShare = useCallback(async (url: string, label: string, index: number) => {
+    try {
+      if (Platform.OS === 'web' && navigator.share) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const file = new File([blob], `virtual-cut-${index + 1}.png`, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: label, text: `${label} - 가상 컷` });
+        } else {
+          await navigator.share({ title: label, text: `${label} - 가상 컷`, url });
+        }
+      } else if (Platform.OS !== 'web') {
+        await Share.share({ url, message: `${label} - 가상 컷` });
+      } else {
+        window.open(url, '_blank');
+      }
+      setShared(index);
+      setTimeout(() => setShared(null), 2000);
+    } catch {
+      // share cancelled or failed
+    }
+  }, []);
+
   const previewVisible = previewIndex >= 0 && previewIndex < cuts.length;
   const previewCut = previewVisible ? cuts[previewIndex] : null;
 
@@ -291,6 +342,20 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.tileActionBtn}
+                          onPress={() => handleShare(cut.imageUrl, cut.label, idx)}
+                          activeOpacity={0.7}
+                        >
+                          {shared === idx ? (
+                            <Check size={13} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                          ) : (
+                            <Share2 size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                          )}
+                          <Text style={[styles.tileActionText, shared === idx && styles.tileActionTextShared]}>
+                            {shared === idx ? '공유됨' : '공유'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.tileActionBtn}
                           onPress={() => handleDownload(cut.imageUrl, idx)}
                           activeOpacity={0.7}
                         >
@@ -307,6 +372,26 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                     </View>
                   );
                 })}
+              </View>
+
+              <View style={styles.batchRow}>
+                <TouchableOpacity
+                  style={[styles.batchBtn, batchDone && styles.batchBtnDone]}
+                  onPress={handleBatchDownload}
+                  disabled={batchDownloading}
+                  activeOpacity={0.7}
+                >
+                  {batchDone ? (
+                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  ) : batchDownloading ? (
+                    <ActivityIndicator size={14} color={theme.colors.accent[400]} />
+                  ) : (
+                    <PackageCheck size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  )}
+                  <Text style={[styles.batchBtnText, batchDone && styles.batchBtnTextDone]}>
+                    {batchDone ? '모두 저장됨' : batchDownloading ? '저장 중...' : `전체 ${cuts.length}장 저장`}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.actionRow}>
@@ -589,7 +674,7 @@ const styles = StyleSheet.create({
   },
   tileActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     paddingHorizontal: 2,
   },
   tileActionBtn: {
@@ -604,6 +689,36 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
   },
   tileActionTextDone: {
+    color: theme.colors.success[400],
+  },
+  tileActionTextShared: {
+    color: theme.colors.accent[400],
+  },
+  batchRow: {
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+  },
+  batchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.accent[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[500] + '40',
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+  },
+  batchBtnDone: {
+    borderColor: theme.colors.success[500] + '60',
+    backgroundColor: theme.colors.success[500] + '15',
+  },
+  batchBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  batchBtnTextDone: {
     color: theme.colors.success[400],
   },
   actionRow: {
