@@ -40,8 +40,8 @@ Deno.serve(async (req: Request) => {
 
     if (!body.productCategory) {
       return new Response(
-        JSON.stringify({ error: "Product category is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify(generateLocalTrendMatch({ productCategory: "product", productName: body.productName, platform: body.platform })),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

@@ -115,7 +115,7 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
     } catch (err) {
       setTemplates(DEFAULT_TEMPLATES);
       setInsight('기본 트렌드 템플릿을 표시하고 있어요.');
-      const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+      const isTimeout = err instanceof Error && (err.name === 'AbortError' || (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError'));
       setError(isTimeout
         ? '트렌드 분석 응답이 지연되었습니다. 잠시 후 다시 시도해주세요.'
         : friendlyError(err, '트렌드 분석에 실패했습니다. 잠시 후 다시 시도해주세요.'));
