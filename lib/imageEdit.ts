@@ -169,7 +169,7 @@ async function compositeOnBackgroundWeb(productDataUrl: string, bgUrl: string): 
 function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
     img.src = src;
@@ -192,15 +192,19 @@ export async function prepareImageForApi(
   quality = 0.8,
 ): Promise<string> {
   if (Platform.OS === 'web') {
-    const img = await loadImageElement(dataUrl);
-    const canvas = document.createElement('canvas');
-    const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas 컨텍스트 생성 실패');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', quality);
+    try {
+      const img = await loadImageElement(dataUrl);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return dataUrl;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg', quality);
+    } catch {
+      return dataUrl;
+    }
   }
 
   const { width: origW, height: origH } = await getImageSize(dataUrl);
@@ -230,15 +234,19 @@ export async function prepareImageForEdit(
   maxDimension = 1024,
 ): Promise<string> {
   if (Platform.OS === 'web') {
-    const img = await loadImageElement(dataUrl);
-    const canvas = document.createElement('canvas');
-    const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas 컨텍스트 생성 실패');
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
+    try {
+      const img = await loadImageElement(dataUrl);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return dataUrl;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    } catch {
+      return dataUrl;
+    }
   }
 
   const { width: origW, height: origH } = await getImageSize(dataUrl);

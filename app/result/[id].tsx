@@ -181,8 +181,18 @@ export default function ResultScreen() {
         }
       } catch {
         if (!cancelled) {
-          setCaptureImageUrl(url);
-          setCaptureImageError(true);
+          try {
+            const fallbackDataUrl = await urlToDataUrl(url);
+            if (!cancelled) {
+              setCaptureImageUrl(fallbackDataUrl);
+              setCaptureImageError(false);
+            }
+          } catch {
+            if (!cancelled) {
+              setCaptureImageUrl(url);
+              setCaptureImageError(true);
+            }
+          }
         }
       }
     })();
