@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Music2, Clapperboard, Type, Zap, Copy, Check, ChevronDown, ChevronUp, TrendingUp, Headphones } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { friendlyError } from '@/lib/errors';
 import { TREND_MATCH_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
 
@@ -110,7 +111,7 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
     } catch (err) {
       setTemplates(DEFAULT_TEMPLATES);
       setInsight('기본 트렌드 템플릿을 표시하고 있어요.');
-      setError(null);
+      setError(friendlyError(err, '트렌드 분석에 실패했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
       setLoading(false);
     }

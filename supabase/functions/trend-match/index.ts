@@ -113,35 +113,43 @@ async function generateWithOpenAI(
     `제품명: ${data.productName || ""}\n` +
     `플랫폼: ${data.platform || "종합"}`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 1500,
-      temperature: 0.85,
-      response_format: { type: "json_object" },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 1500,
+        temperature: 0.85,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    const content = result.choices?.[0]?.message?.content;
+    if (!content) throw new Error("No content returned from OpenAI");
+
+    const parsed = JSON.parse(content);
+    return normalizeResponse(parsed);
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const result = await response.json();
-  const content = result.choices?.[0]?.message?.content;
-  if (!content) throw new Error("No content returned from OpenAI");
-
-  const parsed = JSON.parse(content);
-  return normalizeResponse(parsed);
 }
 
 function normalizeResponse(raw: Record<string, unknown>): TrendMatchResponse {
@@ -196,7 +204,7 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
         bgmTempo: "120-140 BPM",
         subtitleStyle: "팝업 애니메이션 + 카운터 효과",
         transitionStyle: "와이프 + 플래시",
-        hashtagSuggestions: ["#unboxing", "#가격충격", "#fashionfind", "# finds"],
+        hashtagSuggestions: ["#unboxing", "#가격충격", "#fashionfind", "#finds"],
       },
     ],
     beauty: [
@@ -283,7 +291,7 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
         bgmTempo: "110-130 BPM",
         subtitleStyle: "볼드 중앙 + 팝업",
         transitionStyle: "와이프 + 타임랩스",
-        hashtagSuggestions: ["#hometransform", "#공간변신", "#인테리어해", "#homefinds"],
+        hashtagSuggestions: ["#hometransform", "#공간변신", "#인테리어", "#homefinds"],
       },
     ],
     food: [
@@ -313,6 +321,64 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
         subtitleStyle: "스텝 카운터 + 볼드",
         transitionStyle: "와이프 + 글리치",
         hashtagSuggestions: ["#recipe", "#15초레시피", "#요리", "#easyrecipe"],
+      },
+    ],
+    toy: [
+      {
+        name: "장난감 언박싱 쇼크",
+        description: "박스 오픈 순간의 반응을 클로즈업으로 보여주는 키즈 숏폼",
+        bgmMood: "업비트 팝 / K-pop",
+        bgmTempo: "120-140 BPM",
+        subtitleStyle: "큰 볼드 + 이모지 팝업",
+        transitionStyle: "줌 인 + 플래시",
+        hashtagSuggestions: ["#unboxing", "#장난감", "#toys", "#키즈"],
+      },
+      {
+        name: "만화 전환 매직",
+        description: "실사에서 만화 스타일로 전환되는 재미 요소 숏폼",
+        bgmMood: "트렌디 신스팝 / Pop",
+        bgmTempo: "110-130 BPM",
+        subtitleStyle: "팝업 애니메이션 + 볼드",
+        transitionStyle: "글리치 + 만화 전환",
+        hashtagSuggestions: ["#cartoon", "#만화", "#fun", "#키즈숏폼"],
+      },
+      {
+        name: "ASMR 장난감 힐링",
+        description: "장난감 소리를 ASMR로 담는 차분한 키즈 콘텐츠",
+        bgmMood: "ASMR / Ambience",
+        bgmTempo: "50-70 BPM",
+        subtitleStyle: "미니멀 하단 + 페이드",
+        transitionStyle: "슬로우 줌",
+        hashtagSuggestions: ["#asmr", "#toysasmr", "#힐링", "#키즈"],
+      },
+    ],
+    luxury: [
+      {
+        name: "럭셔리 무비 룩북",
+        description: "슬로우 모션으로 제품의 고급스러움을 감성적으로 담는 숏폼",
+        bgmMood: "잔잔한 클래식 / Ambient",
+        bgmTempo: "60-80 BPM",
+        subtitleStyle: "미니멀 세리프 하단 + 페이드",
+        transitionStyle: "크로스 디졸브 + 슬로우 줌",
+        hashtagSuggestions: ["#luxury", "#럭셔리", "#premium", "#명품"],
+      },
+      {
+        name: "언박싱 시네마",
+        description: "고급 패키지 오픈을 영화처럼 담는 감성 언박싱",
+        bgmMood: "감성 R&B / Lo-fi",
+        bgmTempo: "70-90 BPM",
+        subtitleStyle: "미니멀 중앙 + 타이핑 효과",
+        transitionStyle: "슬로우 줌 + 페이드",
+        hashtagSuggestions: ["#unboxing", "#luxury", "#명품언박싱", "#premium"],
+      },
+      {
+        name: "디테일 클로즈업",
+        description: "제품의 디테일을 클로즈업으로 보여주는 미니멀 럭셔리",
+        bgmMood: "잔잔한 Piano / Ambient",
+        bgmTempo: "60-80 BPM",
+        subtitleStyle: "미니멀 하단 + 페이드",
+        transitionStyle: "슬로우 줌",
+        hashtagSuggestions: ["#luxury", "#detail", "#명품", "#premium"],
       },
     ],
   };
@@ -348,11 +414,13 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
   ];
 
   const categoryMap: Record<string, string[]> = {
-    fashion: ['fashion', '패션', '의류', '옷', '신발', 'sneakers', 'shoes', 'apparel', '의류'],
-    beauty: ['beauty', '뷰티', '화장품', 'skincare', 'cosmetics', '메이크업', '피부'],
-    electronics: ['electronics', '디지털', '전자', '가전', 'tech', 'gadget', '기기'],
-    home: ['home', '홈', '인테리어', '가구', 'living', '주방', 'kitchen', '생활'],
-    food: ['food', '식품', '음식', '먹방', '요리', 'kitchen', 'snack'],
+    fashion: ['fashion', '패션', '의류', '옷', '신발', 'sneakers', 'shoes', 'apparel', 'cloth', 'jacket', 'shirt', '자켓', '셔츠'],
+    beauty: ['beauty', '뷰티', '화장품', 'skincare', 'cosmetics', '메이크업', '피부', 'makeup'],
+    electronics: ['electronics', '디지털', '전자', '가전', 'tech', 'gadget', '기기', 'phone', '스마트폰', '휴대폰'],
+    home: ['home', '홈', '인테리어', '가구', 'living', '주방', 'kitchen', '생활', 'furniture', 'lamp', 'light', '조명', '램프'],
+    food: ['food', '식품', '음식', '먹방', '요리', 'snack', 'drink', 'beverage', '음료', '간식'],
+    toy: ['toy', '장난감', '완구', 'kid', '유아', '키즈', 'fun'],
+    luxury: ['luxury', '럭셔리', '명품', 'jewel', '주얼리', 'watch', '시계', 'premium', '프리미엄'],
   };
 
   const matchedKey = Object.keys(categoryMap).find((key) =>
@@ -366,6 +434,8 @@ function generateLocalTrendMatch(data: TrendMatchRequest): TrendMatchResponse {
     electronics: "테크는 3초 클로즈업 데모와 가성비 강조가 시선을 잡아요",
     home: "홈/인테리어는 비포애프터 공간 변화가 가장 바이럴이 잘 나요",
     food: "푸드는 첫 반응 클로즈업과 ASMR 조리 소리가 핵심이에요",
+    toy: "키즈/장난감은 언박싱 반응과 만화 전환 효과가 시선을 잡아요",
+    luxury: "럭셔리는 슬로우 모션과 디테일 클로즈업으로 고급스러움을 살려요",
   };
 
   const categoryInsight = matchedKey
