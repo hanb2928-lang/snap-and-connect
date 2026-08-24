@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -34,6 +34,7 @@ import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
+import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -289,6 +290,34 @@ export default function CameraScreen() {
   const handlePickImage = async () => {
     if (processing) return;
 
+    if (isWebPlatform()) {
+      try {
+        const images = await pickImageWeb(recognitionMode === 'multi', 4 - multiShots.length);
+        if (images.length === 0) return;
+
+        if (recognitionMode === 'multi') {
+          const newShots = images.map((img) => cleanBase64(img.base64));
+          setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
+          return;
+        }
+
+        setProcessing(true);
+        setError(null);
+        setProgressStep(0);
+        setProgressText('사진 선택 중...');
+        progressWidth.value = withTiming(0.1, { duration: 200 });
+        fadeAnim.value = 0;
+
+        const img = images[0];
+        const cleanB64 = cleanBase64(img.base64);
+        await processImage(cleanB64, img.uri, img.mimeType);
+      } catch (err) {
+        setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
+        setProcessing(false);
+      }
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -343,25 +372,38 @@ export default function CameraScreen() {
     fadeAnim.value = 0;
 
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        base64: true,
-        quality: 0.7,
-      });
+      let cleanB64: string;
+      let mimeType: string;
 
-      if (result.canceled || !result.assets?.[0]?.base64) {
-        setProcessing(false);
-        return;
-      }
+      if (isWebPlatform()) {
+        const images = await pickImageWeb(false, 1);
+        if (images.length === 0) {
+          setProcessing(false);
+          return;
+        }
+        cleanB64 = cleanBase64(images[0].base64);
+        mimeType = images[0].mimeType;
+      } else {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          base64: true,
+          quality: 0.7,
+        });
 
-      const asset = result.assets[0];
-      const b64 = asset.base64;
-      if (!b64) {
-        setProcessing(false);
-        return;
+        if (result.canceled || !result.assets?.[0]?.base64) {
+          setProcessing(false);
+          return;
+        }
+
+        const asset = result.assets[0];
+        const b64 = asset.base64;
+        if (!b64) {
+          setProcessing(false);
+          return;
+        }
+        mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+        cleanB64 = cleanBase64(b64);
       }
-      const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      const cleanB64 = cleanBase64(b64);
 
       setProgressText('이미지 업로드 중...');
       const imageUrl = await uploadImage(cleanB64, mimeType);
@@ -423,6 +465,10 @@ export default function CameraScreen() {
       setProcessing(false);
     }
   };
+
+  if (isWebPlatform()) {
+    return <WebUploadScreen />;
+  }
 
   if (!permission) {
     return (
@@ -820,6 +866,314 @@ export default function CameraScreen() {
             </View>
             <View style={styles.progressStepLabels}>
               <Text style={styles.progressStepLabel}>촬영</Text>
+              <Text style={styles.progressStepLabel}>분석</Text>
+              <Text style={styles.progressStepLabel}>저장</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+function WebUploadScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const safeTop = useSafeTop();
+  const [recognitionMode, setRecognitionMode] = useState<'single' | 'multi'>('single');
+  const [multiShots, setMultiShots] = useState<string[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progressText, setProgressText] = useState('');
+  const [progressStep, setProgressStep] = useState(0);
+  const fadeAnim = useSharedValue(0);
+  const spinnerRotate = useSharedValue(0);
+  const progressWidth = useSharedValue(0);
+
+  const fadeIn = useCallback(() => {
+    fadeAnim.value = withTiming(1, { duration: 300 });
+    spinnerRotate.value = withRepeat(withTiming(360, { duration: 800 }), -1, false);
+  }, [fadeAnim, spinnerRotate]);
+
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  const spinnerStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spinnerRotate.value}deg` }] }));
+  const progressBarStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value * 100}%` }));
+
+  const processImage = async (base64: string, mimeType: string) => {
+    const dataUrl = buildDataUrl(base64, mimeType);
+    const fileName = `scan-${Date.now()}`;
+
+    try {
+      setProgressStep(1);
+      setProgressText('AI 분석 중...');
+      progressWidth.value = withTiming(0.35, { duration: 500 });
+
+      const progressTimer = setInterval(() => {
+        progressWidth.value = withTiming(
+          Math.min(progressWidth.value + 0.04, 0.75),
+          { duration: 800 },
+        );
+      }, 3000);
+
+      let imageUrl: string, analysis: AnalysisResult;
+      try {
+        [imageUrl, analysis] = await Promise.all([
+          uploadImage(base64, mimeType),
+          analyzeImage(dataUrl, fileName, mimeType, recognitionMode),
+        ]);
+      } finally {
+        clearInterval(progressTimer);
+      }
+
+      setProgressStep(2);
+      setProgressText('결과 저장 중...');
+      progressWidth.value = withTiming(0.85, { duration: 300 });
+      const scanId = await saveScan(imageUrl, analysis);
+
+      setProgressStep(3);
+      setProgressText('완료!');
+      progressWidth.value = withTiming(1, { duration: 200 });
+
+      router.push({ pathname: '/result/[id]', params: { id: scanId } });
+    } catch (err) {
+      setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (processing) return;
+    setError(null);
+
+    try {
+      const images = await pickImageWeb(recognitionMode === 'multi', 4);
+      if (images.length === 0) return;
+
+      if (recognitionMode === 'multi') {
+        const newShots = images.map((img) => cleanBase64(img.base64));
+        setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
+        return;
+      }
+
+      setProcessing(true);
+      setProgressStep(0);
+      setProgressText('사진 업로드 중...');
+      progressWidth.value = withTiming(0.1, { duration: 200 });
+      fadeAnim.value = 0;
+
+      const img = images[0];
+      const cleanB64 = cleanBase64(img.base64);
+      await processImage(cleanB64, img.mimeType);
+    } catch (err) {
+      setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
+      setProcessing(false);
+    }
+  };
+
+  const handleAnalyzeMultiShot = async () => {
+    if (multiShots.length === 0 || processing) return;
+    setProcessing(true);
+    setError(null);
+    setProgressStep(0);
+    setProgressText('다각도 사진 분석 중...');
+    progressWidth.value = withTiming(0.15, { duration: 300 });
+    fadeAnim.value = 0;
+
+    try {
+      setProgressStep(1);
+      setProgressText('AI 다각도 분석 중...');
+      progressWidth.value = withTiming(0.35, { duration: 500 });
+
+      const progressTimer = setInterval(() => {
+        progressWidth.value = withTiming(
+          Math.min(progressWidth.value + 0.04, 0.75),
+          { duration: 800 },
+        );
+      }, 3000);
+
+      let imageUrl: string, analysis: AnalysisResult;
+      try {
+        [imageUrl, analysis] = await Promise.all([
+          uploadImage(multiShots[0], 'image/jpeg'),
+          analyzeMultiShot(multiShots, `scan-${Date.now()}`),
+        ]);
+      } finally {
+        clearInterval(progressTimer);
+      }
+
+      const additionalUrls: string[] = [];
+      if (multiShots.length > 1) {
+        for (let i = 1; i < multiShots.length; i++) {
+          try {
+            const url = await uploadImage(multiShots[i], 'image/jpeg');
+            additionalUrls.push(url);
+          } catch {
+            // individual angle upload failure shouldn't block the whole scan
+          }
+        }
+      }
+
+      setProgressStep(2);
+      setProgressText('결과 저장 중...');
+      progressWidth.value = withTiming(0.85, { duration: 300 });
+      const scanId = await saveScan(imageUrl, analysis, additionalUrls);
+
+      setProgressStep(3);
+      setProgressText('완료!');
+      progressWidth.value = withTiming(1, { duration: 200 });
+
+      setMultiShots([]);
+      router.push({ pathname: '/result/[id]', params: { id: scanId } });
+    } catch (err) {
+      setError(friendlyError(err, '다각도 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleTemplateOnly = async () => {
+    if (processing) return;
+    setProcessing(true);
+    setError(null);
+    setProgressStep(0);
+    setProgressText('사진 선택 중...');
+    progressWidth.value = withTiming(0.1, { duration: 200 });
+    fadeAnim.value = 0;
+
+    try {
+      const images = await pickImageWeb(false, 1);
+      if (images.length === 0) {
+        setProcessing(false);
+        return;
+      }
+      const cleanB64 = cleanBase64(images[0].base64);
+      setProgressText('이미지 업로드 중...');
+      const imageUrl = await uploadImage(cleanB64, images[0].mimeType);
+      setProgressText('템플릿 준비 중...');
+      const scanId = await saveManualScan(imageUrl);
+      router.push({ pathname: '/result/[id]', params: { id: scanId } });
+    } catch (err) {
+      setError(friendlyError(err, '이미지를 불러오지 못했습니다. 다시 시도해주세요.'));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRemoveShot = (index: number) => {
+    setMultiShots((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.xl, paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
+          <View style={styles.webHeroIcon}>
+            <Camera size={44} color={theme.colors.primary[400]} strokeWidth={1.5} />
+          </View>
+          <Text style={styles.webHeroTitle}>제품 사진으로 시작</Text>
+          <Text style={styles.webHeroSub}>
+            사진을 올리면 AI가 제품을 분석하고 마케팅 소재를 만들어 드립니다
+          </Text>
+        </View>
+
+        <View style={styles.webModeRow}>
+          <TouchableOpacity
+            style={[styles.webModePill, recognitionMode === 'single' && styles.webModePillActive]}
+            onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
+            activeOpacity={0.7}
+          >
+            <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={[styles.modeButtonText, recognitionMode === 'single' && styles.modeButtonTextActive]}>단품</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.webModePill, recognitionMode === 'multi' && styles.webModePillActive]}
+            onPress={() => { setRecognitionMode('multi'); setMultiShots([]); }}
+            activeOpacity={0.7}
+          >
+            <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={[styles.modeButtonText, recognitionMode === 'multi' && styles.modeButtonTextActive]}>다각도 (1~4장)</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.webUploadCard}>
+          <TouchableOpacity style={styles.webUploadBtn} onPress={handleUpload} disabled={processing} activeOpacity={0.8}>
+            <ImageIcon size={22} color="#fff" strokeWidth={2} />
+            <Text style={styles.webUploadBtnText}>
+              {recognitionMode === 'multi' ? '사진 여러 장 올리기' : '사진 올리기'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.webTemplateBtn} onPress={handleTemplateOnly} disabled={processing} activeOpacity={0.7}>
+            <Wand2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.webTemplateBtnText}>템플릿만 만들기</Text>
+          </TouchableOpacity>
+        </View>
+
+        {recognitionMode === 'multi' && multiShots.length > 0 && (
+          <View style={[styles.multiShotStrip, { position: 'relative', bottom: undefined, left: undefined, right: undefined, marginTop: theme.spacing.md }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
+              {multiShots.map((shot, i) => (
+                <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
+                  <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
+                  <Text style={styles.multiShotBadge}>{i + 1}</Text>
+                  <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
+                    <X size={12} color="#fff" strokeWidth={3} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.analyzeMultiBtn} onPress={handleAnalyzeMultiShot} disabled={processing} activeOpacity={0.8}>
+              <Play size={16} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.analyzeMultiText}>{multiShots.length}장 분석 시작</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <View style={styles.webNoteBox}>
+          <CircleAlert size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+          <Text style={styles.webNoteText}>
+            브라우저 미리보기에서는 카메라 직접 촬영이 제한됩니다. 사진 파일을 올려서 AI 분석을 이용하세요. 실제 스마트폰 앱(APK)에서는 카메라 촬영이 완벽하게 작동합니다.
+          </Text>
+        </View>
+
+        {error && (
+          <View style={[styles.errorBanner, { position: 'relative', bottom: undefined, left: undefined, right: undefined, marginTop: theme.spacing.md }]}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <RecentWorkButton />
+
+      {processing && (
+        <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
+          <View style={styles.processingCard}>
+            <Animated.View style={[styles.processingSpinner, spinnerStyle]} />
+            <Text style={styles.processingTitle}>제품 분석 중</Text>
+            <Text style={styles.processingSubtext}>{progressText}</Text>
+            <View style={styles.progressTrack}>
+              <Animated.View style={[styles.progressFill, progressBarStyle]} />
+            </View>
+            <View style={styles.progressSteps}>
+              <View style={[styles.progressStep, progressStep >= 1 && styles.progressStepActive]}>
+                {progressStep >= 1 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>1</Text>}
+              </View>
+              <View style={[styles.progressStepLine, progressStep >= 2 && styles.progressStepLineActive]} />
+              <View style={[styles.progressStep, progressStep >= 2 && styles.progressStepActive]}>
+                {progressStep >= 2 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>2</Text>}
+              </View>
+              <View style={[styles.progressStepLine, progressStep >= 3 && styles.progressStepLineActive]} />
+              <View style={[styles.progressStep, progressStep >= 3 && styles.progressStepActive]}>
+                {progressStep >= 3 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>3</Text>}
+              </View>
+            </View>
+            <View style={styles.progressStepLabels}>
+              <Text style={styles.progressStepLabel}>업로드</Text>
               <Text style={styles.progressStepLabel}>분석</Text>
               <Text style={styles.progressStepLabel}>저장</Text>
             </View>
@@ -1429,5 +1783,109 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  webHeroIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  webHeroTitle: {
+    fontSize: 28,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  webHeroSub: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
+  },
+  webModeRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  webModePill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  webModePillActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[600],
+  },
+  webUploadCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    ...theme.shadows.elevated,
+  },
+  webUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  webUploadBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  webTemplateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+  },
+  webTemplateBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  webNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  webNoteText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
   },
 });

@@ -24,6 +24,12 @@ export function friendlyError(err: unknown, fallback: string): string {
   if (lower.includes('capture') || lower.includes('camera')) {
     return '사진 촬영에 실패했습니다. 카메라를 다시 시도해주세요.';
   }
+  if (lower.includes('notallowed') || lower.includes('not-allowed') || lower.includes('permission')) {
+    return '카메라 또는 파일 접근 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.';
+  }
+  if (lower.includes('notreadable') || lower.includes('not-readable')) {
+    return '이미지를 읽을 수 없습니다. 다른 사진으로 시도해주세요.';
+  }
 
   return fallback;
 }
