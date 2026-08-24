@@ -188,6 +188,7 @@ export default function CameraScreen() {
 
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady) return;
+    setProcessing(true);
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -206,13 +207,14 @@ export default function CameraScreen() {
       if (recognitionMode === 'multi') {
         if (multiShots.length >= 4) {
           setError('최대 4장까지 촬영할 수 있습니다. 분석을 시작하거나 사진을 삭제해주세요.');
+          setProcessing(false);
           return;
         }
         setMultiShots((prev) => [...prev, compressedB64]);
+        setProcessing(false);
         return;
       }
 
-      setProcessing(true);
       setError(null);
       setProgressStep(0);
       setProgressText('사진 촬영 중...');

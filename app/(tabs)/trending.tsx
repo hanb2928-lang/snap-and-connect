@@ -149,6 +149,7 @@ export default function TrendingScreen() {
   const [copiedIdea, setCopiedIdea] = useState<number | null>(null);
 
   const fetchTrending = useCallback(async (mp: Marketplace, isRefresh = false) => {
+    setError(null);
     if (!isRefresh) {
       const cached = productCache.get(mp);
       if (cached && Date.now() - cached.ts < PRODUCT_CACHE_TTL) {
@@ -162,7 +163,6 @@ export default function TrendingScreen() {
     } else {
       setLoading(true);
     }
-    setError(null);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke(`naver-trending?marketplace=${mp}`);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   TextInput,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
   Tag,
@@ -165,12 +164,6 @@ export default function ResultScreen() {
       if (saved) setActivePlatform(saved as PlatformKey);
     })();
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchScan();
-    }, [fetchScan]),
-  );
 
   useEffect(() => {
     if (!scan) return;
