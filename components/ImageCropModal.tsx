@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Dimensions,
+  Platform,
   Image as RNImage,
   LayoutChangeEvent,
   GestureResponderEvent,
@@ -13,8 +13,6 @@ import {
 import { Check, X, RotateCw, Crop } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 interface ImageCropModalProps {
   visible: boolean;
@@ -44,41 +42,74 @@ export function ImageCropModal({
   const [layout, setLayout] = useState({ w: 0, h: 0 });
   const [imageDim, setImageDim] = useState({ w: 0, h: 0 });
   const [crop, setCrop] = useState<CropRect>({ x: 0, y: 0, w: 0, h: 0 });
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; rect: CropRect } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number; rect: CropRect; mode: 'move' | 'resize' } | null>(null);
   const [processing, setProcessing] = useState(false);
-  const dataUrl = buildDataUrl(imageBase64, mimeType);
+  const dataUrl = useMemo(() => buildDataUrl(imageBase64, mimeType), [imageBase64, mimeType]);
+  const previewRect = useMemo(() => {
+    if (!layout.w || !layout.h || !imageDim.w || !imageDim.h) {
+      return { x: 0, y: 0, w: layout.w, h: layout.h };
+    }
+    const scale = Math.min(layout.w / imageDim.w, layout.h / imageDim.h);
+    const w = imageDim.w * scale;
+    const h = imageDim.h * scale;
+    return { x: (layout.w - w) / 2, y: (layout.h - h) / 2, w, h };
+  }, [layout, imageDim]);
+  const imageRect = useMemo(() => {
+    const rotated = rotation % 180 === 0 ? imageDim : { w: imageDim.h, h: imageDim.w };
+    if (!layout.w || !layout.h || !rotated.w || !rotated.h) {
+      return { x: 0, y: 0, w: layout.w, h: layout.h };
+    }
+    const scale = Math.min(layout.w / rotated.w, layout.h / rotated.h);
+    const w = rotated.w * scale;
+    const h = rotated.h * scale;
+    return { x: (layout.w - w) / 2, y: (layout.h - h) / 2, w, h };
+  }, [layout, imageDim, rotation]);
 
   const handleLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setLayout({ w: width, h: height });
-    if (imageDim.w === 0 && width > 0) {
-      setCrop({ x: 0, y: 0, w: width, h: height });
-    }
-  }, [imageDim.w]);
+  }, []);
 
   const handleImageLoad = useCallback((e: { nativeEvent: { source: { width: number; height: number } } }) => {
     const { width, height } = e.nativeEvent.source;
     setImageDim({ w: width, h: height });
   }, []);
 
-  const handleRotate = () => {
-    setRotation((r) => (r + 90) % 360);
-    if (layout.w > 0 && layout.h > 0) {
-      setCrop({ x: 0, y: 0, w: layout.h, h: layout.w });
+  useEffect(() => {
+    if (imageRect.w > 0 && imageRect.h > 0 && crop.w === 0) {
+      setCrop({ x: imageRect.x, y: imageRect.y, w: imageRect.w, h: imageRect.h });
     }
+  }, [imageRect, crop.w]);
+
+  const handleRotate = () => {
+    const nextRotation = (rotation + 90) % 360;
+    const rotated = nextRotation % 180 === 0 ? imageDim : { w: imageDim.h, h: imageDim.w };
+    const scale = rotated.w && rotated.h
+      ? Math.min(layout.w / rotated.w, layout.h / rotated.h)
+      : 0;
+    const w = rotated.w * scale;
+    const h = rotated.h * scale;
+    setRotation(nextRotation);
+    setCrop({ x: (layout.w - w) / 2, y: (layout.h - h) / 2, w, h });
   };
 
-  const handleDragStart = (e: GestureResponderEvent) => {
-    if (layout.w === 0) return;
-    setDragStart({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, rect: crop });
+  const handleDragStart = (e: GestureResponderEvent, mode: 'move' | 'resize') => {
+    if (!imageRect.w || !imageRect.h) return;
+    setDragStart({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY, rect: crop, mode });
   };
 
   const handleDragMove = (e: GestureResponderEvent) => {
     if (!dragStart) return;
-    const dx = e.nativeEvent.locationX - dragStart.x;
-    const dy = e.nativeEvent.locationY - dragStart.y;
-    const newW = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.w + dx, layout.w - dragStart.rect.x));
-    const newH = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.h + dy, layout.h - dragStart.rect.y));
+    const dx = e.nativeEvent.pageX - dragStart.x;
+    const dy = e.nativeEvent.pageY - dragStart.y;
+    if (dragStart.mode === 'move') {
+      const x = Math.max(imageRect.x, Math.min(imageRect.x + imageRect.w - dragStart.rect.w, dragStart.rect.x + dx));
+      const y = Math.max(imageRect.y, Math.min(imageRect.y + imageRect.h - dragStart.rect.h, dragStart.rect.y + dy));
+      setCrop({ ...dragStart.rect, x, y });
+      return;
+    }
+    const newW = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.w + dx, imageRect.x + imageRect.w - dragStart.rect.x));
+    const newH = Math.max(MIN_CROP_SIZE, Math.min(dragStart.rect.h + dy, imageRect.y + imageRect.h - dragStart.rect.y));
     setCrop({ ...dragStart.rect, w: newW, h: newH });
   };
 
@@ -87,10 +118,12 @@ export function ImageCropModal({
   };
 
   const handleConfirm = async () => {
-    if (processing) return;
+    if (processing || !imageRect.w || !imageRect.h || !imageDim.w || !imageDim.h) return;
     setProcessing(true);
     try {
-      const result = await cropOnWeb(dataUrl, crop, layout, rotation, imageDim);
+      const result = Platform.OS === 'web'
+        ? await cropOnWeb(dataUrl, crop, imageRect, rotation, imageDim)
+        : dataUrl;
       const b64 = cleanBase64(result);
       onConfirm(b64, result.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg');
     } catch {
@@ -101,8 +134,8 @@ export function ImageCropModal({
   };
 
   const handleReset = () => {
-    setCrop({ x: 0, y: 0, w: layout.w, h: layout.h });
     setRotation(0);
+    setCrop({ x: imageRect.x, y: imageRect.y, w: imageRect.w, h: imageRect.h });
   };
 
   return (
@@ -123,8 +156,10 @@ export function ImageCropModal({
                 style={[
                   styles.previewImage,
                   {
-                    width: layout.w,
-                    height: layout.h,
+                    left: previewRect.x,
+                    top: previewRect.y,
+                    width: previewRect.w,
+                    height: previewRect.h,
                     transform: [{ rotate: `${rotation}deg` }],
                   },
                 ]}
@@ -143,15 +178,27 @@ export function ImageCropModal({
                 },
               ]}
               onStartShouldSetResponder={() => true}
-              onResponderGrant={handleDragStart}
+              onResponderGrant={(e) => handleDragStart(e, 'move')}
               onResponderMove={handleDragMove}
               onResponderRelease={handleDragEnd}
             >
               <View style={styles.cropCornerTL} />
               <View style={styles.cropCornerTR} />
               <View style={styles.cropCornerBL} />
-              <View style={styles.cropCornerBR} />
-              <View style={styles.cropHandle} />
+              <View
+                style={styles.cropCornerBR}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(e) => handleDragStart(e, 'resize')}
+                onResponderMove={handleDragMove}
+                onResponderRelease={handleDragEnd}
+              />
+              <View
+                style={styles.cropHandle}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(e) => handleDragStart(e, 'resize')}
+                onResponderMove={handleDragMove}
+                onResponderRelease={handleDragEnd}
+              />
             </View>
           </View>
 
@@ -180,43 +227,54 @@ export function ImageCropModal({
 function cropOnWeb(
   dataUrl: string,
   crop: CropRect,
-  layout: { w: number; h: number },
+  imageRect: { x: number; y: number; w: number; h: number },
   rotation: number,
   imageDim: { w: number; h: number },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scaleX = img.naturalWidth / layout.w;
-      const scaleY = img.naturalHeight / layout.h;
-
-      const sourceX = crop.x * scaleX;
-      const sourceY = crop.y * scaleY;
-      const sourceW = crop.w * scaleX;
-      const sourceH = crop.h * scaleY;
-
-      const isRotated = rotation === 90 || rotation === 270;
-      const outW = isRotated ? sourceH : sourceW;
-      const outH = isRotated ? sourceW : sourceH;
-
+      const sourceW = img.naturalWidth || imageDim.w;
+      const sourceH = img.naturalHeight || imageDim.h;
+      const rotatedW = rotation % 180 === 0 ? sourceW : sourceH;
+      const rotatedH = rotation % 180 === 0 ? sourceH : sourceW;
+      const scaleX = rotatedW / imageRect.w;
+      const scaleY = rotatedH / imageRect.h;
+      const cropX = Math.max(0, (crop.x - imageRect.x) * scaleX);
+      const cropY = Math.max(0, (crop.y - imageRect.y) * scaleY);
+      const cropW = Math.min(rotatedW - cropX, crop.w * scaleX);
+      const cropH = Math.min(rotatedH - cropY, crop.h * scaleY);
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(outW);
-      canvas.height = Math.round(outH);
+      canvas.width = Math.max(1, Math.round(cropW));
+      canvas.height = Math.max(1, Math.round(cropH));
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('canvas error'));
         return;
       }
 
-      if (rotation > 0) {
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-sourceW / 2, -sourceH / 2);
-        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, sourceW, sourceH);
-      } else {
-        ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, outW, outH);
+      const rotatedCanvas = document.createElement('canvas');
+      rotatedCanvas.width = rotatedW;
+      rotatedCanvas.height = rotatedH;
+      const rotatedCtx = rotatedCanvas.getContext('2d');
+      if (!rotatedCtx) {
+        reject(new Error('canvas error'));
+        return;
       }
-
+      rotatedCtx.save();
+      if (rotation === 90) {
+        rotatedCtx.translate(rotatedW, 0);
+        rotatedCtx.rotate(Math.PI / 2);
+      } else if (rotation === 180) {
+        rotatedCtx.translate(rotatedW, rotatedH);
+        rotatedCtx.rotate(Math.PI);
+      } else if (rotation === 270) {
+        rotatedCtx.translate(0, rotatedH);
+        rotatedCtx.rotate(-Math.PI / 2);
+      }
+      rotatedCtx.drawImage(img, 0, 0, sourceW, sourceH);
+      rotatedCtx.restore();
+      ctx.drawImage(rotatedCanvas, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = () => reject(new Error('image load error'));
@@ -264,7 +322,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     backgroundColor: '#000',
     borderRadius: theme.radius.md,
-    overflow: 'hidden',
+    overflow: 'visible',
     justifyContent: 'center',
     alignItems: 'center',
   },
