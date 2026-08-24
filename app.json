@@ -34,8 +34,8 @@
       "eas": {
         "projectId": "382227db-bb80-4cd7-9dc4-895bde2536bf"
       },
-      "supabaseUrl": "https://pnlyrodbiqlpwduuzrsp.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBubHlyb2RiaXFscHdkdXV6cnNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTA0NDIsImV4cCI6MjEwMjI4NjQ0Mn0.CP2hnNB5UfPQh6kxUvIUzEkd8q0gby1ukLCCkh5ri38",
+      "supabaseUrl": "https://fzvvriycfiqecherbhli.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs",
       "router": {}
     },
     "web": {
