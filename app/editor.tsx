@@ -21,6 +21,7 @@ import {
   X,
   Trash2,
   Undo2,
+  Zap,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -36,6 +37,7 @@ import {
   compositeOnBackground,
 } from '@/lib/imageEdit';
 import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundPicker';
+import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { getHtml2Canvas } from '@/lib/html2canvas';
 import { captureRef } from 'react-native-view-shot';
@@ -191,6 +193,41 @@ export default function EditorScreen() {
     setImageUri(prev);
     setCanUndo(undoStack.current.length > 0);
   }, []);
+
+  const handleQuickRemoveBg = useCallback(async () => {
+    if (processing) return;
+    setProcessing(true);
+    setError(null);
+    setProgressText('온디바이스 배경 제거 중...');
+    setEditMode('none');
+    try {
+      let dataUrl: string;
+      if (Platform.OS === 'web') {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        dataUrl = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('이미지를 변환할 수 없습니다'));
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        const { base64, mimeType: detectedMime } = await readUriAsBase64(imageUri);
+        dataUrl = `data:${detectedMime};base64,${base64}`;
+      }
+
+      const result = await removeBackgroundOnDevice(dataUrl);
+      if (!result.ok) throw new Error(result.error);
+
+      const base64 = cleanBase64(result.dataUrl);
+      const newUri = await uploadEditedImage(base64, 'image/png');
+      updateImage(newUri);
+      setBgPickerVisible(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '배경 제거 실패');
+    }
+    setProcessing(false);
+  }, [imageUri, processing, updateImage]);
 
   const handleRemoveBg = useCallback(async () => {
     if (processing) return;
@@ -510,8 +547,15 @@ export default function EditorScreen() {
         <View style={[styles.toolBar, { paddingBottom: theme.spacing.md + insets.bottom }]}>
           <View style={styles.toolRow}>
             <ToolButton
+              icon={<Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />}
+              label="0.1초 누끼"
+              onPress={handleQuickRemoveBg}
+              disabled={processing}
+              highlight
+            />
+            <ToolButton
               icon={<Scissors size={18} color={theme.colors.accent[400]} strokeWidth={2} />}
-              label="배경제거"
+              label="AI 배경제거"
               onPress={handleRemoveBg}
               disabled={processing}
               highlight
