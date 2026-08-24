@@ -30,6 +30,36 @@ interface TrendMatchCardProps {
   onApplyHashtags?: (tags: string[]) => void;
 }
 
+const DEFAULT_TEMPLATES: TrendTemplate[] = [
+  {
+    name: '트렌디 줌인',
+    description: '제품의 핵심을 빠른 줌인으로 보여주는 숏폼 스타일',
+    bgmMood: '업비트 신스팝',
+    bgmTempo: '120-140 BPM',
+    subtitleStyle: '대형 볼드 중앙 + 팝업',
+    transitionStyle: '줌 인 + 와이프',
+    hashtagSuggestions: ['trending', 'shorts', '릴스', 'fyp'],
+  },
+  {
+    name: '감성 무비',
+    description: '제품의 질감과 분위기를 차분하게 담는 감성 숏폼',
+    bgmMood: '잔잔한 R&B / Lo-fi',
+    bgmTempo: '70-90 BPM',
+    subtitleStyle: '미니멀 하단 + 페이드',
+    transitionStyle: '크로스 디졸브',
+    hashtagSuggestions: ['aesthetic', '감성', 'mood', 'cinematic'],
+  },
+  {
+    name: '가격 충격 컷',
+    description: '빠른 전환으로 제품의 장점을 강하게 강조하는 스타일',
+    bgmMood: '업비트 EDM',
+    bgmTempo: '130-150 BPM',
+    subtitleStyle: '팝업 카운터 + 글리치',
+    transitionStyle: '플래시 + 와이프',
+    hashtagSuggestions: ['deal', '추천', 'musthave', 'finds'],
+  },
+];
+
 export function TrendMatchCard({ productCategory, productName, platform, onApplyHashtags }: TrendMatchCardProps) {
   const [templates, setTemplates] = useState<TrendTemplate[]>([]);
   const [insight, setInsight] = useState<string>('');
@@ -63,10 +93,25 @@ export function TrendMatchCard({ productCategory, productName, platform, onApply
       }
       const data = await resp.json();
       if (data.error) throw new Error(data.error);
-      setTemplates(data.templates || []);
-      setInsight(data.categoryInsight || '');
+      const nextTemplates: TrendTemplate[] = Array.isArray(data.templates)
+        ? data.templates.slice(0, 3).map((template: Partial<TrendTemplate>) => ({
+            name: String(template.name || '추천 템플릿'),
+            description: String(template.description || '제품의 특징을 보여주는 숏폼 구성'),
+            bgmMood: String(template.bgmMood || '업비트 팝'),
+            bgmTempo: String(template.bgmTempo || '100-120 BPM'),
+            subtitleStyle: String(template.subtitleStyle || '볼드 자막'),
+            transitionStyle: String(template.transitionStyle || '빠른 컷 전환'),
+            hashtagSuggestions: Array.isArray(template.hashtagSuggestions)
+              ? template.hashtagSuggestions.map((tag) => String(tag)).slice(0, 5)
+              : [],
+          }))
+        : [];
+      setTemplates(nextTemplates.length > 0 ? nextTemplates : DEFAULT_TEMPLATES);
+      setInsight(typeof data.categoryInsight === 'string' ? data.categoryInsight : '제품의 핵심 장점을 빠르게 보여주는 구성이 효과적이에요.');
     } catch (err) {
-      setError(friendlyError(err, '트렌드 추천을 불러오지 못했습니다.'));
+      setTemplates(DEFAULT_TEMPLATES);
+      setInsight('기본 트렌드 템플릿을 표시하고 있어요.');
+      setError(null);
     } finally {
       setLoading(false);
     }

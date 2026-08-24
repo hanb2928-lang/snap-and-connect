@@ -51,7 +51,7 @@ export async function analyzeImage(
 
     return normalizeAnalysis(data);
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
     }
     throw err;
@@ -90,7 +90,7 @@ export async function analyzeMultiShot(
 
     return normalizeAnalysis(data);
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('AI 다각도 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
     }
     throw err;

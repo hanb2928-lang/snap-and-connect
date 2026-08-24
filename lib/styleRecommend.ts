@@ -45,7 +45,7 @@ export async function fetchStyleRecommendation(params: {
 
     return data as StyleRecommendation;
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('AI 스타일 추천 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
     }
     throw err;
