@@ -54,6 +54,8 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressStepRef = useRef(0);
+  const isGeneratingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
@@ -89,7 +91,11 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   }, []);
 
   const generateCuts = useCallback(async () => {
-    if (loading || !imageDataUrl) return;
+    if (isGeneratingRef.current || !imageDataUrl) return;
+    isGeneratingRef.current = true;
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setError(null);
     setCuts([]);
@@ -104,7 +110,6 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
         ? imageDataUrl
         : await urlToDataUrl(imageDataUrl);
       const preparedImage = await prepareImageForEdit(dataUrl);
-      const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 180000);
       let response: Response;
       try {
@@ -157,8 +162,10 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     } finally {
       stopProgressCycle();
       setLoading(false);
+      isGeneratingRef.current = false;
+      if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [imageDataUrl, loading, productName, productCategory]);
+  }, [imageDataUrl, productName, productCategory]);
 
   const handleUseCut = useCallback(
     (cut: VirtualCut) => {

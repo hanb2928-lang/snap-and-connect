@@ -260,14 +260,36 @@ async function editWithOpenAI(
 function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
   const formData = new FormData();
 
-  const base64Match = imageDataUrl.match(/^data:image\/([\w+]+);base64,(.+)$/s);
-  if (!base64Match) throw new Error("Invalid image data URL");
+  let base64Data = "";
+  let mimeType = "image/png";
 
-  const imgFormat = base64Match[1];
-  const mimeType = `image/${imgFormat}`;
-  const ext = imgFormat === "jpeg" ? "jpg" : imgFormat;
+  const commaIdx = imageDataUrl.indexOf(",");
+  if (imageDataUrl.startsWith("data:") && commaIdx > 0) {
+    const header = imageDataUrl.slice(5, commaIdx);
+    base64Data = imageDataUrl.slice(commaIdx + 1).replace(/\s/g, "");
+    if (header.includes("base64")) {
+      const declaredMime = header.split(";")[0];
+      if (declaredMime.startsWith("image/")) {
+        mimeType = declaredMime;
+      } else {
+        const detected = detectImageMime(base64Data);
+        if (detected) mimeType = detected;
+      }
+    }
+  } else {
+    const clean = imageDataUrl.trim().replace(/\s/g, "");
+    const detected = detectImageMime(clean);
+    if (detected) mimeType = detected;
+    base64Data = clean;
+  }
 
-  const base64Data = base64Match[2];
+  if (!base64Data) throw new Error("Invalid image data: empty base64");
+
+  const detectedFromData = detectImageMime(base64Data);
+  if (detectedFromData) mimeType = detectedFromData;
+
+  const ext = mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1] || "png";
+
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
