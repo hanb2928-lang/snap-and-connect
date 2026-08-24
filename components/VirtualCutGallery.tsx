@@ -61,6 +61,16 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     };
   }, []);
 
+  useEffect(() => {
+    setCuts([]);
+    setSelectedCut(null);
+    setDownloaded(null);
+    setShared(null);
+    setBatchDone(false);
+    setError(null);
+    setExpanded(false);
+  }, [imageDataUrl]);
+
   const startProgressCycle = useCallback(() => {
     progressStepRef.current = 0;
     setProgressMessage(PROGRESS_MESSAGES[0]);

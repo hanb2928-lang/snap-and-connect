@@ -66,6 +66,16 @@ export function VirtualFittingGallery({
     };
   }, []);
 
+  useEffect(() => {
+    setResults([]);
+    setSelected(null);
+    setDownloaded(null);
+    setShared(null);
+    setBatchDone(false);
+    setError(null);
+    setExpanded(false);
+  }, [imageDataUrl]);
+
   const startProgressCycle = useCallback(() => {
     progressStepRef.current = 0;
     setProgressMessage(PROGRESS_MESSAGES[0]);
