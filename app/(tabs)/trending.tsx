@@ -12,29 +12,7 @@ import {
   Platform as RNPlatform,
   Alert,
 } from 'react-native';
-import {
-  ExternalLink,
-  ShoppingBag,
-  ChevronRight,
-  Flame,
-  Star,
-  Globe,
-  Lightbulb,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Sparkles,
-  Copy,
-  Check,
-  X,
-  Youtube,
-  Wand2,
-  Send,
-  Home,
-  ShoppingBasket,
-  Palmtree,
-  Ticket,
-} from 'lucide-react-native';
+import { ExternalLink, ShoppingBag, ChevronRight, Flame, Star, Globe, Lightbulb, ArrowUp, ArrowDown, Minus, Sparkles, Copy, Check, X, Youtube, Wand as Wand2, Send, Hop as Home, ShoppingBasket, TreePalm as Palmtree, Ticket } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase, KEYWORD_TRENDS_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
@@ -633,7 +611,7 @@ export default function TrendingScreen() {
 
                 {currentKeywordGroup && currentKeywordGroup.keywords.length > 0 ? (
                   currentKeywordGroup.keywords.map((item, index) => {
-                  const trendInfo = TREND_ICON[item.trend];
+                  const trendInfo = TREND_ICON[item.trend] || TREND_ICON.steady;
                   const TrendIcon = trendInfo.icon;
                   const pm = KEYWORD_PLATFORM_META[item.platform];
                   return (

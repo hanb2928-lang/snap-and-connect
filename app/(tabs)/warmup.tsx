@@ -158,9 +158,8 @@ export default function WarmupScreen() {
 
   const handleToggleTask = useCallback(async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'done' ? 'pending' : 'done';
-    try {
-      await updateTaskStatus(taskId, newStatus);
-    } catch {
+    const ok = await updateTaskStatus(taskId, newStatus);
+    if (!ok) {
       showToast('작업 상태 변경에 실패했어요. 다시 시도해주세요.');
       return;
     }
@@ -168,9 +167,8 @@ export default function WarmupScreen() {
   }, [loadData, showToast]);
 
   const handleSkipTask = useCallback(async (taskId: string) => {
-    try {
-      await updateTaskStatus(taskId, 'skipped');
-    } catch {
+    const ok = await updateTaskStatus(taskId, 'skipped');
+    if (!ok) {
       showToast('작업 건너뛰기에 실패했어요. 다시 시도해주세요.');
       return;
     }
@@ -179,9 +177,8 @@ export default function WarmupScreen() {
 
   const handlePauseSchedule = useCallback(async (scheduleId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'paused' : 'active';
-    try {
-      await updateScheduleStatus(scheduleId, newStatus);
-    } catch {
+    const ok = await updateScheduleStatus(scheduleId, newStatus);
+    if (!ok) {
       showToast('스케줄 상태 변경에 실패했어요. 다시 시도해주세요.');
       return;
     }
@@ -189,9 +186,8 @@ export default function WarmupScreen() {
   }, [loadData, showToast]);
 
   const handleDeleteSchedule = useCallback(async (scheduleId: string) => {
-    try {
-      await deleteSchedule(scheduleId);
-    } catch {
+    const ok = await deleteSchedule(scheduleId);
+    if (!ok) {
       showToast('스케줄 삭제에 실패했어요. 다시 시도해주세요.');
       return;
     }
