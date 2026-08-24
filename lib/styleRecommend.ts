@@ -22,7 +22,7 @@ export async function fetchStyleRecommendation(params: {
   platform?: string;
 }): Promise<StyleRecommendation> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 35000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch(RECOMMEND_FUNCTION_URL, {
@@ -30,6 +30,7 @@ export async function fetchStyleRecommendation(params: {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supabaseAnonKey}`,
+        apikey: supabaseAnonKey,
       },
       signal: controller.signal,
       body: JSON.stringify(params),

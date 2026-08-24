@@ -143,7 +143,7 @@ async function recommendWithOpenAI(
   ].filter(Boolean).join("\n");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -287,6 +287,14 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
   const format: StyleRecommendation["format"] =
     platform === "naverBlog" || platform === "twitter" || platform === "smartstore" ? "horizontal" : "vertical";
 
+  const allAlts: { label: string; cardStyle: string; reason: string }[] = [
+    { label: "볼드", cardStyle: "bold", reason: "큰 텍스트로 숏폼에서 시선을 강하게 사로잡습니다." },
+    { label: "매거진", cardStyle: "magazine", reason: "블로그처럼 신뢰감 있는 상세 설명에 적합합니다." },
+    { label: "피드", cardStyle: "feed", reason: "인스타그램 피드에서 리뷰 중심으로 보기 좋습니다." },
+    { label: "미니멀", cardStyle: "minimal", reason: "여백이 많아 고급스럽고 차분한 인상을 줍니다." },
+  ];
+  const alternatives = allAlts.filter((a) => a.cardStyle !== cardStyle).slice(0, 2);
+
   return {
     cardStyle,
     musicMood,
@@ -295,9 +303,6 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
     duration,
     hybridMode,
     reason,
-    alternatives: [
-      { label: "볼드", cardStyle: "bold", reason: "큰 텍스트로 숏폼에서 시선을 강하게 사로잡습니다." },
-      { label: "매거진", cardStyle: "magazine", reason: "블로그처럼 신뢰감 있는 상세 설명에 적합합니다." },
-    ],
+    alternatives,
   };
 }
