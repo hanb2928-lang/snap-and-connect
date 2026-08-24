@@ -157,17 +157,20 @@ export function VirtualFittingGallery({
     setPreviewIndex(-1);
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
   }, []);
 
   const goPrev = useCallback(() => {
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
     setPreviewIndex((i) => (i > 0 ? i - 1 : results.length - 1));
   }, [results.length]);
 
   const goNext = useCallback(() => {
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
     setPreviewIndex((i) => (i < results.length - 1 ? i + 1 : 0));
   }, [results.length]);
 

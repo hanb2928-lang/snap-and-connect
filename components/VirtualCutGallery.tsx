@@ -135,11 +135,8 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const handleUseCut = useCallback(
     (cut: VirtualCut) => {
       setSelectedCut(cut);
-      if (onUseImage) {
-        onUseImage(cut.imageUrl);
-      }
     },
-    [onUseImage],
+    [],
   );
 
   const openPreview = useCallback((index: number) => {
@@ -151,17 +148,20 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     setPreviewIndex(-1);
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
   }, []);
 
   const goPrev = useCallback(() => {
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
     setPreviewIndex((i) => (i > 0 ? i - 1 : cuts.length - 1));
   }, [cuts.length]);
 
   const goNext = useCallback(() => {
     setImageLoaded(false);
     setDownloaded(null);
+    setShared(null);
     setPreviewIndex((i) => (i < cuts.length - 1 ? i + 1 : 0));
   }, [cuts.length]);
 
