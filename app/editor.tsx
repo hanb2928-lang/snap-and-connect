@@ -217,8 +217,13 @@ export default function EditorScreen() {
       const mimeType = dataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/png';
       const editedDataUrl = await removeBackground(dataUrl, mimeType);
 
-      const base64 = cleanBase64(editedDataUrl);
-      const newUri = await uploadEditedImage(base64, 'image/png');
+      let newUri: string;
+      if (editedDataUrl.startsWith('http')) {
+        newUri = editedDataUrl;
+      } else {
+        const base64 = cleanBase64(editedDataUrl);
+        newUri = await uploadEditedImage(base64, 'image/png');
+      }
       updateImage(newUri);
       setBgPickerVisible(true);
     } catch (err) {

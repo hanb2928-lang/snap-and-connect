@@ -71,9 +71,13 @@ export async function removeBackground(
   const data = await response.json();
   if (data.error) throw new Error(data.error);
 
+  if (data.imageUrl) {
+    return data.imageUrl;
+  }
+
+  // Fallback for older deployments still returning base64
   const base64 = cleanBase64(data.imageBase64);
-  const dataUrl = `data:${data.mimeType || 'image/png'};base64,${base64}`;
-  return dataUrl;
+  return `data:${data.mimeType || 'image/png'};base64,${base64}`;
 }
 
 function base64ToBlob(base64: string, mimeType: string): any {
