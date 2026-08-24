@@ -20,7 +20,6 @@ import {
   Trash2,
   Sparkles,
   ShoppingBag,
-  Image as ImageIcon,
   Pencil,
   Hash,
   Copy,
@@ -86,6 +85,25 @@ import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { AIStyleCard } from '@/components/AIStyleCard';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
+import { FeatureTileGrid } from '@/components/FeatureTileGrid';
+import type { FeatureCategory } from '@/components/FeatureTileGrid';
+import {
+  TrendingUp as TrendingUpIcon,
+  Hash as HashIcon,
+  PenLine,
+  LayoutTemplate,
+  ShoppingBag as ShoppingBagIcon,
+  Wand2,
+  Film as FilmIcon,
+  Lightbulb,
+  Store,
+  BookOpen,
+  Rocket,
+  Users,
+  Globe,
+  Share2 as Share2Icon,
+  Palette as PaletteIcon,
+} from 'lucide-react-native';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -563,6 +581,473 @@ export default function ResultScreen() {
     );
   }
 
+  const featureCategories: FeatureCategory[] = [
+    {
+      key: 'content',
+      label: '콘텐츠 생성',
+      tiles: [
+        {
+          key: 'trendCopy',
+          label: '트렌드 카피',
+          category: 'content',
+          icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <TrendCopyBar
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              tags={scan?.tags || []}
+              platform={activePlatform}
+              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
+            />
+          ),
+        },
+        {
+          key: 'hashtag',
+          label: '해시태그',
+          category: 'content',
+          icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <HashtagCopyBar
+              hashtags={allDisplayHashtags}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              platform={activePlatform}
+            />
+          ),
+        },
+        {
+          key: 'copyWriter',
+          label: '카피라이터',
+          category: 'content',
+          icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <CopyWriter
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              priceEstimate={activePriceEstimate}
+              oneLiner={activeOneLiner}
+              productAdvantages={td?.productAdvantages || []}
+              platform={activePlatform}
+            />
+          ),
+        },
+        {
+          key: 'shortFormGuide',
+          label: '숏폼 가이드',
+          category: 'content',
+          icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <ShortFormGuideCard
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              priceEstimate={activePriceEstimate}
+              oneLiner={activeOneLiner}
+              productAdvantages={td?.productAdvantages || []}
+              onApplyHook={(hook) => setHookOverride(hook)}
+              appliedHook={hookOverride}
+            />
+          ),
+        },
+      ],
+    },
+    {
+      key: 'template',
+      label: '템플릿 & 이미지',
+      tiles: [
+        {
+          key: 'templateCard',
+          label: '템플릿 카드',
+          category: 'template',
+          icon: <LayoutTemplate size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          render: () => (
+            <View>
+              {primaryAffiliateUrl ? (
+                <>
+                  <StickerLinkControls
+                    enabled={true}
+                    onToggle={() => {}}
+                    stickerStyle={stickerStyle}
+                    onStyleChange={handleStickerStyleChange}
+                    size={stickerSize}
+                    onSizeChange={handleStickerSizeChange}
+                    aiRecommended={!stickerUserOverride}
+                  />
+                  <View style={styles.qrPositionRow}>
+                    <Text style={styles.qrPositionLabel}>스티커 위치</Text>
+                    <View style={styles.qrPositionGroup}>
+                      {STICKER_POSITIONS.map((pos) => (
+                        <TouchableOpacity
+                          key={pos.value}
+                          style={[
+                            styles.qrPositionPill,
+                            stickerPosition === pos.value && styles.qrPositionPillActive,
+                          ]}
+                          onPress={() => setStickerPosition(pos.value)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.qrPositionPillText,
+                              stickerPosition === pos.value && styles.qrPositionPillTextActive,
+                            ]}
+                          >
+                            {pos.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.noLinkNotice}>
+                  <Link2 size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.noLinkNoticeText}>
+                    구매 링크를 입력하면 스티커 링크가 자동으로 만들어져요. 아래 '쇼핑커넥트 & 제휴 링크'를 펼쳐서 플랫폼을 선택하고 내 수수료 링크를 붙여넣으세요.
+                  </Text>
+                </View>
+              )}
+              <View style={styles.overlayControlWrap}>
+                <View style={styles.overlayControlHeader}>
+                  <Sun size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.overlayControlTitle}>배경 투명도</Text>
+                  <TouchableOpacity onPress={() => setOverlayOpacity(null)} activeOpacity={0.7}>
+                    <Text style={styles.overlayResetText}>기본값</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.opacitySliderRow}>
+                  <Text style={styles.opacityMinLabel}>얇게</Text>
+                  <TouchableOpacity
+                    style={styles.opacityTrack}
+                    onPress={(e) => {
+                      const { locationX } = e.nativeEvent;
+                      const trackWidth = 200;
+                      const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
+                      setOverlayOpacity(Math.round(ratio * 100) / 100);
+                    }}
+                    activeOpacity={1}
+                  >
+                    <View
+                      style={[
+                        styles.opacityFill,
+                        { width: `${Math.round((overlayOpacity != null ? overlayOpacity : 0.62) * 100)}%` },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.opacityThumb,
+                        { left: `${Math.round((overlayOpacity != null ? overlayOpacity : 0.62) * 100)}%` },
+                      ]}
+                    />
+                  </TouchableOpacity>
+                  <Text style={styles.opacityMaxLabel}>진하게</Text>
+                </View>
+              </View>
+              <View style={styles.textPositionRow}>
+                <Text style={styles.qrPositionLabel}>문구 위치</Text>
+                <View style={styles.qrPositionGroup}>
+                  {TEXT_POSITIONS.map((pos: { label: string; value: TextPosition }) => (
+                    <TouchableOpacity
+                      key={pos.value}
+                      style={[
+                        styles.qrPositionPill,
+                        textPosition === pos.value && styles.qrPositionPillActive,
+                      ]}
+                      onPress={() => setTextPosition(pos.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.qrPositionPillText,
+                          textPosition === pos.value && styles.qrPositionPillTextActive,
+                        ]}
+                      >
+                        {pos.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.templateWrap}>
+                <TemplateCard
+                  ref={cardRef}
+                  imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+                  templateData={activeTemplateData}
+                  title={activeProductName || scan.title || 'Product'}
+                  affiliatePlatforms={affiliatePlatforms}
+                  platform={activePlatform}
+                  customReview={scan.custom_review?.text ? scan.custom_review : null}
+                  shortUrl={shortUrl || ''}
+                  stickerPosition={stickerPosition}
+                  stickerStyle={stickerStyle}
+                  stickerSize={stickerSize}
+                  overlayOpacity={overlayOpacity ?? undefined}
+                  textPosition={textPosition}
+                />
+              </View>
+            </View>
+          ),
+        },
+        {
+          key: 'aiStyle',
+          label: 'AI 스타일',
+          category: 'template',
+          icon: <PaletteIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          render: () => (
+            <AIStyleCard
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              accentColor={td?.accentColor || theme.colors.primary[400]}
+              hook={activeHook}
+              oneLiner={activeOneLiner || scan?.one_liner || ''}
+              platform={activePlatform}
+              onApply={(rec) => {
+                setRecommendedStyle(rec);
+                styleApplyCounter.current += 1;
+                setStyleAppliedKey(`style-${styleApplyCounter.current}`);
+              }}
+            />
+          ),
+        },
+        {
+          key: 'clipGen',
+          label: '클립 생성',
+          category: 'template',
+          icon: <FilmIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          render: () => (
+            <ClipGenerator
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.primary[400]}
+              category={td?.category || ''}
+              fileName={`snap-connect-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              templateData={td ?? null}
+              customReview={scan.custom_review?.text ? scan.custom_review : null}
+              shortUrl={shortUrl || ''}
+              recommendedStyle={recommendedStyle}
+              styleAppliedKey={styleAppliedKey}
+            />
+          ),
+        },
+        {
+          key: 'comicShort',
+          label: '코믹 숏',
+          category: 'template',
+          icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          render: () => (
+            <ComicShortGenerator
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.accent[400]}
+              fileName={`snap-connect-comic-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              shortUrl={shortUrl || ''}
+              stickerPosition={stickerPosition}
+              stickerStyle={stickerStyle}
+              stickerSize={stickerSize}
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              priceEstimate={activePriceEstimate || ''}
+              oneLiner={activeOneLiner || ''}
+              productAdvantages={td?.productAdvantages || []}
+              localStoreInfo={localStoreInfo}
+            />
+          ),
+        },
+      ],
+    },
+    {
+      key: 'commerce',
+      label: '커머스 & 링크',
+      tiles: [
+        {
+          key: 'trendMatch',
+          label: '트렌드 매치',
+          category: 'commerce',
+          icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <TrendMatchCard
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              productName={activeProductName || scan?.product_name || ''}
+              platform={activePlatform}
+              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
+            />
+          ),
+        },
+        {
+          key: 'shoppingMatch',
+          label: '쇼핑커넥트',
+          category: 'commerce',
+          icon: <ShoppingBagIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <ShoppingMatchCard
+              matches={activeShoppingMatches}
+              affiliateLinks={activeShoppingMatches.length > 0 ? [] : currentAffiliateLinks}
+              customAffiliateLinks={customAffiliateLinks}
+              selectedProductIndex={selectedProductIndex}
+              saving={savingLink}
+              productName={activeProductName}
+              priceLabel={activePriceEstimate}
+              onMarketingCopyGenerated={(copy) => setAutoMarketingCopy(copy)}
+              onSaveCustomLink={handleSaveCustomLink}
+              onRemoveCustomLink={handleRemoveCustomLink}
+              selectedAffiliate={selectedAffiliate}
+              onSelectAffiliate={setSelectedAffiliate}
+              availablePlatforms={availablePlatforms}
+              shortUrl={shortUrl}
+              scanId={scan.id}
+            />
+          ),
+        },
+        {
+          key: 'localStore',
+          label: '로컬 스토어',
+          category: 'commerce',
+          icon: <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <LocalStoreCard
+              value={localStoreInfo}
+              onChange={(info) => {
+                setLocalStoreInfo(info);
+                if (scan) {
+                  supabase
+                    .from('scans')
+                    .update({ local_store_info: info })
+                    .eq('id', scan.id)
+                    .then(() => {});
+                }
+              }}
+            />
+          ),
+        },
+      ],
+    },
+    {
+      key: 'insight',
+      label: '분석 & 전략',
+      tiles: [
+        {
+          key: 'shortFormTips',
+          label: '숏폼 팁',
+          category: 'insight',
+          icon: <Lightbulb size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          render: () => (
+            <ShortFormTipsCard
+              hook={activeHook}
+              oneLiner={activeOneLiner || scan?.one_liner || ''}
+              productAdvantages={td?.productAdvantages || []}
+              caption={activeCaption}
+              productName={activeProductName || scan?.product_name || ''}
+              platform={activePlatform}
+              onApplyPlatform={setActivePlatform}
+            />
+          ),
+        },
+        {
+          key: 'viralPredict',
+          label: '바이럴 예측',
+          category: 'insight',
+          icon: <Rocket size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          render: () => (
+            <ViralPredictor
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              hashtags={allDisplayHashtags}
+              comicStyle="lineart"
+              panelCount={1}
+              hasTTS={false}
+              episodeMode={false}
+              trendingKeywords={trendingHashtags}
+            />
+          ),
+        },
+        {
+          key: 'personaSim',
+          label: '페르소나 시뮬',
+          category: 'insight',
+          icon: <Users size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          render: () => (
+            <PersonaSimulator
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              priceEstimate={activePriceEstimate}
+              oneLiner={activeOneLiner}
+              productAdvantages={td?.productAdvantages || []}
+              hook={activeHook}
+            />
+          ),
+        },
+      ],
+    },
+    {
+      key: 'export',
+      label: '내보내기 & 공유',
+      tiles: [
+        {
+          key: 'multiExport',
+          label: '멀티 내보내기',
+          category: 'export',
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <MultiPlatformExport
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.primary[400]}
+              category={td?.category || ''}
+              fileName={`snap-connect-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              shortUrl={shortUrl || ''}
+            />
+          ),
+        },
+        {
+          key: 'globalLocalizer',
+          label: '글로벌 로컬라이저',
+          category: 'export',
+          icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <GlobalLocalizer
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              caption={baseCaption}
+              hashtags={allDisplayHashtags}
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              narrationText={activeHook || activeOneLiner}
+              affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
+            />
+          ),
+        },
+        {
+          key: 'shareBar',
+          label: '공유하기',
+          category: 'export',
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <ShareBar
+              cardRef={cardRef}
+              shareText={shareText}
+              affiliateUrl={primaryAffiliateUrl}
+              shortUrl={shortUrl}
+              fileName={`snap-connect-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+            />
+          ),
+        },
+      ],
+    },
+  ];
+
   return (
     <View style={styles.container}>
       <View style={[styles.topBar, { paddingTop: safeTop + 12 }]}>
@@ -902,398 +1387,24 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
-          <LazySection>
-          <View style={styles.section}>
-            <TrendCopyBar
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              tags={scan?.tags || []}
-              platform={activePlatform}
-              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
-            />
-          </View>
-          </LazySection>
+          <FeatureTileGrid categories={featureCategories} />
 
-          <LazySection delayMs={50}>
-          <View style={styles.section}>
-            <HashtagCopyBar
-              hashtags={allDisplayHashtags}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              platform={activePlatform}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection>
-          <View style={styles.section}>
-            <CopyWriter
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              priceEstimate={activePriceEstimate}
-              oneLiner={activeOneLiner}
-              productAdvantages={td?.productAdvantages || []}
-              platform={activePlatform}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={100}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <ImageIcon size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.sectionLabel}>숏폼 템플릿 카드</Text>
-            </View>
-            <ShortFormGuideCard
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              priceEstimate={activePriceEstimate}
-              oneLiner={activeOneLiner}
-              productAdvantages={td?.productAdvantages || []}
-              onApplyHook={(hook) => setHookOverride(hook)}
-              appliedHook={hookOverride}
-            />
-            {primaryAffiliateUrl ? (
-              <>
-                <StickerLinkControls
-                  enabled={true}
-                  onToggle={() => {}}
-                  stickerStyle={stickerStyle}
-                  onStyleChange={handleStickerStyleChange}
-                  size={stickerSize}
-                  onSizeChange={handleStickerSizeChange}
-                  aiRecommended={!stickerUserOverride}
-                />
-                <View style={styles.qrPositionRow}>
-                  <Text style={styles.qrPositionLabel}>스티커 위치</Text>
-                  <View style={styles.qrPositionGroup}>
-                    {STICKER_POSITIONS.map((pos) => (
-                      <TouchableOpacity
-                        key={pos.value}
-                        style={[
-                          styles.qrPositionPill,
-                          stickerPosition === pos.value && styles.qrPositionPillActive,
-                        ]}
-                        onPress={() => setStickerPosition(pos.value)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.qrPositionPillText,
-                            stickerPosition === pos.value && styles.qrPositionPillTextActive,
-                          ]}
-                        >
-                          {pos.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </>
-            ) : (
-              <View style={styles.noLinkNotice}>
-                <Link2 size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.noLinkNoticeText}>
-                  구매 링크를 입력하면 스티커 링크가 자동으로 만들어져요. 아래 '쇼핑커넥트 & 제휴 링크'를 펼쳐서 플랫폼을 선택하고 내 수수료 링크를 붙여넣으세요.
-                </Text>
-              </View>
-            )}
-            <View style={styles.overlayControlWrap}>
-              <View style={styles.overlayControlHeader}>
-                <Sun size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                <Text style={styles.overlayControlTitle}>배경 투명도</Text>
-                <TouchableOpacity onPress={() => setOverlayOpacity(null)} activeOpacity={0.7}>
-                  <Text style={styles.overlayResetText}>기본값</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.opacitySliderRow}>
-                <Text style={styles.opacityMinLabel}>얇게</Text>
-                <TouchableOpacity
-                  style={styles.opacityTrack}
-                  onPress={(e) => {
-                    const { locationX } = e.nativeEvent;
-                    const trackWidth = 200;
-                    const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
-                    setOverlayOpacity(Math.round(ratio * 100) / 100);
-                  }}
-                  activeOpacity={1}
-                >
-                  <View
-                    style={[
-                      styles.opacityFill,
-                      { width: `${Math.round((overlayOpacity != null ? overlayOpacity : 0.62) * 100)}%` },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.opacityThumb,
-                      { left: `${Math.round((overlayOpacity != null ? overlayOpacity : 0.62) * 100)}%` },
-                    ]}
-                  />
-                </TouchableOpacity>
-                <Text style={styles.opacityMaxLabel}>진하게</Text>
-              </View>
-            </View>
-            <View style={styles.textPositionRow}>
-              <Text style={styles.qrPositionLabel}>문구 위치</Text>
-              <View style={styles.qrPositionGroup}>
-                {TEXT_POSITIONS.map((pos: { label: string; value: TextPosition }) => (
-                  <TouchableOpacity
-                    key={pos.value}
-                    style={[
-                      styles.qrPositionPill,
-                      textPosition === pos.value && styles.qrPositionPillActive,
-                    ]}
-                    onPress={() => setTextPosition(pos.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.qrPositionPillText,
-                        textPosition === pos.value && styles.qrPositionPillTextActive,
-                      ]}
-                    >
-                      {pos.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View style={styles.templateWrap}>
-              <TemplateCard
-                ref={cardRef}
-                imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-                templateData={activeTemplateData}
-                title={activeProductName || scan.title || 'Product'}
-                affiliatePlatforms={affiliatePlatforms}
-                platform={activePlatform}
-                customReview={scan.custom_review?.text ? scan.custom_review : null}
-                shortUrl={shortUrl || ''}
-                stickerPosition={stickerPosition}
-                stickerStyle={stickerStyle}
-                stickerSize={stickerSize}
-                overlayOpacity={overlayOpacity ?? undefined}
-                textPosition={textPosition}
-              />
-            </View>
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={120}>
-          <View style={styles.section}>
-            <TrendMatchCard
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              productName={activeProductName || scan?.product_name || ''}
-              platform={activePlatform}
-              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={150}>
-          <View style={styles.section}>
-            <ShoppingMatchCard
-              matches={activeShoppingMatches}
-              affiliateLinks={activeShoppingMatches.length > 0 ? [] : currentAffiliateLinks}
-              customAffiliateLinks={customAffiliateLinks}
-              selectedProductIndex={selectedProductIndex}
-              saving={savingLink}
-              productName={activeProductName}
-              priceLabel={activePriceEstimate}
-              onMarketingCopyGenerated={(copy) => setAutoMarketingCopy(copy)}
-              onSaveCustomLink={handleSaveCustomLink}
-              onRemoveCustomLink={handleRemoveCustomLink}
-              selectedAffiliate={selectedAffiliate}
-              onSelectAffiliate={setSelectedAffiliate}
-              availablePlatforms={availablePlatforms}
-              shortUrl={shortUrl}
-              scanId={scan.id}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <AIStyleCard
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              accentColor={td?.accentColor || theme.colors.primary[400]}
-              hook={activeHook}
-              oneLiner={activeOneLiner || scan?.one_liner || ''}
-              platform={activePlatform}
-              onApply={(rec) => {
-                setRecommendedStyle(rec);
-                styleApplyCounter.current += 1;
-                setStyleAppliedKey(`style-${styleApplyCounter.current}`);
-              }}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <ClipGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.primary[400]}
-              category={td?.category || ''}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              templateData={td ?? null}
-              customReview={scan.custom_review?.text ? scan.custom_review : null}
-              shortUrl={shortUrl || ''}
-              recommendedStyle={recommendedStyle}
-              styleAppliedKey={styleAppliedKey}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <ShortFormTipsCard
-              hook={activeHook}
-              oneLiner={activeOneLiner || scan?.one_liner || ''}
-              productAdvantages={td?.productAdvantages || []}
-              caption={activeCaption}
-              productName={activeProductName || scan?.product_name || ''}
-              platform={activePlatform}
-              onApplyPlatform={setActivePlatform}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <LocalStoreCard
-              value={localStoreInfo}
-              onChange={(info) => {
-                setLocalStoreInfo(info);
-                if (scan) {
-                  supabase
-                    .from('scans')
-                    .update({ local_store_info: info })
-                    .eq('id', scan.id)
-                    .then(() => {});
-                }
-              }}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <ComicShortGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.accent[400]}
-              fileName={`snap-connect-comic-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-              stickerPosition={stickerPosition}
-              stickerStyle={stickerStyle}
-              stickerSize={stickerSize}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              priceEstimate={activePriceEstimate || ''}
-              oneLiner={activeOneLiner || ''}
-              productAdvantages={td?.productAdvantages || []}
-              localStoreInfo={localStoreInfo}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <ViralPredictor
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              hashtags={allDisplayHashtags}
-              comicStyle="lineart"
-              panelCount={1}
-              hasTTS={false}
-              episodeMode={false}
-              trendingKeywords={trendingHashtags}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <PersonaSimulator
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              priceEstimate={activePriceEstimate}
-              oneLiner={activeOneLiner}
-              productAdvantages={td?.productAdvantages || []}
-              hook={activeHook}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={200}>
-          <View style={styles.section}>
-            <MultiPlatformExport
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.primary[400]}
-              category={td?.category || ''}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <GlobalLocalizer
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              caption={baseCaption}
-              hashtags={allDisplayHashtags}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              narrationText={activeHook || activeOneLiner}
-              affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <ShareBar
-              cardRef={cardRef}
-              shareText={shareText}
-              affiliateUrl={primaryAffiliateUrl}
-              shortUrl={shortUrl}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-            />
-          </View>
-          </LazySection>
-
-          <LazySection delayMs={250}>
           {detectedProducts.length > 1 && (
-            <View style={styles.section}>
-              <CarouselGenerator
-                imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-                detectedProducts={detectedProducts}
-                platform={activePlatform}
-                customReview={scan.custom_review?.text ? scan.custom_review : null}
-                affiliatePlatforms={affiliatePlatforms}
-                fileName={`snap-connect-${scan.id}.png`}
-                shortUrl={shortUrl || ''}
-                stickerPosition={stickerPosition}
-              />
-            </View>
+            <LazySection delayMs={250}>
+              <View style={styles.section}>
+                <CarouselGenerator
+                  imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+                  detectedProducts={detectedProducts}
+                  platform={activePlatform}
+                  customReview={scan.custom_review?.text ? scan.custom_review : null}
+                  affiliatePlatforms={affiliatePlatforms}
+                  fileName={`snap-connect-${scan.id}.png`}
+                  shortUrl={shortUrl || ''}
+                  stickerPosition={stickerPosition}
+                />
+              </View>
+            </LazySection>
           )}
-          </LazySection>
 
           <Text style={styles.dateText}>
             {new Date(scan.created_at).toLocaleDateString('ko-KR', {
