@@ -11,6 +11,7 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { initStorage } from '@/lib/storage';
 import { theme } from '@/lib/theme';
@@ -26,6 +27,7 @@ type ReadyState = 'loading' | 'app' | 'error';
 
 export default function RootLayout() {
   useFrameworkReady();
+  useKeepAwake();
   const [ready, setReady] = useState<ReadyState>('loading');
   const startedRef = useRef(false);
 
