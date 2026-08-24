@@ -146,9 +146,16 @@ export function VirtualFittingGallery({
       setResults(uploaded);
       if (uploaded.length === 0) {
         setError('AI가 착용 컷을 생성하지 못했어요. 다시 시도해주세요.');
+      } else if (data.failedCount && data.totalRequested && data.failedCount > 0) {
+        setError(`${data.totalRequested}장 중 ${data.failedCount}장 생성 실패. ${uploaded.length}장만 표시됩니다. 다시 생성해보세요.`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '가상 피팅 생성 실패');
+      const msg = err instanceof Error ? err.message : '가상 피팅 생성 실패';
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('요청 시간이 초과되었습니다. 네트워크 환경을 확인 후 다시 시도해주세요.');
+      } else {
+        setError(msg);
+      }
     } finally {
       stopProgressCycle();
       setLoading(false);

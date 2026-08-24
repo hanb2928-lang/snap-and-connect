@@ -200,13 +200,13 @@ export async function prepareImageForApi(
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('canvas 컨텍스트 생성 실패');
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/webp', quality);
+    return canvas.toDataURL('image/png');
   }
 
   const manipulated = await ImageManipulator.manipulateAsync(
     dataUrl,
     [{ resize: { width: maxDimension } }],
-    { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
+    { compress: quality, format: ImageManipulator.SaveFormat.PNG },
   );
 
   const fileInfo = await FileSystem.getInfoAsync(manipulated.uri);
@@ -214,7 +214,7 @@ export async function prepareImageForApi(
   const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
     encoding: FileSystem.EncodingType.Base64,
   });
-  return `data:image/jpeg;base64,${base64}`;
+  return `data:image/png;base64,${base64}`;
 }
 
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {

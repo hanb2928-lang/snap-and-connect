@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const results = await generateFittingImages(
+    const { results, failedCount, totalRequested } = await generateFittingImages(
       sanitizedDataUrl,
       openaiKey,
       productName || "",
@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     );
 
     return new Response(
-      JSON.stringify({ results }),
+      JSON.stringify({ results, failedCount, totalRequested }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
@@ -155,7 +155,7 @@ async function generateFittingImages(
   apiKey: string,
   productName: string,
   productCategory: string,
-): Promise<FittingResult[]> {
+): Promise<{ results: FittingResult[]; failedCount: number; totalRequested: number }> {
   const contextHint = productName || productCategory
     ? ` This is a ${productCategory || 'fashion/beauty product'}${productName ? ` called "${productName}"` : ''}.`
     : ' This is a fashion or beauty product.';
@@ -181,7 +181,7 @@ async function generateFittingImages(
   if (valid.length === 0) {
     throw new Error('모든 가상 피팅 생성에 실패했습니다. OpenAI API 키를 확인하거나 이미지를 다시 시도해주세요.');
   }
-  return valid;
+  return { results: valid, failedCount: results.length - valid.length, totalRequested: results.length };
 }
 
 async function editWithOpenAI(
@@ -189,33 +189,55 @@ async function editWithOpenAI(
   apiKey: string,
   prompt: string,
 ): Promise<string> {
-  const formData = buildMultipartForm(imageDataUrl, prompt);
+  const maxRetries = 2;
+  let lastError: Error | null = null;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const formData = buildMultipartForm(imageDataUrl, prompt);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
-  try {
-    const response = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      signal: controller.signal,
-      body: formData,
-    });
+    try {
+      const response = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        if (response.status >= 500 && attempt < maxRetries) {
+          lastError = new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+      }
+
+      const data = await response.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error("No image returned from OpenAI");
+      return b64;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (err instanceof Error && err.name === 'AbortError' && attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw lastError;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = await response.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (!b64) throw new Error("No image returned from OpenAI");
-    return b64;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastError ?? new Error("OpenAI API request failed");
 }
 
 function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {

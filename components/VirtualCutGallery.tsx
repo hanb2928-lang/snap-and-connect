@@ -142,8 +142,17 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       }
 
       setCuts(validCuts);
+
+      if (data.failedCount && data.totalRequested && data.failedCount > 0) {
+        setError(`${data.totalRequested}장 중 ${data.failedCount}장 생성 실패. ${validCuts.length}장만 표시됩니다. 다시 생성해보세요.`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '가상 컷 생성 실패');
+      const msg = err instanceof Error ? err.message : '가상 컷 생성 실패';
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('요청 시간이 초과되었습니다. 네트워크 환경을 확인 후 다시 시도해주세요.');
+      } else {
+        setError(msg);
+      }
     } finally {
       stopProgressCycle();
       setLoading(false);
