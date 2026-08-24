@@ -14,7 +14,7 @@ import { Camera, Sparkles, Download, RefreshCw, ChevronRight } from 'lucide-reac
 import { theme } from '@/lib/theme';
 import { supabaseUrl, supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { cleanBase64 } from '@/lib/base64';
-import { uploadEditedImage } from '@/lib/imageEdit';
+import { uploadEditedImage, prepareImageForApi } from '@/lib/imageEdit';
 
 type CutAngle = 'front' | 'side' | 'detail' | 'full';
 
@@ -45,7 +45,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     setCuts([]);
     setExpanded(true);
     try {
-      const mimeType = imageDataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
+      const preparedImage = await prepareImageForApi(imageDataUrl);
       const response = await fetch(VIRTUAL_CUTS_FUNCTION_URL, {
         method: 'POST',
         headers: {
@@ -53,8 +53,8 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           Authorization: `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
-          imageDataUrl,
-          mimeType,
+          imageDataUrl: preparedImage,
+          mimeType: 'image/png',
           productName,
           productCategory,
         }),

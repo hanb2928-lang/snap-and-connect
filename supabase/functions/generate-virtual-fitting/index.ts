@@ -141,7 +141,8 @@ async function generateFittingImages(
           imageBase64: b64,
           mimeType: 'image/png',
         } satisfies FittingResult;
-      } catch {
+      } catch (err) {
+        console.error(`Fitting ${preset.type} failed:`, err instanceof Error ? err.message : String(err));
         return null;
       }
     }),
@@ -149,7 +150,7 @@ async function generateFittingImages(
 
   const valid = results.filter((r): r is FittingResult => r !== null);
   if (valid.length === 0) {
-    throw new Error('모든 가상 피팅 생성에 실패했습니다');
+    throw new Error('모든 가상 피팅 생성에 실패했습니다. OpenAI API 키를 확인하거나 이미지를 다시 시도해주세요.');
   }
   return valid;
 }

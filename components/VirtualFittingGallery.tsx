@@ -13,7 +13,7 @@ import { User, Sparkles, RefreshCw, ChevronRight, Shirt } from 'lucide-react-nat
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_FITTING_FUNCTION_URL } from '@/lib/supabase';
 import { cleanBase64 } from '@/lib/base64';
-import { uploadEditedImage } from '@/lib/imageEdit';
+import { uploadEditedImage, prepareImageForApi } from '@/lib/imageEdit';
 
 type ModelType = 'asian-female-young' | 'asian-male-young' | 'western-female' | 'asian-female-30s';
 
@@ -49,7 +49,7 @@ export function VirtualFittingGallery({
     setResults([]);
     setExpanded(true);
     try {
-      const mimeType = imageDataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
+      const preparedImage = await prepareImageForApi(imageDataUrl);
       const response = await fetch(VIRTUAL_FITTING_FUNCTION_URL, {
         method: 'POST',
         headers: {
@@ -57,8 +57,8 @@ export function VirtualFittingGallery({
           Authorization: `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
-          imageDataUrl,
-          mimeType,
+          imageDataUrl: preparedImage,
+          mimeType: 'image/png',
           productName,
           productCategory,
         }),

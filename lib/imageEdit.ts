@@ -182,6 +182,37 @@ async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string
   return result.uri;
 }
 
+export async function prepareImageForApi(
+  dataUrl: string,
+  maxDimension = 1024,
+  quality = 0.85,
+): Promise<string> {
+  if (Platform.OS === 'web') {
+    const img = await loadImageElement(dataUrl);
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('canvas 컨텍스트 생성 실패');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png', quality);
+  }
+
+  const manipulated = await ImageManipulator.manipulateAsync(
+    dataUrl,
+    [{ resize: { width: maxDimension } }],
+    { compress: quality, format: ImageManipulator.SaveFormat.PNG },
+  );
+
+  const fileInfo = await FileSystem.getInfoAsync(manipulated.uri);
+  if (!fileInfo.exists) throw new Error('이미지 변환 실패');
+  const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return `data:image/png;base64,${base64}`;
+}
+
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {
   if (Platform.OS === 'web') {
     const response = await fetch(uri);
