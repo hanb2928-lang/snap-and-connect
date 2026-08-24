@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Music2, Clapperboard, Type, Zap, Copy, Check, ChevronDown, ChevronUp, TrendingUp, Headphones } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { friendlyError } from '@/lib/errors';
 import { TREND_MATCH_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
 
