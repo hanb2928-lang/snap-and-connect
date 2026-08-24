@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
 import { uploadAssetBlob } from '@/lib/savedAssets';
 import { clearLogoCache } from '@/lib/logoWatermark';
@@ -23,6 +25,7 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
 import { formatKRW } from '@/lib/dashboard';
+import { OnboardingModal } from '@/components/OnboardingModal';
 
 export default function SettingsScreen() {
   const tabBarHeight = useTabBarHeight();
@@ -46,6 +49,8 @@ export default function SettingsScreen() {
   const [revMonth, setRevMonth] = useState(new Date().toISOString().slice(0, 7));
   const [revNote, setRevNote] = useState('');
   const [revSaving, setRevSaving] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const router = useRouter();
 
   const loadSettings = useCallback(async () => {
     try {
@@ -913,8 +918,28 @@ export default function SettingsScreen() {
             title="수수료 링크 적용"
             desc="결과 화면에서 '내 수수료 링크 붙여넣기' 버튼으로 브랜드커넥트 링크를 적용하세요. 공유와 카드에 자동 반영됩니다."
           />
+          <Divider />
+          <TouchableOpacity
+            style={styles.feedbackRow}
+            onPress={() => setShowOnboarding(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.featureIconWrap}>
+              <Sparkles size={20} color={theme.colors.primary[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.featureBody}>
+              <Text style={styles.featureTitle}>앱 둘러보기 다시 보기</Text>
+              <Text style={styles.featureDesc}>처음 안내를 다시 확인하고 싶다면 눌러주세요</Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+          </TouchableOpacity>
         </View>
       </View>
+
+      <OnboardingModal
+        visible={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>피드백 & 오류 신고</Text>

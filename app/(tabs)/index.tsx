@@ -34,6 +34,7 @@ import { prepareImageForApi } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
+import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -73,6 +74,7 @@ export default function CameraScreen() {
   const [stylePickerVisible, setStylePickerVisible] = useState(false);
   const [showOnboardingStyle, setShowOnboardingStyle] = useState(false);
   const [showOnboardingCapture, setShowOnboardingCapture] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [arMode, setArMode] = useState(false);
   const [videoImportVisible, setVideoImportVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
@@ -127,7 +129,7 @@ export default function CameraScreen() {
       if (saved) setPreferredStyle(saved as PlatformKey);
       const seenOnboarding = await getItem('onboarding_seen');
       if (!seenOnboarding) {
-        setShowOnboardingStyle(true);
+        setShowOnboardingModal(true);
         setItem('onboarding_seen', 'true');
       }
     })();
@@ -832,6 +834,14 @@ export default function CameraScreen() {
               ? '다각도 모드: 같은 제품을 여러 각도에서 촬영(최대 4장)하면 더 정확하게 분석합니다'
               : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
       </Text>
+
+      <OnboardingModal
+        visible={showOnboardingModal}
+        onComplete={() => {
+          setShowOnboardingModal(false);
+          setShowOnboardingStyle(true);
+        }}
+      />
 
       <OnboardingTooltip
         visible={showOnboardingStyle}
