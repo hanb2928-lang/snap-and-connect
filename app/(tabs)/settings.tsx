@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -544,6 +544,38 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 7: 가상 피팅 & 컷 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.accent[500] }]}>
+              <Shirt size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 7</Text>
+              <Text style={styles.flowStepTitle}>가상 피팅 & 컷 갤러리</Text>
+              <Text style={styles.flowStepDesc}>
+                상품 사진으로 가상 착용 컷과 다양한 각도의 컷을 AI로 생성합니다
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.flowConnector} />
+
+          {/* Step 8: 분석 & 인사이트 */}
+          <View style={styles.flowStep}>
+            <View style={[styles.flowStepIcon, { backgroundColor: theme.colors.success[500] }]}>
+              <Target size={22} color="#fff" strokeWidth={2} />
+            </View>
+            <View style={styles.flowStepBody}>
+              <Text style={styles.flowStepNum}>STEP 8</Text>
+              <Text style={styles.flowStepTitle}>바이럴 예측 & 트렌드 분석</Text>
+              <Text style={styles.flowStepDesc}>
+                콘텐츠의 바이럴 잠재력을 예측하고 트렌드 매칭으로 최적화합니다
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -649,6 +681,130 @@ export default function SettingsScreen() {
               '필요시 배경 색상을 직접 변경할 수 있습니다',
             ]}
           />
+          <Divider />
+          <UsageGuide
+            icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="가상 피팅 갤러리"
+            steps={[
+              '결과 화면에서 "가상 피팅" 섹션을 확인합니다',
+              'AI가 상품 사진을 바탕으로 다양한 착용 장면을 자동 생성합니다',
+              '의류, 액세서리 등 착용 가능한 상품에 최적화되어 있습니다',
+              '생성된 피팅 이미지를 탭하면 확대해서 볼 수 있습니다',
+              '"이 이미지 사용" 버튼으로 피팅 이미지를 메인으로 설정할 수 있습니다',
+              '생성된 이미지를 저장하거나 숏폼 카드에 활용할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Layers size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+            title="가상 컷 갤러리"
+            steps={[
+              '결과 화면에서 "가상 컷" 섹션을 확인합니다',
+              'AI가 상품을 다양한 각도와 배경에서 촬영한 것 같은 컷을 생성합니다',
+              '스튜디오, 자연, 매장, 그라데이션 등 다양한 배경으로 자동 합성합니다',
+              '생성된 컷을 탭하면 확대해서 확인할 수 있습니다',
+              '"이 이미지 사용" 버튼으로 원하는 컷을 메인 이미지로 설정합니다',
+              '여러 컷을 캐러셀이나 숏폼 영상에 활용할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Wand2 size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="AI 스타일 추천"
+            steps={[
+              '결과 화면에서 "AI 스타일" 섹션을 확인합니다',
+              'AI가 상품 카테고리와 분위기에 맞는 디자인 스타일을 추천합니다',
+              '추천된 스타일을 탭하면 숏폼 카드에 즉시 적용됩니다',
+              '스타일을 변경하면 텍스트 배치, 색상, 폰트가 자동으로 조정됩니다',
+              '마음에 드는 스타일을 선택하면 모든 콘텐츠에 일관되게 적용됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Target size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="바이럴 예측"
+            steps={[
+              '결과 화면에서 "바이럴 예측" 섹션을 확인합니다',
+              'AI가 콘텐츠의 바이럴 잠재력을 점수로 예측합니다',
+              '예측 점수는 후킹력, 트렌드 적합도, 공유 가능성을 종합 평가합니다',
+              '개선 제안을 탭하면 점수를 높일 수 있는 팁을 확인할 수 있습니다',
+              '제안에 따라 카피나 스타일을 수정하면 예측 점수가 다시 계산됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Users size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="페르소나 시뮬레이터"
+            steps={[
+              '결과 화면에서 "페르소나 시뮬레이터" 섹션을 확인합니다',
+              '타겟 고객의 페르소나(연령, 성별, 관심사)를 선택합니다',
+              'AI가 해당 페르소나 관점에서 상품을 어떻게 평가할지 시뮬레이션합니다',
+              '예상 반응, 구매 확률, 주요 어필 포인트를 확인할 수 있습니다',
+              '시뮬레이션 결과를 바탕으로 마케팅 카피를 최적화할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Globe size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="글로벌 현지화"
+            steps={[
+              '결과 화면에서 "글로벌 현지화" 섹션을 확인합니다',
+              '마케팅 카피를 영어, 일본어, 중국어 등 다국어로 번역합니다',
+              '단순 번역이 아닌 각국 문화와 SNS 트렌드에 맞게 현지화합니다',
+              '국가별 인기 해시태그와 마케팅 톤을 자동 반영합니다',
+              '번역된 카피를 탭하면 클립보드에 복사됩니다',
+              '해외 진출 시 각국 플랫폼에 맞춘 콘텐츠를 빠르게 제작할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Shuffle size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="멀티 플랫폼 익스포트"
+            steps={[
+              '결과 화면에서 "멀티 플랫폼 익스포트" 섹션을 확인합니다',
+              '인스타그램, 틱톡, 유튜브 쇼츠 세 플랫폼에 맞춘 이미지를 한 번에 생성합니다',
+              '각 플랫폼별 최적 화면 비율과 텍스트 위치가 자동 조정됩니다',
+              '플랫폼별 권장 해시태그와 캡션 스타일이 자동 적용됩니다',
+              '생성된 이미지를 각 플랫폼에 맞춰 개별 저장할 수 있습니다',
+              '세 플랫폼 동시 업로드로 노출을 극대화할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<TrendingUp size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="트렌드 매칭"
+            steps={[
+              '결과 화면에서 "트렌드 매칭" 섹션을 확인합니다',
+              'AI가 현재 SNS에서 유행하는 키워드와 상품을 자동 매칭합니다',
+              '실시간 트렌드 키워드를 탭하면 관련 마케팅 카피가 자동 생성됩니다',
+              '트렌드에 맞춘 해시태그 추천도 함께 제공됩니다',
+              '시의성 있는 콘텐츠로 알고리즘 노출을 높일 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Store size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="내 가게 정보"
+            steps={[
+              '결과 화면에서 "내 가게 정보" 섹션을 확인합니다',
+              '오프라인 매장 정보(주소, 영업시간, 전화번호)를 등록할 수 있습니다',
+              '등록한 가게 정보가 숏폼 카드와 공유 콘텐츠에 자동 포함됩니다',
+              '고객이 콘텐츠를 보고 매장 위치를 바로 확인할 수 있습니다',
+              '온·오프라인 연계 마케팅에 활용하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Video size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="비디오 임포트"
+            steps={[
+              '결과 화면에서 "비디오 임포트" 기능을 사용합니다',
+              '기존에 촬영한 영상을 불러와 숏폼 콘텐츠로 변환합니다',
+              '영상에서 핵심 구간을 자동 추출하여 숏폼으로 만듭니다',
+              '추출된 구간에 텍스트와 스티커를 추가할 수 있습니다',
+              '기존 영상 자산을 재활용하여 콘텐츠 제작 시간을 단축하세요',
+            ]}
+          />
         </View>
       </View>
 
@@ -677,6 +833,42 @@ export default function SettingsScreen() {
             icon={<Send size={20} color={theme.colors.success[500]} strokeWidth={2} />}
             title="SNS 원터치 공유 (아코디언)"
             desc="공유 버튼을 탭하면 네이버클립·네이버TV·인스타·카카오톡·블로그 버튼이 펼쳐집니다. 한 번 더 탭하면 접혀서 화면을 깔끔하게 유지합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="가상 피팅 & 컷 갤러리"
+            desc="상품 사진으로 AI가 다양한 착용 장면과 각도의 컷을 자동 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Wand2 size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="AI 스타일 추천"
+            desc="상품에 맞는 디자인 스타일을 AI가 추천하고 원탭으로 적용합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Target size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="바이럴 예측 & 페르소나 시뮬레이터"
+            desc="콘텐츠의 바이럴 잠재력을 예측하고 타겟 고객 관점의 반응을 시뮬레이션합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Globe size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="글로벌 현지화 & 멀티 플랫폼 익스포트"
+            desc="마케팅 카피를 다국어로 현지화하고, 인스타·틱톡·쇼츠 맞춤 이미지를 한 번에 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<TrendingUp size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="트렌드 매칭 & 트렌드 카피"
+            desc="실시간 SNS 트렌드 키워드와 상품을 자동 매칭하여 시의성 있는 카피를 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Store size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="내 가게 정보 & 오프라인 연계"
+            desc="매장 정보를 등록하면 숏폼 카드와 공유 콘텐츠에 자동으로 포함됩니다"
           />
         </View>
       </View>
@@ -820,6 +1012,108 @@ export default function SettingsScreen() {
               '매일 완료한 활동을 체크하면 진행률이 자동으로 업데이트됩니다',
               '일시정지/재개 버튼으로 스케줄을 잠시 멈추거나 다시 시작할 수 있습니다',
               '하단 웜업 가이드라인에서 계정 성장 팁을 확인하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="가상 피팅 & 컷 갤러리 활용"
+            steps={[
+              '결과 화면 상단에서 "가상 피팅"과 "가상 컷" 섹션을 확인합니다',
+              '가상 피팅: 의류나 액세서리 상품을 AI가 다양한 착용 장면으로 생성합니다',
+              '가상 컷: 상품을 스튜디오, 자연, 매장 등 다양한 배경에서 촬영한 컷을 생성합니다',
+              '생성된 이미지를 탭하면 확대해서 확인할 수 있습니다',
+              '"이 이미지 사용" 버튼으로 원하는 이미지를 메인으로 설정합니다',
+              '선택한 이미지가 숏폼 카드, 캐러셀, 숏폼 영상에 자동 반영됩니다',
+              '여러 컷을 조합하여 캐러셀이나 영상으로 제작하면 풍부한 콘텐츠가 됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Wand2 size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="AI 스타일 추천 활용"
+            steps={[
+              '결과 화면에서 "AI 스타일" 섹션을 확인합니다',
+              'AI가 상품 카테고리와 분위기에 맞는 디자인 스타일을 자동 추천합니다',
+              '추천 스타일을 탭하면 숏폼 카드에 즉시 적용됩니다',
+              '스타일 적용 시 텍스트 배치, 색상 테마, 폰트가 자동으로 조정됩니다',
+              '여러 스타일을 비교해보고 가장 마음에 드는 것을 선택하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Target size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="바이럴 예측 & 페르소나 시뮬레이터"
+            steps={[
+              '결과 화면에서 "바이럴 예측" 섹션에서 콘텐츠의 바이럴 점수를 확인합니다',
+              '후킹력, 트렌드 적합도, 공유 가능성을 종합한 점수가 표시됩니다',
+              '개선 제안을 확인하고 카피나 스타일을 수정하면 점수가 재계산됩니다',
+              '"페르소나 시뮬레이터"에서 타겟 고객의 연령, 성별, 관심사를 선택합니다',
+              'AI가 해당 페르소나 관점에서 예상 반응과 구매 확률을 시뮬레이션합니다',
+              '주요 어필 포인트를 확인하고 마케팅 카피에 반영하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Globe size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="글로벌 현지화"
+            steps={[
+              '결과 화면에서 "글로벌 현지화" 섹션을 확인합니다',
+              '번역할 국가(영어, 일본어, 중국어 등)를 선택합니다',
+              'AI가 마케팅 카피를 단순 번역이 아닌 현지화하여 생성합니다',
+              '각국 SNS 트렌드와 문화에 맞는 톤앤매너가 자동 반영됩니다',
+              '국가별 인기 해시태그도 함께 추천됩니다',
+              '번역된 카피를 탭하면 클립보드에 복사되어 바로 사용할 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Shuffle size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="멀티 플랫폼 익스포트"
+            steps={[
+              '결과 화면에서 "멀티 플랫폼 익스포트" 섹션을 확인합니다',
+              '인스타그램, 틱톡, 유튜브 쇼츠 세 플랫폼 맞춤 이미지를 한 번에 생성합니다',
+              '각 플랫폼별 최적 화면 비율과 텍스트 위치가 자동 조정됩니다',
+              '플랫폼별 권장 해시태그와 캡션 스타일이 자동 적용됩니다',
+              '생성된 이미지를 각 플랫폼에 맞춰 개별 저장할 수 있습니다',
+              '세 플랫폼에 동시 업로드하여 노출을 극대화하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<TrendingUp size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="트렌드 매칭 & 트렌드 카피"
+            steps={[
+              '결과 화면에서 "트렌드 매칭" 섹션을 확인합니다',
+              'AI가 현재 SNS에서 유행하는 키워드와 상품을 자동 매칭합니다',
+              '실시간 트렌드 키워드를 탭하면 관련 마케팅 카피가 자동 생성됩니다',
+              '"트렌드 카피" 바에서 상품명과 카테고리를 바탕으로 유행 문구를 추천받습니다',
+              '추천된 문구를 탭하면 마케팅 카피에 즉시 적용됩니다',
+              '시의성 있는 콘텐츠로 알고리즘 노출을 높이세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Store size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+            title="내 가게 정보 등록"
+            steps={[
+              '결과 화면에서 "내 가게 정보" 섹션을 확인합니다',
+              '매장 이름, 주소, 영업시간, 전화번호를 입력합니다',
+              '등록한 정보가 숏폼 카드와 공유 콘텐츠에 자동으로 포함됩니다',
+              '고객이 콘텐츠를 보고 매장 위치를 바로 확인할 수 있습니다',
+              '온라인 제휴 링크와 오프라인 매장 정보를 함께 홍보하세요',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Video size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="비디오 임포트"
+            steps={[
+              '결과 화면에서 "비디오 임포트" 기능을 사용합니다',
+              '기존에 촬영한 영상을 불러와 숏폼 콘텐츠로 변환합니다',
+              '영상에서 핵심 구간을 자동 추출하여 숏폼으로 만듭니다',
+              '추출된 구간에 텍스트와 스티커를 추가할 수 있습니다',
+              '기존 영상 자산을 재활용하여 콘텐츠 제작 시간을 단축하세요',
             ]}
           />
         </View>
