@@ -1544,6 +1544,8 @@ export function ComicShortGenerator({
     setProgress(0);
     setNarrationAudioDataUrl(null);
     setScenarioPanels([]);
+    setFittingResultUrl(null);
+    setFittingModalOpen(false);
   }, [resultUri]);
 
   const html = useMemo(() => buildComicHTML({
@@ -2256,7 +2258,7 @@ const styles = StyleSheet.create({
   fittingResultBadge: {
     position: 'absolute',
     left: theme.spacing.sm,
-    bottom: theme.spacing.sm,
+    top: theme.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
