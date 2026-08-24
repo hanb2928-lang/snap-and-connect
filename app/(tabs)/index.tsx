@@ -29,7 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { uploadImage, analyzeImage, analyzeMultiShot, saveScan, saveManualScan } from '@/lib/analysis';
-import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
@@ -205,6 +205,7 @@ export default function CameraScreen() {
       const cleanB64 = cleanBase64(photo.base64);
       const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1280, 0.7);
       const compressedB64 = cleanBase64(compressedDataUrl);
+      const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
 
       if (recognitionMode === 'multi') {
         if (multiShots.length >= 4) {
@@ -222,7 +223,7 @@ export default function CameraScreen() {
       setProgressText('사진 촬영 중...');
       progressWidth.value = withTiming(0.15, { duration: 300 });
       fadeAnim.value = 0;
-      await processImage(compressedB64, photo.uri, 'image/jpeg');
+      await processImage(compressedB64, photo.uri, compressedMime);
     } catch (err) {
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -254,7 +255,7 @@ export default function CameraScreen() {
       let imageUrl: string, analysis: AnalysisResult;
       try {
         [imageUrl, analysis] = await Promise.all([
-          uploadImage(firstB64, 'image/jpeg'),
+          uploadImage(firstB64, 'image/png'),
           analyzeMultiShot(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
@@ -265,7 +266,7 @@ export default function CameraScreen() {
       if (multiShots.length > 1) {
         for (let i = 1; i < multiShots.length; i++) {
           try {
-            const url = await uploadImage(multiShots[i], 'image/jpeg');
+            const url = await uploadImage(multiShots[i], 'image/png');
             additionalUrls.push(url);
           } catch {
             // individual angle upload failure shouldn't block the whole scan
@@ -322,7 +323,8 @@ export default function CameraScreen() {
 
         const img = images[0];
         const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
-        await processImage(cleanBase64(compressed), img.uri, img.mimeType);
+        const compressedMime = getMimeTypeFromDataUrl(compressed);
+        await processImage(cleanBase64(compressed), img.uri, compressedMime);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
         setProcessing(false);
@@ -371,7 +373,8 @@ export default function CameraScreen() {
       }
       const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
       const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(b64), mimeType), 1280, 0.7);
-      await processImage(cleanBase64(compressed), asset.uri, mimeType);
+      const compressedMime = getMimeTypeFromDataUrl(compressed);
+      await processImage(cleanBase64(compressed), asset.uri, compressedMime);
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -764,7 +767,7 @@ export default function CameraScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
             {multiShots.map((shot, i) => (
               <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
-                <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
+                <Image source={{ uri: `data:image/png;base64,${shot}` }} style={styles.multiShotImage} />
                 <Text style={styles.multiShotBadge}>{i + 1}</Text>
                 <TouchableOpacity
                   style={styles.multiShotRemove}
@@ -977,15 +980,20 @@ function WebUploadScreen() {
       if (images.length === 0) return;
 
       if (recognitionMode === 'multi') {
-        const newShots = images.map((img) => cleanBase64(img.base64));
+        const newShots: string[] = [];
+        for (const img of images) {
+          const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+          newShots.push(cleanBase64(compressed));
+        }
         setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
         setShowMultiTip(false);
         return;
       }
 
       const img = images[0];
-      const cleanB64 = cleanBase64(img.base64);
-      setCropState({ base64: cleanB64, mimeType: img.mimeType });
+      const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+      const compressedMime = getMimeTypeFromDataUrl(compressed);
+      setCropState({ base64: cleanBase64(compressed), mimeType: compressedMime });
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -1016,7 +1024,7 @@ function WebUploadScreen() {
       let imageUrl: string, analysis: AnalysisResult;
       try {
         [imageUrl, analysis] = await Promise.all([
-          uploadImage(multiShots[0], 'image/jpeg'),
+          uploadImage(multiShots[0], 'image/png'),
           analyzeMultiShot(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
@@ -1027,7 +1035,7 @@ function WebUploadScreen() {
       if (multiShots.length > 1) {
         for (let i = 1; i < multiShots.length; i++) {
           try {
-            const url = await uploadImage(multiShots[i], 'image/jpeg');
+            const url = await uploadImage(multiShots[i], 'image/png');
             additionalUrls.push(url);
             await new Promise((r) => setTimeout(r, 100));
           } catch {
@@ -1069,9 +1077,11 @@ function WebUploadScreen() {
         setProcessing(false);
         return;
       }
-      const cleanB64 = cleanBase64(images[0].base64);
+      const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1280, 0.7);
+      const compressedMime = getMimeTypeFromDataUrl(compressed);
+      const cleanB64 = cleanBase64(compressed);
       setProgressText('이미지 업로드 중...');
-      const imageUrl = await uploadImage(cleanB64, images[0].mimeType);
+      const imageUrl = await uploadImage(cleanB64, compressedMime);
       setProgressText('템플릿 준비 중...');
       const scanId = await saveManualScan(imageUrl);
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
@@ -1141,7 +1151,7 @@ function WebUploadScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
               {multiShots.map((shot, i) => (
                 <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
-                  <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
+                  <Image source={{ uri: `data:image/png;base64,${shot}` }} style={styles.multiShotImage} />
                   <Text style={styles.multiShotBadge}>{i + 1}</Text>
                   <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
                     <X size={12} color="#fff" strokeWidth={3} />

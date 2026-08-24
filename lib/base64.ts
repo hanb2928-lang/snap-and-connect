@@ -5,6 +5,11 @@ export function cleanBase64(base64: string): string {
   return base64.replace(/\s/g, '').replace(/^data:image\/\w+;base64,/, '');
 }
 
+export function getMimeTypeFromDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:(image\/[\w+]+);/);
+  return match ? match[1] : 'image/png';
+}
+
 export function buildDataUrl(base64: string, mimeType: string): string {
   const clean = cleanBase64(base64);
   return `data:${mimeType};base64,${clean}`;

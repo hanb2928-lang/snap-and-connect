@@ -64,7 +64,7 @@ export async function analyzeMultiShot(
   base64Images: string[],
   fileName: string,
 ): Promise<AnalysisResult> {
-  const images = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const images = base64Images.map((b64) => buildDataUrl(b64, 'image/png'));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90000);
