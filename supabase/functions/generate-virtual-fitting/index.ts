@@ -99,8 +99,27 @@ async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
 function ensureDataUrl(imageDataUrl: string, mimeType: string): string {
   if (!imageDataUrl) return "";
   const trimmed = imageDataUrl.trim().replace(/\s/g, "");
-  if (trimmed.startsWith("data:")) return trimmed;
-  return `data:${mimeType};base64,${trimmed}`;
+  if (trimmed.startsWith("data:")) {
+    const match = trimmed.match(/^data:([^;,]+);base64,(.+)$/s);
+    if (match) {
+      const [, declaredMime, b64] = match;
+      const detectedMime = detectImageMime(b64);
+      if (detectedMime) return `data:${detectedMime};base64,${b64}`;
+      if (declaredMime.startsWith("image/")) return trimmed;
+    }
+    return trimmed;
+  }
+  const detectedMime = detectImageMime(trimmed);
+  return `data:${detectedMime || mimeType};base64,${trimmed}`;
+}
+
+function detectImageMime(b64: string): string | null {
+  const clean = b64.replace(/\s/g, "");
+  if (clean.startsWith("iVBORw0KGgo")) return "image/png";
+  if (clean.startsWith("/9j/")) return "image/jpeg";
+  if (clean.startsWith("R0lGOD")) return "image/gif";
+  if (clean.startsWith("UklGR")) return "image/webp";
+  return null;
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {

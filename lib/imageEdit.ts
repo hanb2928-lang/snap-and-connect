@@ -273,24 +273,29 @@ export async function prepareImageForEdit(
   return `data:image/png;base64,${base64}`;
 }
 
-function normalizeImageDataUrl(dataUrl: string): string {
-  const match = dataUrl.match(/^data:([^;,]+);base64,(.+)$/s);
-  if (!match) return dataUrl;
-  const [, mimeType, base64] = match;
-  if (mimeType.startsWith('image/')) return dataUrl;
+export function normalizeImageDataUrl(dataUrl: string): string {
+  if (!dataUrl.startsWith('data:')) return dataUrl;
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex < 0) return dataUrl;
 
-  const normalizedBase64 = base64.replace(/\s/g, '');
-  const detectedMime = normalizedBase64.startsWith('iVBORw0KGgo')
+  const header = dataUrl.slice(5, commaIndex);
+  const base64 = dataUrl.slice(commaIndex + 1).replace(/\s/g, '');
+  if (!header.includes('base64') || !base64) return dataUrl;
+
+  const declaredMime = header.split(';')[0];
+  if (declaredMime.startsWith('image/')) return `data:${declaredMime};base64,${base64}`;
+
+  const detectedMime = base64.startsWith('iVBORw0KGgo')
     ? 'image/png'
-    : normalizedBase64.startsWith('/9j/')
+    : base64.startsWith('/9j/')
       ? 'image/jpeg'
-      : normalizedBase64.startsWith('R0lGOD')
+      : base64.startsWith('R0lGOD')
         ? 'image/gif'
-        : normalizedBase64.startsWith('UklGR')
+        : base64.startsWith('UklGR')
           ? 'image/webp'
           : null;
 
-  return detectedMime ? `data:${detectedMime};base64,${normalizedBase64}` : dataUrl;
+  return detectedMime ? `data:${detectedMime};base64,${base64}` : dataUrl;
 }
 
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {

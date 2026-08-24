@@ -15,7 +15,7 @@ import { User, Sparkles, RefreshCw, ChevronRight, Shirt, X, Download, ChevronLef
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_FITTING_FUNCTION_URL } from '@/lib/supabase';
 import { urlToDataUrl } from '@/lib/base64';
-import { prepareImageForEdit } from '@/lib/imageEdit';
+import { normalizeImageDataUrl, prepareImageForEdit } from '@/lib/imageEdit';
 
 type ModelType = 'asian-female-young' | 'asian-male-young' | 'western-female' | 'asian-female-30s';
 
@@ -108,7 +108,7 @@ export function VirtualFittingGallery({
       const dataUrl = imageDataUrl.startsWith('data:')
         ? imageDataUrl
         : await urlToDataUrl(imageDataUrl);
-      const preparedImage = await prepareImageForEdit(dataUrl);
+      const preparedImage = await prepareImageForEdit(normalizeImageDataUrl(dataUrl));
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 180000);
       let response: Response;
@@ -118,6 +118,7 @@ export function VirtualFittingGallery({
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${supabaseAnonKey}`,
+            apikey: supabaseAnonKey,
           },
           signal: controller.signal,
           body: JSON.stringify({
