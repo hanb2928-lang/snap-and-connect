@@ -116,22 +116,22 @@ export function VirtualFittingGallery({
       }
 
       setResults(uploaded);
+      if (uploaded.length === 0) {
+        setError('AI가 착용 컷을 생성하지 못했어요. 다시 시도해주세요.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '가상 피팅 생성 실패');
     } finally {
       stopProgressCycle();
+      setLoading(false);
     }
-    setLoading(false);
   }, [imageDataUrl, loading, productName, productCategory]);
 
   const handleSelect = useCallback(
     (item: FittingImage) => {
       setSelected(item);
-      if (onUseImage) {
-        onUseImage(item.imageUrl);
-      }
     },
-    [onUseImage],
+    [],
   );
 
   return (
