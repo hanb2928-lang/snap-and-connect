@@ -70,10 +70,21 @@ export function ImageCropModal({
     setLayout({ w: width, h: height });
   }, []);
 
-  const handleImageLoad = useCallback((e: { nativeEvent: { source: { width: number; height: number } } }) => {
-    const { width, height } = e.nativeEvent.source;
-    setImageDim({ w: width, h: height });
-  }, []);
+  const handleImageLoad = useCallback((e: { nativeEvent: { source?: { width?: number; height?: number }; dimensions?: { width: number; height: number } } }) => {
+    const source = e.nativeEvent.source;
+    const dimensions = e.nativeEvent.dimensions;
+    const width = source?.width ?? dimensions?.width ?? 0;
+    const height = source?.height ?? dimensions?.height ?? 0;
+    if (width && height) {
+      setImageDim({ w: width, h: height });
+    } else if (dataUrl) {
+      RNImage.getSize(
+        dataUrl,
+        (w, h) => setImageDim({ w, h }),
+        () => {},
+      );
+    }
+  }, [dataUrl]);
 
   useEffect(() => {
     if (imageRect.w > 0 && imageRect.h > 0 && crop.w === 0) {
