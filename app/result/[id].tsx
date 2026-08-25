@@ -50,6 +50,7 @@ import type { StickerPosition, TextPosition } from '@/components/TemplateCard';
 import { StickerLinkControls } from '@/components/StickerLink';
 import type { StickerStyle } from '@/components/StickerLink';
 import { ShareBar } from '@/components/ShareBar';
+import { SocialShortFormShare } from '@/components/SocialShortFormShare';
 import { ShoppingMatchCard } from '@/components/ShoppingMatchCard';
 import { ProductSelector } from '@/components/ProductSelector';
 import { PlatformTabs } from '@/components/PlatformTabs';
@@ -87,23 +88,7 @@ import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
 import type { FeatureCategory } from '@/components/FeatureTileGrid';
-import {
-  TrendingUp as TrendingUpIcon,
-  Hash as HashIcon,
-  PenLine,
-  LayoutTemplate,
-  ShoppingBag as ShoppingBagIcon,
-  Wand2,
-  Film as FilmIcon,
-  Lightbulb,
-  Store,
-  BookOpen,
-  Rocket,
-  Users,
-  Globe,
-  Share2 as Share2Icon,
-  Palette as PaletteIcon,
-} from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon } from 'lucide-react-native';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1041,6 +1026,20 @@ export default function ResultScreen() {
               shortUrl={shortUrl}
               fileName={`snap-connect-${scan.id}.png`}
               affiliatePlatforms={affiliatePlatforms}
+            />
+          ),
+        },
+        {
+          key: 'socialShortForm',
+          label: '숏폼 인트로/아웃트로',
+          category: 'export',
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <SocialShortFormShare
+              shareText={shareText}
+              affiliateUrl={primaryAffiliateUrl}
+              shortUrl={shortUrl}
+              productName={activeProductName}
             />
           ),
         },

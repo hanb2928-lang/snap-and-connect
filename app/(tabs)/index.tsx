@@ -24,7 +24,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withRepeat,
   runOnJS,
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -36,7 +35,7 @@ import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
-import { CrawlingBaby } from '@/components/CrawlingBaby';
+import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
@@ -82,7 +81,6 @@ export default function CameraScreen() {
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
   const zoomShared = useSharedValue(0);
-  const spinnerRotate = useSharedValue(0);
   const updateZoom = useCallback((newZoom: number) => {
     const clamped = Math.max(0, Math.min(1, newZoom));
     zoomShared.value = clamped;
@@ -143,23 +141,10 @@ export default function CameraScreen() {
 
   const fadeIn = useCallback(() => {
     fadeAnim.value = withTiming(1, { duration: 300 });
-    spinnerRotate.value = withRepeat(
-      withTiming(360, { duration: 800 }),
-      -1,
-      false,
-    );
-  }, [fadeAnim, spinnerRotate]);
+  }, [fadeAnim]);
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
-  }));
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spinnerRotate.value}deg` }],
-  }));
-
-  const progressBarStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value * 100}%`,
   }));
 
   const focusBoxSize = focusAnim.interpolate({
@@ -872,34 +857,12 @@ export default function CameraScreen() {
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
-          <View style={styles.processingCard}>
-            <View style={styles.babyCrawlWrap}>
-              <CrawlingBaby size={56} color={theme.colors.primary[400]} crawlWidth={100} speed={1600} />
-            </View>
-            <Text style={styles.processingTitle}>제품 분석 중</Text>
-            <Text style={styles.processingSubtext}>{progressText}</Text>
-            <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressFill, progressBarStyle]} />
-            </View>
-            <View style={styles.progressSteps}>
-              <View style={[styles.progressStep, progressStep >= 1 && styles.progressStepActive]}>
-                {progressStep >= 1 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>1</Text>}
-              </View>
-              <View style={[styles.progressStepLine, progressStep >= 2 && styles.progressStepLineActive]} />
-              <View style={[styles.progressStep, progressStep >= 2 && styles.progressStepActive]}>
-                {progressStep >= 2 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>2</Text>}
-              </View>
-              <View style={[styles.progressStepLine, progressStep >= 3 && styles.progressStepLineActive]} />
-              <View style={[styles.progressStep, progressStep >= 3 && styles.progressStepActive]}>
-                {progressStep >= 3 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>3</Text>}
-              </View>
-            </View>
-            <View style={styles.progressStepLabels}>
-              <Text style={styles.progressStepLabel}>촬영</Text>
-              <Text style={styles.progressStepLabel}>분석</Text>
-              <Text style={styles.progressStepLabel}>저장</Text>
-            </View>
-          </View>
+          <AnalysisLoadingOverlay
+            progress={progressWidth.value}
+            step={progressStep as 0 | 1 | 2 | 3}
+            text={progressText}
+            stepLabels={['촬영', '분석', '저장']}
+          />
         </Animated.View>
       )}
     </View>
@@ -919,17 +882,13 @@ function WebUploadScreen() {
   const [cropState, setCropState] = useState<{ base64: string; mimeType: string } | null>(null);
   const [showMultiTip, setShowMultiTip] = useState(true);
   const fadeAnim = useSharedValue(0);
-  const spinnerRotate = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
   const fadeIn = useCallback(() => {
     fadeAnim.value = withTiming(1, { duration: 300 });
-    spinnerRotate.value = withRepeat(withTiming(360, { duration: 800 }), -1, false);
-  }, [fadeAnim, spinnerRotate]);
+  }, [fadeAnim]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
-  const spinnerStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spinnerRotate.value}deg` }] }));
-  const progressBarStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value * 100}%` }));
 
   const processImage = async (base64: string, mimeType: string) => {
     const dataUrl = buildDataUrl(base64, mimeType);
@@ -1217,34 +1176,12 @@ function WebUploadScreen() {
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
-          <View style={styles.processingCard}>
-            <View style={styles.babyCrawlWrap}>
-              <CrawlingBaby size={56} color={theme.colors.primary[400]} crawlWidth={100} speed={1600} />
-            </View>
-            <Text style={styles.processingTitle}>제품 분석 중</Text>
-            <Text style={styles.processingSubtext}>{progressText}</Text>
-            <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressFill, progressBarStyle]} />
-            </View>
-            <View style={styles.progressSteps}>
-              <View style={[styles.progressStep, progressStep >= 1 && styles.progressStepActive]}>
-                {progressStep >= 1 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>1</Text>}
-              </View>
-              <View style={[styles.progressStepLine, progressStep >= 2 && styles.progressStepLineActive]} />
-              <View style={[styles.progressStep, progressStep >= 2 && styles.progressStepActive]}>
-                {progressStep >= 2 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>2</Text>}
-              </View>
-              <View style={[styles.progressStepLine, progressStep >= 3 && styles.progressStepLineActive]} />
-              <View style={[styles.progressStep, progressStep >= 3 && styles.progressStepActive]}>
-                {progressStep >= 3 ? <Check size={10} color="#fff" strokeWidth={3} /> : <Text style={styles.progressStepText}>3</Text>}
-              </View>
-            </View>
-            <View style={styles.progressStepLabels}>
-              <Text style={styles.progressStepLabel}>업로드</Text>
-              <Text style={styles.progressStepLabel}>분석</Text>
-              <Text style={styles.progressStepLabel}>저장</Text>
-            </View>
-          </View>
+          <AnalysisLoadingOverlay
+            progress={progressWidth.value}
+            step={progressStep as 0 | 1 | 2 | 3}
+            text={progressText}
+            stepLabels={['업로드', '분석', '저장']}
+          />
         </Animated.View>
       )}
     </View>
@@ -1645,95 +1582,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 15, 30, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  processingCard: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    ...theme.shadows.elevated,
-  },
-  processingSpinner: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.full,
-    borderWidth: 4,
-    borderColor: theme.colors.dark.border,
-    borderTopColor: theme.colors.primary[400],
-  },
-  babyCrawlWrap: {
-    width: 180,
-    height: 64,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  processingTitle: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  processingSubtext: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-  },
-  progressTrack: {
-    width: '100%',
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.dark.border,
-    marginTop: theme.spacing.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: theme.colors.primary[400],
-  },
-  progressSteps: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-  },
-  progressStep: {
-    width: 22,
-    height: 22,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.dark.border,
-  },
-  progressStepActive: {
-    backgroundColor: theme.colors.primary[500],
-    borderColor: theme.colors.primary[500],
-  },
-  progressStepText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  progressStepLine: {
-    width: 28,
-    height: 2,
-    backgroundColor: theme.colors.dark.border,
-  },
-  progressStepLineActive: {
-    backgroundColor: theme.colors.primary[400],
-  },
-  progressStepLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: 78,
-    marginTop: 4,
-    marginLeft: -28,
-  },
-  progressStepLabel: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textFaint,
   },
   topBarLeft: {
     flexDirection: 'row',
