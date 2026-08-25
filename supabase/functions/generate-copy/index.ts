@@ -51,7 +51,26 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body: CopyRequest = await req.json();
+    const raw = await req.json();
+    const body: CopyRequest = {
+      productName: String(raw?.productName ?? ''),
+      productCategory: String(raw?.productCategory ?? ''),
+      priceEstimate: String(raw?.priceEstimate ?? ''),
+      oneLiner: String(raw?.oneLiner ?? ''),
+      productAdvantages: Array.isArray(raw?.productAdvantages)
+        ? raw.productAdvantages.map((s: unknown) => String(s)).slice(0, 10)
+        : [],
+      copyType: ((): CopyType => {
+        const valid: CopyType[] = ['viral', 'info', 'deal', 'all'];
+        return valid.includes(raw?.copyType) ? raw.copyType : 'viral';
+      })(),
+      platform: ((): CopyPlatform => {
+        const valid: CopyPlatform[] = ['shortform', 'instagram', 'blog', 'naverBlog', 'x', 'twitter', 'threads', 'smartstore', 'pinterest'];
+        return valid.includes(raw?.platform) ? raw.platform : 'shortform';
+      })(),
+      count: Math.min(Math.max(Number(raw?.count) || 3, 1), 5),
+      localStoreInfo: raw?.localStoreInfo ?? null,
+    };
 
     if (!body.productName) {
       return new Response(
@@ -60,7 +79,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const count = Math.min(Math.max(body.count || 3, 1), 5);
+    const count = body.count;
     const openaiKey = await resolveOpenAIKey();
     const isAllMode = body.copyType === "all";
 

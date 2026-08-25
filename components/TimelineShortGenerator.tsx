@@ -16,6 +16,7 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
+import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import type { PlatformKey } from '@/types/database';
 
@@ -472,6 +473,11 @@ function WebTimelineGenerator({
           ctx.textAlign = 'left';
           ctx.textBaseline = 'alphabetic';
           ctx.globalAlpha = 1;
+        }
+
+        // Draw roaming baby + link sticker overlay into the video frame
+        if (shortUrl) {
+          drawRoamingBabyWithLink(ctx, elapsed, CANVAS_W, CANVAS_H, shortUrl, accentColor);
         }
 
         if (t < 1) {

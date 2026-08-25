@@ -745,6 +745,7 @@ export default function CameraScreen() {
       {videoImportVisible && (
         <VideoImportGenerator
           affiliatePlatforms={[]}
+          shortUrl={''}
           onClose={() => setVideoImportVisible(false)}
         />
       )}

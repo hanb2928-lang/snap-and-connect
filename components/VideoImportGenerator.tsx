@@ -4,9 +4,11 @@ import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as Aler
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 
 interface VideoImportGeneratorProps {
   affiliatePlatforms?: string[];
+  shortUrl?: string;
   onClose: () => void;
 }
 
@@ -73,7 +75,7 @@ function drawTextLines(
   return currentY;
 }
 
-export function VideoImportGenerator({ affiliatePlatforms = [], onClose }: VideoImportGeneratorProps) {
+export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', onClose }: VideoImportGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -465,6 +467,11 @@ export function VideoImportGenerator({ affiliatePlatforms = [], onClose }: Video
           ctx.globalAlpha = 1;
         }
 
+        // Draw roaming baby + link sticker overlay into the video frame
+        if (shortUrl) {
+          drawRoamingBabyWithLink(ctx, elapsed * 1000, W, H, shortUrl, theme.colors.primary[500]);
+        }
+
         if (elapsed < totalDuration) {
           requestAnimationFrame(drawFrame);
         } else {
@@ -499,7 +506,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], onClose }: Video
       setError(msg);
       showToast('영상 가공에 실패했어요: ' + msg);
     }
-  }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, outputUrl, showToast, highlightMode, highlightSegments]);
+  }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, shortUrl, outputUrl, showToast, highlightMode, highlightSegments]);
 
   const handleDownload = useCallback(() => {
     if (!outputUrl) return;

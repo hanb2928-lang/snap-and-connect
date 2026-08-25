@@ -1,20 +1,27 @@
 import type { AnalysisResult } from '@/types/database';
 import { supabase, ANALYSIS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { safeFetch, safeSupabaseCall, ApiError } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
-import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
+import { base64ToUint8Array, buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
+import { prepareImageForApi } from '@/lib/imageEdit';
 
 export async function uploadImage(
   base64: string,
   mimeType: string,
 ): Promise<string> {
-  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const dataUrl = buildDataUrl(base64, mimeType);
+  const compressedDataUrl = await prepareImageForApi(dataUrl, 1080, 0.8);
+  const compressedBase64 = cleanBase64(compressedDataUrl);
+  const uploadMime = 'image/jpeg';
+
+  const ext = 'jpg';
   const fileName = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, base64ToUint8Array(base64), { contentType: mimeType });
+    .upload(fileName, base64ToUint8Array(compressedBase64), { contentType: uploadMime });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
@@ -28,37 +35,25 @@ export async function analyzeImage(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
+    timeoutMs: 60000,
+  });
 
-  try {
-    const response = await fetch(ANALYSIS_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`Analysis failed (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-
-    return normalizeAnalysis(data);
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`AI 분석 실패 (${response.status}): ${errText}`);
   }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+
+  return normalizeAnalysis(data);
 }
 
 export async function analyzeMultiShot(
@@ -67,37 +62,25 @@ export async function analyzeMultiShot(
 ): Promise<AnalysisResult> {
   const images = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ images, fileName, mode: 'multi-shot' }),
+    timeoutMs: 90000,
+  });
 
-  try {
-    const response = await fetch(ANALYSIS_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({ images, fileName, mode: 'multi-shot' }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`Analysis failed (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-
-    return normalizeAnalysis(data);
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('AI 다각도 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`AI 다각도 분석 실패 (${response.status}): ${errText}`);
   }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+
+  return normalizeAnalysis(data);
 }
 
 function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {

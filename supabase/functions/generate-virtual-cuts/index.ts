@@ -27,7 +27,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { imageDataUrl, mimeType, productName, productCategory } = await req.json() as CutRequest;
+    const raw = await req.json();
+    const imageDataUrl = String(raw?.imageDataUrl ?? '');
+    const mimeType = String(raw?.mimeType ?? 'image/jpeg');
+    const productName = String(raw?.productName ?? '');
+    const productCategory = String(raw?.productCategory ?? '');
 
     if (!imageDataUrl) {
       return new Response(
@@ -36,7 +40,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const cleanMime = mimeType || "image/jpeg";
+    const cleanMime = mimeType;
     const sanitizedDataUrl = ensureDataUrl(imageDataUrl, cleanMime);
 
     const openaiKey = await resolveOpenAIKey();

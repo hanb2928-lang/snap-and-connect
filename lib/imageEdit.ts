@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Platform, Image as RNImage } from 'react-native';
 import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { base64ToUint8Array, cleanBase64 } from '@/lib/base64';
+import { safeFetch } from '@/lib/apiClient';
 
 export async function rotateImage(uri: string): Promise<string> {
   const result = await ImageManipulator.manipulateAsync(uri, [{ rotate: 90 }]);
@@ -54,13 +55,14 @@ export async function removeBackground(
   mimeType: string,
 ): Promise<string> {
   const functionUrl = `${supabaseUrl}/functions/v1/remove-bg`;
-  const response = await fetch(functionUrl, {
+  const response = await safeFetch(functionUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ imageDataUrl, mimeType }),
+    timeoutMs: 60000,
   });
 
   if (!response.ok) {
@@ -95,16 +97,21 @@ export async function compressImage(uri: string, maxWidth = 1280, quality = 0.8)
 }
 
 export async function uploadEditedImage(base64: string, mimeType: string): Promise<string> {
-  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const dataUrl = mimeType === 'image/png' ? `data:image/png;base64,${base64}` : `data:image/jpeg;base64,${base64}`;
+  const compressedDataUrl = await prepareImageForApi(dataUrl, 1080, 0.85);
+  const compressedBase64 = cleanBase64(compressedDataUrl);
+  const uploadMime = 'image/jpeg';
+  const ext = 'jpg';
+
   const fileName = `edited-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const body = Platform.OS === 'web'
-    ? base64ToBlob(base64, mimeType)
-    : base64ToUint8Array(base64);
+    ? base64ToBlob(compressedBase64, uploadMime)
+    : base64ToUint8Array(compressedBase64);
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, body, { contentType: mimeType });
+    .upload(fileName, body, { contentType: uploadMime });
 
   if (error) throw new Error(`업로드 실패: ${error.message}`);
 
