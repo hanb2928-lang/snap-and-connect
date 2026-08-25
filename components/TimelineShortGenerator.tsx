@@ -9,8 +9,6 @@ import {
   CircleAlert as AlertCircle,
   Clock,
   Baby,
-  Sparkles,
-  Megaphone,
   CloudUpload,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -297,6 +295,7 @@ function WebTimelineGenerator({
 
   const duration = mode === '30s' ? 30000 : 60000;
   const phases = mode === '30s' ? TIMELINE_30S : TIMELINE_60S;
+  const phasesKey = mode;
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -457,20 +456,21 @@ function WebTimelineGenerator({
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
 
-        // Disclosure at the very end (last 3 seconds)
-        const disclosureStart = totalSec - 3;
+        // Disclosure at the very end (last 2 seconds, partial overlay so CTA stays visible)
+        const disclosureStart = totalSec - 2;
         if (timeSec >= disclosureStart) {
           const dt = Math.min((timeSec - disclosureStart) / 0.5, 1);
-          ctx.globalAlpha = dt;
+          ctx.globalAlpha = dt * 0.75;
           ctx.fillStyle = '#0a0f1e';
-          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+          ctx.fillRect(0, CANVAS_H - 80, CANVAS_W, 80);
           ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          ctx.font = '400 18px sans-serif';
+          ctx.font = '400 16px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
-          drawTextLines(ctx, disclosure, CANVAS_W / 2, CANVAS_H / 2 - 20, CANVAS_W - 80, 26);
+          ctx.fillText(disclosure, CANVAS_W / 2, CANVAS_H - 40);
           ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
           ctx.globalAlpha = 1;
         }
 
@@ -505,7 +505,7 @@ function WebTimelineGenerator({
       const msg = err instanceof Error ? err.message : String(err);
       showToast('생성 실패: ' + msg);
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, fileName, affiliatePlatforms, shortUrl, productAdvantages, oneLiner, duration, mode, phases, videoUrl, showToast]);
+  }, [imageUrl, hook, title, hashtags, accentColor, fileName, affiliatePlatforms, shortUrl, productAdvantages, oneLiner, duration, mode, phasesKey, videoUrl, showToast]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;
@@ -1059,10 +1059,12 @@ function draw60sFrame(
       ctx.fillStyle = 'rgba(255,200,100,0.8)';
       ctx.font = '700 36px sans-serif';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
       ctx.fillText('?', babyX + 30 + i * 20, qY);
       ctx.textAlign = 'left';
     }
     ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
 
     if (logoImg) drawLogoWatermark(ctx, logoImg, CANVAS_W, CANVAS_H, 0.5);
   } else if (phaseIdx === 1) {
@@ -1552,3 +1554,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+
+export { TimelineShortGenerator }
