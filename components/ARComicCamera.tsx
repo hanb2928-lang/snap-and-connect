@@ -50,6 +50,7 @@ export function ARComicCamera({ onClose, recognitionMode = 'single', preferredSt
   const [bubbleVisible, setBubbleVisible] = useState(false);
   const [sfxPulse, setSfxPulse] = useState(false);
   const [showFirstGuide, setShowFirstGuide] = useState(false);
+  const [closing, setClosing] = useState(false);
   const scanAnim = useRef(new RNAnimated.Value(0)).current;
   const pulseAnim = useRef(new RNAnimated.Value(0)).current;
   const filterAnim = useRef(new RNAnimated.Value(0)).current;
@@ -101,6 +102,15 @@ export function ARComicCamera({ onClose, recognitionMode = 'single', preferredSt
     }
   }, [magicMode, cameraReady, pulseAnim]);
 
+  const handleClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    setCameraReady(false);
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  }, [closing, onClose]);
+
   const handleCapture = useCallback(async () => {
     if (!cameraRef.current || processing || !cameraReady) return;
     setProcessing(true);
@@ -124,13 +134,17 @@ export function ARComicCamera({ onClose, recognitionMode = 'single', preferredSt
       ]);
       const scanId = await saveScan(imageUrl, analysis);
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
-      onClose();
+      setClosing(true);
+      setCameraReady(false);
+      setTimeout(() => {
+        onClose();
+      }, 300);
     } catch (err) {
       setError(friendlyError(err, '촬영에 실패했습니다. 다시 시도해주세요.'));
     } finally {
       setProcessing(false);
     }
-  }, [processing, cameraReady, recognitionMode, router, onClose]);
+  }, [processing, cameraReady, recognitionMode, router, onClose, closing]);
 
   if (!permission) {
     return (
@@ -197,19 +211,21 @@ export function ARComicCamera({ onClose, recognitionMode = 'single', preferredSt
   return (
     <View style={styles.container}>
       <View style={styles.cameraWrapper}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing={facing}
-          flash="off"
-          ratio="16:9"
-          onCameraReady={() => setCameraReady(true)}
-        />
+        {!closing && (
+          <CameraView
+            ref={cameraRef}
+            style={styles.camera}
+            facing={facing}
+            flash="off"
+            ratio="16:9"
+            onCameraReady={() => setCameraReady(true)}
+          />
+        )}
         {filterOverlay}
       </View>
 
       <View style={[styles.topBar, { top: safeTop + 8 }]}>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
           <X size={22} color="#fff" strokeWidth={2} />
         </TouchableOpacity>
         <View style={styles.modeTitleWrap}>
