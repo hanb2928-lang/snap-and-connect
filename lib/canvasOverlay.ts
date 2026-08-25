@@ -38,18 +38,18 @@ export function computeBabyPosition(
 ): BabyOverlayState {
   const t = elapsed / 1000;
 
-  const padding = 60;
-  const stickerW = 120;
-  const stickerH = 50;
+  const padding = 40;
+  const stickerW = 200;
+  const stickerH = 80;
   const maxX = Math.max(0, formatWidth - stickerW - padding * 2);
-  const maxY = Math.max(0, formatHeight * 0.5 - stickerH - padding);
+  const maxY = Math.max(0, formatHeight * 0.7 - stickerH - padding);
 
-  const x = padding + (Math.sin(t * 0.35) * 0.4 + Math.sin(t * 0.72) * 0.3 + 0.5) * maxX;
-  const y = padding + (Math.sin(t * 0.28 + 1) * 0.3 + Math.sin(t * 0.55 + 2) * 0.4 + 0.4) * maxY;
+  const x = padding + (Math.sin(t * 0.9) * 0.4 + Math.sin(t * 1.8) * 0.3 + 0.5) * maxX;
+  const y = padding + (Math.sin(t * 0.7 + 1) * 0.3 + Math.sin(t * 1.3 + 2) * 0.4 + 0.4) * maxY;
 
-  const bob = Math.sin(t * 3) * 3;
-  const scale = 1 + Math.sin(t * 1.5) * 0.05;
-  const crawlPhase = t * 1.2;
+  const bob = Math.sin(t * 4) * 4;
+  const scale = 1.5 + Math.sin(t * 1.5) * 0.08;
+  const crawlPhase = t * 1.5;
 
   return { x, y: y + bob, scale, crawlPhase, alpha: 1 };
 }
@@ -306,16 +306,16 @@ export function getWebViewOverlayScript(): string {
   return `
   function __computeBabyPosition(elapsed, W, H) {
     var t = elapsed / 1000;
-    var padding = 60;
-    var stickerW = 120;
-    var stickerH = 50;
+    var padding = 40;
+    var stickerW = 200;
+    var stickerH = 80;
     var maxX = Math.max(0, W - stickerW - padding * 2);
-    var maxY = Math.max(0, H * 0.5 - stickerH - padding);
-    var x = padding + (Math.sin(t * 0.35) * 0.4 + Math.sin(t * 0.72) * 0.3 + 0.5) * maxX;
-    var y = padding + (Math.sin(t * 0.28 + 1) * 0.3 + Math.sin(t * 0.55 + 2) * 0.4 + 0.4) * maxY;
-    var bob = Math.sin(t * 3) * 3;
-    var scale = 1 + Math.sin(t * 1.5) * 0.05;
-    var crawlPhase = t * 1.2;
+    var maxY = Math.max(0, H * 0.7 - stickerH - padding);
+    var x = padding + (Math.sin(t * 0.9) * 0.4 + Math.sin(t * 1.8) * 0.3 + 0.5) * maxX;
+    var y = padding + (Math.sin(t * 0.7 + 1) * 0.3 + Math.sin(t * 1.3 + 2) * 0.4 + 0.4) * maxY;
+    var bob = Math.sin(t * 4) * 4;
+    var scale = 1.5 + Math.sin(t * 1.5) * 0.08;
+    var crawlPhase = t * 1.5;
     return { x: x, y: y + bob, scale: scale, crawlPhase: crawlPhase, alpha: 1 };
   }
 
@@ -434,3 +434,6 @@ export function getWebViewOverlayScript(): string {
   }
   `;
 }
+
+
+export { getWebViewOverlayScript }
