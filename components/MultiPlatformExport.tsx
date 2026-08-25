@@ -60,7 +60,7 @@ const PLATFORM_FORMAT_PRIORITY: Record<PlatformKey, string[]> = {
   threads: ['threads', 'instagram', 'reels'],
   twitter: ['twitter', 'instagram', 'reels'],
   pinterest: ['pinterest', 'instagram', 'blog'],
-  smartstore: ['smartstore', 'naver', 'shopping'],
+  smartstore: ['blog', 'instagram', 'pinterest'],
 };
 
 function getFormatsForPlatform(platform?: PlatformKey): ExportFormat[] {
