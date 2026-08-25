@@ -15,7 +15,7 @@ import { Camera, Sparkles, RefreshCw, ChevronRight, X, Download, ChevronLeft, Ma
 import { theme } from '@/lib/theme';
 import { supabaseAnonKey, VIRTUAL_CUTS_FUNCTION_URL } from '@/lib/supabase';
 import { urlToDataUrl } from '@/lib/base64';
-import { prepareImageForEdit } from '@/lib/imageEdit';
+import { normalizeImageDataUrl, prepareImageForEdit } from '@/lib/imageEdit';
 
 type CutAngle = 'front' | 'side' | 'detail' | 'full';
 
@@ -109,7 +109,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       const dataUrl = imageDataUrl.startsWith('data:')
         ? imageDataUrl
         : await urlToDataUrl(imageDataUrl);
-      const preparedImage = await prepareImageForEdit(dataUrl);
+      const preparedImage = await prepareImageForEdit(normalizeImageDataUrl(dataUrl));
       const timeout = setTimeout(() => controller.abort(), 180000);
       let response: Response;
       try {

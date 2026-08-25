@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -49,6 +49,10 @@ export default function SettingsScreen() {
   const [revMonth, setRevMonth] = useState(new Date().toISOString().slice(0, 7));
   const [revNote, setRevNote] = useState('');
   const [revSaving, setRevSaving] = useState(false);
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
+  const [savedKey, setSavedKey] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
@@ -60,6 +64,7 @@ export default function SettingsScreen() {
       setNaverId(data?.naver_shopping_id || '');
       setTossId(data?.toss_share_id || '');
       setLogoUrl(data?.logo_url || null);
+      setOpenaiKey(data?.openai_api_key || '');
     } catch {
       setSettings(null);
     } finally {
@@ -427,6 +432,67 @@ export default function SettingsScreen() {
             ))}
           </View>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>OpenAI API 키 설정</Text>
+        <Text style={styles.sectionDesc}>
+          가상 컷 생성, 가상 피팅 등 AI 이미지 기능에 사용됩니다. 키는 안전하게 저장되며 서버에서만 사용됩니다.
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+              <Key size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>OpenAI API Key</Text>
+              <TextInput
+                style={styles.idInput}
+                value={openaiKey}
+                onChangeText={setOpenaiKey}
+                placeholder="sk-..."
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!showApiKey}
+              />
+            </View>
+            <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)} style={styles.idIconWrap} hitSlop={12}>
+              {showApiKey ? <EyeOff size={18} color={theme.colors.dark.textDim} strokeWidth={2} /> : <Eye size={18} color={theme.colors.dark.textDim} strokeWidth={2} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[styles.saveIdButton, savedKey && styles.saveIdButtonDone]}
+          onPress={async () => {
+            setSavingKey(true);
+            setSavedKey(false);
+            try {
+              await updateUserSettings({ openai_api_key: openaiKey || null });
+              setSavedKey(true);
+              setTimeout(() => setSavedKey(false), 2500);
+            } catch (err) {
+              Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+            }
+            setSavingKey(false);
+          }}
+          disabled={savingKey}
+          activeOpacity={0.8}
+        >
+          {savingKey ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : savedKey ? (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.saveIdButtonText}>저장됨</Text>
+            </>
+          ) : (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>API 키 저장</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>

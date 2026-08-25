@@ -6,7 +6,7 @@ const SINGLETON_ID = 1;
 export async function getUserSettings(): Promise<UserSettings | null> {
   const { data, error } = await supabase
     .from('user_settings')
-    .select('id, coupang_partners_id, naver_shopping_id, toss_share_id, updated_at')
+    .select('id, coupang_partners_id, naver_shopping_id, toss_share_id, openai_api_key, logo_url, updated_at')
     .eq('id', SINGLETON_ID)
     .maybeSingle();
 
