@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking, Modal, Pressable } from 'react-native';
-import { Copy, Check, CirclePlay as PlayCircle, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink } from 'lucide-react-native';
+import { Copy, Check, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink } from 'lucide-react-native';
 import { useRef, useState, useCallback } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -132,7 +132,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     }
   }, []);
 
-  const handleNaverShare = useCallback(async (platform: 'naverclip' | 'navertv') => {
+  const handleNaverShare = useCallback(async () => {
     setSharing(true);
     try {
       const uri = await captureCard();
@@ -142,10 +142,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
       const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
 
-    const siteUrls: Record<string, string> = {
-      naverclip: 'https://clip.naver.com',
-      navertv: 'https://tv.naver.com',
-    };
+    const siteUrl = 'https://clip.naver.com';
 
     let imageCopied = false;
     let textCopied = false;
@@ -188,9 +185,9 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     }
 
     if (Platform.OS === 'web') {
-      setShareModal({ url: siteUrls[platform], label: platform === 'naverclip' ? '네이버클립' : '네이버TV' });
+      setShareModal({ url: siteUrl, label: '네이버클립' });
     } else {
-      Linking.openURL(siteUrls[platform]).catch(() => {});
+      Linking.openURL(siteUrl).catch(() => {});
     }
     } finally {
       setSharing(false);
@@ -374,14 +371,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
             icon={<Clapperboard size={22} color="#fff" strokeWidth={2} />}
             bg="#03C75A"
             label="네이버클립"
-            onPress={() => handleNaverShare('naverclip')}
-            disabled={sharing}
-          />
-          <ShareButton
-            icon={<PlayCircle size={22} color="#fff" strokeWidth={2} />}
-            bg="#E6252C"
-            label="네이버TV"
-            onPress={() => handleNaverShare('navertv')}
+            onPress={handleNaverShare}
             disabled={sharing}
           />
           <ShareButton
