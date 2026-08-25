@@ -117,7 +117,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 ### 3-3. 패키지 설치
 
-PowerShell 열기 (프로젌트 폴더에서 Shift+우클릭 → "PowerShell 창 열기"):
+PowerShell 열기 (프로젝트 폴더에서 Shift+우클릭 → "PowerShell 창 열기"):
 
 ```
 cd "C:\Projects\shortconnect"
@@ -126,21 +126,7 @@ npm install
 
 설치 완료까지 대기 (약 2~3분). 오류가 나지 않으면 성공.
 
-### 3-4. Android SDK 경로 파일 만들기 (중요 — 이 단계를 건너뛰면 빌드 실패)
-
-`android` 폴더 안에 `local.properties` 파일을 만들어야 합니다.
-
-메모장으로 `android\local.properties` 파일을 생성하고 다음 내용을 입력:
-
-```
-sdk.dir=C:\\Users\\본인계정\\AppData\\Local\\Android\\Sdk
-```
-
-> `본인계정`은 실제 Windows 사용자 이름으로 변경하세요.
-> 경로를 모르겠으면 Android Studio의 SDK Manager에서 "Android SDK Location" 항목을 확인하세요.
-> 환경 변수 `ANDROID_HOME`이 설정되어 있어도 이 파일이 있어야 Gradle이 SDK를 찾을 수 있습니다.
-
-### 3-5. Android 네이티브 프로젝트 생성
+### 3-4. Android 네이티브 프로젝트 생성
 
 같은 PowerShell에서 실행:
 

@@ -33,7 +33,12 @@
     "extra": {
       "supabaseUrl": "https://fzvvriycfiqecherbhli.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs",
-      "router": {}
+      "router": {
+        "origin": "snapconnect://"
+      },
+      "eas": {
+        "projectId": "382227db-bb80-4cd7-9dc4-895bde2536bf"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -78,6 +83,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "hanbon9"
   }
 }

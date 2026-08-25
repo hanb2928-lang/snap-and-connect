@@ -9,9 +9,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "android": "expo run:android",
-    "ios": "expo run:ios",
-    "build:android:local": "expo prebuild --platform android --no-install && cd android && ./gradlew assembleRelease -x lint -x lintRelease",
-    "build:android:debug": "expo prebuild --platform android --no-install && cd android && ./gradlew assembleDebug -x lint -x lintDebug"
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
