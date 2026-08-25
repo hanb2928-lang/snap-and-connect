@@ -203,10 +203,20 @@ export function drawLinkSticker(
   const stickerW = padH + iconR * 2 + gap + textW + gap + arrowW + padH;
   const stickerH = padV * 2 + Math.max(iconR * 2, labelFS);
 
-  // Pill background
+  // Pill background (with fallback for browsers without roundRect)
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.beginPath();
-  ctx.roundRect(x, y, stickerW, stickerH, stickerH / 2);
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, stickerW, stickerH, stickerH / 2);
+  } else {
+    const r = stickerH / 2;
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + stickerW, y, x + stickerW, y + stickerH, r);
+    ctx.arcTo(x + stickerW, y + stickerH, x, y + stickerH, r);
+    ctx.arcTo(x, y + stickerH, x, y, r);
+    ctx.arcTo(x, y, x + stickerW, y, r);
+    ctx.closePath();
+  }
   ctx.fill();
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
@@ -269,7 +279,6 @@ export function drawShortUrlText(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(shortUrl, x, y);
-  ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
 
