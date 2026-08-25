@@ -7,6 +7,7 @@ import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
+import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 
@@ -1103,24 +1104,33 @@ function WebClipGenerator({
 
       {state === 'done' && videoUrl && (
         <View style={styles.resultWrap}>
-          {Platform.OS === 'web' && videoMime.includes('png') && (
-            // @ts-ignore img element on web
-            <img
-              src={videoUrl}
-              style={isVertical ? styles.videoVertical : styles.videoHorizontal}
-            />
-          )}
-          {Platform.OS === 'web' && !videoMime.includes('png') && (
-            // @ts-ignore video element on web
-            <video
-              src={videoUrl}
-              style={isVertical ? styles.videoVertical : styles.videoHorizontal}
-              controls
-              autoPlay
-              loop
-              playsInline
-            />
-          )}
+          <View style={isVertical ? styles.videoVerticalWrap : styles.videoHorizontalWrap}>
+            {Platform.OS === 'web' && videoMime.includes('png') && (
+              // @ts-ignore img element on web
+              <img
+                src={videoUrl}
+                style={isVertical ? styles.videoVertical : styles.videoHorizontal}
+              />
+            )}
+            {Platform.OS === 'web' && !videoMime.includes('png') && (
+              // @ts-ignore video element on web
+              <video
+                src={videoUrl}
+                style={isVertical ? styles.videoVertical : styles.videoHorizontal}
+                controls
+                autoPlay
+                loop
+                playsInline
+              />
+            )}
+            {Platform.OS === 'web' && shortUrl && (
+              <RoamingBabyOverlay
+                linkUrl={shortUrl}
+                containerWidth={isVertical ? 280 : 440}
+                containerHeight={isVertical ? 400 : 248}
+              />
+            )}
+          </View>
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleDownload} activeOpacity={0.8}>
               <Download size={18} color="#fff" strokeWidth={2} />
@@ -1457,6 +1467,22 @@ const styles = StyleSheet.create({
   },
   resultWrap: {
     gap: theme.spacing.md,
+  },
+  videoVerticalWrap: {
+    width: '100%',
+    maxHeight: 400,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    position: 'relative',
+  },
+  videoHorizontalWrap: {
+    width: '100%',
+    maxHeight: 300,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    position: 'relative',
   },
   videoVertical: {
     width: '100%',

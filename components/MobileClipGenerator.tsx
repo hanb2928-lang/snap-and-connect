@@ -13,6 +13,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
+import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
@@ -830,12 +831,21 @@ export function MobileClipGenerator({
               : '동영상이 생성됐어요. 미리보기 후 저장하세요.'}
           </Text>
           <View style={styles.previewWrap}>
-            <VideoPreview
-              uri={videoUri}
-              mimeType={videoMime}
-              isVertical={format === 'vertical'}
-              maxHeight={380}
-            />
+            <View style={styles.previewInner}>
+              <VideoPreview
+                uri={videoUri}
+                mimeType={videoMime}
+                isVertical={format === 'vertical'}
+                maxHeight={380}
+              />
+              {shortUrl && Platform.OS !== 'web' && (
+                <RoamingBabyOverlay
+                  linkUrl={shortUrl}
+                  containerWidth={format === 'vertical' ? 220 : 360}
+                  containerHeight={format === 'vertical' ? 380 : 220}
+                />
+              )}
+            </View>
           </View>
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
@@ -1138,6 +1148,13 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginVertical: theme.spacing.sm,
+  },
+  previewInner: {
+    width: '100%',
+    position: 'relative',
+    alignItems: 'center',
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
   },
   doneNotice: {
     fontSize: theme.typography.caption,
