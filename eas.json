@@ -12,8 +12,8 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://pnlyrodbiqlpwduuzrsp.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBubHlyb2RiaXFscHdkdXV6cnNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTA0NDIsImV4cCI6MjEwMjI4NjQ0Mn0.CP2hnNB5UfPQh6kxUvIUzEkd8q0gby1ukLCCkh5ri38"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
     },
     "preview": {
@@ -24,8 +24,8 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://pnlyrodbiqlpwduuzrsp.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBubHlyb2RiaXFscHdkdXV6cnNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTA0NDIsImV4cCI6MjEwMjI4NjQ0Mn0.CP2hnNB5UfPQh6kxUvIUzEkd8q0gby1ukLCCkh5ri38"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
     },
     "production": {
@@ -36,8 +36,8 @@
         "gradleCommand": ":app:assembleRelease"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://pnlyrodbiqlpwduuzrsp.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBubHlyb2RiaXFscHdkdXV6cnNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTA0NDIsImV4cCI6MjEwMjI4NjQ0Mn0.CP2hnNB5UfPQh6kxUvIUzEkd8q0gby1ukLCCkh5ri38"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
     }
   },
