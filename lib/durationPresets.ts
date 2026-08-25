@@ -126,11 +126,17 @@ export function getRecommendedDuration(category: string): CategoryDurationRecomm
   const cat = category.toLowerCase();
   for (const key of Object.keys(CATEGORY_DURATION_MAP)) {
     if (key === 'default') continue;
-    if (cat.includes(key) || cat.includes(translateCategoryKey(key))) {
+    if (cat.includes(key) || matchesKoreanCategory(cat, key)) {
       return CATEGORY_DURATION_MAP[key];
     }
   }
   return CATEGORY_DURATION_MAP.default;
+}
+
+function matchesKoreanCategory(cat: string, key: string): boolean {
+  const translations = translateCategoryKey(key);
+  if (!translations) return false;
+  return translations.split('|').some((word) => cat.includes(word));
 }
 
 function translateCategoryKey(key: string): string {

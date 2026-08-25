@@ -795,9 +795,10 @@ export function MobileClipGenerator({
                   </View>
                 </View>
                 <View style={styles.durationPillGroup}>
-                  {DURATION_PRESETS.map((preset) => {
-                    const active = duration === preset.value;
+                  {(() => {
                     const recDur = getRecommendedDuration(_category);
+                    return DURATION_PRESETS.map((preset) => {
+                    const active = duration === preset.value;
                     const isRec = recDur.duration === preset.value;
                     return (
                       <TouchableOpacity
@@ -822,7 +823,8 @@ export function MobileClipGenerator({
                         )}
                       </TouchableOpacity>
                     );
-                  })}
+                    });
+                  })()}
                 </View>
                 <Text style={styles.durationHint}>
                   {DURATION_PRESETS.find((p) => p.value === duration)?.desc}
@@ -830,7 +832,7 @@ export function MobileClipGenerator({
                 <View style={styles.durationRecBox}>
                   <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2} />
                   <Text style={styles.durationRecText}>
-                    이 카테고리 추천: {getRecommendedDuration(_category).duration / 1000}초 · {getRecommendedDuration(_category).reason}
+                    {(() => { const r = getRecommendedDuration(_category); return `이 카테고리 추천: ${r.duration / 1000}초 · ${r.reason}`; })()}
                   </Text>
                 </View>
               </View>
