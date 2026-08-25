@@ -18,6 +18,7 @@ import { VideoPreview } from '@/components/VideoPreview';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
+import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -595,6 +596,8 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     ctx.restore();
   }
 
+  ${getWebViewOverlayScript()}
+
   function postMsg(type,data){
     var msg=JSON.stringify({type:type,data:data||{}});
     if(window.__comicPostMsg){window.__comicPostMsg(msg);}
@@ -903,6 +906,11 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       }
 
       ctx.restore();
+
+      // Baby + link sticker composited into the video frame
+      if(shortUrl&&t<0.667){
+        __drawRoamingBabyWithLink(ctx,elapsed,W,H,shortUrl,effectiveAccent);
+      }
 
       // Ending credits: store info + disclosure (last ~2 seconds)
       if(t>=0.667){

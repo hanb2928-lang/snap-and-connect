@@ -8,6 +8,7 @@ import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
+import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 
@@ -693,6 +694,11 @@ function WebClipGenerator({
         // Logo watermark (visible until disclosure covers screen)
         if (logoImg && t < 0.667) {
           drawLogoWatermark(ctx, logoImg, L.width, L.height, 0.65);
+        }
+
+        // Baby + link sticker composited into the video frame
+        if (shortUrl && t < 0.667) {
+          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor);
         }
 
         // Disclosure text (last ~2 seconds)

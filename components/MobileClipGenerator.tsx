@@ -18,6 +18,7 @@ import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
+import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 
@@ -235,6 +236,8 @@ function buildWebViewHTML(params: {
     return {stream:dest.stream,stop:function(){try{oscs.forEach(function(o){try{o.stop();}catch(e){}});ac.close();}catch(e){}}};
   }
 
+  ${getWebViewOverlayScript()}
+
   function postMsg(type,data){
     var msg=JSON.stringify({type:type,data:data||{}});
     if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg);}
@@ -362,6 +365,11 @@ function buildWebViewHTML(params: {
         drawTextLines(ctx,hook,60,hookY,W-120,56);
         ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
         ctx.globalAlpha=1;}
+
+      // Baby + link sticker composited into the video frame
+      if(shortUrl&&t<0.667){
+        __drawRoamingBabyWithLink(ctx,elapsed,W,H,shortUrl,accentColor);
+      }
 
       // Disclosure text (last ~2 seconds)
       if(t>=0.667){
