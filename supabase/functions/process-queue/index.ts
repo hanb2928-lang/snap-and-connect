@@ -23,6 +23,11 @@ const ALLOWED_JOB_TYPES = new Set([
   "generate-comic-scenario",
 ]);
 
+const JOB_TYPE_TO_FUNCTION_SLUG: Record<string, string> = {
+  "virtual-cuts": "generate-virtual-cuts",
+  "virtual-fitting": "generate-virtual-fitting",
+};
+
 interface RenderJob {
   id: string;
   job_type: string;
@@ -161,7 +166,8 @@ async function processJob(job: RenderJob): Promise<Record<string, unknown>> {
   const timeout = setTimeout(() => controller.abort(), JOB_TIMEOUT_MS);
 
   try {
-    const functionUrl = `${supabaseUrl}/functions/v1/${job.job_type}`;
+    const functionSlug = JOB_TYPE_TO_FUNCTION_SLUG[job.job_type] ?? job.job_type;
+    const functionUrl = `${supabaseUrl}/functions/v1/${functionSlug}`;
     const resp = await fetch(functionUrl, {
       method: "POST",
       headers: {
