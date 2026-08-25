@@ -6,6 +6,7 @@ export interface StyleRecommendation {
   motionPreset: 'kenburns' | 'zoom-in' | 'zoom-out' | 'slide-in' | 'slow-motion';
   format: 'vertical' | 'horizontal';
   duration: number;
+  durationReason: string;
   hybridMode: 'off' | 'photo-to-comic';
   reason: string;
   alternatives: { label: string; cardStyle: string; reason: string }[];

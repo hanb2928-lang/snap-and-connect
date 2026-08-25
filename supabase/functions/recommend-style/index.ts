@@ -12,6 +12,7 @@ interface StyleRecommendation {
   motionPreset: "kenburns" | "zoom-in" | "zoom-out" | "slide-in" | "slow-motion";
   format: "vertical" | "horizontal";
   duration: number;
+  durationReason: string;
   hybridMode: "off" | "photo-to-comic";
   reason: string;
   alternatives: { label: string; cardStyle: string; reason: string }[];
@@ -119,7 +120,8 @@ async function recommendWithOpenAI(
     "- musicMood: one of \"upbeat\" (energetic, fast tempo), \"calm\" (relaxed, steady), \"emotional\" (sentimental, slow), \"none\"\n" +
     "- motionPreset: one of \"kenburns\" (smooth zoom + pan), \"zoom-in\" (fast zoom to grab attention), \"zoom-out\" (reveal whole product), \"slide-in\" (slide from left), \"slow-motion\" (slow zoom + fade for emotional feel)\n" +
     "- format: \"vertical\" (9:16 for Reels/Shorts/Stories) or \"horizontal\" (16:9 for Blog/X)\n" +
-    "- duration: integer in milliseconds (8000-20000). Shorter for punchy products, longer for detailed storytelling.\n" +
+    "- duration: integer in milliseconds. Use 12000-15000 for punchy/viral products (food, toys, trendy items), 18000-22000 as the standard for most products, 30000 for detailed storytelling (luxury, home, complex products).\n" +
+    "- durationReason: Korean explanation (1 sentence) of why this duration is recommended for this product.\n" +
     "- hybridMode: \"off\" or \"photo-to-comic\" (photo hook then comic transition — use for fun/trendy products)\n" +
     "- reason: Korean explanation of why this combination is best for THIS product (1-2 sentences)\n" +
     "- alternatives: array of 2 objects, each with { label (Korean style name), cardStyle (one of the 4 values), reason (Korean, 1 sentence why) }\n\n" +
@@ -206,11 +208,14 @@ function normalizeRecommendation(
       : "vertical";
 
   const rawDuration = Number(raw.duration);
-  let duration = 15000;
+  let duration = 20000;
   if (Number.isFinite(rawDuration)) {
     const ms = rawDuration < 100 ? rawDuration * 1000 : rawDuration;
-    if (ms >= 8000 && ms <= 20000) duration = Math.round(ms);
+    const ALLOWED = [12000, 15000, 18000, 20000, 22000, 30000];
+    const closest = ALLOWED.reduce((best, v) => Math.abs(v - ms) < Math.abs(best - ms) ? v : best, ALLOWED[0]);
+    duration = closest;
   }
+  const durationReason = String(raw.durationReason || "");
 
   const hybridMode = VALID_HYBRID.has(String(raw.hybridMode))
     ? String(raw.hybridMode) as StyleRecommendation["hybridMode"]
@@ -226,7 +231,7 @@ function normalizeRecommendation(
       }))
     : [];
 
-  return { cardStyle, musicMood, motionPreset, format, duration, hybridMode, reason, alternatives };
+  return { cardStyle, musicMood, motionPreset, format, duration, durationReason, hybridMode, reason, alternatives };
 }
 
 function fallbackRecommendation(category: string, platform: string): StyleRecommendation {
@@ -235,7 +240,8 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
   let cardStyle: StyleRecommendation["cardStyle"] = "bold";
   let musicMood: StyleRecommendation["musicMood"] = "upbeat";
   let motionPreset: StyleRecommendation["motionPreset"] = "kenburns";
-  let duration = 15000;
+  let duration = 20000;
+  let durationReason = "대부분의 제품은 18~22초 표준 길이가 구매 전환에 가장 효과적입니다.";
   let hybridMode: StyleRecommendation["hybridMode"] = "off";
   let reason = "이 상품에 가장 적합한 스타일입니다.";
 
@@ -243,44 +249,51 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
     cardStyle = "feed";
     musicMood = "emotional";
     motionPreset = "slow-motion";
-    duration = 14000;
+    duration = 18000;
+    durationReason = "패션은 착장 무드를 보여줄 18초 표준이 구매 전환에 가장 효과적입니다.";
     reason = "패션 상품은 감성적인 음악과 슬로우모션으로 착장 분위기를 살리는 것이 효과적입니다.";
   } else if (cat.includes("beauty") || cat.includes("cosmetic") || cat.includes("skincare") || cat.includes("makeup") || cat.includes("뷰티") || cat.includes("화장품") || cat.includes("스킨케어") || cat.includes("메이크업")) {
     cardStyle = "feed";
     musicMood = "calm";
     motionPreset = "kenburns";
-    duration = 13000;
+    duration = 18000;
+    durationReason = "뷰티는 제품 질감과 효과를 전달할 18초 표준이 적합합니다.";
     reason = "뷰티 상품은 차분한 음악과 부드러운 줌으로 제품 질감을 돋보이게 하는 것이 좋습니다.";
   } else if (cat.includes("food") || cat.includes("drink") || cat.includes("beverage") || cat.includes("snack") || cat.includes("식품") || cat.includes("음식") || cat.includes("음료") || cat.includes("간식")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "zoom-in";
-    duration = 10000;
+    duration = 12000;
+    durationReason = "식품은 12초 바이럴로 즉각적인 식욕 자극과 구매 전환이 좋습니다.";
     reason = "식품은 업비트 음악과 빠른 줌인으로 시선을 즉시 사로잡는 짧은 영상이 효과적입니다.";
   } else if (cat.includes("tech") || cat.includes("electronic") || cat.includes("gadget") || cat.includes("phone") || cat.includes("테크") || cat.includes("전자") || cat.includes("가전") || cat.includes("스마트폰") || cat.includes("휴대폰")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "zoom-in";
-    duration = 12000;
+    duration = 15000;
+    durationReason = "테크는 15초 바이럴로 핵심 기능을 빠르게 보여주는 것이 효과적입니다.";
     reason = "테크 제품은 업비트 음악과 줌인으로 핵심 기능을 빠르게 보여주는 것이 좋습니다.";
   } else if (cat.includes("home") || cat.includes("furniture") || cat.includes("interior") || cat.includes("lamp") || cat.includes("light") || cat.includes("홈") || cat.includes("가구") || cat.includes("인테리어") || cat.includes("조명") || cat.includes("램프")) {
     cardStyle = "magazine";
     musicMood = "calm";
     motionPreset = "zoom-out";
-    duration = 16000;
+    duration = 20000;
+    durationReason = "홈/인테리어는 20초 표준으로 공간 분위기를 충분히 전달하는 것이 좋습니다.";
     reason = "홈/인테리어는 매거진 스타일과 차분한 음악으로 공간 분위기를 전달하는 것이 효과적입니다.";
   } else if (cat.includes("toy") || cat.includes("kid") || cat.includes("fun") || cat.includes("장난감") || cat.includes("완구") || cat.includes("유아") || cat.includes("키즈")) {
     cardStyle = "bold";
     musicMood = "upbeat";
     motionPreset = "kenburns";
-    duration = 12000;
+    duration = 15000;
+    durationReason = "키즈/장난감은 15초 바이럴로 재미와 시선 끌기가 효과적입니다.";
     hybridMode = "photo-to-comic";
     reason = "장난감/유아 상품은 업비트 음악과 만화 전환 효과로 재미를 살리는 것이 좋습니다.";
   } else if (cat.includes("luxury") || cat.includes("jewel") || cat.includes("watch") || cat.includes("premium") || cat.includes("럭셔리") || cat.includes("명품") || cat.includes("주얼리") || cat.includes("시계") || cat.includes("프리미엄")) {
     cardStyle = "minimal";
     musicMood = "emotional";
     motionPreset = "slow-motion";
-    duration = 16000;
+    duration = 22000;
+    durationReason = "럭셔리는 22초 표준으로 고급스러운 스토리를 전달하는 것이 적합합니다.";
     reason = "럭셔리 상품은 미니멀 디자인과 감성 음악으로 고급스러움을 강조하는 것이 좋습니다.";
   }
 
@@ -301,6 +314,7 @@ function fallbackRecommendation(category: string, platform: string): StyleRecomm
     motionPreset,
     format,
     duration,
+    durationReason,
     hybridMode,
     reason,
     alternatives,

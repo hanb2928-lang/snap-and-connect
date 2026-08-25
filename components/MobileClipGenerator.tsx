@@ -19,6 +19,7 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
+import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 
@@ -432,7 +433,7 @@ export function MobileClipGenerator({
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
-  const [duration, setDuration] = useState(6000);
+  const [duration, setDuration] = useState(DEFAULT_DURATION);
   const [format, setFormat] = useState<VideoFormat>(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
   const [cardStyle, setCardStyle] = useState<CardStyleKey>(PLATFORM_STYLE_MAP[platform] || 'bold');
   const [musicMood, setMusicMood] = useState<MusicMood>('none');
@@ -784,6 +785,56 @@ export function MobileClipGenerator({
                 </View>
               </View>
 
+              <View style={styles.durationSection}>
+                <View style={styles.durationHeaderRow}>
+                  <Text style={styles.optionLabel}>영상 길이</Text>
+                  <View style={styles.durationTierBadge}>
+                    <Text style={[styles.durationTierText, { color: tierColor(getTierForDuration(duration)) }]}>
+                      {tierLabel(getTierForDuration(duration))}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.durationPillGroup}>
+                  {DURATION_PRESETS.map((preset) => {
+                    const active = duration === preset.value;
+                    const recDur = getRecommendedDuration(_category);
+                    const isRec = recDur.duration === preset.value;
+                    return (
+                      <TouchableOpacity
+                        key={preset.value}
+                        style={[
+                          styles.durationPill,
+                          active && styles.durationPillActive,
+                        ]}
+                        onPress={() => setDuration(preset.value)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.durationPillLabel,
+                            active && styles.durationPillLabelActive,
+                          ]}
+                        >
+                          {preset.label}
+                        </Text>
+                        {isRec && (
+                          <View style={styles.recDot} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.durationHint}>
+                  {DURATION_PRESETS.find((p) => p.value === duration)?.desc}
+                </Text>
+                <View style={styles.durationRecBox}>
+                  <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.durationRecText}>
+                    이 카테고리 추천: {getRecommendedDuration(_category).duration / 1000}초 · {getRecommendedDuration(_category).reason}
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.optionRow}>
                 <Text style={styles.optionLabel}>하이브리드</Text>
                 <View style={styles.hybridScroll}>
@@ -1005,6 +1056,83 @@ const styles = StyleSheet.create({
   },
   togglePillSubActive: {
     color: 'rgba(255,255,255,0.7)',
+  },
+  durationSection: {
+    marginBottom: theme.spacing.md,
+  },
+  durationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  durationTierBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  durationTierText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  durationPillGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 3,
+    gap: 2,
+  },
+  durationPill: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  durationPillActive: {
+    backgroundColor: theme.colors.warning[500],
+  },
+  durationPillLabel: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  durationPillLabelActive: {
+    color: '#fff',
+  },
+  recDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: theme.colors.warning[400],
+  },
+  durationHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  durationRecBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: theme.colors.warning[500] + '0D',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '20',
+  },
+  durationRecText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
   styleScroll: {
     flexDirection: 'row',
