@@ -1,15 +1,12 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Share as RNShare, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Share as RNShare } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withSequence,
-  withDelay,
   withRepeat,
   Easing,
-  cancelAnimation,
-  runOnJS,
 } from 'react-native-reanimated';
 import { Share2, Baby, ArrowRight, ExternalLink, Sparkles, Copy, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -21,7 +18,6 @@ interface SocialShortFormShareProps {
   shareText: string;
   affiliateUrl: string | null;
   shortUrl?: string | null;
-  productName?: string;
 }
 
 const INTRO_PHRASES = [
@@ -35,7 +31,6 @@ export function SocialShortFormShare({
   shareText,
   affiliateUrl,
   shortUrl,
-  productName,
 }: SocialShortFormShareProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -47,7 +42,6 @@ export function SocialShortFormShare({
   const babyBounce = useSharedValue(0);
   const sparkleRot = useSharedValue(0);
   const introOpacity = useSharedValue(0);
-  const outroScale = useSharedValue(0);
 
   const toggleExpand = useCallback(() => {
     const next = !expanded;
@@ -63,13 +57,17 @@ export function SocialShortFormShare({
         -1,
         false,
       );
-      introOpacity.value = withDelay(200, withTiming(1, { duration: 400 }));
+      introOpacity.value = withTiming(1, { duration: 400 });
+    } else {
+      babyBounce.value = withTiming(0, { duration: 200 });
+      sparkleRot.value = withTiming(0, { duration: 200 });
+      introOpacity.value = withTiming(0, { duration: 200 });
     }
   }, [expanded, expandAnim, babyBounce, sparkleRot, introOpacity]);
 
   const handleShare = useCallback(async () => {
     const intro = INTRO_PHRASES[selectedIntro];
-    const outro = showOutro ? '\n\n더 많은 혜택은 클릭! 👆' : '';
+    const outro = showOutro ? '\n\n더 많은 혜택은 클릭!' : '';
     const link = shortUrl || affiliateUrl;
     const linkLine = link ? `\n\n${link}` : '';
     const fullText = `${intro}\n\n${shareText}${linkLine}${outro}`;
@@ -129,6 +127,10 @@ export function SocialShortFormShare({
     opacity: introOpacity.value,
   }));
 
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${expandAnim.value * 180}deg` }],
+  }));
+
   const outroStyle = useAnimatedStyle(() => ({
     opacity: showOutro ? 1 : 0.3,
     transform: [{ scale: showOutro ? 1 : 0.95 }],
@@ -143,9 +145,7 @@ export function SocialShortFormShare({
           </View>
           <Text style={styles.headerTitle}>숏폼 인트로/아웃트로 추가</Text>
         </View>
-        <Animated.Text style={[styles.chevron, { transform: [{ rotate: expandAnim.value === 1 ? '180deg' : '0deg' }] }]}>
-          ▼
-        </Animated.Text>
+        <Animated.Text style={[styles.chevron, chevronStyle]}>▼</Animated.Text>
       </TouchableOpacity>
 
       <Animated.View style={[styles.expandWrap, expandStyle]} pointerEvents={expanded ? 'auto' : 'none'}>

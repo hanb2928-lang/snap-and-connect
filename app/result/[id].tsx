@@ -1039,7 +1039,6 @@ export default function ResultScreen() {
               shareText={shareText}
               affiliateUrl={primaryAffiliateUrl}
               shortUrl={shortUrl}
-              productName={activeProductName}
             />
           ),
         },

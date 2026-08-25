@@ -5,13 +5,13 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedProps,
+  useDerivedValue,
   withTiming,
   withSequence,
   withRepeat,
-  withDelay,
   Easing,
   cancelAnimation,
-  runOnJS,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { Sparkles, Scan, Save, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -19,7 +19,7 @@ import { theme } from '@/lib/theme';
 type ProgressStep = 0 | 1 | 2 | 3;
 
 interface AnalysisLoadingOverlayProps {
-  progress: number;
+  progressSV: SharedValue<number>;
   step: ProgressStep;
   text: string;
   stepLabels?: [string, string, string];
@@ -28,8 +28,12 @@ interface AnalysisLoadingOverlayProps {
 const STEP_ICONS = [Scan, Sparkles, Save] as const;
 const STEP_TEXTS_DEFAULT: [string, string, string] = ['촬영', '분석', '저장'];
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+
 export function AnalysisLoadingOverlay({
-  progress,
+  progressSV,
   step,
   text,
   stepLabels = STEP_TEXTS_DEFAULT,
@@ -45,17 +49,23 @@ export function AnalysisLoadingOverlay({
   const mouthOpen = useSharedValue(0);
   const sparkleOpacity = useSharedValue(0);
   const sparkleRotate = useSharedValue(0);
-  const trackWidth = useSharedValue(0);
-  const trackRef = useRef<View>(null);
   const prevStep = useRef<ProgressStep>(0);
 
   const isComplete = step >= 3;
   const babyColor = isComplete ? theme.colors.success[400] : theme.colors.primary[400];
   const crawlRange = 180;
 
+  const targetX = useDerivedValue(() => {
+    if (isComplete) return crawlRange;
+    return Math.max(0, Math.min(progressSV.value, 1)) * crawlRange;
+  });
+
+  useEffect(() => {
+    babyX.value = withTiming(targetX.value, { duration: 600, easing: Easing.inOut(Easing.quad) });
+  }, [targetX.value, babyX]);
+
   useEffect(() => {
     if (isComplete) {
-      babyX.value = withTiming(crawlRange, { duration: 400, easing: Easing.out(Easing.cubic) });
       mouthOpen.value = withSequence(
         withTiming(3, { duration: 150 }),
         withTiming(0, { duration: 200 }),
@@ -76,6 +86,12 @@ export function AnalysisLoadingOverlay({
         withTiming(180, { duration: 400 }),
         withTiming(360, { duration: 400 }),
       );
+      cancelAnimation(bodyBob);
+      cancelAnimation(armLeft);
+      cancelAnimation(armRight);
+      cancelAnimation(legLeft);
+      cancelAnimation(legRight);
+      cancelAnimation(headBob);
       return;
     }
 
@@ -123,12 +139,6 @@ export function AnalysisLoadingOverlay({
       -1, false,
     );
   }, [isComplete, babyX, bodyBob, armLeft, armRight, legLeft, legRight, headBob, eyeScale, mouthOpen, sparkleOpacity, sparkleRotate]);
-
-  useEffect(() => {
-    if (isComplete) return;
-    const target = Math.max(0, Math.min(progress, 1)) * crawlRange;
-    babyX.value = withTiming(target, { duration: 600, easing: Easing.inOut(Easing.quad) });
-  }, [progress, isComplete, babyX]);
 
   useEffect(() => {
     if (step !== prevStep.current && step > 0 && step < 3) {
@@ -203,32 +213,25 @@ export function AnalysisLoadingOverlay({
     transform: [{ rotate: `${sparkleRotate.value}deg` }],
   }));
 
-  const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-  const AnimatedPath = Animated.createAnimatedComponent(Path);
-  const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
   const sw = 2;
 
   return (
     <View style={styles.card}>
       <View style={styles.babyTrackWrap}>
-        <View
-          ref={trackRef}
-          style={styles.babyTrack}
-          onLayout={(e) => { trackWidth.value = e.nativeEvent.layout.width; }}
-        >
+        <View style={styles.babyTrack}>
           <View style={styles.babyTrackLine} />
           <View style={styles.babyStartDot} />
           <View style={styles.babyEndDot} />
         </View>
         <Animated.View style={[styles.babyWrap, babyContainerStyle]}>
           <Svg width={48} height={48} viewBox="0 0 48 48" fill="none">
-            <AnimatedCircle cx="24" cy={14} r="7" stroke={babyColor} strokeWidth={sw} fill="none" animatedProps={headProps} />
+            <AnimatedCircle cx="24" r="7" stroke={babyColor} strokeWidth={sw} fill="none" animatedProps={headProps} />
             <AnimatedPath stroke={babyColor} strokeWidth={sw * 0.7} strokeLinecap="round" fill="none" animatedProps={mouthProps} />
             <AnimatedCircle cx="21.5" cy="13" fill={babyColor} animatedProps={leftEyeProps} />
             <AnimatedCircle cx="26.5" cy="13" fill={babyColor} animatedProps={rightEyeProps} />
             <Circle cx="19" cy="16" r="1.2" fill={babyColor} opacity={0.3} />
             <Circle cx="29" cy="16" r="1.2" fill={babyColor} opacity={0.3} />
-            <AnimatedEllipse cx="24" cy={30} rx="12" ry="5" stroke={babyColor} strokeWidth={sw} fill="none" animatedProps={bodyProps} />
+            <AnimatedEllipse cx="24" rx="12" ry="5" stroke={babyColor} strokeWidth={sw} fill="none" animatedProps={bodyProps} />
             <AnimatedPath stroke={babyColor} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={leftArmProps} />
             <AnimatedPath stroke={babyColor} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={rightArmProps} />
             <AnimatedPath stroke={babyColor} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={leftLegProps} />

@@ -858,7 +858,7 @@ export default function CameraScreen() {
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
           <AnalysisLoadingOverlay
-            progress={progressWidth.value}
+            progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
             stepLabels={['촬영', '분석', '저장']}
@@ -1177,7 +1177,7 @@ function WebUploadScreen() {
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
           <AnalysisLoadingOverlay
-            progress={progressWidth.value}
+            progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
             stepLabels={['업로드', '분석', '저장']}
