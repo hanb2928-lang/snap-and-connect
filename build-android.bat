@@ -13,7 +13,22 @@ set EAS_NO_VCS=1
 echo EAS_NO_VCS=1 설정 완료 (Git 없이 빌드)
 echo.
 
-echo [1/5] 패키지 설치 중... (몇 분 걸릴 수 있습니다)
+echo [1/6] Android SDK 경로 설정 중...
+if not defined ANDROID_HOME (
+    set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
+)
+if exist "%ANDROID_HOME%" (
+    echo sdk.dir=%ANDROID_HOME%> android\local.properties
+    echo local.properties 생성 완료: %ANDROID_HOME%
+) else (
+    echo 경고: Android SDK를 찾을 수 없습니다. (%ANDROID_HOME%)
+    echo Android Studio를 설치하고 SDK를 다운로드한 후 다시 시도하세요.
+    pause
+    exit /b 1
+)
+echo.
+
+echo [2/6] 패키지 설치 중... (몇 분 걸릴 수 있습니다)
 call npm install
 if %ERRORLEVEL% neq 0 (
     echo.
@@ -25,11 +40,11 @@ if %ERRORLEVEL% neq 0 (
 echo 패키지 설치 완료.
 echo.
 
-echo [2/5] EAS CLI 설치 확인 중...
+echo [3/6] EAS CLI 설치 확인 중...
 call npm install -g eas-cli
 echo.
 
-echo [3/5] EAS 로그인 확인 중...
+echo [4/6] EAS 로그인 확인 중...
 call eas whoami >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo EAS 로그인이 필요합니다.
@@ -47,11 +62,11 @@ if %ERRORLEVEL% neq 0 (
 echo 로그인 확인 완료.
 echo.
 
-echo [4/5] 프로젝트 연결 중...
+echo [5/6] 프로젝트 연결 중...
 call eas init
 echo.
 
-echo [5/5] Android APK 빌드 시작... (약 10~15분 소요)
+echo [6/6] Android APK 빌드 시작... (약 10~15분 소요)
 call eas build --platform android --profile preview --clear-cache
 if %ERRORLEVEL% neq 0 (
     echo.
