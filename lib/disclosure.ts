@@ -103,7 +103,6 @@ export function getPlatformDisclosure(platform: string): PlatformDisclosure {
 
 export function getDisclosureForPlatforms(platforms: string[]): string {
   if (platforms.length === 0) return GENERIC_DISCLOSURE;
-  if (platforms.includes('Coupang')) return COUPANG_DISCLOSURE;
   if (platforms.length === 1) return getPlatformDisclosure(platforms[0]).full;
   return platforms
     .map((p) => getPlatformDisclosure(p).full)
@@ -112,7 +111,6 @@ export function getDisclosureForPlatforms(platforms: string[]): string {
 
 export function getDisclosureShortForPlatforms(platforms: string[]): string {
   if (platforms.length === 0) return GENERIC_DISCLOSURE_SHORT;
-  if (platforms.includes('Coupang')) return COUPANG_DISCLOSURE_SHORT;
   if (platforms.length === 1) return getPlatformDisclosure(platforms[0]).short;
   return platforms
     .map((p) => getPlatformDisclosure(p).short)
@@ -121,7 +119,6 @@ export function getDisclosureShortForPlatforms(platforms: string[]): string {
 
 export function getShareDisclosureForPlatforms(platforms: string[]): string {
   if (platforms.length === 0) return GENERIC_DISCLOSURE;
-  if (platforms.includes('Coupang')) return COUPANG_DISCLOSURE;
   return platforms
     .map((p) => `(${getPlatformDisclosure(p).platform}) ${getPlatformDisclosure(p).full}`)
     .join('\n');

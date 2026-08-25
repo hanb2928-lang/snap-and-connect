@@ -13,6 +13,16 @@ const MAX_ATTEMPTS = 3;
 const MAX_JOBS_PER_RUN = 3;
 const JOB_TIMEOUT_MS = 55000;
 
+const ALLOWED_JOB_TYPES = new Set([
+  "analyze-photo",
+  "virtual-fitting",
+  "virtual-cuts",
+  "generate-tts",
+  "generate-copy",
+  "generate-review",
+  "generate-comic-scenario",
+]);
+
 interface RenderJob {
   id: string;
   job_type: string;
@@ -144,6 +154,9 @@ async function requeueJob(jobId: string, attempts: number, errorMsg: string): Pr
 }
 
 async function processJob(job: RenderJob): Promise<Record<string, unknown>> {
+  if (!ALLOWED_JOB_TYPES.has(job.job_type)) {
+    throw new Error(`Disallowed job_type: ${job.job_type}`);
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), JOB_TIMEOUT_MS);
 

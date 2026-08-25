@@ -67,7 +67,8 @@ export function useSoundPunch() {
     recognitionActive: false,
   });
 
-  const isWeb = typeof window !== 'undefined' && typeof window.AudioContext !== 'undefined';
+  const isWeb = typeof window !== 'undefined' &&
+    (typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined');
 
   const cleanup = useCallback(() => {
     const r = refs.current;
@@ -255,6 +256,7 @@ export function useSoundPunch() {
 
       r.rafId = requestAnimationFrame(analyze);
     } catch (err) {
+      cleanup();
       const msg = err instanceof Error ? err.message : '마이크 접근에 실패했어요';
       setState((prev) => ({ ...prev, error: msg }));
     }

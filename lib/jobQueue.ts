@@ -116,7 +116,9 @@ export function subscribeToJob(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
       (payload) => {
-        onUpdate(payload.new as RenderJob);
+        if (payload.new) {
+          onUpdate(payload.new as RenderJob);
+        }
       },
     )
     .subscribe();
@@ -139,13 +141,25 @@ export async function enqueueAndWait<T = Record<string, unknown>>(
 
 async function triggerQueueProcessor(): Promise<void> {
   if (!supabaseUrl || !supabaseAnonKey) return;
-  await fetch(`${supabaseUrl}/functions/v1/process-queue`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseAnonKey}`,
-      apikey: supabaseAnonKey,
-    },
-    body: JSON.stringify({ trigger: true }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/process-queue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        apikey: supabaseAnonKey,
+      },
+      body: JSON.stringify({ trigger: true }),
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      // Trigger failed but we don't throw — the queue will be picked up on next enqueue
+    }
+  } catch {
+    // Network error — queue will be picked up on next enqueue
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

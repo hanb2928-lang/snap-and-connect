@@ -8,13 +8,6 @@ export function isTossUrl(url: string): boolean {
   return /toss\.(to|im)/i.test(url);
 }
 
-function detectCustomPlatform(url: string): 'Coupang' | 'Toss' | 'BrandConnect' | 'Custom' {
-  if (isCoupangUrl(url)) return 'Coupang';
-  if (isTossUrl(url)) return 'Toss';
-  if (/smartstore\.naver\.com|brand\.naver\.com|search\.shopping\.naver\.com/i.test(url)) return 'BrandConnect';
-  return 'Custom';
-}
-
 export function generateAffiliateLinks(
   analysis: AnalysisResult,
   settings: UserSettings | null,

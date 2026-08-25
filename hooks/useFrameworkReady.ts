@@ -12,5 +12,5 @@ export function useFrameworkReady() {
     if (Platform.OS !== 'web') return;
     if (typeof window === 'undefined') return;
     window.frameworkReady?.();
-  });
+  }, []);
 }

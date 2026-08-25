@@ -54,13 +54,12 @@ function emptyDashboard(): DashboardSummary {
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const [scansRes, assetsRes, clicksRes, linksRes, revenueRes, recentScansRes] = await Promise.all([
+    const [scansRes, assetsRes, clicksRes, linksRes, revenueRes] = await Promise.all([
       supabase.from('scans').select('id, title, product_name, image_url, created_at, template_data', { count: 'exact' }).order('created_at', { ascending: false }).limit(200),
       supabase.from('saved_assets').select('scan_id, platform, affiliate_platform, created_at'),
       supabase.from('click_events').select('platform, clicked_at, scan_id').order('clicked_at', { ascending: false }).limit(500),
       supabase.from('short_links').select('slug, scan_id, click_count, last_clicked_at, destination_url'),
       supabase.from('revenue_records').select('*').order('period_month', { ascending: false }),
-      supabase.from('scans').select('id, title, product_name, image_url, created_at, template_data').order('created_at', { ascending: false }).limit(20),
     ]);
 
     const scans = (scansRes.data ?? []) as Array<Scan & { created_at: string }>;
@@ -72,7 +71,7 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const totalScans = scansRes.count ?? scans.length;
   const totalAssets = assets.length;
   const linkClicks = links.reduce((s, l) => s + (l.click_count || 0), 0);
-  const totalClicks = links.length > 0 ? linkClicks : clickEvents.length;
+  const totalClicks = linkClicks > 0 ? linkClicks : clickEvents.length;
   const totalRevenue = revenues.reduce((s, r) => s + Number(r.amount), 0);
   const avgCtr = totalScans > 0 ? (totalClicks / totalScans) * 100 : 0;
 

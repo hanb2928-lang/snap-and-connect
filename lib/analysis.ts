@@ -103,6 +103,10 @@ function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {
       oneLiner: (data.oneLiner as string) || '',
       category: (data.productCategory as string) || '',
       accentColor: '#2f9dff',
+      hook: (data.hook as string) || '',
+      hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+      productAdvantages: Array.isArray(data.productAdvantages) ? data.productAdvantages : [],
+      caption: (data.caption as string) || '',
     },
     detectedProducts: Array.isArray(data.detectedProducts) ? data.detectedProducts : [],
   };

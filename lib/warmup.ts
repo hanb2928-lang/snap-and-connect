@@ -66,6 +66,7 @@ export async function fetchActiveSchedules(): Promise<WarmupScheduleWithTasks[]>
   const { data: schedules } = await supabase
     .from('warmup_schedules')
     .select('*')
+    .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (!schedules || schedules.length === 0) return [];
@@ -114,6 +115,11 @@ export async function updateScheduleStatus(
 }
 
 export async function deleteSchedule(scheduleId: string): Promise<boolean> {
+  await supabase
+    .from('warmup_tasks')
+    .delete()
+    .eq('schedule_id', scheduleId);
+
   const { error } = await supabase
     .from('warmup_schedules')
     .delete()

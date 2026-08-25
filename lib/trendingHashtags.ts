@@ -1,4 +1,5 @@
 import { supabase, supabaseUrl, supabaseAnonKey } from './supabase';
+import { safeFetch } from './apiClient';
 
 const TRENDING_URL = `${supabaseUrl}/functions/v1/naver-trending`;
 
@@ -19,7 +20,7 @@ export async function fetchMatchedTrendingHashtags(
   const now = Date.now();
   if (!cachedAllHashtags || now - cacheTimestamp >= CACHE_TTL) {
     try {
-      const resp = await fetch(`${TRENDING_URL}?hashtags=true`, {
+      const resp = await safeFetch(`${TRENDING_URL}?hashtags=true`, {
         headers: {
           Authorization: `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
@@ -43,7 +44,7 @@ export async function fetchMatchedTrendingHashtags(
   if (productName) params.set('productName', productName);
 
   try {
-    const resp = await fetch(`${TRENDING_URL}?${params.toString()}`, {
+    const resp = await safeFetch(`${TRENDING_URL}?${params.toString()}`, {
       headers: {
         Authorization: `Bearer ${supabaseAnonKey}`,
         'Content-Type': 'application/json',

@@ -69,10 +69,7 @@ export async function safeSupabaseCall<T>(
       }
       throw new Error(msg);
     }
-    if (result.data === null) {
-      throw new Error('데이터를 불러오지 못했습니다.');
-    }
-    return result.data;
+    return result.data as T;
   } catch (err) {
     if (err instanceof ApiError) throw err;
     if (err instanceof Error && err.message.includes('Failed to fetch')) {

@@ -61,11 +61,6 @@ function getKoreaHour(iso: string): number {
   return korea.getUTCHours();
 }
 
-function todayKoreaKey(): string {
-  const korea = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  return korea.toISOString().split('T')[0];
-}
-
 function dateKeyOffsetDays(days: number): string {
   const korea = new Date(Date.now() + 9 * 60 * 60 * 1000);
   korea.setDate(korea.getDate() - days);

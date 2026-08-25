@@ -28,11 +28,13 @@ export async function createShortLink(destinationUrl: string, scanId?: string): 
       existingQuery.is('scan_id', null);
     }
 
-    const existing = await existingQuery.maybeSingle();
+    const existing = await existingQuery.limit(1).maybeSingle();
 
     if (existing.data) {
       return `${FUNCTION_BASE}/${existing.data.slug}`;
     }
+
+    // If error (e.g. duplicate rows), fall through to insert
 
     let attempts = 0;
     while (attempts < 5) {

@@ -14,7 +14,7 @@ interface TrendCopy {
 
 const TREND_COPIES_BY_CATEGORY: Record<string, TrendCopy[]> = {
   fashion: [
-    { phrase: "이거 입고 나갔더니 칭찬 비降水量 200%", context: "착붙 인증 · OOTD 후킹", platforms: ["instagram", "shortform"] },
+    { phrase: "이거 입고 나갔더니 칭찬 빈도 200%", context: "착붙 인증 · OOTD 후킹", platforms: ["instagram", "shortform"] },
     { phrase: "옷장에 하나씩은 무조건 있어야 하는", context: "필수템 강조 · 트렌드템", platforms: ["instagram", "naverBlog"] },
     { phrase: "이 가격에 이 퀄리티가 되나 싶은", context: "가성비 강조 · 공구형", platforms: ["shortform", "threads"] },
     { phrase: "스태프들이 다 물어본 아이템", context: "호기심 유발 · 릴스", platforms: ["shortform", "instagram"] },

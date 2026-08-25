@@ -35,8 +35,8 @@ export function initStorage(): Promise<void> {
 }
 
 export async function getItem(key: string): Promise<string | null> {
-  if (!initDone && initPromise) {
-    await initPromise;
+  if (!initDone) {
+    await initStorage();
   }
 
   if (webStorage) {
@@ -57,8 +57,8 @@ export async function getItem(key: string): Promise<string | null> {
 }
 
 export async function setItem(key: string, value: string): Promise<void> {
-  if (!initDone && initPromise) {
-    await initPromise;
+  if (!initDone) {
+    await initStorage();
   }
 
   if (webStorage) {

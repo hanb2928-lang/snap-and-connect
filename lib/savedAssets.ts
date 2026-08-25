@@ -54,6 +54,8 @@ export async function uploadAssetDataUrl(
       .from(BUCKET)
       .upload(fileName, formData, { contentType: mimeType, upsert: true });
 
+    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+
     if (error) return null;
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);

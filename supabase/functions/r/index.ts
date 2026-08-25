@@ -49,7 +49,36 @@ function isSafeRedirectUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    return true;
+    const allowedHosts = [
+      "coupang.com",
+      "www.coupang.com",
+      "partners.coupang.com",
+      "search.shopping.naver.com",
+      "brandconnect.naver.com",
+      "smartstore.naver.com",
+      "sharelink.toss.im",
+      "toss.to",
+      "toss.im",
+      "www.toss.im",
+      "oliveyoung.co.kr",
+      "www.oliveyoung.co.kr",
+      "m.ably.co",
+      "ably.co",
+      "zigzag.kr",
+      "m.zigzag.kr",
+      "ohou.se",
+      "www.ohou.se",
+      "kurly.com",
+      "www.kurly.com",
+      "aliexpress.com",
+      "www.aliexpress.com",
+      "myrealtrip.com",
+      "www.myrealtrip.com",
+      "klook.com",
+      "www.klook.com",
+    ];
+    const hostname = parsed.hostname.toLowerCase();
+    return allowedHosts.some((h) => hostname === h || hostname.endsWith("." + h));
   } catch {
     return false;
   }
