@@ -589,8 +589,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accent[400],
   },
   captureButtonInner: {
-    width: 58,
-    height: 58,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.primary[400],
   },
