@@ -1,4 +1,4 @@
-import { useState, useCallback, ReactNode } from 'react';
+import { useState, useCallback, useRef, useEffect, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,10 @@ import {
   Platform,
   UIManager,
   ScrollView,
+  Dimensions,
+  Animated as RNAnimated,
 } from 'react-native';
-import {
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react-native';
+import { ChevronDown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { LazySection } from '@/components/LazySection';
 
@@ -38,145 +37,212 @@ type Props = {
   categories: FeatureCategory[];
 };
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_GAP = theme.spacing.sm;
+const CARD_MIN_WIDTH = Math.max(150, (SCREEN_WIDTH - theme.spacing.lg * 2 - CARD_GAP * 2) / 3);
+
 export function FeatureTileGrid({ categories }: Props) {
+  const [activeCategory, setActiveCategory] = useState(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const tabScrollRef = useRef<ScrollView>(null);
+  const indicatorX = useRef(new RNAnimated.Value(0)).current;
+
+  const selectCategory = useCallback((index: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActiveCategory(index);
+    setExpandedKey(null);
+  }, []);
 
   const toggle = useCallback((key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedKey((prev) => (prev === key ? null : key));
   }, []);
 
+  const currentCategory = categories[activeCategory];
+
   return (
     <View style={styles.wrap}>
-      {categories.map((category, ci) => {
-        const expandedTile = category.tiles.find((t) => t.key === expandedKey);
-        return (
-          <LazySection key={category.key} delayMs={ci * 60}>
-            <View style={styles.categoryWrap}>
-              <Text style={styles.categoryLabel}>{category.label}</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.tileRow}
+      <View style={styles.tabBarContainer}>
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBarScroll}
+        >
+          {categories.map((category, index) => {
+            const isActive = index === activeCategory;
+            return (
+              <TouchableOpacity
+                key={category.key}
+                style={[styles.tab, isActive && styles.tabActive]}
+                onPress={() => selectCategory(index)}
+                activeOpacity={0.7}
               >
-                {category.tiles.map((tile) => (
-                  <TouchableOpacity
-                    key={tile.key}
-                    style={[
-                      styles.tile,
-                      expandedKey === tile.key && styles.tileActive,
-                      expandedTile && expandedKey !== tile.key && styles.tileDimmed,
-                    ]}
-                    onPress={() => toggle(tile.key)}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={[
-                        styles.tileIconWrap,
-                        expandedKey === tile.key && styles.tileIconWrapActive,
-                      ]}
-                    >
-                      {tile.icon}
-                    </View>
-                    <Text
-                      style={[
-                        styles.tileLabel,
-                        expandedKey === tile.key && styles.tileLabelActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {tile.label}
-                    </Text>
-                    {expandedKey === tile.key ? (
-                      <ChevronUp size={12} color={theme.colors.primary[300]} strokeWidth={2.5} />
-                    ) : (
-                      <ChevronDown size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              {expandedTile && (
-                <View style={styles.expandedPanel}>
-                  {category.tiles
-                    .filter((t) => t.key === expandedKey)
-                    .map((t) => (
-                      <View key={t.key}>{t.render()}</View>
-                    ))}
+                <Text
+                  style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+                  numberOfLines={1}
+                >
+                  {category.label}
+                </Text>
+                <View style={[styles.tabDot, isActive && styles.tabDotActive]} />
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={styles.gridContainer}>
+        <View style={styles.cardGrid}>
+          {currentCategory.tiles.map((tile) => {
+            const isExpanded = expandedKey === tile.key;
+            return (
+              <TouchableOpacity
+                key={tile.key}
+                style={[
+                  styles.card,
+                  isExpanded && styles.cardExpanded,
+                  expandedKey && !isExpanded && styles.cardDimmed,
+                ]}
+                onPress={() => toggle(tile.key)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.cardIconWrap, isExpanded && styles.cardIconWrapActive]}>
+                  {tile.icon}
                 </View>
-              )}
+                <Text
+                  style={[styles.cardLabel, isExpanded && styles.cardLabelActive]}
+                  numberOfLines={1}
+                >
+                  {tile.label}
+                </Text>
+                <ChevronDown
+                  size={14}
+                  color={isExpanded ? theme.colors.primary[300] : theme.colors.dark.textFaint}
+                  strokeWidth={2.5}
+                  style={isExpanded ? styles.chevronRotated : undefined}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {expandedKey && (
+          <LazySection delayMs={50}>
+            <View style={styles.expandedPanel}>
+              {currentCategory.tiles
+                .filter((t) => t.key === expandedKey)
+                .map((t) => (
+                  <View key={t.key}>{t.render()}</View>
+                ))}
             </View>
           </LazySection>
-        );
-      })}
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: theme.spacing.lg,
+    gap: theme.spacing.md,
   },
-  categoryWrap: {
-    marginTop: theme.spacing.xl,
-  },
-  categoryLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: theme.spacing.sm,
-    paddingLeft: 2,
-  },
-  tileRow: {
+  tabBarContainer: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+  },
+  tabBarScroll: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
     paddingVertical: 2,
   },
-  tile: {
+  tab: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 12,
     paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surface,
     ...theme.shadows.card,
   },
-  tileActive: {
-    backgroundColor: theme.colors.primary[500] + '20',
+  tabActive: {
+    backgroundColor: theme.colors.primary[500] + '18',
     borderWidth: 1.5,
     borderColor: theme.colors.primary[400] + '60',
   },
-  tileDimmed: {
-    opacity: 0.55,
+  tabLabel: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
-  tileIconWrap: {
-    width: 32,
-    height: 32,
+  tabLabelActive: {
+    color: theme.colors.primary[300],
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  tabDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: theme.colors.dark.textFaint,
+  },
+  tabDotActive: {
+    backgroundColor: theme.colors.primary[400],
+  },
+  gridContainer: {
+    gap: theme.spacing.sm,
+  },
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CARD_GAP,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    minWidth: CARD_MIN_WIDTH,
+    flex: 1,
+    ...theme.shadows.card,
+  },
+  cardExpanded: {
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '50',
+  },
+  cardDimmed: {
+    opacity: 0.5,
+  },
+  cardIconWrap: {
+    width: 36,
+    height: 36,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tileIconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '30',
+  cardIconWrapActive: {
+    backgroundColor: theme.colors.primary[500] + '25',
   },
-  tileLabel: {
+  cardLabel: {
     flex: 1,
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.text,
   },
-  tileLabelActive: {
+  cardLabelActive: {
     color: theme.colors.primary[300],
     fontFamily: theme.typography.fontFamily.semiBold,
   },
+  chevronRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
   expandedPanel: {
-    marginTop: theme.spacing.sm,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
-    ...theme.shadows.card,
+    ...theme.shadows.elevated,
   },
 });
