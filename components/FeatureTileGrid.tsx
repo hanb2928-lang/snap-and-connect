@@ -48,7 +48,7 @@ export function FeatureTileGrid({ categories }: Props) {
   return (
     <View style={styles.wrap}>
       {categories.map((category, ci) => {
-        const isExpanded = expandedKey === category.key;
+        const expandedTile = category.tiles.find((t) => t.key === expandedKey);
         return (
           <LazySection key={category.key} delayMs={ci * 60}>
             <View style={styles.categoryWrap}>
@@ -59,7 +59,7 @@ export function FeatureTileGrid({ categories }: Props) {
                     key={tile.key}
                     style={[
                       styles.tile,
-                      isExpanded && expandedKey === category.key && styles.tileDimmed,
+                      expandedTile && expandedKey !== tile.key && styles.tileDimmed,
                     ]}
                     onPress={() => toggle(tile.key)}
                     activeOpacity={0.7}
@@ -89,7 +89,7 @@ export function FeatureTileGrid({ categories }: Props) {
                   </TouchableOpacity>
                 ))}
               </View>
-              {isExpanded && (
+              {expandedTile && (
                 <View style={styles.expandedPanel}>
                   {category.tiles
                     .filter((t) => t.key === expandedKey)
