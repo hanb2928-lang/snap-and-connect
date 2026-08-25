@@ -913,8 +913,15 @@ export function ARComicCamera({
         </View>
       </View>
 
+      {error && (
+        <View style={styles.errorBannerInline}>
+          <AlertCircle size={14} color={theme.colors.error[400]} strokeWidth={2} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       {recognitionMode === 'multi' && multiShots.length > 0 && (
-        <View style={styles.multiShotStrip} pointerEvents="auto">
+        <View style={styles.multiShotStripInline} pointerEvents="auto">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -945,13 +952,6 @@ export function ARComicCamera({
             <Play size={16} color="#fff" strokeWidth={2.5} />
             <Text style={styles.analyzeMultiText}>{multiShots.length}장 분석 시작</Text>
           </TouchableOpacity>
-        </View>
-      )}
-
-      {error && (
-        <View style={styles.errorBanner}>
-          <AlertCircle size={14} color={theme.colors.error[400]} strokeWidth={2} />
-          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
@@ -1459,6 +1459,19 @@ const styles = StyleSheet.create({
     borderLeftColor: theme.colors.error[400],
     zIndex: 15,
   },
+  errorBannerInline: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.error[500] + '20',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.error[400],
+  },
   errorText: {
     flex: 1,
     color: theme.colors.error[400],
@@ -1475,6 +1488,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.md,
     zIndex: 15,
+  },
+  multiShotStripInline: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
   },
   multiShotScroll: {
     gap: 8,
