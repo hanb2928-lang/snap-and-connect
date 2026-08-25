@@ -19,6 +19,7 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
+import { MobileVideoImport } from '@/components/MobileVideoImport';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -740,8 +741,16 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {videoImportVisible && (
+      {videoImportVisible && Platform.OS === 'web' && (
         <VideoImportGenerator
+          affiliatePlatforms={[]}
+          shortUrl={''}
+          onClose={() => setVideoImportVisible(false)}
+        />
+      )}
+
+      {videoImportVisible && Platform.OS !== 'web' && (
+        <MobileVideoImport
           affiliatePlatforms={[]}
           shortUrl={''}
           onClose={() => setVideoImportVisible(false)}
