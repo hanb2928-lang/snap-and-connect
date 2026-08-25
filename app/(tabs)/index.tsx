@@ -1432,11 +1432,12 @@ const styles = StyleSheet.create({
   stylePickerPanel: {
     position: 'absolute',
     bottom: 180,
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
+    left: theme.spacing.md,
+    right: theme.spacing.md,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
+    overflow: 'hidden',
     zIndex: 20,
     ...theme.shadows.elevated,
   },
@@ -1469,8 +1470,10 @@ const styles = StyleSheet.create({
   },
   styleOptionTextWrap: {
     flex: 1,
+    minWidth: 0,
   },
   styleOptionLabel: {
+    flexShrink: 1,
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
@@ -1479,6 +1482,7 @@ const styles = StyleSheet.create({
     color: theme.colors.accent[300],
   },
   styleOptionDesc: {
+    flexShrink: 1,
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
