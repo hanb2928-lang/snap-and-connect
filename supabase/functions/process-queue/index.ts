@@ -62,38 +62,39 @@ Deno.serve(async (req: Request) => {
 });
 
 async function dequeueJob(): Promise<RenderJob | null> {
-  const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?select=id,job_type,payload,attempts&status=eq.queued&order=priority.asc,created_at.asc&limit=1`, {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/rpc/dequeue_render_job`,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ max_attempts: MAX_ATTEMPTS }),
     },
-  });
+  );
 
-  if (!resp.ok) throw new Error(`Dequeue failed: ${resp.status}`);
-  const rows = await resp.json() as RenderJob[];
-  if (!rows || rows.length === 0) return null;
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Dequeue RPC failed: ${resp.status} ${errText}`);
+  }
 
-  const job = rows[0];
-  const updateResp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${job.id}`, {
-    method: "PATCH",
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      status: "processing",
-      started_at: new Date().toISOString(),
-    }),
-  });
+  const data = await resp.json();
+  if (!data || (Array.isArray(data) && data.length === 0)) return null;
+  const job = Array.isArray(data) ? data[0] : data;
+  if (!job || !job.id) return null;
 
-  if (!updateResp.ok) throw new Error(`Claim job ${job.id} failed: ${updateResp.status}`);
-  return job;
+  return {
+    id: job.id,
+    job_type: job.job_type,
+    payload: job.payload,
+    attempts: job.attempts ?? 0,
+  };
 }
 
 async function markJobDone(jobId: string, result: Record<string, unknown>): Promise<void> {
-  const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}`, {
+  const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
       apikey: serviceRoleKey,
@@ -111,7 +112,7 @@ async function markJobDone(jobId: string, result: Record<string, unknown>): Prom
 }
 
 async function markJobError(jobId: string, errorMsg: string): Promise<void> {
-  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}`, {
+  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
       apikey: serviceRoleKey,
@@ -127,7 +128,7 @@ async function markJobError(jobId: string, errorMsg: string): Promise<void> {
 }
 
 async function requeueJob(jobId: string, attempts: number, errorMsg: string): Promise<void> {
-  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}`, {
+  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
       apikey: serviceRoleKey,
@@ -153,6 +154,7 @@ async function processJob(job: RenderJob): Promise<Record<string, unknown>> {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
       },
       signal: controller.signal,
       body: JSON.stringify(job.payload),

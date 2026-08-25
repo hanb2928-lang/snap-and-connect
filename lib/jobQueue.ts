@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 export type JobType =
   | 'analyze-photo'
@@ -28,7 +28,7 @@ export interface RenderJob {
 
 const POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 120000;
-const MAX_ATTEMPTS = 3;
+const MAX_CLIENT_RETRIES = 2;
 
 export async function enqueueJob(
   jobType: JobType,
@@ -48,6 +48,9 @@ export async function enqueueJob(
     .single();
 
   if (error) throw new Error(`Job enqueue failed: ${error.message}`);
+
+  triggerQueueProcessor().catch(() => {});
+
   return data.id;
 }
 
@@ -73,6 +76,7 @@ export async function waitForJob<T = Record<string, unknown>>(
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<JobResult<T>> {
   const deadline = Date.now() + timeoutMs;
+  let clientRetries = 0;
 
   while (Date.now() < deadline) {
     const job = await getJob(jobId);
@@ -83,8 +87,14 @@ export async function waitForJob<T = Record<string, unknown>>(
     }
 
     if (job.status === 'error') {
-      if (job.attempts < MAX_ATTEMPTS) {
-        await retryJob(jobId);
+      if (job.attempts < 3 && clientRetries < MAX_CLIENT_RETRIES) {
+        clientRetries++;
+        await supabase
+          .from('render_jobs')
+          .update({ status: 'queued', error_message: null })
+          .eq('id', jobId)
+          .eq('status', 'error');
+        triggerQueueProcessor().catch(() => {});
         continue;
       }
       return { success: false, error: job.error_message ?? 'Job failed' };
@@ -93,30 +103,7 @@ export async function waitForJob<T = Record<string, unknown>>(
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  await markJobTimedOut(jobId);
   return { success: false, error: 'Job timed out' };
-}
-
-async function retryJob(jobId: string): Promise<void> {
-  await supabase
-    .from('render_jobs')
-    .update({
-      status: 'queued',
-      error_message: null,
-      attempts: 0,
-    })
-    .eq('id', jobId);
-}
-
-async function markJobTimedOut(jobId: string): Promise<void> {
-  await supabase
-    .from('render_jobs')
-    .update({
-      status: 'error',
-      error_message: 'Client-side timeout',
-      completed_at: new Date().toISOString(),
-    })
-    .eq('id', jobId);
 }
 
 export function subscribeToJob(
@@ -148,4 +135,17 @@ export async function enqueueAndWait<T = Record<string, unknown>>(
 ): Promise<JobResult<T>> {
   const jobId = await enqueueJob(jobType, payload, options);
   return waitForJob<T>(jobId, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+}
+
+async function triggerQueueProcessor(): Promise<void> {
+  if (!supabaseUrl || !supabaseAnonKey) return;
+  await fetch(`${supabaseUrl}/functions/v1/process-queue`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      apikey: supabaseAnonKey,
+    },
+    body: JSON.stringify({ trigger: true }),
+  });
 }
