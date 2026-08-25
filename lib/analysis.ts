@@ -1,6 +1,6 @@
 import type { AnalysisResult } from '@/types/database';
 import { supabase, ANALYSIS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
-import { safeFetch, safeSupabaseCall, ApiError } from '@/lib/apiClient';
+import { safeFetch } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl, cleanBase64 } from '@/lib/base64';
@@ -35,13 +35,14 @@ export async function analyzeImage(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
+  const compressedDataUrl = await prepareImageForApi(imageDataUrl, 1080, 0.8);
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
+    body: JSON.stringify({ imageDataUrl: compressedDataUrl, fileName, mimeType: 'image/jpeg', mode }),
     timeoutMs: 60000,
   });
 
@@ -60,7 +61,10 @@ export async function analyzeMultiShot(
   base64Images: string[],
   fileName: string,
 ): Promise<AnalysisResult> {
-  const images = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const compressedImages = await Promise.all(
+    dataUrls.map((url) => prepareImageForApi(url, 1080, 0.8)),
+  );
 
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
@@ -68,7 +72,7 @@ export async function analyzeMultiShot(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ images, fileName, mode: 'multi-shot' }),
+    body: JSON.stringify({ images: compressedImages, fileName, mode: 'multi-shot' }),
     timeoutMs: 90000,
   });
 
@@ -184,9 +188,10 @@ export async function analyzeImageQueued(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
+  const compressedDataUrl = await prepareImageForApi(imageDataUrl, 1080, 0.8);
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
-    { imageDataUrl, fileName, mimeType, mode },
+    { imageDataUrl: compressedDataUrl, fileName, mimeType: 'image/jpeg', mode },
     { timeoutMs: 180000 },
   );
 
@@ -200,10 +205,13 @@ export async function analyzeMultiShotQueued(
   base64Images: string[],
   fileName: string,
 ): Promise<AnalysisResult> {
-  const images = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const compressedImages = await Promise.all(
+    dataUrls.map((url) => prepareImageForApi(url, 1080, 0.8)),
+  );
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
-    { images, fileName, mode: 'multi-shot' },
+    { images: compressedImages, fileName, mode: 'multi-shot' },
     { timeoutMs: 180000 },
   );
 
