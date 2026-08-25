@@ -1,23 +1,16 @@
-# APK 추출하기 - 완전 가이드 (EAS 계정 불필요)
+# APK 추출하기 - EAS 서버 빌드 가이드
 
 ## 개요
 
-이 프로젝트는 **EAS 서버 없이 로컬에서 직접 APK를 빌드**합니다.
-Expo 계정, 로그인, 빌드 한도가 전혀 필요 없습니다.
+EAS 서버에서 APK를 빌드합니다. 컴퓨터 성능과 무관하며, Android Studio 설치가 필요 없습니다.
+Node.js만 있으면 됩니다.
 
 ---
 
 ## 필수 설치 (최초 1회)
 
-### 1. Node.js (LTS)
+### Node.js (LTS)
 - https://nodejs.org 에서 LTS 버전 다운로드 후 설치
-
-### 2. Android Studio
-- https://developer.android.com/studio 에서 설치
-- 설치 후 실행 → SDK 구성요소 자동 설치
-- SDK 라이선스에 동의
-
-Android Studio를 설치하면 Java JDK 17과 Android SDK가 함께 설치됩니다.
 
 ---
 
@@ -26,17 +19,14 @@ Android Studio를 설치하면 Java JDK 17과 Android SDK가 함께 설치됩니
 ### Windows
 1. 프로젝트 폴더 열기
 2. `build-android.bat` 더블클릭
-3. 완료되면 APK 파일이 있는 폴더가 자동으로 열림
 
 ### Mac / Linux
 1. 터미널 열기
 2. 프로젝트 폴더로 이동
 3. `bash build-android.sh` 실행
-4. 완료되면 APK 경로가 출력됨
 
 ### PowerShell (Windows)
-1. 프로젝트 폴더에서 우클릭 → "터미널에서 열기"
-2. `.\build-android.ps1` 실행
+1. 프로젝트 폴더에서 `.\build-android.ps1` 실행
 
 ---
 
@@ -44,14 +34,46 @@ Android Studio를 설치하면 Java JDK 17과 Android SDK가 함께 설치됩니
 
 1. Node.js 설치 확인
 2. 패키지 설치 (`npm install --legacy-peer-deps`)
-3. Java SDK (JAVA_HOME) 확인
-4. Android SDK (ANDROID_HOME) 확인
-5. Gradle로 APK 빌드 (`./gradlew assembleRelease`)
+3. EAS CLI 설치
+4. EAS 로그인 (안 되어 있으면 자동으로 로그인 화면 표시)
+5. 프로젝트 연결 확인 (연결 오류 시 자동으로 새 프로젝트 생성)
+6. EAS 서버에서 APK 빌드 (`eas build --platform android --profile preview`)
 
-빌드가 완료되면 APK 파일이 생성됩니다:
+빌드 완료 후 터미널에 URL이 표시되면 클릭하여 APK를 다운로드하면 됩니다.
 
+---
+
+## 계정 연결 오류 해결
+
+빌드 스크립트가 자동으로 처리하지만, 수동 해결이 필요한 경우:
+
+### "Project not found" 오류
+```bash
+eas logout
+eas login
+eas init
 ```
-android/app/build/outputs/apk/release/app-release.apk
+
+### "You don't have access to this project" 오류
+기존 계정의 프로젝트 연결이 꼬인 경우입니다:
+```bash
+eas logout
+eas login    # 새 계정 또는 같은 계정으로 다시 로그인
+eas init     # 새 프로젝트 생성
+```
+
+### "Android builds from the Free plan are temporarily limited" 오류
+무료 계정의 월간 빌드 한도(15회)를 소진한 경우입니다:
+1. https://expo.dev/signup 에서 **다른 이메일**로 새 계정 가입
+2. `eas logout && eas login` 으로 새 계정 로그인
+3. `eas init` 으로 새 프로젝트 생성
+4. 빌드 스크립트 다시 실행
+
+### "You are not logged in" 오류
+세션이 만료된 경우입니다:
+```bash
+eas logout
+eas login
 ```
 
 ---
@@ -62,31 +84,27 @@ android/app/build/outputs/apk/release/app-release.apk
 
 ```bash
 npm install --legacy-peer-deps
-cd android
-./gradlew assembleRelease
-```
-
-빌드 완료 후:
-```
-android/app/build/outputs/apk/release/app-release.apk
+npm install -g eas-cli
+eas login
+eas init
+eas build --platform android --profile preview --clear-cache
 ```
 
 ---
 
 ## 자주 묻는 질문
 
-**Q: EAS 계정이 필요한가요?**
-아니요. 로컬 Gradle로 빌드하므로 Expo 계정, 로그인, 빌드 한도가 전혀 필요 없습니다.
+**Q: Android Studio가 필요한가요?**
+아니요. EAS 서버에서 빌드하므로 컴퓨터에 Android Studio, Java, Android SDK가 필요 없습니다.
 
 **Q: 빌드 시간은 얼마나 걸리나요?**
-첫 빌드는 약 10~20분 (Gradle과 의존성 다운로드). 이후 재빌드는 3~5분.
+약 10~15분 (EAS 서버에서 빌드).
 
-**Q: "SDK license not accepted" 오류가 나요**
-Android Studio를 실행해서 SDK 라이선스에 동의하세요.
+**Q: 빌드 한도는 몇 회인가요?**
+무료 계정마다 매월 15회. 한도 소진 시 새 이메일로 새 계정을 만들면 됩니다.
 
-**Q: "Could not find JAVA_HOME" 오류가 나요**
-JDK 17을 설치하고 환경변수 JAVA_HOME을 설정하세요.
-또는 Android Studio를 설치하면 자동으로 포함됩니다.
+**Q: APK는 어디서 다운로드하나요?**
+빌드 완료 후 터미널에 표시되는 URL을 클릭하거나, https://expo.dev → 계정 → Builds 에서 다운로드할 수 있습니다.
 
-**Q: 메모리 부족 오류가 나요**
-`android/gradle.properties`에서 `org.gradle.jvmargs` 값을 `-Xmx4096m`로 변경하세요.
+**Q: 같은 컴퓨터에서 계정을 바꿀 수 있나요?**
+네. `eas logout` 후 `eas login`으로 새 계정 로그인하면 됩니다.

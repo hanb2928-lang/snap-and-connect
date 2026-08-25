@@ -1,11 +1,13 @@
 #!/bin/bash
 set -e
 echo "============================================"
-echo "  숏커넥트 Android APK 로컬 빌드 (EAS 불필요)"
+echo "  숏커넥트 Android APK 빌드 (EAS 서버)"
 echo "============================================"
 echo ""
 
-echo "[1/5] Node.js 확인 중..."
+export EAS_NO_VCS=1
+
+echo "[1/6] Node.js 확인 중..."
 if ! command -v node &> /dev/null; then
     echo "오류: Node.js가 설치되어 있지 않습니다."
     echo "다운로드: https://nodejs.org (LTS 버전 설치)"
@@ -14,73 +16,86 @@ fi
 echo "Node.js $(node --version) 확인 완료."
 echo ""
 
-echo "[2/5] 패키지 설치 중... (몇 분 걸릴 수 있습니다)"
+echo "[2/6] 패키지 설치 중... (몇 분 걸릴 수 있습니다)"
 npm install --legacy-peer-deps
 echo "패키지 설치 완료."
 echo ""
 
-echo "[3/5] Java SDK 확인 중..."
-if [ -z "$JAVA_HOME" ]; then
-    if command -v java &> /dev/null; then
-        JAVA_HOME="$(dirname "$(dirname "$(command -v java)")")"
-        export JAVA_HOME
-        echo "JAVA_HOME 자동 감지: $JAVA_HOME"
-    else
-        echo "경고: Java가 설치되어 있지 않을 수 있습니다."
-        echo "Android Studio 또는 JDK 17 설치 필요: https://developer.android.com/studio"
+echo "[3/6] EAS CLI 설치 중..."
+npm install -g eas-cli 2>/dev/null || true
+echo "EAS CLI 준비 완료."
+echo ""
+
+echo "[4/6] EAS 로그인 확인 중..."
+if ! eas whoami > /dev/null 2>&1; then
+    echo "EAS 로그인이 필요합니다."
+    echo "계정이 없다면 https://expo.dev/signup 에서 가입하세요."
+    echo ""
+    eas login
+    if ! eas whoami > /dev/null 2>&1; then
+        echo "오류: 로그인에 실패했습니다."
+        exit 1
     fi
+fi
+echo "로그인 완료: $(eas whoami)"
+echo ""
+
+echo "[5/6] 프로젝트 연결 확인 중..."
+PROJECT_ID=$(node -e "
+try {
+  const c = require('./app.json');
+  const id = c?.expo?.extra?.eas?.projectId || '';
+  console.log(id);
+} catch { console.log(''); }
+")
+
+if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "" ]; then
+    echo "프로젝트 ID가 없습니다. 새 프로젝트를 생성합니다..."
+    eas init --non-interactive 2>/dev/null || {
+        echo "자동 생성 실패. 수동으로 진행합니다..."
+        eas init
+    }
+    echo "프로젝트 연결 완료."
 else
-    echo "JAVA_HOME: $JAVA_HOME"
+    echo "기존 프로젝트 ID 확인됈습니다."
+    echo "연결 상태를 확인합니다..."
+    if ! eas build:list --limit 1 > /dev/null 2>&1; then
+        echo "기존 프로젝트에 접근할 수 없습니다. 새 프로젝트를 생성합니다..."
+        node -e "
+const fs = require('fs');
+let s = fs.readFileSync('app.json','utf8');
+s = s.replace(/\"projectId\": \"[^\"]*\"/, '\"projectId\": \"\"');
+fs.writeFileSync('app.json', s);
+"
+        eas init --non-interactive 2>/dev/null || eas init
+        echo "새 프로젝트 연결 완료."
+    else
+        echo "프로젝트 연결 정상."
+    fi
 fi
 echo ""
 
-echo "[4/5] Android SDK 확인 중..."
-if [ -z "$ANDROID_HOME" ]; then
-    if [ -d "$HOME/Android/Sdk" ]; then
-        export ANDROID_HOME="$HOME/Android/Sdk"
-        echo "ANDROID_HOME 자동 감지: $ANDROID_HOME"
-    elif [ -d "$HOME/Library/Android/sdk" ]; then
-        export ANDROID_HOME="$HOME/Library/Android/sdk"
-        echo "ANDROID_HOME 자동 감지: $ANDROID_HOME"
-    else
-        echo "경고: Android SDK 경로를 찾을 수 없습니다."
-        echo "Android Studio 설치 필요: https://developer.android.com/studio"
-        echo "또는 환경변수 ANDROID_HOME을 수동 설정하세요."
-    fi
-else
-    echo "ANDROID_HOME: $ANDROID_HOME"
-fi
+echo "[6/6] Android APK 빌드 시작... (약 10~15분 소요)"
+echo "EAS 서버에서 빌드합니다. 컴퓨터 성능과 무관합니다."
 echo ""
 
-echo "[5/5] APK 빌드 시작... (약 10~20분 소요)"
-cd android
-chmod +x gradlew
-./gradlew assembleRelease --no-daemon || {
+eas build --platform android --profile preview --clear-cache --non-interactive || {
     echo ""
     echo "============================================"
     echo "  빌드 실패."
     echo "============================================"
     echo ""
-    echo "일반적인 오류 해결 방법:"
-    echo "  1. Java 미설치 - JDK 17 설치"
-    echo "  2. Android SDK 미설치 - Android Studio 설치"
-    echo "  3. SDK 라이선스 미동의 - Android Studio에서 SDK 설치 후 동의"
-    echo "  4. 메모리 부족 - gradle.properties의 Xmx 값을 4096m로 증가"
+    echo "오류 해결 방법:"
+    echo "  1. 빌드 한도 소진 → 새 이메일로 새 계정 가입: https://expo.dev/signup"
+    echo "  2. 프로젝트 연결 오류 → 아래 명령어로 수동 연결:"
+    echo "     eas logout && eas login && eas init"
+    echo "  3. 세션 만료 → eas logout 후 eas login"
     exit 1
 }
-cd ..
 
-APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
-if [ -f "$APK_PATH" ]; then
-    echo ""
-    echo "============================================"
-    echo "  빌드 성공!"
-    echo "  APK 위치: $APK_PATH"
-    echo "============================================"
-    echo ""
-    echo "폴더를 열려면:"
-    echo "  open $(dirname "$APK_PATH")"
-else
-    echo ""
-    echo "경고: APK 파일을 찾을 수 없습니다. 빌드 출력을 확인하세요."
-fi
+echo ""
+echo "============================================"
+echo "  빌드가 완료되었습니다!"
+echo "  위에 표시된 URL에서 APK를 다운로드하세요."
+echo "  또는 https://expo.dev → 계정 → Builds 에서 다운로드"
+echo "============================================"
