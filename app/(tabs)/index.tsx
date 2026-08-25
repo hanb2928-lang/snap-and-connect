@@ -707,27 +707,29 @@ export default function CameraScreen() {
           <View style={styles.stylePickerPanel}>
             <Text style={styles.stylePickerTitle}>템플릿 스타일 선택</Text>
             <Text style={styles.stylePickerSubtitle}>촬영 후 이 스타일이 자동 적용됩니다</Text>
-            {STYLE_PRESETS.map((preset) => (
-              <TouchableOpacity
-                key={preset.key}
-                style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
-                onPress={() => {
-                  handleStyleChange(preset.key);
-                  setStylePickerVisible(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.styleOptionTextWrap}>
-                  <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
-                    {preset.label}
-                  </Text>
-                  <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
-                </View>
-                {preferredStyle === preset.key && (
-                  <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                )}
-              </TouchableOpacity>
-            ))}
+            <ScrollView style={styles.styleOptionScroll}>
+              {STYLE_PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
+                  onPress={() => {
+                    handleStyleChange(preset.key);
+                    setStylePickerVisible(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.styleOptionTextWrap}>
+                    <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
+                      {preset.label}
+                    </Text>
+                    <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
+                  </View>
+                  {preferredStyle === preset.key && (
+                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -1434,12 +1436,16 @@ const styles = StyleSheet.create({
     bottom: 180,
     left: theme.spacing.md,
     right: theme.spacing.md,
+    maxHeight: '60%',
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     overflow: 'hidden',
     zIndex: 20,
     ...theme.shadows.elevated,
+  },
+  styleOptionScroll: {
+    maxHeight: '100%',
   },
   stylePickerTitle: {
     fontSize: theme.typography.caption,
