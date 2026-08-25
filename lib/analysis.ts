@@ -3,6 +3,7 @@ import { supabase, ANALYSIS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
+import { enqueueAndWait } from '@/lib/jobQueue';
 
 export async function uploadImage(
   base64: string,
@@ -192,4 +193,39 @@ export async function saveManualScan(
 export async function deleteScan(id: string): Promise<void> {
   const { error } = await supabase.from('scans').delete().eq('id', id);
   if (error) throw new Error(`Failed to delete: ${error.message}`);
+}
+
+export async function analyzeImageQueued(
+  imageDataUrl: string,
+  fileName: string,
+  mimeType: string,
+  mode: 'single' | 'multi' = 'multi',
+): Promise<AnalysisResult> {
+  const result = await enqueueAndWait<Record<string, unknown>>(
+    'analyze-photo',
+    { imageDataUrl, fileName, mimeType, mode },
+    { timeoutMs: 180000 },
+  );
+
+  if (!result.success || !result.result) {
+    throw new Error(result.error ?? 'AI 분석 작업이 실패했습니다.');
+  }
+  return normalizeAnalysis(result.result);
+}
+
+export async function analyzeMultiShotQueued(
+  base64Images: string[],
+  fileName: string,
+): Promise<AnalysisResult> {
+  const images = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const result = await enqueueAndWait<Record<string, unknown>>(
+    'analyze-photo',
+    { images, fileName, mode: 'multi-shot' },
+    { timeoutMs: 180000 },
+  );
+
+  if (!result.success || !result.result) {
+    throw new Error(result.error ?? 'AI 다각도 분석 작업이 실패했습니다.');
+  }
+  return normalizeAnalysis(result.result);
 }
