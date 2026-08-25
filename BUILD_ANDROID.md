@@ -46,7 +46,7 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 3. 오른쪽 **Run workflow** 버튼 클릭
 4. **Run workflow** 한 번 더 클릭
 
-빌드가 시작됩니다. 약 15~25분 걸립니다.
+빌드가 시작됩니다. 약 20~30분 걸립니다.
 끝나면 초록색 체크 표시가 나옵니다.
 
 ---
@@ -83,9 +83,10 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 | 문제 | 해결 |
 |------|------|
 | Actions 탭이 안 보임 | Settings → Actions → General → "Allow all actions" 선택 |
-| 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 40으로 변경 |
+| 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 60으로 변경 |
 | npm install 실패 | `package.json`과 `package-lock.json`이 올라가 있는지 확인 |
 | 파일 업로드 안 됨 | `node_modules/`, `android/` 폴더는 올리지 마세요 |
+| Node.js 버전 에러 | 워크플로우에서 Node.js 20을 명시적으로 사용하도록 설정되어 있습니다 |
 
 ---
 
@@ -93,5 +94,5 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 
 - GitHub Actions 무료 한도: 매월 2,000분 (Private 저장소)
 - Public 저장소는 무제한
-- APK 1회당 약 20~25분 사용
-- 매월 약 80회까지 무료 빌드 가능
+- APK 1회당 약 20~30분 사용
+- 매월 약 60~80회까지 무료 빌드 가능
