@@ -54,11 +54,12 @@ export default function RootLayout() {
         setReady('app');
         SplashScreen.hideAsync();
       } catch {
+        startedRef.current = false;
         setReady('error');
         SplashScreen.hideAsync();
       }
     })();
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, ready]);
 
   useEffect(() => {
     const handleDeepLink = (url: string) => {
@@ -92,10 +93,10 @@ export default function RootLayout() {
   }
 
   if (ready === 'error') {
-    const retryInit = () => {
-      startedRef.current = false;
-      setReady('loading');
-    };
+  const retryInit = () => {
+    startedRef.current = false;
+    setReady('loading');
+  };
     return (
       <ErrorBoundary>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.dark.bg, paddingHorizontal: 40, gap: 12 }}>

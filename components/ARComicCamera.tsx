@@ -92,7 +92,10 @@ export function ARComicCamera({ onClose, recognitionMode = 'single', preferredSt
           RNAnimated.timing(pulseAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
         ]).start(() => setSfxPulse(false));
       }, 3500);
-      return () => clearInterval(bubbleTimer);
+      return () => {
+        clearInterval(bubbleTimer);
+        pulseAnim.stopAnimation();
+      };
     } else {
       setBubbleVisible(false);
     }

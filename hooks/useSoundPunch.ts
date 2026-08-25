@@ -66,6 +66,8 @@ export function useSoundPunch() {
     recognition: null,
     recognitionActive: false,
   });
+  const isStartingRef = useRef(false);
+  const lastStateUpdateRef = useRef(0);
 
   const isWeb = typeof window !== 'undefined' &&
     (typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined');
@@ -130,7 +132,8 @@ export function useSoundPunch() {
   }, []);
 
   const startRecording = useCallback(async () => {
-    if (state.isRecording) return;
+    if (state.isRecording || isStartingRef.current) return;
+    isStartingRef.current = true;
     if (!isWeb || !navigator.mediaDevices?.getUserMedia) {
       setState((prev) => ({ ...prev, error: '이 브라우저에서는 마이크 녹음을 지원하지 않아요' }));
       return;
@@ -215,6 +218,7 @@ export function useSoundPunch() {
       }
 
       setState((prev) => ({ ...prev, isRecording: true, isReady: true }));
+      isStartingRef.current = false;
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
@@ -245,11 +249,15 @@ export function useSoundPunch() {
           addMarker(elapsed, EFFECT_CYCLE[effectIndex], intensity);
         }
 
-        setState((prev) => ({
-          ...prev,
-          amplitude: prev.amplitude * AMPLITUDE_SMOOTHING + amplitude * (1 - AMPLITUDE_SMOOTHING),
-          duration: elapsed,
-        }));
+        const nowMs = performance.now();
+        if (nowMs - lastStateUpdateRef.current > 66) {
+          lastStateUpdateRef.current = nowMs;
+          setState((prev) => ({
+            ...prev,
+            amplitude: prev.amplitude * AMPLITUDE_SMOOTHING + amplitude * (1 - AMPLITUDE_SMOOTHING),
+            duration: elapsed,
+          }));
+        }
 
         rr.rafId = requestAnimationFrame(analyze);
       };
@@ -257,6 +265,7 @@ export function useSoundPunch() {
       r.rafId = requestAnimationFrame(analyze);
     } catch (err) {
       cleanup();
+      isStartingRef.current = false;
       const msg = err instanceof Error ? err.message : '마이크 접근에 실패했어요';
       setState((prev) => ({ ...prev, error: msg }));
     }

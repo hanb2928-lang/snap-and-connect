@@ -926,7 +926,7 @@ export default function ResultScreen() {
                     .from('scans')
                     .update({ local_store_info: info })
                     .eq('id', scan.id)
-                    .then(() => {});
+                    .then(() => {}, () => {});
                 }
               }}
             />

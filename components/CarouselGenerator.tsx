@@ -66,16 +66,23 @@ export function CarouselGenerator({
   const scrollRef = useRef<ScrollView | null>(null);
   const lastScrollUpdate = useRef(0);
   const rafRef = useRef<number | null>(null);
+  const recorderRef = useRef<any>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch { /* ignore */ }
+      }
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   const slides: CarouselSlide[] = detectedProducts.map((product) => ({
@@ -166,6 +173,7 @@ export function CarouselGenerator({
         mimeType,
         videoBitsPerSecond: 8000000,
       });
+      recorderRef.current = recorder;
       const chunks: any[] = [];
       recorder.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data); };
 
@@ -264,12 +272,14 @@ export function CarouselGenerator({
       rafRef.current = requestAnimationFrame(drawFrame);
 
       const blob = await done;
+      recorderRef.current = null;
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       setExportState('done');
       setExportProgress(100);
       showToast('20초 동영상이 생성됐어요');
     } catch {
+      recorderRef.current = null;
       setExportState('error');
       showToast('동영상 생성에 실패했어요');
     }
@@ -445,8 +455,13 @@ export function CarouselGenerator({
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('image load failed'));
+    const timeout = setTimeout(() => {
+      img.onload = null;
+      img.onerror = null;
+      reject(new Error('image load timeout'));
+    }, 10000);
+    img.onload = () => { clearTimeout(timeout); resolve(img); };
+    img.onerror = () => { clearTimeout(timeout); reject(new Error('image load failed')); };
     img.src = src;
   });
 }

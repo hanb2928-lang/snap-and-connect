@@ -57,13 +57,36 @@ function resizeImage(file: File, maxSize = 1280, quality = 0.7): Promise<{ base6
 
 export async function pickImageWeb(multiple = false, maxCount = 4): Promise<PickedImage[]> {
   return new Promise((resolve, reject) => {
+    if (Platform.OS !== 'web') {
+      reject(new Error('웹에서만 사용할 수 있는 기능입니다'));
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     if (multiple) {
       input.multiple = true;
     }
+
+    let settled = false;
+    const cleanup = () => {
+      input.onchange = null;
+      input.onerror = null;
+      window.removeEventListener('focus', onFocus);
+    };
+    const onFocus = () => {
+      setTimeout(() => {
+        if (!settled && (!input.files || input.files.length === 0)) {
+          settled = true;
+          cleanup();
+          resolve([]);
+        }
+      }, 500);
+    };
+
     input.onchange = async () => {
+      settled = true;
+      cleanup();
       const files = Array.from(input.files || []);
       if (files.length === 0) {
         resolve([]);
@@ -79,7 +102,16 @@ export async function pickImageWeb(multiple = false, maxCount = 4): Promise<Pick
         reject(err instanceof Error ? err : new Error('이미지 선택에 실패했습니다'));
       }
     };
-    input.onerror = () => reject(new Error('파일 선택창을 열 수 없습니다'));
+    input.onerror = () => {
+      settled = true;
+      cleanup();
+      reject(new Error('파일 선택창을 열 수 없습니다'));
+    };
+
+    setTimeout(() => {
+      window.addEventListener('focus', onFocus);
+    }, 300);
+
     input.click();
   });
 }

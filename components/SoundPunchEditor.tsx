@@ -22,20 +22,6 @@ interface SoundPunchEditorProps {
 
 export function SoundPunchEditor({ enabled, onToggle, onMarkersChange, onAudioReady, style }: SoundPunchEditorProps) {
   const punch = useSoundPunch();
-
-  if (Platform.OS !== 'web') {
-    return (
-      <View style={[styles.enableCard, style]}>
-        <View style={styles.enableIconWrap}>
-          <MicOff size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-        </View>
-        <View style={styles.enableTextWrap}>
-          <Text style={styles.enableTitle}>소리 펀치 컷 편집</Text>
-          <Text style={styles.enableDesc}>웹 브라우저에서만 사용할 수 있어요</Text>
-        </View>
-      </View>
-    );
-  }
   const lastMarkersRef = useRef<string>('');
   const lastAudioRef = useRef<string | null>(null);
 
@@ -51,15 +37,32 @@ export function SoundPunchEditor({ enabled, onToggle, onMarkersChange, onAudioRe
     if (!enabled) return;
     if (punch.audioBlob && !punch.isRecording) {
       (async () => {
-        const dataUrl = await punch.getAudioDataUrl();
-        if (dataUrl && dataUrl !== lastAudioRef.current) {
-          lastAudioRef.current = dataUrl;
-          onAudioReady(dataUrl);
+        try {
+          const dataUrl = await punch.getAudioDataUrl();
+          if (dataUrl && dataUrl !== lastAudioRef.current) {
+            lastAudioRef.current = dataUrl;
+            onAudioReady(dataUrl);
+          }
+        } catch {
+          // ignore audio conversion errors
         }
       })();
     }
   }, [enabled, punch.audioBlob, punch.isRecording, punch.getAudioDataUrl, onAudioReady]);
 
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={[styles.enableCard, style]}>
+        <View style={styles.enableIconWrap}>
+          <MicOff size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </View>
+        <View style={styles.enableTextWrap}>
+          <Text style={styles.enableTitle}>소리 펀치 컷 편집</Text>
+          <Text style={styles.enableDesc}>웹 브라우저에서만 사용할 수 있어요</Text>
+        </View>
+      </View>
+    );
+  }
   if (!enabled) {
     return (
       <TouchableOpacity

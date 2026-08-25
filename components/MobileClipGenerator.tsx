@@ -950,37 +950,39 @@ export function MobileClipGenerator({
         </View>
       )}
 
-      <View style={styles.webViewHidden}>
-        {Platform.OS === 'web' ? (
-          <iframe
-            key={webviewKey}
-            srcDoc={html}
-            sandbox="allow-scripts allow-same-origin"
-            style={{ width: 1, height: 1, border: 'none', opacity: 0.01, position: 'absolute' }}
-          />
-        ) : (
-          <WebView
-            key={webviewKey}
-            ref={webViewRef}
-            source={{ html }}
-            onMessage={handleWebViewMessage}
-            onError={() => {
-              if (stateRef.current === 'generating') {
-                setState('error');
-                showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
-              }
-            }}
-            javaScriptEnabled
-            domStorageEnabled
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            mixedContentMode="always"
-            originWhitelist={['*']}
-            style={styles.webView as ViewStyle}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
+      {state === 'generating' && (
+        <View style={styles.webViewHidden}>
+          {Platform.OS === 'web' ? (
+            <iframe
+              key={webviewKey}
+              srcDoc={html}
+              sandbox="allow-scripts allow-same-origin"
+              style={{ width: 1, height: 1, border: 'none', opacity: 0.01, position: 'absolute' }}
+            />
+          ) : (
+            <WebView
+              key={webviewKey}
+              ref={webViewRef}
+              source={{ html }}
+              onMessage={handleWebViewMessage}
+              onError={() => {
+                if (stateRef.current === 'generating') {
+                  setState('error');
+                  showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
+                }
+              }}
+              javaScriptEnabled
+              domStorageEnabled
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              mixedContentMode="always"
+              originWhitelist={['*']}
+              style={styles.webView as ViewStyle}
+              scrollEnabled={false}
+            />
+          )}
+        </View>
+      )}
     </View>
   );
 }

@@ -375,7 +375,13 @@ export default function WarmupScreen() {
               keyExtractor={(item) => `day-${item.day}`}
               getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
               onScrollToIndexFailed={({ index }) => {
-                setTimeout(() => flatListRef.current?.scrollToIndex({ index, animated: true }), 100);
+                if (slides.length === 0) return;
+                setTimeout(() => {
+                  if (slides.length === 0) return;
+                  try {
+                    flatListRef.current?.scrollToIndex({ index: Math.min(index, slides.length - 1), animated: true });
+                  } catch { /* ignore */ }
+                }, 100);
               }}
               renderItem={({ item }) => (
                 <View style={styles.slide}>

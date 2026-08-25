@@ -122,17 +122,20 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
 
     useEffect(() => {
       if (!imageUrl) return;
+      let cancelled = false;
       if (Platform.OS === 'web') {
         const img = new (global as any).Image();
-        img.onload = () => setImgAspect(img.naturalWidth / img.naturalHeight);
-        img.onerror = () => setImgAspect(null);
+        img.onload = () => { if (!cancelled) setImgAspect(img.naturalWidth / img.naturalHeight); };
+        img.onerror = () => { if (!cancelled) setImgAspect(null); };
         img.src = imageUrl;
+        return () => { cancelled = true; img.onload = null; img.onerror = null; };
       } else {
         Image.getSize(
           imageUrl,
-          (w, h) => setImgAspect(w / h),
-          () => setImgAspect(null),
+          (w, h) => { if (!cancelled) setImgAspect(w / h); },
+          () => { if (!cancelled) setImgAspect(null); },
         );
+        return () => { cancelled = true; };
       }
     }, [imageUrl]);
 
