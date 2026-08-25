@@ -672,7 +672,11 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.extraButtonsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.extraButtonsRow}
+        >
           <TouchableOpacity
             style={styles.arModeButton}
             onPress={() => setArMode(true)}
@@ -701,7 +705,7 @@ export default function CameraScreen() {
               {STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {stylePickerVisible && (
           <View style={styles.stylePickerPanel}>
@@ -1310,8 +1314,10 @@ const styles = StyleSheet.create({
   extraButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: theme.spacing.sm,
     paddingVertical: 4,
+    paddingHorizontal: theme.spacing.sm,
   },
   zoomBar: {
     flexDirection: 'row',
@@ -1379,7 +1385,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.dark.surface,
     borderWidth: 1.5,
@@ -1391,7 +1397,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.accent[500] + '20',
     borderWidth: 1.5,
@@ -1408,7 +1414,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.warning[500] + '20',
     borderWidth: 1.5,
