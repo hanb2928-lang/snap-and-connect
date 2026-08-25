@@ -123,12 +123,11 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   tileRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: theme.spacing.sm,
   },
   tile: {
-    width: '48%',
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
