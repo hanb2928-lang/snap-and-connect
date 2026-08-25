@@ -787,44 +787,48 @@ export default function CameraScreen() {
         </View>
       )}
 
-      <View style={[styles.controls, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
-        <TouchableOpacity
-          style={styles.galleryButton}
-          onPress={handlePickImage}
-          disabled={processing}
-          activeOpacity={0.7}
-        >
-          <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2} />
-        </TouchableOpacity>
+      {!arMode && (
+        <View style={[styles.controls, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+          <TouchableOpacity
+            style={styles.galleryButton}
+            onPress={handlePickImage}
+            disabled={processing}
+            activeOpacity={0.7}
+          >
+            <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.captureButton}
-          onPress={handleCapture}
-          disabled={processing}
-          activeOpacity={0.8}
-        >
-          <View style={styles.captureButtonInner} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleCapture}
+            disabled={processing}
+            activeOpacity={0.8}
+          >
+            <View style={styles.captureButtonInner} />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.templateOnlyButton}
-          onPress={handleTemplateOnly}
-          disabled={processing}
-          activeOpacity={0.7}
-        >
-          <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.templateOnlyButton}
+            onPress={handleTemplateOnly}
+            disabled={processing}
+            activeOpacity={0.7}
+          >
+            <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <Text style={[styles.hintText, { paddingBottom: theme.spacing.xl + insets.bottom }]}>
-        {processing
-          ? progressText
-          : recognitionMode === 'single'
-            ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다'
-            : multiShots.length === 0
-              ? '다각도 모드: 같은 제품을 여러 각도에서 촬영(최대 4장)하면 더 정확하게 분석합니다'
-              : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
-      </Text>
+      {!arMode && (
+        <Text style={[styles.hintText, { paddingBottom: theme.spacing.xl + insets.bottom }]}>
+          {processing
+            ? progressText
+            : recognitionMode === 'single'
+              ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다'
+              : multiShots.length === 0
+                ? '다각도 모드: 같은 제품을 여러 각도에서 촬영(최대 4장)하면 더 정확하게 분석합니다'
+                : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
+        </Text>
+      )}
 
       <OnboardingModal
         visible={showOnboardingModal}
