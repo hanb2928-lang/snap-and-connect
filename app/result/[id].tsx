@@ -62,6 +62,7 @@ import type { LocalStoreInfo } from '@/types/database';
 import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
+import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
@@ -88,7 +89,7 @@ import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
 import type { FeatureCategory } from '@/components/FeatureTileGrid';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock } from 'lucide-react-native';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -813,6 +814,27 @@ export default function ResultScreen() {
               shortUrl={shortUrl || ''}
               recommendedStyle={recommendedStyle}
               styleAppliedKey={styleAppliedKey}
+            />
+          ),
+        },
+        {
+          key: 'timelineShort',
+          label: '30초/60초 숏폼',
+          category: 'template',
+          icon: <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <TimelineShortGenerator
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.warning[400]}
+              fileName={`snap-connect-timeline-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              shortUrl={shortUrl || ''}
+              productAdvantages={td?.productAdvantages || []}
+              oneLiner={activeOneLiner || scan?.one_liner || ''}
             />
           ),
         },
