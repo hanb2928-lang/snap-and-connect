@@ -54,6 +54,11 @@ export default function SettingsScreen() {
   const [savedKey, setSavedKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [defaultVideoDuration, setDefaultVideoDuration] = useState('15s');
+  const [defaultTtsVoice, setDefaultTtsVoice] = useState('alloy');
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [savedDefaults, setSavedDefaults] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -65,6 +70,9 @@ export default function SettingsScreen() {
       setTossId(data?.toss_share_id || '');
       setLogoUrl(data?.logo_url || null);
       setOpenaiKey(data?.openai_api_key || '');
+      setDefaultVideoDuration(data?.default_video_duration || '15s');
+      setDefaultTtsVoice(data?.default_tts_voice || 'alloy');
+      setAutoDisclosure(data?.auto_disclosure ?? true);
     } catch {
       setSettings(null);
     } finally {
@@ -432,6 +440,127 @@ export default function SettingsScreen() {
             ))}
           </View>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>콘텐츠 기본 설정</Text>
+        <Text style={styles.sectionDesc}>
+          만화 숏폼, 숏폼 영상 생성 시 기본으로 사용될 옵션을 미리 설정하세요
+        </Text>
+        <View style={styles.card}>
+          <Text style={styles.idInputLabel}>기본 영상 길이</Text>
+          <View style={styles.platformPickerRow}>
+            {['10s', '15s', '20s', '30s'].map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.platformChip, defaultVideoDuration === d && styles.platformChipActive]}
+                onPress={() => setDefaultVideoDuration(d)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.platformChipText, defaultVideoDuration === d && styles.platformChipTextActive]}>
+                  {d}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Divider />
+          <Text style={styles.idInputLabel}>기본 TTS 음성</Text>
+          <View style={styles.platformPickerRow}>
+            {[
+              { key: 'alloy', label: '알로이' },
+              { key: 'echo', label: '에코' },
+              { key: 'verse', label: '버스' },
+              { key: 'onyx', label: '오닉스' },
+              { key: 'shimmer', label: '시머' },
+            ].map((v) => (
+              <TouchableOpacity
+                key={v.key}
+                style={[styles.platformChip, defaultTtsVoice === v.key && styles.platformChipActive]}
+                onPress={() => setDefaultTtsVoice(v.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.platformChipText, defaultTtsVoice === v.key && styles.platformChipTextActive]}>
+                  {v.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Divider />
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.featureTitle}>제휴 공시문 자동 포함</Text>
+              <Text style={styles.featureDesc}>생성되는 카드와 공유 콘텐츠에 제휴 광고 표시를 자동으로 추가합니다</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setAutoDisclosure(!autoDisclosure)}
+              activeOpacity={0.7}
+              hitSlop={12}
+            >
+              <View style={[styles.toggleSwitch, autoDisclosure && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, autoDisclosure && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[styles.saveIdButton, savedDefaults && styles.saveIdButtonDone]}
+          onPress={async () => {
+            setSavingDefaults(true);
+            setSavedDefaults(false);
+            try {
+              await updateUserSettings({
+                default_video_duration: defaultVideoDuration,
+                default_tts_voice: defaultTtsVoice,
+                auto_disclosure: autoDisclosure,
+              });
+              setSavedDefaults(true);
+              setTimeout(() => setSavedDefaults(false), 2500);
+            } catch (err) {
+              Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+            }
+            setSavingDefaults(false);
+          }}
+          disabled={savingDefaults}
+          activeOpacity={0.8}
+        >
+          {savingDefaults ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : savedDefaults ? (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.saveIdButtonText}>저장됨</Text>
+            </>
+          ) : (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>기본 설정 저장</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>소리 펀치 (사운드 효과) 사용법</Text>
+        <Text style={styles.sectionDesc}>
+          인기 밈 효과음을 직접 녹음해서 만화 숏폼에 타이밍별로 추가하는 기능입니다
+        </Text>
+        <View style={styles.card}>
+          <UsageGuide
+            icon={<Music2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="소리 펀치 편집기 사용법"
+            steps={[
+              '만화 숏폼 생성기에서 "고급 옵션"을 펼칩니다',
+              '"소리 펀치 컷 편집" 토글을 켭니다 (웹 브라우저에서만 사용 가능)',
+              '녹음 버튼을 누르고 마이크에 소리를 내면 실시간으로 음파가 표시됩니다',
+              '큰 소리가 감지되면 자동으로 효과 마커가 추가됩니다 (빵, 줌, 코믹 등)',
+              '음성 명령으로 효과를 지정할 수도 있습니다 ("빵", "줌 인", "코믹" 등)',
+              '녹음을 중지하면 타임라인에 마커가 표시되고 재생할 수 있습니다',
+              '마커를 탭하면 효과 종류를 변경하거나 삭제할 수 있습니다',
+              '만화 숏폼 생성 시 녹음된 효과가 영상에 자동으로 합성됩니다',
+              '모바일에서는 "웹 브라우저에서만 사용할 수 있어요" 메시지가 표시됩니다',
+            ]}
+          />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -2056,5 +2185,36 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  toggleSwitch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleSwitchActive: {
+    backgroundColor: theme.colors.success[500],
+    borderColor: theme.colors.success[500],
+  },
+  toggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.dark.textDim,
+    marginLeft: 0,
+  },
+  toggleKnobActive: {
+    backgroundColor: '#fff',
+    marginLeft: 22,
   },
 });

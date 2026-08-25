@@ -114,6 +114,9 @@ export interface UserSettings {
   toss_share_id: string | null;
   openai_api_key: string | null;
   logo_url: string | null;
+  default_video_duration: string | null;
+  default_tts_voice: string | null;
+  auto_disclosure: boolean | null;
 }
 
 export interface SavedAsset {
