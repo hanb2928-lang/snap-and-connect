@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Pencil, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { StickerLink } from '@/components/StickerLink';
 import type { StickerStyle } from '@/components/StickerLink';
 import type { TemplateData, PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 
@@ -114,7 +113,7 @@ function getVariant(td: TemplateData | null | undefined, platform: PlatformKey):
 const HOOK_FONT_SIZE = 26;
 
 export const TemplateCard = forwardRef<View, TemplateCardProps>(
-  ({ imageUrl, templateData, title, platform = 'shortform', shortUrl = '', stickerPosition = 'top-left', stickerStyle = 'pill', stickerSize = 48, overlayOpacity, textPosition = 'bottom', onHookChange }, ref) => {
+  ({ imageUrl, templateData, title, platform = 'shortform', shortUrl = '', overlayOpacity, textPosition = 'bottom', onHookChange }, ref) => {
     const variant = getVariant(templateData, platform);
     const [editingHook, setEditingHook] = useState(false);
     const [hookText, setHookText] = useState(variant.hook);
@@ -147,12 +146,6 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
 
     const contentJustify = textPosition === 'top' ? 'flex-start' : textPosition === 'center' ? 'center' : 'flex-end';
 
-    const stickerOffsets: Record<StickerPosition, { top?: number; bottom?: number; left?: number; right?: number }> = {
-      'top-left': { top: theme.spacing.md, left: theme.spacing.md },
-      'top-right': { top: theme.spacing.md, right: theme.spacing.md },
-    };
-    const stickerPos = stickerOffsets[stickerPosition];
-
     return (
       <View
         ref={ref}
@@ -175,16 +168,6 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
           />
           {editingHook && <Text style={styles.hookEditHint}>터치해서 문구 수정</Text>}
         </View>
-        {shortUrl ? (
-          <View style={[styles.stickerWrap, stickerPos]}>
-            <StickerLink
-              url={shortUrl}
-              shortUrl={shortUrl}
-              stickerStyle={stickerStyle}
-              size={stickerSize}
-            />
-          </View>
-        ) : null}
       </View>
     );
   },
@@ -261,9 +244,5 @@ const styles = StyleSheet.create({
   hookPencilHint: {
     marginTop: 4,
     opacity: 0.6,
-  },
-  stickerWrap: {
-    position: 'absolute',
-    zIndex: 10,
   },
 });
