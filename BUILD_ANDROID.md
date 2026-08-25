@@ -1,144 +1,96 @@
-# 숏커넥트 - 안드로이드 APK 빌드 가이드 (처음부터 끝까지)
+# 숏커넥트 APK 만들기 - 초간단 가이드
 
-## 현재 상황
-
-- 기존 Expo 계정(hanbonggoo)의 무료 월간 빌드 한도 소진
-- 9월 1일에 초기화됨 (9일 남음)
-- **해결책: 새 Expo 계정을 만들어 빌드하면 즉시 가능**
+컴퓨터에 아무것도 설치할 필요 없이 웹 브라우저만 있으면 됩니다.
+GitHub에서 무료로 APK를 만들고 다운로드할 수 있습니다.
 
 ---
 
-## 단계별 가이드
+## 1단계: GitHub 가입하기
 
-### 1단계: 프로젝트 다운로드 및 압축 해제
-
-Bolt에서 프로젝트를 다운로드하고, 원하는 폴더에 압축을 해제합니다.
-
-### 2단계: Node.js 설치 확인
-
-Node.js v18 이상이 필요합니다. 설치 여부 확인:
-
-**Windows (PowerShell):**
-```powershell
-node --version
-```
-
-버전이 표시되지 않으면 https://nodejs.org 에서 LTS 버전을 설치하세요.
-
-### 3단계: 새 Expo 계정 만들기
-
-1. https://expo.dev/signup 접속
-2. 새 이메일로 가입 (기존 계정과 다른 이메일 사용)
-3. 가입 완료 후 이메일 인증
-
-### 4단계: EAS CLI 설치
-
-**Windows (PowerShell):**
-```powershell
-npm install -g eas-cli
-```
-
-### 5단계: 패키지 설치
-
-프로젝트 폴더에서 PowerShell을 열고 실행:
-
-```powershell
-cd "프로젝트_폴더_경로"
-npm install
-```
-
-설치가 완료될 때까지 대기 (2~3분 소요).
-
-### 6단계: 환경 변수 설정
-
-**Windows (PowerShell) - 매 터미널 세션마다 실행 필요:**
-```powershell
-$env:EAS_NO_VCS=1
-```
-
-### 7단계: 새 계정으로 로그인
-
-```powershell
-eas login
-```
-
-3단계에서 만든 새 계정의 이메일과 비밀번호 입력.
-
-### 8단계: 프로젝트 연결 (최초 1회만)
-
-```powershell
-eas init
-```
-
-이 명령어는 새 계정에 프로젝트를 등록하고, `app.json`에 projectId를 자동으로 채워줍니다.
-
-### 9단계: APK 빌드
-
-```powershell
-eas build --platform android --profile preview --clear-cache
-```
-
-빌드가 시작되면:
-- EAS 서버에서 자동으로 컴파일 (약 10~15분 소요)
-- 진행 상황이 터미널에 실시간 표시
-- 완료되면 다운로드 URL이 표시됨
-
-### 10단계: APK 다운로드 및 설치
-
-1. 빌드 완료 후 터미널에 표시된 URL 클릭 (또는 https://expo.dev 계정 페이지에서 빌드 항목 확인)
-2. APK 파일 다운로드
-3. 안드로이드 폰으로 전송 (USB, 이메일, 클라우드 등)
-4. 폰에서 APK 실행하여 설치
-   - "출처를 알 수 없는 앱" 경고가 나오면 설정에서 허용
+1. https://github.com 접속
+2. 우상단 **Sign up** 클릭
+3. 이메일, 비밀번호 입력하고 가입
+4. 이메일로 온 인증 메일 확인
 
 ---
 
-## 한 번에 실행 (PowerShell)
+## 2단계: 새 저장소 만들기
 
-모든 단계를 순서대로 실행하는 전체 명령어:
-
-```powershell
-# 1. 패키지 설치
-npm install
-
-# 2. 환경 변수 설정
-$env:EAS_NO_VCS=1
-
-# 3. 새 계정 로그인
-eas login
-
-# 4. 프로젝트 연결
-eas init
-
-# 5. 빌드
-eas build --platform android --profile preview --clear-cache
-```
+1. GitHub 로그인 후 우상단 **+** 버튼 클릭 → **New repository**
+2. Repository name에 `shortconnect` 입력
+3. **Private** 선택 (소스 코드 보호)
+4. **Create repository** 클릭
 
 ---
 
-## 빌드 스크립트로 한 번에 실행
+## 3단계: 프로젝트 파일 올리기
 
-프로젝트 폴더의 `build-android.bat` 파일을 더블클릭하면 2~5단계가 자동 실행됩니다. 로그인만 직접 하면 됩니다.
+1. Bolt에서 프로젝트 다운로드 → 압축 해제
+2. GitHub 저장소 페이지에서 **uploading an existing file** 클릭
+3. 프로젝트의 모든 파일을 드래그 앤 드롭
+   - **제외할 폴더:** `node_modules/`, `android/` 폴더는 올리지 마세요
+   - `.github/workflows/build-android-apk.yml` 파일은 반드시 포함
+4. 파일이 많아서 여러 번에 나눠 올려야 할 수 있습니다
+5. **Commit changes** 클릭
 
----
-
-## 자주 발생하는 에러
-
-| 에러 메시지 | 원인 | 해결 |
-|---|---|---|
-| `node modules installed?` | npm install 안 함 | `npm install` 실행 |
-| `Failed to resolve plugin` | npm install 안 함 | `npm install` 실행 |
-| `projectId is empty` | eas init 안 함 | `eas init` 실행 |
-| `git command not found` | Git 미설치 | `$env:EAS_NO_VCS=1` 설정 |
-| `Android builds from the Free plan` | 빌드 한도 소진 | 새 Expo 계정으로 빌드 |
-| `Gradle build failed` | 네이티브 컴파일 오류 | `--clear-cache` 추가 |
-| `You are not logged in` | 로그인 안 됨 | `eas login` 실행 |
+> 팁: 파일이 너무 많으면 `node_modules`를 제외한 모든 파일을 한 번에 드래그하세요.
 
 ---
 
-## 주의사항
+## 4단계: APK 만들기
 
-- **반드시 `npm install`을 먼저 실행하세요.** Bolt에서 다운로드한 프로젝트에는 `node_modules` 폴더가 없습니다.
-- **매 터미널 세션마다 `$env:EAS_NO_VCS=1`을 설정해야 합니다.** 창을 닫거면 다시 설정해야 합니다.
-- **`--profile preview`를 사용하세요.** 이 프로필은 Expo Go 없이 작동하는 독립 APK를 만듭니다.
-- **새 계정으로 빌드하려면 반드시 `eas init`을 다시 실행해야 합니다.** 기존 projectId는 이전 계정에 연결되어 있습니다.
+1. 저장소 페이지 위쪽의 **Actions** 탭 클릭
+2. 왼쪽 목록에서 **Build Android APK** 클릭
+3. 오른쪽의 **Run workflow** 버튼 클릭
+4. **Run workflow** 한 번 더 클릭
+
+빌드가 시작됩니다. 약 15~25분 걸립니다.
+빌드가 끝나면 초록색 체크 표시가 나옵니다.
+
+---
+
+## 5단계: APK 다운로드
+
+1. 초록색 체크가 된 빌드 클릭
+2. 페이지 아래쪽 **Artifacts** 섹션에서 `shortconnect-android-apk` 클릭
+3. APK 파일이 다운로드됩니다 (zip 안에 APK가 들어 있음)
+4. zip을 풀면 APK 파일이 나옵니다
+
+---
+
+## 6단계: 폰에 설치
+
+1. 다운로드한 APK를 안드로이드폰으로 전송
+   - USB 케이블, 이메일, 카카오톡, Google Drive 등 사용
+2. 폰에서 APK 파일 실행
+3. "출처를 알 수 없는 앱" 경고 → **설정에서 허용**
+4. 설치 완료 후 앱 실행
+
+---
+
+## 코드 수정 후 다시 만들기
+
+1. GitHub 저장소에서 수정할 파일 클릭 → 연필 아이콘 클릭 → 수정
+2. **Commit changes** 클릭
+3. 자동으로 빌드가 시작됨
+4. 또는 Actions 탭에서 **Run workflow** 수동 클릭
+
+---
+
+## 빌드 실패 시
+
+| 문제 | 해결 |
+|------|------|
+| Actions 탭이 안 보임 | Settings → Actions → General → "Allow all actions" 선택 |
+| 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 40으로 변경 |
+| Gradle 에러 | Actions 탭에서 "Run workflow" 다시 클릭 |
+| npm ci 실패 | `package-lock.json` 파일이 올라가 있는지 확인 |
+
+---
+
+## 무료 한도
+
+- GitHub Actions 무료 한도: 매월 2,000분 (Private 저장소)
+- Public 저장소는 무제한
+- APK 1회당 약 20~25분 사용
+- 매월 약 80회까지 무료 빌드 가능
