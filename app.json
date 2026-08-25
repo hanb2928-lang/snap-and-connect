@@ -37,7 +37,7 @@
         "origin": "snapconnect://"
       },
       "eas": {
-        "projectId": "382227db-bb80-4cd7-9dc4-895bde2536bf"
+        "projectId": ""
       }
     },
     "web": {
@@ -83,7 +83,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "owner": "hanbon9"
+    }
   }
 }
