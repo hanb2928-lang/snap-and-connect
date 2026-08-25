@@ -702,7 +702,6 @@ export function ARComicCamera({
               facing={facing}
               flash={flash}
               zoom={zoom}
-              ratio="16:9"
               onCameraReady={() => setCameraReady(true)}
             />
           </GestureDetector>
