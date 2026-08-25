@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { User, Sparkles, RefreshCw, ChevronRight, Shirt, X, Download, ChevronLeft, Maximize2, Check, PackageCheck, Share2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { supabaseAnonKey, VIRTUAL_FITTING_FUNCTION_URL } from '@/lib/supabase';
 import { urlToDataUrl } from '@/lib/base64';
 import { normalizeImageDataUrl, prepareImageForEdit } from '@/lib/imageEdit';
+import { enqueueAndWait, type JobStatus } from '@/lib/jobQueue';
+import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 
 type ModelType = 'asian-female-young' | 'asian-male-young' | 'western-female' | 'asian-female-30s';
 
@@ -57,10 +58,10 @@ export function VirtualFittingGallery({
   const [batchDone, setBatchDone] = useState(false);
   const [shared, setShared] = useState<number | null>(null);
   const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
+  const [queueStatus, setQueueStatus] = useState<JobStatus | 'idle'>('idle');
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressStepRef = useRef(0);
   const isGeneratingRef = useRef(false);
-  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
@@ -98,9 +99,6 @@ export function VirtualFittingGallery({
   const generate = useCallback(async () => {
     if (isGeneratingRef.current || !imageDataUrl) return;
     isGeneratingRef.current = true;
-    if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
     setLoading(true);
     setError(null);
     setResults([]);
@@ -109,66 +107,49 @@ export function VirtualFittingGallery({
     setShared(null);
     setBatchDone(false);
     setExpanded(true);
+    setQueueStatus('queued');
     startProgressCycle();
     try {
       const dataUrl = imageDataUrl.startsWith('data:')
         ? imageDataUrl
         : await urlToDataUrl(imageDataUrl);
       const preparedImage = await prepareImageForEdit(normalizeImageDataUrl(dataUrl));
-      const timeout = setTimeout(() => controller.abort(), 180000);
-      let response: Response;
-      try {
-        response = await fetch(VIRTUAL_FITTING_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${supabaseAnonKey}`,
-            apikey: supabaseAnonKey,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            imageDataUrl: preparedImage,
-            mimeType: 'image/png',
-            productName,
-            productCategory,
-          }),
-        });
-      } finally {
-        clearTimeout(timeout);
+      setQueueStatus('processing');
+      const jobResult = await enqueueAndWait<Record<string, unknown>>(
+        'virtual-fitting',
+        { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
+        { timeoutMs: 180000 },
+      );
+      if (!jobResult.success || !jobResult.result) {
+        throw new Error(jobResult.error ?? '가상 피팅 생성 실패');
       }
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`가상 피팅 실패 (${response.status}): ${errText}`);
-      }
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      const data = jobResult.result;
+      setQueueStatus('done');
 
       const raw: Array<{ modelType: ModelType; label: string; imageUrl: string }> =
-        data.results || [];
+        (data.results as Array<{ modelType: ModelType; label: string; imageUrl: string }>) || [];
       const uploaded: FittingImage[] = raw.filter((r) => r.imageUrl);
 
       setResults(uploaded);
       if (uploaded.length === 0) {
         setError('AI가 착용 컷을 생성하지 못했어요. 다시 시도해주세요.');
-      } else if (data.failedCount && data.totalRequested && data.failedCount > 0) {
-        setError(`${data.totalRequested}장 중 ${data.failedCount}장 생성 실패. ${uploaded.length}장만 표시됩니다. 다시 생성해보세요.`);
+      } else {
+        const failedCount = data.failedCount as number | undefined;
+        const totalRequested = data.totalRequested as number | undefined;
+        if (failedCount && totalRequested && failedCount > 0) {
+          setError(`${totalRequested}장 중 ${failedCount}장 생성 실패. ${uploaded.length}장만 표시됩니다. 다시 생성해보세요.`);
+        }
       }
     } catch (err) {
+      setQueueStatus('error');
       const msg = err instanceof Error ? err.message : '가상 피팅 생성 실패';
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('요청 시간이 초과되었습니다. 네트워크 환경을 확인 후 다시 시도해주세요.');
-      } else {
-        setError(msg);
-      }
+      setError(msg);
     } finally {
       stopProgressCycle();
       setLoading(false);
       isGeneratingRef.current = false;
-      if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [imageDataUrl, productName, productCategory]);
+  }, [imageDataUrl, productName, productCategory, startProgressCycle, stopProgressCycle]);
 
   const handleSelect = useCallback(
     (item: FittingImage) => {
@@ -365,6 +346,7 @@ export function VirtualFittingGallery({
               <View style={styles.progressWrap}>
                 <ActivityIndicator size="small" color={theme.colors.success[400]} />
                 <Text style={styles.progressText}>{progressMessage}</Text>
+                <QueueStatusBadge status={queueStatus} />
               </View>
             </View>
           )}

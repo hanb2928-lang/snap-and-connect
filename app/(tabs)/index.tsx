@@ -27,7 +27,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { uploadImage, analyzeImage, analyzeMultiShot, saveScan, saveManualScan } from '@/lib/analysis';
+import { uploadImage, analyzeImageQueued, analyzeMultiShotQueued, saveScan, saveManualScan } from '@/lib/analysis';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
@@ -36,6 +36,7 @@ import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
 import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
+import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
@@ -242,7 +243,7 @@ export default function CameraScreen() {
       try {
         [imageUrl, analysis] = await Promise.all([
           uploadImage(firstB64, 'image/jpeg'),
-          analyzeMultiShot(multiShots, `scan-${Date.now()}`),
+          analyzeMultiShotQueued(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
         clearInterval(progressTimer);
@@ -448,7 +449,7 @@ export default function CameraScreen() {
       try {
         [imageUrl, analysis] = await Promise.all([
           uploadImage(base64, mimeType),
-          analyzeImage(dataUrl, fileName, mimeType, recognitionMode),
+          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode),
         ]);
       } finally {
         clearInterval(progressTimer);
@@ -863,6 +864,11 @@ export default function CameraScreen() {
             text={progressText}
             stepLabels={['촬영', '분석', '저장']}
           />
+          {progressStep === 1 && (
+            <View style={{ marginTop: 8, alignItems: 'center' }}>
+              <QueueStatusBadge status="processing" label="서버 큐에서 처리 중" />
+            </View>
+          )}
         </Animated.View>
       )}
     </View>
@@ -910,7 +916,7 @@ function WebUploadScreen() {
       try {
         [imageUrl, analysis] = await Promise.all([
           uploadImage(base64, mimeType),
-          analyzeImage(dataUrl, fileName, mimeType, recognitionMode),
+          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode),
         ]);
       } finally {
         clearInterval(progressTimer);
@@ -987,7 +993,7 @@ function WebUploadScreen() {
       try {
         [imageUrl, analysis] = await Promise.all([
           uploadImage(multiShots[0], 'image/jpeg'),
-          analyzeMultiShot(multiShots, `scan-${Date.now()}`),
+          analyzeMultiShotQueued(multiShots, `scan-${Date.now()}`),
         ]);
       } finally {
         clearInterval(progressTimer);
@@ -1182,6 +1188,11 @@ function WebUploadScreen() {
             text={progressText}
             stepLabels={['업로드', '분석', '저장']}
           />
+          {progressStep === 1 && (
+            <View style={{ marginTop: 8, alignItems: 'center' }}>
+              <QueueStatusBadge status="processing" label="서버 큐에서 처리 중" />
+            </View>
+          )}
         </Animated.View>
       )}
     </View>
