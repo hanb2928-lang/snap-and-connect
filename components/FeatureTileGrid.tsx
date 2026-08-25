@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ScrollView,
 } from 'react-native';
 import {
   ChevronDown,
@@ -53,12 +54,17 @@ export function FeatureTileGrid({ categories }: Props) {
           <LazySection key={category.key} delayMs={ci * 60}>
             <View style={styles.categoryWrap}>
               <Text style={styles.categoryLabel}>{category.label}</Text>
-              <View style={styles.tileRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tileRow}
+              >
                 {category.tiles.map((tile) => (
                   <TouchableOpacity
                     key={tile.key}
                     style={[
                       styles.tile,
+                      expandedKey === tile.key && styles.tileActive,
                       expandedTile && expandedKey !== tile.key && styles.tileDimmed,
                     ]}
                     onPress={() => toggle(tile.key)}
@@ -88,7 +94,7 @@ export function FeatureTileGrid({ categories }: Props) {
                     )}
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
               {expandedTile && (
                 <View style={styles.expandedPanel}>
                   {category.tiles
@@ -123,19 +129,24 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   tileRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     gap: theme.spacing.sm,
+    paddingVertical: 2,
   },
   tile: {
-    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 12,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     ...theme.shadows.card,
+  },
+  tileActive: {
+    backgroundColor: theme.colors.primary[500] + '20',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '60',
   },
   tileDimmed: {
     opacity: 0.55,
