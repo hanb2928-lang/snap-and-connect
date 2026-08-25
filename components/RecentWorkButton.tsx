@@ -241,7 +241,7 @@ export function RecentWorkButton() {
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    top: 60,
+    top: 120,
     right: theme.spacing.lg,
     width: 44,
     height: 44,
