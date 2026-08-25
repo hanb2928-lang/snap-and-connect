@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking } from 'react-native';
-import { Copy, Check, CirclePlay as PlayCircle, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking, Modal, Pressable } from 'react-native';
+import { Copy, Check, CirclePlay as PlayCircle, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink } from 'lucide-react-native';
 import { useRef, useState, useCallback } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -25,6 +25,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   const [cloudSaving, setCloudSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareModal, setShareModal] = useState<{ url: string; label: string } | null>(null);
   const toastAnim = useSharedValue(0);
   const accordionHeight = useSharedValue(0);
   const accordionOpacity = useSharedValue(0);
@@ -187,7 +188,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     }
 
     if (Platform.OS === 'web') {
-      window.open(siteUrls[platform], '_blank');
+      setShareModal({ url: siteUrls[platform], label: platform === 'naverclip' ? '네이버클립' : '네이버TV' });
     } else {
       Linking.openURL(siteUrls[platform]).catch(() => {});
     }
@@ -253,8 +254,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       } else {
         await copyTextToClipboard(fullText);
       }
-      window.open('https://www.instagram.com', '_blank');
-      showToast('홍보 문구와 이미지가 클립보드에 복사됐어요!\n인스타에서 붙여넣기(Ctrl+V)하세요');
+      setShareModal({ url: 'https://www.instagram.com', label: '인스타그램' });
     } else {
       if (uri) {
         try {
@@ -280,8 +280,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     if (Platform.OS === 'web') {
       await copyTextToClipboard(fullText);
       if (uri) await copyImageToClipboard(uri);
-      window.open('https://accounts.kakao.com/weblogin/share', '_blank');
-      showToast('홍보 문구가 클립보드에 복사됐어요!\n카카오톡에서 붙여넣기하세요');
+      setShareModal({ url: 'https://accounts.kakao.com/weblogin/share', label: '카카오톡' });
     } else {
       if (uri) {
         try {
@@ -312,8 +311,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       } else {
         await copyTextToClipboard(fullText);
       }
-      window.open('https://blog.naver.com', '_blank');
-      showToast('홍보 문구와 이미지가 클립보드에 복사됐어요!\n블로그에서 붙여넣기(Ctrl+V)하세요');
+      setShareModal({ url: 'https://blog.naver.com', label: '네이버 블로그' });
     } else {
       if (uri) {
         try {
@@ -456,6 +454,39 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
           <Text style={styles.toastText}>{toast}</Text>
         </Animated.View>
       )}
+
+      <Modal visible={!!shareModal} transparent animationType="fade" onRequestClose={() => setShareModal(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShareModal(null)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShareModal(null)} activeOpacity={0.7} hitSlop={8}>
+              <X size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+            <View style={styles.modalIconWrap}>
+              <Instagram size={28} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.modalTitle}>{shareModal?.label}로 이동</Text>
+            <Text style={styles.modalDesc}>
+              홍보 문구와 이미지가 클립보드에 복사됐어요. {shareModal?.label}에서 붙여넣기(Ctrl+V)하세요.
+            </Text>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={styles.modalStayBtn} onPress={() => setShareModal(null)} activeOpacity={0.7}>
+                <Text style={styles.modalStayBtnText}>이 화면에 머무르기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalOpenBtn}
+                onPress={() => {
+                  if (shareModal) window.open(shareModal.url, '_blank');
+                  setShareModal(null);
+                }}
+                activeOpacity={0.8}
+              >
+                <ExternalLink size={16} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.modalOpenBtnText}>{shareModal?.label} 열기</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -640,5 +671,88 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.success[400],
     lineHeight: 22,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
+    ...theme.shadows.elevated,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.accent[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: theme.spacing.xs,
+  },
+  modalDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    width: '100%',
+  },
+  modalStayBtn: {
+    flex: 1,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalStayBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  modalOpenBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  modalOpenBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
