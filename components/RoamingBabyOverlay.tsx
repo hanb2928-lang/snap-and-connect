@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Linking, Pressable } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Linking } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,7 +8,6 @@ import Animated, {
   withTiming,
   Easing,
   cancelAnimation,
-  withDelay,
 } from 'react-native-reanimated';
 import { ExternalLink } from 'lucide-react-native';
 import { CrawlingBaby } from '@/components/CrawlingBaby';
