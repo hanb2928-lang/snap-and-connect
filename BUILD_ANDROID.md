@@ -20,7 +20,6 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 3. 프로젝트의 모든 파일을 드래그 앤 드롭
    - **제외할 폴더 (절대 올리지 마세요):**
      - `node_modules/` 폴더
-     - `android/` 폴더
      - `.expo/` 폴더
    - 이 폴더들은 빌드할 때 자동으로 생성됩니다
    - **반드시 올려야 하는 파일:**
@@ -85,7 +84,6 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 | Actions 탭이 안 보임 | Settings → Actions → General → "Allow all actions" 선택 |
 | 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 60으로 변경 |
 | npm install 실패 | `package.json`과 `package-lock.json`이 올라가 있는지 확인 |
-| 파일 업로드 안 됨 | `node_modules/`, `android/` 폴더는 올리지 마세요 |
 | Node.js 버전 에러 | 워크플로우에서 Node.js 20을 명시적으로 사용하도록 설정되어 있습니다 |
 
 ---
