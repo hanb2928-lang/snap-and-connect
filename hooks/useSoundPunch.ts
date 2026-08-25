@@ -67,6 +67,8 @@ export function useSoundPunch() {
     recognitionActive: false,
   });
 
+  const isWeb = typeof window !== 'undefined' && typeof window.AudioContext !== 'undefined';
+
   const cleanup = useCallback(() => {
     const r = refs.current;
     if (r.rafId) {
@@ -128,6 +130,10 @@ export function useSoundPunch() {
 
   const startRecording = useCallback(async () => {
     if (state.isRecording) return;
+    if (!isWeb || !navigator.mediaDevices?.getUserMedia) {
+      setState((prev) => ({ ...prev, error: '이 브라우저에서는 마이크 녹음을 지원하지 않아요' }));
+      return;
+    }
     setState((prev) => ({ ...prev, error: null, markers: [], duration: 0, audioBlob: null }));
 
     try {
@@ -252,7 +258,7 @@ export function useSoundPunch() {
       const msg = err instanceof Error ? err.message : '마이크 접근에 실패했어요';
       setState((prev) => ({ ...prev, error: msg }));
     }
-  }, [state.isRecording, addMarker, detectVoiceCommand]);
+  }, [state.isRecording, addMarker, detectVoiceCommand, isWeb]);
 
   const stopRecording = useCallback(() => {
     const r = refs.current;

@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
-import { Mic, MicOff, Square, Trash2, Zap, ZoomIn, Waves, Bomb, AlertCircle, Volume2 } from 'lucide-react-native';
+import { Mic, MicOff, Square, Trash2, Zap, ZoomIn, Waves, Bomb, CircleAlert as AlertCircle, Volume2 } from 'lucide-react-native';
+import { Platform } from 'react-native';
 import { theme } from '@/lib/theme';
 import { useSoundPunch, type PunchEffectType, type PunchMarker } from '@/hooks/useSoundPunch';
 
@@ -21,6 +22,20 @@ interface SoundPunchEditorProps {
 
 export function SoundPunchEditor({ enabled, onToggle, onMarkersChange, onAudioReady, style }: SoundPunchEditorProps) {
   const punch = useSoundPunch();
+
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={[styles.enableCard, style]}>
+        <View style={styles.enableIconWrap}>
+          <MicOff size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </View>
+        <View style={styles.enableTextWrap}>
+          <Text style={styles.enableTitle}>소리 펀치 컷 편집</Text>
+          <Text style={styles.enableDesc}>웹 브라우저에서만 사용할 수 있어요</Text>
+        </View>
+      </View>
+    );
+  }
   const lastMarkersRef = useRef<string>('');
   const lastAudioRef = useRef<string | null>(null);
 

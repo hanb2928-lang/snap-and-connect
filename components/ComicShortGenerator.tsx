@@ -23,6 +23,9 @@ import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
+import { SoundPunchEditor } from '@/components/SoundPunchEditor';
+import type { PunchMarker } from '@/hooks/useSoundPunch';
+import { safeFetch } from '@/lib/apiClient';
 import type { PlatformKey, LocalStoreInfo } from '@/types/database';
 import type { StickerStyle } from '@/components/StickerLink';
 import type { StickerPosition } from '@/components/TemplateCard';
@@ -1047,6 +1050,9 @@ export function ComicShortGenerator({
   const [mbtiCommentary, setMbtiCommentary] = useState<MbtiCommentary[]>([]);
   const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
+  const [soundPunchEnabled, setSoundPunchEnabled] = useState(false);
+  const [punchMarkers, setPunchMarkers] = useState<PunchMarker[]>([]);
+  const [punchAudioDataUrl, setPunchAudioDataUrl] = useState<string | null>(null);
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webGenCleanupRef = useRef<(() => void) | null>(null);
@@ -1230,9 +1236,7 @@ export function ComicShortGenerator({
     if (productName) {
       setScenarioLoading(true);
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
-        const response = await fetch(COMIC_SCENARIO_FUNCTION_URL, {
+        const response = await safeFetch(COMIC_SCENARIO_FUNCTION_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1250,9 +1254,8 @@ export function ComicShortGenerator({
             episodeMode,
             mbtiMode,
           }),
-          signal: controller.signal,
+          timeoutMs: 20000,
         });
-        clearTimeout(timeoutId);
         if (response.ok) {
           const data = await response.json();
           if (data.panels && Array.isArray(data.panels) && data.panels.length > 0) {
@@ -1299,9 +1302,7 @@ export function ComicShortGenerator({
     if (ttsEnabled && narrationText) {
       setTtsLoading(true);
       try {
-        const ttsController = new AbortController();
-        const ttsTimeoutId = setTimeout(() => ttsController.abort(), 15000);
-        const ttsResponse = await fetch(TTS_FUNCTION_URL, {
+        const ttsResponse = await safeFetch(TTS_FUNCTION_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1312,9 +1313,8 @@ export function ComicShortGenerator({
             voice: 'alloy',
             speed: 1.0,
           }),
-          signal: ttsController.signal,
+          timeoutMs: 15000,
         });
-        clearTimeout(ttsTimeoutId);
         if (ttsResponse.ok) {
           const ttsData = await ttsResponse.json();
           if (ttsData.audioBase64) {
@@ -1361,8 +1361,8 @@ export function ComicShortGenerator({
         duration: finalDuration,
         episodeMode,
         narrationAudioDataUrl: finalNarrationAudioDataUrl,
-        punchMarkers: [],
-        punchAudioDataUrl: null,
+        punchMarkers: punchAudioDataUrl ? punchMarkers : [],
+        punchAudioDataUrl,
         mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
         emotionOverlay,
         localStoreInfo,
@@ -1381,7 +1381,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, runWebComicGeneration]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, runWebComicGeneration, punchMarkers, punchAudioDataUrl]);
 
 
 
@@ -1577,12 +1577,12 @@ export function ComicShortGenerator({
     duration: comicDuration,
     episodeMode,
     narrationAudioDataUrl,
-    punchMarkers: [],
-    punchAudioDataUrl: null,
+    punchMarkers: punchAudioDataUrl ? punchMarkers : [],
+    punchAudioDataUrl,
     mbtiCommentary: mbtiMode ? mbtiCommentary : [],
     emotionOverlay,
     localStoreInfo,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo]);
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 
@@ -1771,6 +1771,16 @@ export function ComicShortGenerator({
                   <Text style={styles.toggleDesc}>"INTJ는 효율템, ENFP는 인싸템!" AI가 유형별 구매 가이드를 만화에 띄워요</Text>
                 </View>
               </TouchableOpacity>
+
+              {Platform.OS === 'web' && (
+                <SoundPunchEditor
+                  enabled={soundPunchEnabled}
+                  onToggle={setSoundPunchEnabled}
+                  onMarkersChange={setPunchMarkers}
+                  onAudioReady={setPunchAudioDataUrl}
+                  style={{ marginTop: 8 }}
+                />
+              )}
             </View>
           )}
 
