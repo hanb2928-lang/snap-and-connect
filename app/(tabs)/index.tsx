@@ -503,7 +503,7 @@ export default function CameraScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.cameraWrapper}>
-        {isActive && (
+        {isActive && !arMode && (
           <GestureDetector gesture={pinchGesture}>
             <CameraView
               ref={cameraRef}
@@ -515,6 +515,7 @@ export default function CameraScreen() {
             />
           </GestureDetector>
         )}
+        {!arMode && (
         <View style={styles.overlay} pointerEvents="none">
           <View style={styles.frameCornerTL} />
           <View style={styles.frameCornerTR} />
@@ -529,8 +530,9 @@ export default function CameraScreen() {
             </View>
           )}
         </View>
+        )}
 
-        {focusIndicator.visible && (
+        {focusIndicator.visible && !arMode && (
           <RNAnimated.View
             pointerEvents="none"
             style={[
@@ -546,12 +548,17 @@ export default function CameraScreen() {
           />
         )}
 
+        {!arMode && (
         <View style={styles.touchLayer} {...cameraPanResponder.panHandlers} pointerEvents={processing ? 'none' : 'auto'} />
+        )}
 
+        {!arMode && (
         <View style={styles.zoomIndicator} pointerEvents="none">
           <Text style={styles.zoomIndicatorText}>{zoomLabel}</Text>
         </View>
+        )}
 
+        {!arMode && (
         <View style={[styles.topBar, { top: safeTop + 8 }]}>
           <View style={styles.topBarLeft}>
             <TouchableOpacity
@@ -595,9 +602,11 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
       </View>
 
+      {!arMode && (
       <View style={styles.bottomControls}>
         <View style={styles.zoomBar}>
           {ZOOM_LEVELS.map((level) => (
@@ -730,6 +739,7 @@ export default function CameraScreen() {
           </View>
         )}
       </View>
+      )}
 
       {arMode && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
