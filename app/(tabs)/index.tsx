@@ -1515,8 +1515,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   captureButtonInner: {
-    width: 58,
-    height: 58,
+    width: 64,
+    height: 64,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.primary[400],
   },
