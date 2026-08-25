@@ -672,18 +672,14 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.extraButtonsRow}
-        >
+        <View style={styles.extraButtonsRow}>
           <TouchableOpacity
             style={styles.arModeButton}
             onPress={() => setArMode(true)}
             activeOpacity={0.8}
           >
-            <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.arModeText}>AR 매직 컷</Text>
+            <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.arModeText}>AR</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -691,8 +687,8 @@ export default function CameraScreen() {
             onPress={() => setVideoImportVisible(true)}
             activeOpacity={0.7}
           >
-            <Film size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-            <Text style={styles.videoImportText}>영상 불러오기</Text>
+            <Film size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.videoImportText}>영상</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -700,12 +696,12 @@ export default function CameraScreen() {
             onPress={() => setStylePickerVisible((v) => !v)}
             activeOpacity={0.7}
           >
-            <Palette size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Palette size={12} color={theme.colors.accent[400]} strokeWidth={2} />
             <Text style={styles.stylePickerLabel}>
               {STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
 
         {stylePickerVisible && (
           <View style={styles.stylePickerPanel}>
@@ -1315,9 +1311,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    gap: 6,
     paddingVertical: 4,
-    paddingHorizontal: theme.spacing.sm,
   },
   zoomBar: {
     flexDirection: 'row',
@@ -1383,9 +1378,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.dark.surface,
     borderWidth: 1.5,
@@ -1395,9 +1390,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.accent[500] + '20',
     borderWidth: 1.5,
@@ -1412,9 +1407,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.warning[500] + '20',
     borderWidth: 1.5,
