@@ -19,7 +19,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function resizeImage(file: File, maxSize = 1280, quality = 0.7): Promise<{ base64: string; uri: string; mimeType: string }> {
+function resizeImage(file: File, maxSize = 1280, quality = 0.65): Promise<{ base64: string; uri: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {

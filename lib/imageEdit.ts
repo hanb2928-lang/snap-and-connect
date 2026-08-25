@@ -96,6 +96,30 @@ export async function compressImage(uri: string, maxWidth = 1280, quality = 0.8)
   return result.uri;
 }
 
+export async function compressImageToBase64(
+  uri: string,
+  maxDimension = 1280,
+  quality = 0.7,
+): Promise<{ base64: string; mimeType: string }> {
+  const { width: origW, height: origH } = await getImageSize(uri);
+  const longer = Math.max(origW, origH);
+  const actions =
+    longer > maxDimension
+      ? origW >= origH
+        ? [{ resize: { width: maxDimension } }]
+        : [{ resize: { height: maxDimension } }]
+      : [];
+  const manipulated = await ImageManipulator.manipulateAsync(
+    uri,
+    actions,
+    { compress: quality, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return { base64, mimeType: 'image/jpeg' };
+}
+
 export async function uploadEditedImage(base64: string, mimeType: string): Promise<string> {
   const dataUrl = mimeType === 'image/png' ? `data:image/png;base64,${base64}` : `data:image/jpeg;base64,${base64}`;
   const compressedDataUrl = await prepareImageForApi(dataUrl, 1080, 0.85);

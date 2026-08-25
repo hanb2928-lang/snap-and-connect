@@ -29,7 +29,7 @@ import Animated, {
 import { theme } from '@/lib/theme';
 import { uploadImage, analyzeImageQueued, analyzeMultiShotQueued, saveScan, saveManualScan } from '@/lib/analysis';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
-import { prepareImageForApi } from '@/lib/imageEdit';
+import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
@@ -322,23 +322,22 @@ export default function CameraScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        base64: true,
+        base64: false,
         quality: 0.7,
         allowsMultipleSelection: recognitionMode === 'multi',
         selectionLimit: 4,
       });
 
-      if (result.canceled || !result.assets?.[0]?.base64) {
+      if (result.canceled || !result.assets?.[0]?.uri) {
         return;
       }
 
       if (recognitionMode === 'multi') {
         const newShots: string[] = [];
         for (const a of result.assets) {
-          if (!a.base64) continue;
-          const mt = a.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-          const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(a.base64), mt), 1280, 0.7);
-          newShots.push(cleanBase64(compressed));
+          if (!a.uri) continue;
+          const { base64 } = await compressImageToBase64(a.uri, 1280, 0.7);
+          newShots.push(base64);
           if (newShots.length >= 4 - multiShots.length) break;
         }
         setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
@@ -353,15 +352,12 @@ export default function CameraScreen() {
       fadeAnim.value = 0;
 
       const asset = result.assets[0];
-      const b64 = asset.base64;
-      if (!b64) {
+      if (!asset.uri) {
         setProcessing(false);
         return;
       }
-      const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(b64), mimeType), 1280, 0.7);
-      const compressedMime = getMimeTypeFromDataUrl(compressed);
-      await processImage(cleanBase64(compressed), asset.uri, compressedMime);
+      const { base64: compressedB64, mimeType: compressedMime } = await compressImageToBase64(asset.uri, 1280, 0.7);
+      await processImage(compressedB64, asset.uri, compressedMime);
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -392,23 +388,23 @@ export default function CameraScreen() {
       } else {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          base64: true,
+          base64: false,
           quality: 0.7,
         });
 
-        if (result.canceled || !result.assets?.[0]?.base64) {
+        if (result.canceled || !result.assets?.[0]?.uri) {
           setProcessing(false);
           return;
         }
 
         const asset = result.assets[0];
-        const b64 = asset.base64;
-        if (!b64) {
+        if (!asset.uri) {
           setProcessing(false);
           return;
         }
-        mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-        cleanB64 = cleanBase64(b64);
+        const compressed = await compressImageToBase64(asset.uri, 1280, 0.7);
+        cleanB64 = compressed.base64;
+        mimeType = compressed.mimeType;
       }
 
       setProgressText('이미지 업로드 중...');
