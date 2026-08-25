@@ -444,5 +444,4 @@ export function getWebViewOverlayScript(): string {
   `;
 }
 
-
 export { getWebViewOverlayScript }
