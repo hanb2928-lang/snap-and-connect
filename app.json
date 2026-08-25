@@ -83,6 +83,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "hanbonggoo9"
   }
 }
