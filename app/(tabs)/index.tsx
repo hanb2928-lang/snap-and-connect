@@ -36,6 +36,7 @@ import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
+import { CrawlingBaby } from '@/components/CrawlingBaby';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
@@ -872,7 +873,9 @@ export default function CameraScreen() {
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
           <View style={styles.processingCard}>
-            <Animated.View style={[styles.processingSpinner, spinnerStyle]} />
+            <View style={styles.babyCrawlWrap}>
+              <CrawlingBaby size={56} color={theme.colors.primary[400]} crawlWidth={100} speed={1600} />
+            </View>
             <Text style={styles.processingTitle}>제품 분석 중</Text>
             <Text style={styles.processingSubtext}>{progressText}</Text>
             <View style={styles.progressTrack}>
@@ -1215,7 +1218,9 @@ function WebUploadScreen() {
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
           <View style={styles.processingCard}>
-            <Animated.View style={[styles.processingSpinner, spinnerStyle]} />
+            <View style={styles.babyCrawlWrap}>
+              <CrawlingBaby size={56} color={theme.colors.primary[400]} crawlWidth={100} speed={1600} />
+            </View>
             <Text style={styles.processingTitle}>제품 분석 중</Text>
             <Text style={styles.processingSubtext}>{progressText}</Text>
             <View style={styles.progressTrack}>
@@ -1656,6 +1661,12 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: theme.colors.dark.border,
     borderTopColor: theme.colors.primary[400],
+  },
+  babyCrawlWrap: {
+    width: 180,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   processingTitle: {
     fontSize: theme.typography.heading,

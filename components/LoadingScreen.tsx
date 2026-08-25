@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '@/lib/theme';
+import { CrawlingBaby } from '@/components/CrawlingBaby';
 
 type LoadingScreenProps = {
   message?: string;
@@ -9,7 +10,9 @@ type LoadingScreenProps = {
 export function LoadingScreen({ message = '불러오는 중...', fullScreen = true }: LoadingScreenProps) {
   return (
     <View style={[styles.container, !fullScreen && styles.inline]}>
-      <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+      <View style={styles.babyWrap}>
+        <CrawlingBaby size={56} color={theme.colors.primary[400]} crawlWidth={80} speed={1600} />
+      </View>
       <Text style={styles.text}>{message}</Text>
     </View>
   );
@@ -26,6 +29,12 @@ const styles = StyleSheet.create({
   inline: {
     flex: undefined,
     paddingVertical: theme.spacing.xl,
+  },
+  babyWrap: {
+    width: 160,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   text: {
     fontSize: theme.typography.caption,
