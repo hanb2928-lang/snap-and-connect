@@ -854,6 +854,12 @@ export default function CameraScreen() {
 
       {!arMode && recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
         <View style={styles.nativeAngleGuide} pointerEvents="none">
+          <View style={styles.nativeAngleTooltip}>
+            <Text style={styles.nativeAngleTooltipText}>
+              앞 · 옆 · 뒤 · 디테일 순서로 촬영하세요
+            </Text>
+            <View style={styles.nativeAngleTooltipArrow} />
+          </View>
           <View style={styles.nativeAngleGuideRow}>
             {[
               { num: '1', label: '정면' },
@@ -1922,9 +1928,9 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: theme.colors.accent[400] + '40',
+    borderColor: theme.colors.accent[400] + '60',
   },
   webTemplateBtnContent: {
     flex: 1,
@@ -2036,6 +2042,31 @@ const styles = StyleSheet.create({
     right: theme.spacing.lg,
     alignItems: 'center',
     zIndex: 5,
+  },
+  nativeAngleTooltip: {
+    backgroundColor: 'rgba(10, 15, 30, 0.9)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  nativeAngleTooltipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  nativeAngleTooltipArrow: {
+    position: 'absolute',
+    bottom: -5,
+    width: 10,
+    height: 10,
+    backgroundColor: 'rgba(10, 15, 30, 0.9)',
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.primary[400] + '40',
+    transform: [{ rotate: '45deg' }],
   },
   nativeAngleGuideRow: {
     flexDirection: 'row',
