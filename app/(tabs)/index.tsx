@@ -842,9 +842,29 @@ export default function CameraScreen() {
             : recognitionMode === 'single'
               ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다'
               : multiShots.length === 0
-                ? '다각도 모드: 같은 제품을 여러 각도에서 촬영(최대 4장)하면 더 정확하게 분석합니다'
+                ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
                 : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
         </Text>
+      )}
+
+      {!arMode && recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
+        <View style={styles.nativeAngleGuide} pointerEvents="none">
+          <View style={styles.nativeAngleGuideRow}>
+            {[
+              { num: '1', label: '정면' },
+              { num: '2', label: '측면' },
+              { num: '3', label: '후면' },
+              { num: '4', label: '디테일' },
+            ].map((item) => (
+              <View key={item.num} style={styles.nativeAngleGuideItem}>
+                <View style={styles.nativeAngleGuideCircle}>
+                  <Text style={styles.nativeAngleGuideNum}>{item.num}</Text>
+                </View>
+                <Text style={styles.nativeAngleGuideLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       )}
 
       <OnboardingModal
@@ -1132,9 +1152,47 @@ function WebUploadScreen() {
 
           <TouchableOpacity style={styles.webTemplateBtn} onPress={handleTemplateOnly} disabled={processing} activeOpacity={0.7}>
             <Wand2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.webTemplateBtnText}>템플릿만 만들기</Text>
+            <View style={styles.webTemplateBtnContent}>
+              <Text style={styles.webTemplateBtnText}>템플릿만 만들기</Text>
+              <Text style={styles.webTemplateBtnSub}>AI 분석 없이 사진만 업로드하고 직접 꾸미기</Text>
+            </View>
           </TouchableOpacity>
         </View>
+
+        {recognitionMode === 'multi' && multiShots.length === 0 && (
+          <View style={styles.angleGuideBox}>
+            <Text style={styles.angleGuideTitle}>촬영 가이드</Text>
+            <View style={styles.angleGuideGrid}>
+              <View style={styles.angleGuideItem}>
+                <View style={styles.angleGuideIcon}>
+                  <Text style={styles.angleGuideEmoji}>1</Text>
+                </View>
+                <Text style={styles.angleGuideLabel}>정면</Text>
+              </View>
+              <View style={styles.angleGuideItem}>
+                <View style={styles.angleGuideIcon}>
+                  <Text style={styles.angleGuideEmoji}>2</Text>
+                </View>
+                <Text style={styles.angleGuideLabel}>측면</Text>
+              </View>
+              <View style={styles.angleGuideItem}>
+                <View style={styles.angleGuideIcon}>
+                  <Text style={styles.angleGuideEmoji}>3</Text>
+                </View>
+                <Text style={styles.angleGuideLabel}>후면</Text>
+              </View>
+              <View style={styles.angleGuideItem}>
+                <View style={styles.angleGuideIcon}>
+                  <Text style={styles.angleGuideEmoji}>4</Text>
+                </View>
+                <Text style={styles.angleGuideLabel}>디테일</Text>
+              </View>
+            </View>
+            <Text style={styles.angleGuideDesc}>
+              같은 제품을 앞·옆·뒤에서 2~4장 촬영하면 더 정확하게 분석합니다.
+            </Text>
+          </View>
+        )}
 
         {recognitionMode === 'multi' && multiShots.length > 0 && (
           <View style={[styles.multiShotStrip, { position: 'relative', bottom: undefined, left: undefined, right: undefined, marginTop: theme.spacing.md }]}>
@@ -1837,19 +1895,82 @@ const styles = StyleSheet.create({
   webTemplateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'flex-start',
+    gap: 10,
     width: '100%',
     paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
     borderColor: theme.colors.accent[400] + '40',
   },
+  webTemplateBtnContent: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
   webTemplateBtnText: {
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.accent[400],
+  },
+  webTemplateBtnSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  angleGuideBox: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[500] + '30',
+  },
+  angleGuideTitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    marginBottom: theme.spacing.md,
+  },
+  angleGuideGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
+  angleGuideItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  angleGuideIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500] + '18',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  angleGuideEmoji: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[300],
+  },
+  angleGuideLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  angleGuideDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   webNoteBox: {
     flexDirection: 'row',
@@ -1886,5 +2007,45 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.accent[300],
     lineHeight: 18,
+  },
+  nativeAngleGuide: {
+    position: 'absolute',
+    bottom: 140,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  nativeAngleGuideRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    backgroundColor: 'rgba(10, 15, 30, 0.75)',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+  },
+  nativeAngleGuideItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  nativeAngleGuideCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '80',
+    backgroundColor: theme.colors.primary[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nativeAngleGuideNum: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[300],
+  },
+  nativeAngleGuideLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
 });

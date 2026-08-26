@@ -33,7 +33,7 @@ const TAB_LABELS: Record<string, string> = {
   settings: '설정',
 };
 
-const TAB_WIDTH = 64;
+const TAB_WIDTH = 72;
 
 export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -50,7 +50,7 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
   const bottomPadding = Math.max(insets.bottom, 0);
 
   return (
-    <View style={[styles.container, { paddingBottom: 6 + bottomPadding }]}>
+    <View style={[styles.container, { paddingBottom: 8 + bottomPadding }]}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -80,14 +80,15 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               onPress={onPress}
-              activeOpacity={0.7}
+              activeOpacity={0.6}
               style={styles.tabItem}
             >
               <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
                 <Icon
                   size={22}
                   color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textFaint}
-                  strokeWidth={2}
+                  strokeWidth={isFocused ? 2.5 : 2}
+                  fill={isFocused ? theme.colors.primary[400] + '20' : 'transparent'}
                 />
               </View>
               <Text
@@ -113,42 +114,42 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderTopColor: theme.colors.dark.border,
     borderTopWidth: 1,
-    paddingTop: 6,
+    paddingTop: 8,
   },
   scrollContent: {
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   tabItem: {
     width: TAB_WIDTH,
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   iconWrap: {
-    width: 38,
-    height: 30,
+    width: 44,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: theme.radius.md,
   },
   iconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '18',
+    backgroundColor: theme.colors.primary[500] + '22',
   },
   tabLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textFaint,
-    marginTop: 2,
+    marginTop: 5,
   },
   tabLabelActive: {
     color: theme.colors.primary[400],
     fontFamily: theme.typography.fontFamily.semiBold,
   },
   activeBar: {
-    width: 20,
+    width: 24,
     height: 3,
     borderRadius: 2,
     backgroundColor: theme.colors.primary[400],
-    marginTop: 3,
+    marginTop: 4,
   },
 });
