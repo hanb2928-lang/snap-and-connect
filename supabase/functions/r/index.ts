@@ -40,7 +40,8 @@ function isBot(userAgent: string): boolean {
 
 function detectPlatform(url: string): string {
   if (/coupang\.com/i.test(url)) return "Coupang";
-  if (/brandconnect\.naver\.com|naver\.com/i.test(url)) return "BrandConnect";
+  if (/brandconnect\.naver\.com|brand\.naver\.com/i.test(url)) return "BrandConnect";
+  if (/smartstore\.naver\.com|search\.shopping\.naver\.com/i.test(url)) return "NaverShopping";
   if (/toss\.(to|im)/i.test(url)) return "Toss";
   return "기타";
 }

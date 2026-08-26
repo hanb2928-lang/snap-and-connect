@@ -117,7 +117,12 @@ const LANG_INFO: Record<string, { code: string; nativeName: string; voice: strin
 };
 
 async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promise<LocalizeResponse> {
-  const langInfos = data.targetLanguages.map(l => LANG_INFO[l]).filter(Boolean);
+  const langInfos = data.targetLanguages
+    .map(l => LANG_INFO[l])
+    .filter((l): l is NonNullable<typeof l> => Boolean(l));
+  if (langInfos.length === 0) {
+    throw new Error("지원하지 않는 언어 코드입니다. 지원 언어: en, ja, zh, th, id");
+  }
 
   const systemPrompt =
     "너는 글로벌 숏폼 로컬라이징 전문가야. 한국어 콘텐츠를 각 국가 언어로 자연스럽게 번역하고 현지화해.\n" +

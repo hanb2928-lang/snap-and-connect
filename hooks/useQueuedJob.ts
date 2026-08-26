@@ -67,6 +67,17 @@ export function useQueuedJob() {
       }
     };
 
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    timeoutRef.current = setTimeout(() => {
+      if (mySubmitId !== submitIdRef.current) return;
+      clearAll();
+      setState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: '작업 시간이 초과되었어요. 다시 시도해주세요.',
+      }));
+    }, timeoutMs);
+
     subRef.current = subscribeToJob(jobId, handleUpdate);
 
     getJob(jobId).then((job) => {
@@ -83,17 +94,6 @@ export function useQueuedJob() {
         if (job) handleUpdate(job);
       }).catch(() => {});
     }, POLL_INTERVAL_MS);
-
-    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    timeoutRef.current = setTimeout(() => {
-      if (mySubmitId !== submitIdRef.current) return;
-      clearAll();
-      setState((prev) => ({
-        ...prev,
-        status: 'error',
-        error: '작업 시간이 초과되었어요. 다시 시도해주세요.',
-      }));
-    }, timeoutMs);
 
     return jobId;
   }, [clearAll]);

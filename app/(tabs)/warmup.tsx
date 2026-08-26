@@ -114,7 +114,7 @@ export default function WarmupScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedScheduleId]);
+  }, []);
 
   useEffect(() => {
     loadData();

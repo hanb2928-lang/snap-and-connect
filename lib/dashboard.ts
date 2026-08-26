@@ -148,7 +148,7 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
       scan_id: s.id,
       product_name: s.product_name || s.title || '제품',
       image_url: s.image_url,
-      platform: s.template_data?.category || '기타',
+      platform: s.product_category || s.template_data?.category || '기타',
       clicks: clickData.clicks,
       revenue,
       asset_count: assetCount,

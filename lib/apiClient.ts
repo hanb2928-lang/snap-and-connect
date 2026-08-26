@@ -48,7 +48,7 @@ export async function safeFetch(
 
     return response;
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
+    if (err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))) {
       throw new ApiError('요청 시간이 초과되었습니다. 네트워크 환경을 확인 후 다시 시도해주세요.', 408);
     }
     throw err;

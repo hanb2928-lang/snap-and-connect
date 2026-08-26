@@ -76,12 +76,12 @@ export async function pickImageWeb(multiple = false, maxCount = 4): Promise<Pick
     };
     const onFocus = () => {
       setTimeout(() => {
-        if (!settled && (!input.files || input.files.length === 0)) {
+        if (!settled && (!input.files || input.files.length === 0) && document.contains(input)) {
           settled = true;
           cleanup();
           resolve([]);
         }
-      }, 500);
+      }, 800);
     };
 
     input.onchange = async () => {

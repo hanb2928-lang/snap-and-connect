@@ -134,7 +134,7 @@ export function useSoundPunch() {
   const startRecording = useCallback(async () => {
     if (state.isRecording || isStartingRef.current) return;
     isStartingRef.current = true;
-    if (!isWeb || !navigator.mediaDevices?.getUserMedia) {
+    if (!isWeb || typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setState((prev) => ({ ...prev, error: '이 브라우저에서는 마이크 녹음을 지원하지 않아요' }));
       return;
     }
