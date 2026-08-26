@@ -11,6 +11,9 @@ function withOptimizedGradle(config) {
       if (prop.type === 'property' && prop.key === 'reactNativeArchitectures') {
         prop.value = 'arm64-v8a';
       }
+      if (prop.type === 'property' && prop.key === 'EX_DEV_CLIENT_NETWORK_INSPECTOR') {
+        prop.value = 'false';
+      }
     }
 
     return config;

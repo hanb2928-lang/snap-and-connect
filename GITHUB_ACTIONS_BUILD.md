@@ -24,7 +24,7 @@ EAS 빌드 한도 없이 GitHub에서 무료로 Android APK를 만드는 방법�
 
 1. 생성된 저장소 페이지에서 "uploading an existing file" 클릭
 2. Bolt에서 다운로드한 프로젝트의 모든 파일을 드래그 앤 드롭
-   - **제외할 파일:** `node_modules/`, `.git/`, `android/` 폴더는 제외
+   - **제외할 파일:** `node_modules/`, `.git/` 폴더는 제외
    - `.github/workflows/build-android-apk.yml` 파일은 반드시 포함
    - `package-lock.json` 파일은 반드시 포함
 3. "Commit changes" 클릭
