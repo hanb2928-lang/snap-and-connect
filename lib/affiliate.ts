@@ -65,12 +65,19 @@ export function generateAffiliateLinks(
 
 export function generateAffiliateLinkForMatch(
   matchUrl: string,
-  _platform: string,
+  platform: string,
   settings: UserSettings | null,
 ): string {
   if (settings?.coupang_partners_id && isCoupangUrl(matchUrl)) {
     const sep = matchUrl.includes('?') ? '&' : '?';
     return `${matchUrl}${sep}partner=${settings.coupang_partners_id}`;
+  }
+  if (settings?.naver_shopping_id && /search\.shopping\.naver\.com/i.test(matchUrl)) {
+    const sep = matchUrl.includes('?') ? '&' : '?';
+    return `${matchUrl}${sep}nsh=${settings.naver_shopping_id}`;
+  }
+  if (settings?.toss_share_id && isTossUrl(matchUrl)) {
+    return `https://sharelink.toss.im/${settings.toss_share_id}`;
   }
   return matchUrl;
 }

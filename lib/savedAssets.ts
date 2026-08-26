@@ -124,10 +124,10 @@ export async function fetchSavedAssets(): Promise<SavedAsset[]> {
 export async function deleteSavedAsset(asset: SavedAsset): Promise<boolean> {
   const filePath = `${asset.file_name}`;
 
-  const { error: dbError } = await supabase.from('saved_assets').delete().eq('id', asset.id);
-  if (dbError) return false;
-
   const { error: storageError } = await supabase.storage.from(BUCKET).remove([filePath]);
-  return !storageError;
+  if (storageError) return false;
+
+  const { error: dbError } = await supabase.from('saved_assets').delete().eq('id', asset.id);
+  return !dbError;
 }
 

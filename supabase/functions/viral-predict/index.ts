@@ -159,20 +159,26 @@ async function predictWithOpenAI(data: ViralPredictRequest, apiKey: string): Pro
   const parsed = JSON.parse(content);
 
   return {
-    score: Math.min(Math.max(Number(parsed.score) || 50, 0), 100),
+    score: clampScore(parsed.score),
     grade: String(parsed.grade || 'B'),
-    factors: Array.isArray(parsed.factors) ? parsed.factors.slice(0, 6).map((f: any) => ({
+    factors: Array.isArray(parsed.factors) ? parsed.factors.filter((f: unknown) => f && typeof f === 'object').slice(0, 6).map((f: Record<string, unknown>) => ({
       label: String(f.label || '').slice(0, 30),
       positive: !!f.positive,
       detail: String(f.detail || '').slice(0, 100),
     })) : [],
-    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 3).map((s: any) => ({
+    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.filter((s: unknown) => s && typeof s === 'object').slice(0, 3).map((s: Record<string, unknown>) => ({
       type: String(s.type || 'tip').slice(0, 20),
       label: String(s.label || '').slice(0, 50),
       detail: String(s.detail || '').slice(0, 150),
     })) : [],
     predictedViews: String(parsed.predictedViews || '1만~5만').slice(0, 30),
   };
+}
+
+function clampScore(raw: unknown): number {
+  const n = Number(raw);
+  if (Number.isNaN(n)) return 50;
+  return Math.min(Math.max(n, 0), 100);
 }
 
 function predictLocal(data: ViralPredictRequest): ViralPrediction {

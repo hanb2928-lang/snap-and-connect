@@ -59,7 +59,6 @@ export async function removeBackgroundOnDevice(
 
       for (const n of neighbors) {
         if (n < 0 || visited[n]) continue;
-        visited[n] = 1;
         const nr = data[n * 4];
         const ng = data[n * 4 + 1];
         const nb = data[n * 4 + 2];
@@ -67,6 +66,7 @@ export async function removeBackgroundOnDevice(
           (nr - pr) * (nr - pr) + (ng - pg) * (ng - pg) + (nb - pb) * (nb - pb),
         );
         if (dist < threshold) {
+          visited[n] = 1;
           data[n * 4 + 3] = 0;
           queue.push(n);
         }
@@ -117,17 +117,15 @@ function edgeFeather(data: Uint8ClampedArray, w: number, h: number): void {
       const idx = (y * w + x) * 4;
       if (tmp[idx + 3] > 0) {
         let opaque = 0;
-        let total = 0;
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
+            if (dy === 0 && dx === 0) continue;
             const nidx = ((y + dy) * w + (x + dx)) * 4;
-            total++;
             if (tmp[nidx + 3] > 0) opaque++;
           }
         }
-        if (opaque < 6) {
-          const ratio = opaque / total;
-          data[idx + 3] = Math.round(data[idx + 3] * ratio);
+        if (opaque < 8) {
+          data[idx + 3] = Math.round(data[idx + 3] * (opaque / 8));
         }
       }
     }

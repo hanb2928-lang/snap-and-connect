@@ -35,13 +35,20 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Only POST is supported" }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   try {
     const body: TrendMatchRequest = await req.json();
 
     if (!body.productCategory) {
       return new Response(
-        JSON.stringify(generateLocalTrendMatch({ productCategory: "product", productName: body.productName, platform: body.platform })),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ error: "Product category is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

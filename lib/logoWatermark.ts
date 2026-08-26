@@ -25,7 +25,7 @@ export function drawLogoWatermark(
   opacity: number = 0.7,
   position: 'bottom-right' | 'bottom-left' | 'top-right' = 'bottom-right',
 ): void {
-  if (!logoImg) return;
+  if (!logoImg || !logoImg.width || !logoImg.height) return;
 
   const maxW = Math.round(canvasW * 0.12);
   const maxH = Math.round(canvasH * 0.08);

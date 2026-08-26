@@ -360,10 +360,16 @@ async function callOpenAIWithRetry(
             const retryContent = retryData.choices?.[0]?.message?.content;
             if (retryContent) {
               try {
-                const parsed = JSON.parse(retryContent);
+                const combined = content + retryContent;
+                const parsed = JSON.parse(combined);
                 return normalizeResult(parsed);
               } catch {
-                // retry content wasn't valid JSON either
+                try {
+                  const parsed = JSON.parse(retryContent);
+                  return normalizeResult(parsed);
+                } catch {
+                  // retry content wasn't valid JSON either
+                }
               }
             }
           }
@@ -478,14 +484,17 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
   const oneLiner = String(raw.oneLiner || raw.one_liner || "");
   const rawMatches = Array.isArray(raw.shoppingMatches) ? raw.shoppingMatches as ShoppingMatch[] : [];
   const shoppingMatches: ShoppingMatch[] = rawMatches.length > 0
-    ? rawMatches.slice(0, 1).map((m) => ({
-        platform: "BrandConnect" as const,
-        productName: m.productName,
-        price: m.price,
-        url: m.url.includes("brandconnect.naver.com") || m.url.includes("brand.naver.com")
-          ? m.url
-          : "https://brandconnect.naver.com/about/creator",
-      }))
+    ? rawMatches.slice(0, 1).map((m) => {
+        const url = String(m?.url || "");
+        return {
+          platform: "BrandConnect" as const,
+          productName: String(m?.productName || ""),
+          price: String(m?.price || ""),
+          url: url.includes("brandconnect.naver.com") || url.includes("brand.naver.com")
+            ? url
+            : "https://brandconnect.naver.com/about/creator",
+        };
+      })
     : [];
   const templateData = normalizeTemplate(raw.templateData as Record<string, unknown>, {
     priceLabel: priceEstimate,
@@ -502,14 +511,17 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
         productCategory: String(p.productCategory || p.product_category || "product"),
         priceEstimate: String(p.priceEstimate || p.price_estimate || ""),
         oneLiner: String(p.oneLiner || p.one_liner || ""),
-        shoppingMatches: Array.isArray(p.shoppingMatches) ? (p.shoppingMatches as ShoppingMatch[]).slice(0, 1).map((m) => ({
-          platform: "BrandConnect" as const,
-          productName: m.productName,
-          price: m.price,
-          url: m.url.includes("brandconnect.naver.com") || m.url.includes("brand.naver.com")
-            ? m.url
-            : "https://brandconnect.naver.com/about/creator",
-        })) : [],
+        shoppingMatches: Array.isArray(p.shoppingMatches) ? (p.shoppingMatches as ShoppingMatch[]).slice(0, 1).map((m) => {
+          const url = String(m?.url || "");
+          return {
+            platform: "BrandConnect" as const,
+            productName: String(m?.productName || ""),
+            price: String(m?.price || ""),
+            url: url.includes("brandconnect.naver.com") || url.includes("brand.naver.com")
+              ? url
+              : "https://brandconnect.naver.com/about/creator",
+          };
+        }) : [],
         templateData: normalizeTemplate(p.templateData as Record<string, unknown>, {
           priceLabel: String(p.priceEstimate || ""),
           oneLiner: String(p.oneLiner || ""),

@@ -165,15 +165,21 @@ async function simulateWithOpenAI(
   return normalizeSimulation(parsed);
 }
 
+function clampNum(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
 function normalizeSimulation(raw: Record<string, unknown>): SimulationResult {
   const personas: PersonaReaction[] = Array.isArray(raw.personas)
     ? (raw.personas as Record<string, unknown>[]).slice(0, 4).map((p) => ({
         persona: String(p.persona || "").slice(0, 30),
         avatar: String(p.avatar || "👤").slice(0, 4),
         ageGroup: String(p.ageGroup || "").slice(0, 15),
-        interestScore: Math.min(Math.max(Number(p.interestScore) || 50, 0), 100),
-        commentCount: Math.min(Math.max(Number(p.commentCount) || 50, 0), 999),
-        cartAddRate: Math.min(Math.max(Number(p.cartAddRate) || 30, 0), 100),
+        interestScore: clampNum(p.interestScore, 50, 0, 100),
+        commentCount: clampNum(p.commentCount, 50, 0, 999),
+        cartAddRate: clampNum(p.cartAddRate, 30, 0, 100),
         predictedComments: Array.isArray(p.predictedComments)
           ? (p.predictedComments as unknown[]).slice(0, 2).map((c) => String(c).slice(0, 50))
           : [],
@@ -184,7 +190,7 @@ function normalizeSimulation(raw: Record<string, unknown>): SimulationResult {
 
   return {
     bestPersona: String(raw.bestPersona || "").slice(0, 30),
-    overallScore: Math.min(Math.max(Number(raw.overallScore) || 50, 0), 100),
+    overallScore: clampNum(raw.overallScore, 50, 0, 100),
     strategy: String(raw.strategy || "").slice(0, 120),
     personas,
   };

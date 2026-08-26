@@ -396,16 +396,16 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
   let hooks: string[], captions: string[], hashtags: string[];
 
   if (data.copyType === "deal") {
-    hooks = dealHooks;
-    captions = dealCaptions;
+    hooks = [...dealHooks];
+    captions = [...dealCaptions];
     hashtags = [...baseHashtags, "한정특가", "할인", "공구", "타임세일", ...catHashtags];
   } else if (data.copyType === "info") {
-    hooks = infoHooks;
-    captions = infoCaptions;
+    hooks = [...infoHooks];
+    captions = [...infoCaptions];
     hashtags = [...baseHashtags, "리뷰", "꿀템", "구매전략", "현직자추천", ...catHashtags];
   } else {
-    hooks = viralHooks;
-    captions = viralCaptions;
+    hooks = [...viralHooks];
+    captions = [...viralCaptions];
     hashtags = [...baseHashtags, "바이럴", "인생템", "SNS난리", "럭키템", "공감", ...catHashtags];
   }
 
@@ -421,15 +421,9 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
     const offerSuffix = ls.todayOffer ? `\n${ls.todayOffer}` : '';
     const addrLine = ls.address ? `\n📍 ${ls.address}${ls.phone ? ` · ${ls.phone}` : ''}` : '';
 
-    dealHooks.unshift(`${ls.storeName} 오늘 방문하면 혜택이 있는 거 아셨나요`);
-    dealHooks.unshift(`${regionTag} 이거 먹으러 오신 분들 여기로 오세요`);
-    dealCaptions.unshift(`${ls.storeName}에서 ${ls.todayOffer || '오늘 특별한 혜택'} 준비했어요.${addrLine}${offerSuffix}\n직접 매장에서 만나보세요!`);
-
-    viralHooks.unshift(`${ls.storeName} 요즘 ${regionTag}에서 난리난 곳`);
-    viralCaptions.unshift(`${ls.storeName} 소문 난 이유가 있더라고요.\n${ls.todayOffer || '직접 와서 확인해보세요'}${addrLine}\n${regionTag} 방문하면 꼭 들르세요.`);
-
-    infoHooks.unshift(`${ls.storeName} 방문 전에 알면 더 좋은 팁`);
-    infoCaptions.unshift(`${ls.storeName}에서 ${ls.todayOffer || '오늘의 추천 메뉴'}(을)를 준비했어요.${addrLine}\n${regionTag} 계시면 한 번쯤 들러보세요.`);
+    hooks.unshift(`${ls.storeName} 오늘 방문하면 혜택이 있는 거 아셨나요`);
+    hooks.unshift(`${regionTag} 이거 먹으러 오신 분들 여기로 오세요`);
+    captions.unshift(`${ls.storeName}에서 ${ls.todayOffer || '오늘 특별한 혜택'} 준비했어요.${addrLine}${offerSuffix}\n직접 매장에서 만나보세요!`);
 
     hashtags = [...hashtags, ...localHashtags];
   }
@@ -437,7 +431,7 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
   const indices = pickUniqueIndices(hooks.length, count);
   const result: CopyItem[] = indices.map((hi, i) => {
     let hook = hooks[hi];
-    let caption = captions[i % captions.length];
+    let caption = captions[hi % captions.length];
     if (data.platform === "threads") {
       hook = toBanmal(hook);
       caption = toBanmal(caption);

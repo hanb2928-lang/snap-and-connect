@@ -121,11 +121,12 @@ export async function compressImageToBase64(
 }
 
 export async function uploadEditedImage(base64: string, mimeType: string): Promise<string> {
-  const dataUrl = mimeType === 'image/png' ? `data:image/png;base64,${base64}` : `data:image/jpeg;base64,${base64}`;
-  const compressedDataUrl = await prepareImageForApi(dataUrl, 1080, 0.85);
+  const isPng = mimeType === 'image/png';
+  const dataUrl = isPng ? `data:image/png;base64,${base64}` : `data:image/jpeg;base64,${base64}`;
+  const compressedDataUrl = isPng ? await prepareImageForEdit(dataUrl, 1080) : await prepareImageForApi(dataUrl, 1080, 0.85);
   const compressedBase64 = cleanBase64(compressedDataUrl);
-  const uploadMime = 'image/jpeg';
-  const ext = 'jpg';
+  const uploadMime = isPng ? 'image/png' : 'image/jpeg';
+  const ext = isPng ? 'png' : 'jpg';
 
   const fileName = `edited-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
@@ -234,10 +235,10 @@ async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string
   });
 
   return ImageManipulator.manipulateAsync(
-    `data:image/jpeg;base64,${prodBase64}`,
+    `data:image/jpeg;base64,${bgBase64}`,
     [
       {
-        overlay: `data:image/jpeg;base64,${bgBase64}`,
+        overlay: `data:image/jpeg;base64,${prodBase64}`,
       } as any,
     ],
     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
