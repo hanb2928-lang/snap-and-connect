@@ -248,7 +248,7 @@ async function editWithOpenAI(
         await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
         continue;
       }
-      if (attempt < maxRetries) {
+      if (err instanceof Error && err.message.startsWith('OpenAI Image API error: 5') && attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
         continue;
       }

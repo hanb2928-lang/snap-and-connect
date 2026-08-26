@@ -353,7 +353,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
                   const isSelected = selectedCut?.angle === cut.angle;
                   const isDownloaded = downloaded === idx;
                   return (
-                    <View key={cut.angle} style={styles.tileCard}>
+                    <View key={`${cut.angle}-${idx}`} style={styles.tileCard}>
                       <TouchableOpacity
                         style={[styles.tileImageWrap, isSelected && styles.tileImageWrapSelected]}
                         onPress={() => handleUseCut(cut)}
@@ -512,7 +512,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
               <View style={styles.previewDots}>
                 {cuts.map((c, i) => (
                   <View
-                    key={c.angle}
+                    key={`dot-${c.angle}-${i}`}
                     style={[styles.previewDot, i === previewIndex && styles.previewDotActive]}
                   />
                 ))}

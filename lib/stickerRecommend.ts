@@ -48,7 +48,7 @@ export function recommendStickerStyle(
   cardStyle: PlatformVariant['cardStyle'],
   category: string,
 ): StickerStyle {
-  const normalizedCategory = category.toLowerCase().trim();
+  const normalizedCategory = (category || '').toLowerCase().trim();
   for (const [key, style] of Object.entries(CATEGORY_STICKER_MAP)) {
     if (normalizedCategory.includes(key)) return style;
   }

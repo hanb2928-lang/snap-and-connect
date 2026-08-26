@@ -15,6 +15,8 @@ export async function createWarmupSchedule(params: {
   duration_days: number;
   daily_post_target?: number;
 }): Promise<WarmupScheduleWithTasks | null> {
+  if (params.duration_days < 1) return null;
+
   const startDate = new Date();
   const { data: schedule, error } = await supabase
     .from('warmup_schedules')

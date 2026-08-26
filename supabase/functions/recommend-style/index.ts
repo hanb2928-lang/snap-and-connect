@@ -224,7 +224,10 @@ function normalizeRecommendation(
   const reason = String(raw.reason || "이 상품에 가장 적합한 스타일입니다.");
 
   const alternatives = Array.isArray(raw.alternatives)
-    ? raw.alternatives.slice(0, 2).map((a: Record<string, unknown>) => ({
+    ? raw.alternatives
+        .filter((a: Record<string, unknown>) => String(a.cardStyle) !== cardStyle)
+        .slice(0, 2)
+        .map((a: Record<string, unknown>) => ({
         label: String(a.label || ""),
         cardStyle: VALID_CARD_STYLES.has(String(a.cardStyle)) ? String(a.cardStyle) : "bold",
         reason: String(a.reason || ""),

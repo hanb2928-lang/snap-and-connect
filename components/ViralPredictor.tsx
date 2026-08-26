@@ -94,7 +94,7 @@ export function ViralPredictor({
       if (response.ok) {
         const data = await response.json();
         if (data.error) { setError(data.error); return; }
-        if (!data.score || !data.factors || !Array.isArray(data.factors)) { setError('예측 응답 형식이 올바르지 않습니다'); return; }
+        if (typeof data.score !== 'number' || !data.factors || !Array.isArray(data.factors)) { setError('예측 응답 형식이 올바르지 않습니다'); return; }
         setPrediction(data);
       } else {
         setError('예측에 실패했어요. 다시 시도해주세요');

@@ -48,7 +48,11 @@ export function TrendCopyBar({ productName, productCategory, tags, platform, onA
         const data = await resp.json();
         if (data.trends && Array.isArray(data.trends)) {
           setTrends(data.trends);
+        } else {
+          setError(true);
         }
+      } else {
+        setError(true);
       }
     } catch {
       setError(true);

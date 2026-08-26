@@ -186,7 +186,7 @@ export async function fetchClickAnalytics(): Promise<ClickAnalytics> {
       .slice(0, 10);
 
     // Recent clicks (last 20)
-    const recentClicks = events.slice(0, 20).map((e) => ({
+    const recentClicks = events.filter((e) => e.clicked_at).slice(0, 20).map((e) => ({
       platform: e.platform || '기타',
       clicked_at: e.clicked_at as string,
       scan_id: e.scan_id as string | null,

@@ -358,7 +358,7 @@ export function VirtualFittingGallery({
                   const isSelected = selected?.modelType === item.modelType;
                   const isDownloaded = downloaded === idx;
                   return (
-                    <View key={item.modelType} style={styles.tileCard}>
+                    <View key={`${item.modelType}-${idx}`} style={styles.tileCard}>
                       <TouchableOpacity
                         style={[styles.tileImageWrap, isSelected && styles.tileImageWrapSelected]}
                         onPress={() => handleSelect(item)}
@@ -518,7 +518,7 @@ export function VirtualFittingGallery({
               <View style={styles.previewDots}>
                 {results.map((r, i) => (
                   <View
-                    key={r.modelType}
+                    key={`dot-${r.modelType}-${i}`}
                     style={[styles.previewDot, i === previewIndex && styles.previewDotActive]}
                   />
                 ))}

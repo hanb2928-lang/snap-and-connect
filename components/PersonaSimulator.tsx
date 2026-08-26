@@ -232,7 +232,7 @@ export function PersonaSimulator({
                   <View style={styles.metricDivider} />
                   <View style={styles.metricItem}>
                     <TrendingUp size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-                    <Text style={styles.metricValue}>{persona.interestScore}%</Text>
+                    <Text style={styles.metricValue}>{persona.interestScore}점</Text>
                     <Text style={styles.metricLabel}>관심도</Text>
                   </View>
                 </View>
