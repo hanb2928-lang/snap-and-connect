@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import { theme } from '@/lib/theme';
 
 export default function AuthCallback() {
@@ -24,7 +25,11 @@ export default function AuthCallback() {
     }
 
     if (access_token && refresh_token) {
-      router.replace('/(tabs)/index');
+      supabase.auth.setSession({ access_token, refresh_token }).then(() => {
+        router.replace('/(tabs)/index');
+      }).catch(() => {
+        setError('세션 설정에 실패했습니다. 다시 시도해주세요.');
+      });
     } else {
       setError('인증 정보를 받지 못했습니다. 다시 시도해주세요.');
     }
