@@ -248,7 +248,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       const totalSec = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
       showToast(`${merged.length}개 하이라이트 구간 발견 (약 ${totalSec.toFixed(0)}초)`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '분석 실패';
+      const msg = err instanceof Error ? err.message : '알 수 없는 오류';
       showToast('하이라이트 분석 실패: ' + msg);
     } finally {
       video.pause();
@@ -508,7 +508,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       setState('error');
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
-      showToast('영상 가공에 실패했어요: ' + msg);
+      showToast('영상 가공에 실패했어요');
     }
   }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, shortUrl, outputUrl, showToast, highlightMode, highlightSegments]);
 

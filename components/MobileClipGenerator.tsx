@@ -679,7 +679,7 @@ export function MobileClipGenerator({
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>
-              AI가 플랫폼에 맞춰 템플릿·비율·길이·음악을 자동으로 선택했어요
+              위 설정은 AI 추천값입니다. 필요하면 고급 옵션에서 직접 조정할 수 있어요
             </Text>
           </View>
 

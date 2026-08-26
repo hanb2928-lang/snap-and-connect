@@ -935,7 +935,7 @@ function WebClipGenerator({
       if (msg.includes('이미지 로드') || msg.includes('CORS') || msg.includes('시간 초과') || msg.includes('SecurityError')) {
         showToast('이미지를 불러올 수 없어요. 네트워크 또는 CORS 문제일 수 있어요. 잠시 후 다시 시도해주세요');
       } else {
-        showToast('동영상 생성에 실패했어요: ' + msg);
+        showToast('동영상 생성에 실패했어요');
       }
     }
   }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime]);
@@ -1039,7 +1039,7 @@ function WebClipGenerator({
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>
-              AI가 플랫폼에 맞춰 템플릿·비율·길이·음악을 자동으로 선택했어요
+              위 설정은 AI 추천값입니다. 필요하면 고급 옵션에서 직접 조정할 수 있어요
             </Text>
           </View>
 

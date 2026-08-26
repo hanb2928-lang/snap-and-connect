@@ -509,7 +509,7 @@ function WebTimelineGenerator({
     } catch (err) {
       setState('error');
       const msg = err instanceof Error ? err.message : String(err);
-      showToast('생성 실패: ' + msg);
+      showToast('생성에 실패했어요: ' + msg);
     }
   }, [imageUrl, hook, title, hashtags, accentColor, fileName, affiliatePlatforms, shortUrl, productAdvantages, oneLiner, duration, mode, phasesKey, videoUrl, showToast]);
 
