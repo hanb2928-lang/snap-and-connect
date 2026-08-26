@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
         const newAttempts = job.attempts + 1;
         if (newAttempts >= MAX_ATTEMPTS) {
-          await markJobError(job.id, errorMsg);
+          await markJobError(job.id, newAttempts, errorMsg);
           processed.push({ id: job.id, status: "error", error: errorMsg });
         } else {
           await requeueJob(job.id, newAttempts, errorMsg);
@@ -156,7 +156,7 @@ async function markJobDone(jobId: string, result: Record<string, unknown>): Prom
   if (!resp.ok) throw new Error(`Mark done failed: ${resp.status}`);
 }
 
-async function markJobError(jobId: string, errorMsg: string): Promise<void> {
+async function markJobError(jobId: string, attempts: number, errorMsg: string): Promise<void> {
   await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
@@ -167,6 +167,7 @@ async function markJobError(jobId: string, errorMsg: string): Promise<void> {
     body: JSON.stringify({
       status: "error",
       error_message: errorMsg,
+      attempts: attempts,
       completed_at: new Date().toISOString(),
     }),
   });

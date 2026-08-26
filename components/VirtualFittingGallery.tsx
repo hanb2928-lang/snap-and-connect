@@ -118,7 +118,7 @@ export function VirtualFittingGallery({
       const jobResult = await enqueueAndWait<Record<string, unknown>>(
         'virtual-fitting',
         { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
-        { timeoutMs: 180000 },
+        { timeoutMs: 300000 },
       );
       if (!jobResult.success || !jobResult.result) {
         throw new Error(jobResult.error ?? '가상 피팅 생성 실패');

@@ -113,7 +113,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       const jobResult = await enqueueAndWait<Record<string, unknown>>(
         'virtual-cuts',
         { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
-        { timeoutMs: 180000 },
+        { timeoutMs: 300000 },
       );
       if (!jobResult.success || !jobResult.result) {
         throw new Error(jobResult.error ?? '가상 컷 생성 실패');

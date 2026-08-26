@@ -27,8 +27,7 @@ export interface RenderJob {
 }
 
 const POLL_INTERVAL_MS = 2000;
-const DEFAULT_TIMEOUT_MS = 120000;
-const MAX_CLIENT_RETRIES = 2;
+const DEFAULT_TIMEOUT_MS = 300000;
 
 export async function enqueueJob(
   jobType: JobType,
@@ -76,7 +75,6 @@ export async function waitForJob<T = Record<string, unknown>>(
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<JobResult<T>> {
   const deadline = Date.now() + timeoutMs;
-  let clientRetries = 0;
 
   while (Date.now() < deadline) {
     const job = await getJob(jobId);
@@ -87,16 +85,6 @@ export async function waitForJob<T = Record<string, unknown>>(
     }
 
     if (job.status === 'error') {
-      if (job.attempts < 3 && clientRetries < MAX_CLIENT_RETRIES) {
-        clientRetries++;
-        await supabase
-          .from('render_jobs')
-          .update({ status: 'queued', error_message: null })
-          .eq('id', jobId)
-          .eq('status', 'error');
-        triggerQueueProcessor().catch(() => {});
-        continue;
-      }
       return { success: false, error: job.error_message ?? 'Job failed' };
     }
 
