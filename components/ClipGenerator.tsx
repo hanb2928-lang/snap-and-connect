@@ -415,10 +415,15 @@ function WebClipGenerator({
   const lastAppliedKey = useRef<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [livePreviewPlaying, setLivePreviewPlaying] = useState(false);
   const [cloudSaving, setCloudSaving] = useState(false);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewRafRef = useRef<number | null>(null);
+  const previewImgRef = useRef<any>(null);
+  const previewStartTimeRef = useRef<number>(0);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -488,6 +493,186 @@ function WebClipGenerator({
       stopPreview();
     }, 3000);
   }, [musicMood, previewPlaying, stopPreview]);
+
+  const stopLivePreview = useCallback(() => {
+    if (previewRafRef.current !== null) {
+      cancelAnimationFrame(previewRafRef.current);
+      previewRafRef.current = null;
+    }
+    if (bgmStopRef.current) {
+      bgmStopRef.current();
+      bgmStopRef.current = null;
+    }
+    setLivePreviewPlaying(false);
+  }, []);
+
+  const startLivePreview = useCallback(async () => {
+    if (livePreviewPlaying) {
+      stopLivePreview();
+      return;
+    }
+    try {
+      const safeImageUrl = await urlToDataUrl(imageUrl);
+      const img = await loadImage(safeImageUrl);
+      previewImgRef.current = img;
+      const L = getLayout(format);
+      const canvas = previewCanvasRef.current;
+      if (!canvas) return;
+      canvas.width = L.width;
+      canvas.height = L.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      if (musicMood !== 'none') {
+        const bgm = createBgmStream(musicMood, clipDuration, true);
+        if (bgm) bgmStopRef.current = bgm.stop;
+      }
+
+      const cachedGrad = ctx.createLinearGradient(0, 0, 0, L.height);
+      cachedGrad.addColorStop(0, 'rgba(10,15,30,0.25)');
+      cachedGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
+      cachedGrad.addColorStop(1, 'rgba(10,15,30,0.95)');
+
+      let halftoneCanvas: HTMLCanvasElement | null = null;
+      if (hybridMode === 'photo-to-comic') {
+        halftoneCanvas = document.createElement('canvas');
+        halftoneCanvas.width = L.width;
+        halftoneCanvas.height = L.height;
+        const hctx = halftoneCanvas.getContext('2d');
+        if (hctx) {
+          hctx.fillStyle = accentColor;
+          for (let dy = 0; dy < L.height; dy += 24) {
+            for (let dx = 0; dx < L.width; dx += 24) {
+              hctx.beginPath();
+              hctx.arc(dx, dy, 3, 0, Math.PI * 2);
+              hctx.fill();
+            }
+          }
+        }
+      }
+
+      previewStartTimeRef.current = performance.now();
+      setLivePreviewPlaying(true);
+
+      const drawPreviewFrame = () => {
+        const elapsed = performance.now() - previewStartTimeRef.current;
+        const t = Math.min(elapsed / clipDuration, 1);
+        const img = previewImgRef.current;
+        if (!img || !ctx) return;
+
+        ctx.fillStyle = '#0a0f1e';
+        ctx.fillRect(0, 0, L.width, L.height);
+
+        const motion = getMotionParams(motionPreset, t);
+        const scale = motion.scale;
+        const imgRatio = img.width / img.height;
+        const canvasRatio = L.width / L.height;
+        let drawW: number, drawH: number;
+        if (imgRatio > canvasRatio) {
+          drawH = L.height * scale;
+          drawW = drawH * imgRatio;
+        } else {
+          drawW = L.width * scale;
+          drawH = drawW / imgRatio;
+        }
+        const panY = (L.height - drawH) / 2 + motion.panY;
+        const panX = (L.width - drawW) / 2 + motion.panX;
+
+        ctx.globalAlpha = motion.alpha;
+        ctx.drawImage(img, panX, panY, drawW, drawH);
+        ctx.globalAlpha = 1;
+
+        const hybridTP = 0.25;
+        const isHybrid = hybridMode === 'photo-to-comic';
+        const inComic = isHybrid && t >= hybridTP;
+        if (inComic) {
+          const comicT = Math.min((t - hybridTP) / 0.15, 1);
+          const ec = easeInOutCubic(comicT);
+          ctx.globalAlpha = ec * 0.45;
+          ctx.fillStyle = accentColor;
+          ctx.fillRect(0, 0, L.width, L.height);
+          ctx.globalAlpha = 1;
+          ctx.save();
+          ctx.filter = 'saturate(2.0) contrast(1.4) brightness(1.05)';
+          ctx.globalAlpha = ec * 0.6;
+          ctx.drawImage(img, panX, panY, drawW, drawH);
+          ctx.restore();
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+          if (comicT > 0.3) {
+            const fa = Math.min((comicT - 0.3) * 3, 1) * (1 - Math.min((comicT - 0.3) * 2, 1));
+            ctx.globalAlpha = fa;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, L.width, L.height);
+            ctx.globalAlpha = 1;
+          }
+          if (comicT > 0.5 && halftoneCanvas) {
+            const da = Math.min((comicT - 0.5) * 4, 1) * 0.08;
+            ctx.globalAlpha = da;
+            ctx.drawImage(halftoneCanvas, 0, 0);
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        ctx.fillStyle = cachedGrad;
+        ctx.fillRect(0, 0, L.width, L.height);
+
+        const hookT = Math.max(0, (t - 0.15) / 0.3);
+        if (hookT > 0) {
+          const hookAlpha = Math.min(hookT * 4, 1);
+          const hookOffset = (1 - easeOutBack(Math.min(hookT, 1))) * 50;
+          const hookY = L.height * 0.72 + hookOffset;
+          ctx.globalAlpha = hookAlpha;
+          ctx.fillStyle = '#fff';
+          ctx.font = '700 44px sans-serif';
+          ctx.textBaseline = 'top';
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 3;
+          drawTextLines(ctx, hook, 60, hookY, L.width - 120, 56);
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.globalAlpha = 1;
+        }
+
+        if (shortUrl && t < 0.667) {
+          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor);
+        }
+
+        if (t >= 0.667) {
+          const dt = Math.min((t - 0.667) / 0.1, 1);
+          ctx.globalAlpha = dt;
+          ctx.fillStyle = '#0a0f1e';
+          ctx.fillRect(0, 0, L.width, L.height);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.font = '400 18px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
+          drawTextLines(ctx, disclosure, L.width / 2, L.height / 2 - 20, L.width - 80, 26);
+          ctx.textAlign = 'left';
+          ctx.globalAlpha = 1;
+        }
+
+        if (t < 1) {
+          previewRafRef.current = requestAnimationFrame(drawPreviewFrame);
+        } else {
+          previewStartTimeRef.current = performance.now();
+          previewRafRef.current = requestAnimationFrame(drawPreviewFrame);
+        }
+      };
+      previewRafRef.current = requestAnimationFrame(drawPreviewFrame);
+    } catch {
+      showToast('미리보기를 시작할 수 없어요. 잠시 후 다시 시도해주세요');
+    }
+  }, [imageUrl, format, musicMood, clipDuration, hybridMode, accentColor, motionPreset, hook, shortUrl, affiliatePlatforms, livePreviewPlaying, stopLivePreview, showToast]);
+
+  useEffect(() => {
+    return () => {
+      if (previewRafRef.current !== null) cancelAnimationFrame(previewRafRef.current);
+    };
+  }, []);
 
   const generateClip = useCallback(async () => {
     setState('generating');
@@ -1116,6 +1301,46 @@ function WebClipGenerator({
             </View>
           )}
 
+          <View style={styles.livePreviewContainer}>
+            <View style={styles.livePreviewWrap}>
+              <canvas
+                ref={previewCanvasRef as any}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  borderRadius: 12,
+                  display: livePreviewPlaying ? 'block' : 'none',
+                }}
+              />
+              {!livePreviewPlaying && (
+                <View style={styles.livePreviewPlaceholder}>
+                  <Play size={32} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
+                  <Text style={styles.livePreviewPlaceholderText}>
+                    미리보기로 움직임을 확인하세요
+                  </Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.livePreviewBtn, livePreviewPlaying && styles.livePreviewBtnActive]}
+              onPress={startLivePreview}
+              activeOpacity={0.7}
+            >
+              {livePreviewPlaying ? (
+                <>
+                  <VolumeX size={16} color="#fff" strokeWidth={2} />
+                  <Text style={styles.livePreviewBtnText}>미리보기 정지</Text>
+                </>
+              ) : (
+                <>
+                  <Play size={16} color="#fff" strokeWidth={2} />
+                  <Text style={styles.livePreviewBtnText}>미리보기 재생</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity style={styles.generateButton} onPress={generateClip} activeOpacity={0.8}>
             <Film size={20} color="#fff" strokeWidth={2} />
             <Text style={styles.generateButtonText}>동영상 만들기</Text>
@@ -1545,6 +1770,47 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.warning[500],
     ...theme.shadows.card,
+  },
+  livePreviewContainer: {
+    marginBottom: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  livePreviewWrap: {
+    width: '100%',
+    aspectRatio: 9 / 16,
+    maxHeight: 360,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    alignSelf: 'center',
+  },
+  livePreviewPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  livePreviewPlaceholderText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textFaint,
+  },
+  livePreviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: theme.spacing.sm + 2,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600],
+  },
+  livePreviewBtnActive: {
+    backgroundColor: theme.colors.error[500],
+  },
+  livePreviewBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   generateButtonText: {
     fontSize: theme.typography.body,
