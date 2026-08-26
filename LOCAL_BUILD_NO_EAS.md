@@ -43,6 +43,19 @@ Node.js만 있으면 됩니다.
 
 ---
 
+## Gradle 최적화 설정
+
+Gradle 메모리 부족(OOM) 문제를 방지하기 위해 `plugins/with-optimized-gradle.js`에서 다음 설정을 자동 적용합니다:
+
+- **힙 메모리:** 4GB (`-Xmx4096m`)
+- **메타스페이스:** 1GB (`-XX:MaxMetaspaceSize=1024m`)
+- **CPU 아키텍처:** arm64-v8a만 빌드 (빌드 시간 단축)
+- **네트워크 인스펙터:** 비활성화 (CI 환경에서 불필요)
+
+이 설정은 `expo prebuild` 실행 시 `android/gradle.properties`에 자동으로 반영됩니다. 별도 수동 수정이 필요 없습니다.
+
+---
+
 ## 계정 연결 오류 해결
 
 빌드 스크립트가 자동으로 처리하지만, 수동 해결이 필요한 경우:
@@ -96,6 +109,9 @@ eas build --platform android --profile preview --clear-cache
 
 **Q: Android Studio가 필요한가요?**
 아니요. EAS 서버에서 빌드하므로 컴퓨터에 Android Studio, Java, Android SDK가 필요 없습니다.
+
+**Q: android 폴더가 없어도 되나요?**
+네. `android/` 폴더는 빌드 시 `expo prebuild`가 자동으로 생성합니다. 커밋하거나 수동으로 관리할 필요가 없습니다.
 
 **Q: 빌드 시간은 얼마나 걸리나요?**
 약 10~15분 (EAS 서버에서 빌드).

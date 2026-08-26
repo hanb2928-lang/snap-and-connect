@@ -21,9 +21,11 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
    - **제외할 폴더 (절대 올리지 마세요):**
      - `node_modules/` 폴더
      - `.expo/` 폴더
+     - `android/` 폴더 (빌드 시 자동 생성됨)
    - 이 폴더들은 빌드할 때 자동으로 생성됩니다
    - **반드시 올려야 하는 파일:**
      - `.github/workflows/build-android-apk.yml`
+     - `plugins/with-optimized-gradle.js` (Gradle 메모리·CPU 아키텍처 설정)
      - `package.json`, `package-lock.json`
      - `app/` 폴더 전체
      - `components/` 폴더 전체
@@ -82,9 +84,10 @@ GitHub 웹 브라우저만 있으면 됩니다. 컴퓨터에 아무것도 설치
 | 문제 | 해결 |
 |------|------|
 | Actions 탭이 안 보임 | Settings → Actions → General → "Allow all actions" 선택 |
-| 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 60으로 변경 |
+| 빌드 시간 초과 | `.github/workflows/build-android-apk.yml`에서 `timeout-minutes`를 120으로 변경 |
 | npm install 실패 | `package.json`과 `package-lock.json`이 올라가 있는지 확인 |
 | Node.js 버전 에러 | 워크플로우에서 Node.js 20을 명시적으로 사용하도록 설정되어 있습니다 |
+| Gradle 메모리 부족(OOM) | `plugins/with-optimized-gradle.js`에서 힙 메모리 설정을 확인 (기본 4GB) |
 
 ---
 
