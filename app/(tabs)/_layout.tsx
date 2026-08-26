@@ -1,10 +1,37 @@
+import { useState, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { ScrollableTabBar } from '@/components/ScrollableTabBar';
+import { ScrollableTabBar, type TabBadgeMap } from '@/components/ScrollableTabBar';
+import { fetchActiveSchedules } from '@/lib/warmup';
 
 export default function TabLayout() {
+  const [badges, setBadges] = useState<TabBadgeMap>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkBadges = async () => {
+      try {
+        const schedules = await fetchActiveSchedules();
+        const hasPending = schedules.some((s) =>
+          s.tasks.some((t) => t.status === 'pending')
+        );
+        if (!cancelled) {
+          setBadges({ warmup: hasPending });
+        }
+      } catch {
+        if (!cancelled) setBadges({});
+      }
+    };
+    checkBadges();
+    const interval = setInterval(checkBadges, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <Tabs
-      tabBar={(props) => <ScrollableTabBar {...props} />}
+      tabBar={(props) => <ScrollableTabBar {...props} badges={badges} />}
       screenOptions={{
         headerShown: false,
       }}

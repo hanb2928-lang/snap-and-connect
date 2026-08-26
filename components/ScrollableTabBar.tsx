@@ -36,7 +36,9 @@ const TAB_LABELS: Record<string, string> = {
 const TAB_WIDTH = 76;
 const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
-export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
+export type TabBadgeMap = Record<string, boolean>;
+
+export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProps & { badges?: TabBadgeMap }) {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const activeIndex = state.index;
@@ -62,6 +64,7 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
           const isFocused = state.index === index;
           const Icon = TAB_ICONS[route.name] || Settings;
           const label = TAB_LABELS[route.name] || route.name;
+          const hasBadge = badges?.[route.name] === true;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -90,8 +93,9 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
                   size={22}
                   color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textDim}
                   strokeWidth={isFocused ? 2.5 : 2.2}
-                  fill={isFocused ? theme.colors.primary[400] + '28' : 'transparent'}
+                  fill={isFocused ? theme.colors.primary[400] + '3C' : 'transparent'}
                 />
+                {hasBadge && <View style={styles.tabBadgeDot} />}
               </View>
               <Text
                 style={[
@@ -99,6 +103,8 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
                   isFocused && styles.tabLabelActive,
                 ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
               >
                 {label}
               </Text>
@@ -135,13 +141,25 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
   },
   iconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '26',
+    backgroundColor: theme.colors.primary[500] + '2E',
+  },
+  tabBadgeDot: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error[400],
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.surface,
   },
   tabLabel: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textFaint,
     marginTop: 6,
+    maxWidth: TAB_WIDTH - 4,
   },
   tabLabelActive: {
     color: theme.colors.primary[400],
