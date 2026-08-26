@@ -15,6 +15,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing Supabase configuration" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const processorUrl = `${supabaseUrl}/functions/v1/process-queue`;
     await fetch(processorUrl, {
       method: "POST",

@@ -455,6 +455,7 @@ export function CarouselGenerator({
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
     const timeout = setTimeout(() => {
       img.onload = null;
       img.onerror = null;

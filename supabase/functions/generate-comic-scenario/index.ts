@@ -247,7 +247,7 @@ async function generateWithOpenAI(
 
   if (panels.length < panelCount) {
     const local = generateLocalScenario(data, panelCount);
-    while (panels.length < panelCount) {
+    while (panels.length < panelCount && panels.length < local.panels.length) {
       panels.push(local.panels[panels.length]);
     }
   }

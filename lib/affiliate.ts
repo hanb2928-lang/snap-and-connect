@@ -22,7 +22,7 @@ export function generateAffiliateLinks(
     links.push({
       platform: 'Coupang',
       label: '쿠팡 파트너스',
-      url: `https://www.coupang.com/np/search?component=&q=${encoded}&partner=${settings.coupang_partners_id}`,
+      url: `https://www.coupang.com/np/search?component=&q=${encoded}&partner=${encodeURIComponent(settings.coupang_partners_id)}`,
     });
   } else {
     links.push({
@@ -36,7 +36,7 @@ export function generateAffiliateLinks(
     links.push({
       platform: 'Toss',
       label: '토스 쉐어링크',
-      url: `https://sharelink.toss.im/${settings.toss_share_id}`,
+      url: `https://sharelink.toss.im/${encodeURIComponent(settings.toss_share_id)}`,
     });
   } else {
     links.push({
@@ -50,7 +50,7 @@ export function generateAffiliateLinks(
     links.push({
       platform: 'BrandConnect',
       label: '네이버 쇼핑',
-      url: `https://search.shopping.naver.com/search/all?query=${encoded}&nsh=${settings.naver_shopping_id}`,
+      url: `https://search.shopping.naver.com/search/all?query=${encoded}&nsh=${encodeURIComponent(settings.naver_shopping_id)}`,
     });
   } else {
     links.push({

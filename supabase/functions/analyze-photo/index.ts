@@ -360,13 +360,16 @@ async function callOpenAIWithRetry(
             const retryContent = retryData.choices?.[0]?.message?.content;
             if (retryContent) {
               try {
-                const combined = content + retryContent;
-                const parsed = JSON.parse(combined);
-                return normalizeResult(parsed);
+                const base = JSON.parse(content);
+                try {
+                  const ext = JSON.parse(retryContent);
+                  return normalizeResult({ ...base, ...ext });
+                } catch {
+                  return normalizeResult(base);
+                }
               } catch {
                 try {
-                  const parsed = JSON.parse(retryContent);
-                  return normalizeResult(parsed);
+                  return normalizeResult(JSON.parse(retryContent));
                 } catch {
                   // retry content wasn't valid JSON either
                 }

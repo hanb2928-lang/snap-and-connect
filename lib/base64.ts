@@ -41,17 +41,17 @@ function decodeBase64Native(base64: string): Uint8Array {
   if (len >= 2 && base64[len - 1] === '=') padding++;
   if (len >= 2 && base64[len - 2] === '=') padding++;
 
-  const byteLen = (len / 4) * 3 - padding;
+  const byteLen = Math.max(0, Math.floor((len / 4) * 3 - padding));
   const bytes = new Uint8Array(byteLen);
 
   let byteIdx = 0;
   for (let i = 0; i < len; i += 4) {
-    const c0 = lookup[base64.charCodeAt(i)];
-    const c1 = lookup[base64.charCodeAt(i + 1)];
-    const c2 = lookup[base64.charCodeAt(i + 2)];
-    const c3 = lookup[base64.charCodeAt(i + 3)];
+    const c0 = lookup[base64.charCodeAt(i)] || 0;
+    const c1 = lookup[base64.charCodeAt(i + 1)] || 0;
+    const c2 = i + 2 < len ? (lookup[base64.charCodeAt(i + 2)] || 0) : 0;
+    const c3 = i + 3 < len ? (lookup[base64.charCodeAt(i + 3)] || 0) : 0;
 
-    const triple = (c0 << 18) | (c1 << 12) | ((c2 || 0) << 6) | (c3 || 0);
+    const triple = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
 
     if (byteIdx < byteLen) bytes[byteIdx++] = (triple >> 16) & 0xff;
     if (byteIdx < byteLen) bytes[byteIdx++] = (triple >> 8) & 0xff;

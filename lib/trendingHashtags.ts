@@ -40,7 +40,7 @@ export async function fetchMatchedTrendingHashtags(
 
   const params = new URLSearchParams();
   if (productCategory) params.set('productCategory', productCategory);
-  if (tags.length > 0) params.set('tags', tags.join(','));
+  if (tags && tags.length > 0) params.set('tags', tags.join(','));
   if (productName) params.set('productName', productName);
 
   try {

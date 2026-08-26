@@ -122,8 +122,8 @@ const CATEGORY_DURATION_MAP: Record<string, CategoryDurationRecommendation> = {
   },
 };
 
-export function getRecommendedDuration(category: string): CategoryDurationRecommendation {
-  const cat = category.toLowerCase();
+export function getRecommendedDuration(category: string | null | undefined): CategoryDurationRecommendation {
+  const cat = (category ?? '').toLowerCase();
   for (const key of Object.keys(CATEGORY_DURATION_MAP)) {
     if (key === 'default') continue;
     if (cat.includes(key) || matchesKoreanCategory(cat, key)) {

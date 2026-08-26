@@ -156,8 +156,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     setAnalyzeProgress(0);
     setHighlightSegments(null);
 
+    const video = document.createElement('video');
     try {
-      const video = document.createElement('video');
       video.src = videoUrl;
       video.muted = true;
       video.playsInline = true;
@@ -250,6 +250,10 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     } catch (err) {
       const msg = err instanceof Error ? err.message : '분석 실패';
       showToast('하이라이트 분석 실패: ' + msg);
+    } finally {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
     }
     setAnalyzing(false);
   }, [videoUrl, targetDuration, showToast]);
@@ -319,7 +323,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       video.src = videoUrl;
       video.muted = true;
       video.playsInline = true;
-      video.crossOrigin = 'anonymous';
+      if (!videoUrl.startsWith('blob:')) video.crossOrigin = 'anonymous';
       videoElRef.current = video;
 
       await new Promise<void>((resolve, reject) => {

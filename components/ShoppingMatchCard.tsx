@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -85,6 +85,10 @@ export function ShoppingMatchCard({
   const [generatingShortUrl, setGeneratingShortUrl] = useState(false);
   const [localShortUrl, setLocalShortUrl] = useState<string | null>(null);
   const { showAffiliateToast } = useAffiliateToast();
+
+  useEffect(() => {
+    setExpanded(!!customAffiliateLinks.find((l) => l.productIndex === selectedProductIndex));
+  }, [selectedProductIndex, customAffiliateLinks]);
 
   const liveDetection = useMemo(() => {
     const trimmed = inputUrl.trim().replace(/\s+/g, '');

@@ -77,6 +77,7 @@ export function ImageCropModal({
     const height = source?.height ?? dimensions?.height ?? 0;
     if (width && height) {
       setImageDim({ w: width, h: height });
+      setCrop({ x: 0, y: 0, w: 0, h: 0 });
     } else if (dataUrl) {
       RNImage.getSize(
         dataUrl,
