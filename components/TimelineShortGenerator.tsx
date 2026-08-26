@@ -17,6 +17,7 @@ import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
+import { friendlyError } from '@/lib/errors';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import type { PlatformKey } from '@/types/database';
 
@@ -508,8 +509,7 @@ function WebTimelineGenerator({
       setProgress(100);
     } catch (err) {
       setState('error');
-      const msg = err instanceof Error ? err.message : String(err);
-      showToast('생성에 실패했어요: ' + msg);
+      showToast(friendlyError(err, '생성에 실패했어요. 다시 시도해주세요.'));
     }
   }, [imageUrl, hook, title, hashtags, accentColor, fileName, affiliatePlatforms, shortUrl, productAdvantages, oneLiner, duration, mode, phasesKey, videoUrl, showToast]);
 
