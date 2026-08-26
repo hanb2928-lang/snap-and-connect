@@ -10,8 +10,8 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_ATTEMPTS = 3;
-const MAX_JOBS_PER_RUN = 3;
-const JOB_TIMEOUT_MS = 55000;
+const MAX_JOBS_PER_RUN = 1;
+const JOB_TIMEOUT_MS = 140000;
 
 const ALLOWED_JOB_TYPES = new Set([
   "analyze-photo",
@@ -64,6 +64,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const hasRequeued = processed.some((p) => p.status === "requeued");
+    const hasQueued = await checkQueuedJobs();
+    if ((hasRequeued || hasQueued) && processed.length > 0) {
+      // Re-trigger for remaining/requeued jobs so they don't sit idle
+      fetch(`${supabaseUrl}/functions/v1/process-queue`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+        body: JSON.stringify({ trigger: true }),
+      }).catch(() => {});
+    }
+
     return new Response(
       JSON.stringify({ processed, count: processed.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -75,6 +90,21 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function checkQueuedJobs(): Promise<boolean> {
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/render_jobs?select=id&status=eq.queued&limit=1`,
+    {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    },
+  );
+  if (!resp.ok) return false;
+  const rows = await resp.json() as Array<{ id: string }>;
+  return rows.length > 0;
+}
 
 async function dequeueJob(): Promise<RenderJob | null> {
   const resp = await fetch(

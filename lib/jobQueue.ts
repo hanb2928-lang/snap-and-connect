@@ -142,7 +142,7 @@ export async function enqueueAndWait<T = Record<string, unknown>>(
 async function triggerQueueProcessor(): Promise<void> {
   if (!supabaseUrl || !supabaseAnonKey) return;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/process-queue`, {
       method: 'POST',

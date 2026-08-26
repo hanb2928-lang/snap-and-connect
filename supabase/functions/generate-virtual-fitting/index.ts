@@ -212,13 +212,13 @@ async function editWithOpenAI(
   apiKey: string,
   prompt: string,
 ): Promise<string> {
-  const maxRetries = 2;
+  const maxRetries = 1;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const formData = buildMultipartForm(imageDataUrl, prompt);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const timeout = setTimeout(() => controller.abort(), 50000);
 
     try {
       const response = await fetch("https://api.openai.com/v1/images/edits", {
