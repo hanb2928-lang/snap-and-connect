@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Sparkles, Check, RefreshCw, CircleAlert as AlertCircle, Film, Music, Move, Monitor, Clock } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -62,6 +62,7 @@ export function AIStyleCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
+  const autoAppliedRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!productName && !productCategory) {
@@ -71,6 +72,7 @@ export function AIStyleCard({
     setLoading(true);
     setError(null);
     setApplied(false);
+    autoAppliedRef.current = false;
     try {
       const rec = await fetchStyleRecommendation({
         productName,
@@ -91,6 +93,15 @@ export function AIStyleCard({
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (recommendation && !autoAppliedRef.current) {
+      autoAppliedRef.current = true;
+      onApply(recommendation);
+      setApplied(true);
+      setTimeout(() => setApplied(false), 3000);
+    }
+  }, [recommendation, onApply]);
 
   const handleApply = () => {
     if (!recommendation) return;
@@ -205,7 +216,7 @@ export function AIStyleCard({
 
       {recommendation.alternatives.length > 0 && (
         <View style={styles.alternatives}>
-          <Text style={styles.alternativesTitle}>다른 스타일도 고려해보세요</Text>
+          <Text style={styles.alternativesTitle}>마음에 안 드시면 다른 스타일로 바꿀 수 있어요</Text>
           {recommendation.alternatives.map((alt, i) => (
             <TouchableOpacity
               key={i}
