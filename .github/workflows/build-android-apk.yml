@@ -15,6 +15,7 @@ jobs:
     env:
       EXPO_NO_TELEMETRY: 1
       NODE_OPTIONS: "--max-old-space-size=4096"
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.workers.max=2"
 
     steps:
       - name: Checkout code
@@ -37,8 +38,11 @@ jobs:
         with:
           accept-license: true
 
+      - name: Remove existing android directory
+        run: rm -rf android
+
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Create .env file
         run: |
@@ -48,11 +52,12 @@ jobs:
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android --no-install --clean
 
-      - name: Patch Gradle properties
+      - name: Patch Gradle properties for CI
         run: |
           sed -i 's/org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m/' android/gradle.properties
           sed -i 's/reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' android/gradle.properties
-          grep -E 'jvmargs|reactNativeArchitectures' android/gradle.properties
+          sed -i 's/EX_DEV_CLIENT_NETWORK_INSPECTOR=true/EX_DEV_CLIENT_NETWORK_INSPECTOR=false/' android/gradle.properties
+          grep -E 'jvmargs|reactNativeArchitectures|NETWORK_INSPECTOR' android/gradle.properties
 
       - name: Gradle cache
         uses: actions/cache@v4
@@ -60,14 +65,16 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-
+          key: gradle-arm64-v8a-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            gradle-arm64-v8a-
 
       - name: Build APK with Gradle
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -x lint -x lintRelease --stacktrace --max-workers=2
 
       - name: Upload APK artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shortconnect-android-apk

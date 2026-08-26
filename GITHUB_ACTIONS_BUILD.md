@@ -26,6 +26,7 @@ EAS 빌드 한도 없이 GitHub에서 무료로 Android APK를 만드는 방법�
 2. Bolt에서 다운로드한 프로젝트의 모든 파일을 드래그 앤 드롭
    - **제외할 파일:** `node_modules/`, `.git/`, `android/` 폴더는 제외
    - `.github/workflows/build-android-apk.yml` 파일은 반드시 포함
+   - `package-lock.json` 파일은 반드시 포함
 3. "Commit changes" 클릭
 
 > 파일이 많아 여러 번에 나눠 올려야 할 수 있습니다.
@@ -39,7 +40,7 @@ EAS 빌드 한도 없이 GitHub에서 무료로 Android APK를 만드는 방법�
 3. 오른쪽의 "Run workflow" 버튼 클릭
 4. "Run workflow" 한 번 더 클릭하여 실행
 
-빌드가 시작되면 약 15~25분이 소요됩니다.
+빌드가 시작되면 약 20~30분이 소요됩니다.
 
 ---
 
@@ -65,9 +66,11 @@ EAS 빌드 한도 없이 GitHub에서 무료로 Android APK를 만드는 방법�
 | 문제 | 해결 |
 |------|------|
 | Actions 탭이 안 보임 | 저장소 Settings > Actions > General에서 "Allow all actions" 선택 |
-| 빌드 시간 초과 | workflow의 `timeout-minutes`를 40으로 변경 |
+| 빌드 시간 초과 | workflow의 `timeout-minutes`를 120으로 변경 |
 | Gradle 에러 | Actions 탭에서 "Run workflow" 다시 클릭 (재실행) |
 | npm ci 실패 | `package-lock.json`이 업로드되었는지 확인 |
+| Prebuild 실패 | `package-lock.json`과 `package.json`이 모두 업로드되었는지 확인 |
+| SDK 다운로드 실패 | 재실행 (일시적인 네트워크 문제일 수 있음) |
 
 ---
 
@@ -75,8 +78,8 @@ EAS 빌드 한도 없이 GitHub에서 무료로 Android APK를 만드는 방법�
 
 - GitHub Actions 무료 한도: 매월 2,000분 (Private 저장소)
 - Public 저장소는 무제한
-- APK 빌드 1회당 약 20~25분 사용
-- 따라서 매월 약 80회까지 무료 빌드 가능
+- APK 빌드 1회당 약 20~30분 사용
+- 따라서 매월 약 60~80회까지 무료 빌드 가능
 
 ---
 
