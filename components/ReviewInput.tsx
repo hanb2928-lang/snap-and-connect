@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
-import { Star, Save, RotateCcw, MessageSquare, Check, Sparkles, Loader2 } from 'lucide-react-native';
+import { Star, Save, RotateCcw, MessageSquare, Check, Sparkles, Loader as Loader2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { REVIEW_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { friendlyError } from '@/lib/errors';

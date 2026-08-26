@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import {
-  BarChart3,
+  ChartBar as BarChart3,
   MousePointerClick,
   TrendingUp,
   TrendingDown,

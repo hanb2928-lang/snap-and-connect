@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { ShoppingBag, Globe, Send, Plane, Home, ShoppingBasket, Mountain, Ticket, Palmtree } from 'lucide-react-native';
+import { ShoppingBag, Globe, Send, Plane, Hop as Home, ShoppingBasket, Mountain, Ticket, TreePalm as Palmtree } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 export type AffiliatePlatformKey =

@@ -11,7 +11,7 @@ import type {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { theme } from '@/lib/theme';
-import { Camera, Settings, FolderOpen, BarChart3, Flame, History, Sprout, type LucideIcon } from 'lucide-react-native';
+import { Camera, Settings, FolderOpen, ChartBar as BarChart3, Flame, History, Sprout, type LucideIcon } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
