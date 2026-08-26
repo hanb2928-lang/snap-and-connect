@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import Svg, { Circle, Ellipse, Path, Defs, RadialGradient, Stop, LinearGradient } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedProps,
@@ -122,6 +122,10 @@ export function CrawlingBaby({
     cy: 14 + headBob.value,
   }));
 
+  const headShadowProps = useAnimatedProps(() => ({
+    cy: 26 + bodyBob.value,
+  }));
+
   const bodyProps = useAnimatedProps(() => ({
     cy: 30 + bodyBob.value,
   }));
@@ -154,29 +158,64 @@ export function CrawlingBaby({
     };
   });
 
-  const sw = 2;
+  const skinBase = '#F4C4A8';
+  const skinShadow = '#E0A884';
 
   return (
     <Animated.View style={containerStyle}>
       <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">
-        {/* Head */}
-        <AnimatedCircle cx="24" cy={14} r="7" stroke={color} strokeWidth={sw} fill="none" animatedProps={headProps} />
-        {/* Smile */}
-        <Path d="M21 15.5 Q24 18 27 15.5" stroke={color} strokeWidth={sw * 0.7} strokeLinecap="round" fill="none" />
-        {/* Eyes */}
-        <Circle cx="21.5" cy="13" r="0.9" fill={color} />
-        <Circle cx="26.5" cy="13" r="0.9" fill={color} />
+        <Defs>
+          <RadialGradient id="cbHeadGrad" cx="40%" cy="35%" r="65%">
+            <Stop offset="0%" stopColor="#FFE4D0" />
+            <Stop offset="60%" stopColor={skinBase} />
+            <Stop offset="100%" stopColor={skinShadow} />
+          </RadialGradient>
+          <RadialGradient id="cbBodyGrad" cx="50%" cy="30%" r="70%">
+            <Stop offset="0%" stopColor="#FFFFFF" />
+            <Stop offset="50%" stopColor={color} />
+            <Stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+          </RadialGradient>
+          <LinearGradient id="cbHairGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#B07A4F" />
+            <Stop offset="100%" stopColor="#8B5E3C" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Head shadow on body */}
+        <AnimatedEllipse cx="24" cy={26} rx="7" ry="2" fill="rgba(0,0,0,0.12)" animatedProps={headShadowProps} />
+
+        {/* Body — filled onesie with gradient */}
+        <AnimatedEllipse cx="24" cy={30} rx="13" ry="6.5" fill="url(#cbBodyGrad)" animatedProps={bodyProps} />
+
+        {/* Arms — filled skin tone */}
+        <AnimatedPath stroke={skinBase} strokeWidth={3.2} strokeLinecap="round" fill="none" animatedProps={leftArmProps} />
+        <AnimatedPath stroke={skinBase} strokeWidth={3.2} strokeLinecap="round" fill="none" animatedProps={rightArmProps} />
+
+        {/* Legs — filled skin tone */}
+        <AnimatedPath stroke={skinBase} strokeWidth={3} strokeLinecap="round" fill="none" animatedProps={leftLegProps} />
+        <AnimatedPath stroke={skinBase} strokeWidth={3} strokeLinecap="round" fill="none" animatedProps={rightLegProps} />
+
+        {/* Head — 3D sphere */}
+        <AnimatedCircle cx="24" cy={14} r="7.5" fill="url(#cbHeadGrad)" stroke={skinShadow} strokeWidth={0.6} animatedProps={headProps} />
+
+        {/* Hair tuft */}
+        <Path
+          d="M16 11 Q18 5 24 5.5 Q30 5 32 11 Q28 8 24 8.5 Q20 8 16 11 Z"
+          fill="url(#cbHairGrad)"
+        />
+
         {/* Cheeks */}
-        <Circle cx="19" cy="16" r="1.2" fill={color} opacity={0.3} />
-        <Circle cx="29" cy="16" r="1.2" fill={color} opacity={0.3} />
-        {/* Body */}
-        <AnimatedEllipse cx="24" cy={30} rx="12" ry="5" stroke={color} strokeWidth={sw} fill="none" animatedProps={bodyProps} />
-        {/* Arms crawling */}
-        <AnimatedPath stroke={color} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={leftArmProps} />
-        <AnimatedPath stroke={color} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={rightArmProps} />
-        {/* Legs kicking */}
-        <AnimatedPath stroke={color} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={leftLegProps} />
-        <AnimatedPath stroke={color} strokeWidth={sw * 0.8} strokeLinecap="round" fill="none" animatedProps={rightLegProps} />
+        <Circle cx="19" cy="16" r="2" fill="#FF9999" opacity={0.5} />
+        <Circle cx="29" cy="16" r="2" fill="#FF9999" opacity={0.5} />
+
+        {/* Eyes with highlight */}
+        <Circle cx="21" cy="13.5" r="1" fill="#2D2D2D" />
+        <Circle cx="27" cy="13.5" r="1" fill="#2D2D2D" />
+        <Circle cx="21.3" cy="13.2" r="0.35" fill="#FFFFFF" />
+        <Circle cx="27.3" cy="13.2" r="0.35" fill="#FFFFFF" />
+
+        {/* Smile */}
+        <Path d="M21 16 Q24 18.5 27 16" stroke="#C47070" strokeWidth={1.2} strokeLinecap="round" fill="none" />
       </Svg>
     </Animated.View>
   );

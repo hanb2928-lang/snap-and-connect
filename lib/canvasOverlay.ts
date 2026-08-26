@@ -69,9 +69,6 @@ export function drawBabyOnCanvas(
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
@@ -82,44 +79,34 @@ export function drawBabyOnCanvas(
   const legR = armL;
   const headBob = Math.sin(crawlPhase * Math.PI * 2 + 0.3) * 0.8;
 
-  // Head
-  ctx.beginPath();
-  ctx.arc(24, 14 + headBob, 7, 0, Math.PI * 2);
-  ctx.stroke();
+  const skinLight = '#FFE4D0';
+  const skinBase = '#F4C4A8';
+  const skinShadow = '#E0A884';
+  const cheekColor = '#FF9999';
+  const hairColor = '#8B5E3C';
+  const hairHighlight = '#B07A4F';
 
-  // Eyes
+  // Head shadow on body
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.arc(21.5, 13 + headBob, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(26.5, 13 + headBob, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cheeks
-  ctx.globalAlpha = 0.3;
-  ctx.beginPath();
-  ctx.arc(19, 16 + headBob, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(29, 16 + headBob, 1.2, 0, Math.PI * 2);
+  ctx.ellipse(24, 26 + bob, 7, 2, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Smile
-  ctx.lineWidth = 1.4;
+  // Body — filled onesie with gradient
+  const bodyGrad = ctx.createRadialGradient(24, 28 + bob, 2, 24, 32 + bob, 14);
+  bodyGrad.addColorStop(0, '#FFFFFF');
+  bodyGrad.addColorStop(0.5, color);
+  bodyGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(21, 15.5 + headBob);
-  ctx.quadraticCurveTo(24, 18 + headBob, 27, 15.5 + headBob);
-  ctx.stroke();
-  ctx.lineWidth = 2;
+  ctx.ellipse(24, 30 + bob, 13, 6.5, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Body
-  ctx.beginPath();
-  ctx.ellipse(24, 30 + bob, 12, 5, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Arms
-  ctx.lineWidth = 1.6;
+  // Arms — filled with skin tone
+  ctx.strokeStyle = skinBase;
+  ctx.lineWidth = 3.2;
   ctx.beginPath();
   ctx.moveTo(14, 28 + bob);
   ctx.quadraticCurveTo(10 + armL, 23 - armL, 12 + armL, 18 - armL);
@@ -129,7 +116,14 @@ export function drawBabyOnCanvas(
   ctx.quadraticCurveTo(38 + armR, 23 - armR, 36 + armR, 18 - armR);
   ctx.stroke();
 
-  // Legs
+  // Tiny hands
+  ctx.fillStyle = skinBase;
+  ctx.beginPath(); ctx.arc(12 + armL, 18 - armL, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(36 + armR, 18 - armR, 2, 0, Math.PI * 2); ctx.fill();
+
+  // Legs — filled skin tone
+  ctx.strokeStyle = skinBase;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(20, 35 + bob);
   ctx.quadraticCurveTo(17 + legL, 40 + legL, 15 + legL, 44 + legL);
@@ -138,7 +132,61 @@ export function drawBabyOnCanvas(
   ctx.moveTo(28, 35 + bob);
   ctx.quadraticCurveTo(31 + legR, 40 + legR, 33 + legR, 44 + legR);
   ctx.stroke();
-  ctx.lineWidth = 2;
+
+  // Tiny feet
+  ctx.fillStyle = skinShadow;
+  ctx.beginPath(); ctx.ellipse(15 + legL, 44 + legL, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(33 + legR, 44 + legR, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Head — 3D sphere with radial gradient
+  const headGrad = ctx.createRadialGradient(21, 11 + headBob, 1, 24, 14 + headBob, 8);
+  headGrad.addColorStop(0, skinLight);
+  headGrad.addColorStop(0.6, skinBase);
+  headGrad.addColorStop(1, skinShadow);
+  ctx.fillStyle = headGrad;
+  ctx.beginPath();
+  ctx.arc(24, 14 + headBob, 7.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = skinShadow;
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  // Hair — soft tuft
+  const hairGrad = ctx.createLinearGradient(16, 6, 32, 12);
+  hairGrad.addColorStop(0, hairHighlight);
+  hairGrad.addColorStop(1, hairColor);
+  ctx.fillStyle = hairGrad;
+  ctx.beginPath();
+  ctx.moveTo(16, 11 + headBob);
+  ctx.quadraticCurveTo(18, 5 + headBob, 24, 5.5 + headBob);
+  ctx.quadraticCurveTo(30, 5 + headBob, 32, 11 + headBob);
+  ctx.quadraticCurveTo(28, 8 + headBob, 24, 8.5 + headBob);
+  ctx.quadraticCurveTo(20, 8 + headBob, 16, 11 + headBob);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cheeks — soft blush
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = cheekColor;
+  ctx.beginPath(); ctx.arc(19, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(29, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Eyes — dark dots with highlight
+  ctx.fillStyle = '#2D2D2D';
+  ctx.beginPath(); ctx.arc(21, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(27, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath(); ctx.arc(21.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(27.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
+
+  // Smile
+  ctx.strokeStyle = '#C47070';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(21, 16 + headBob);
+  ctx.quadraticCurveTo(24, 18.5 + headBob, 27, 16 + headBob);
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -332,9 +380,6 @@ export function getWebViewOverlayScript(): string {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(scale, scale);
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     var bob = Math.sin(crawlPhase * Math.PI * 2) * 1.5;
@@ -343,28 +388,73 @@ export function getWebViewOverlayScript(): string {
     var legL = -armL;
     var legR = armL;
     var headBob = Math.sin(crawlPhase * Math.PI * 2 + 0.3) * 0.8;
-    ctx.beginPath(); ctx.arc(24, 14 + headBob, 7, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(21.5, 13 + headBob, 0.9, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(26.5, 13 + headBob, 0.9, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.3;
-    ctx.beginPath(); ctx.arc(19, 16 + headBob, 1.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(29, 16 + headBob, 1.2, 0, Math.PI * 2); ctx.fill();
+    var skinLight = '#FFE4D0';
+    var skinBase = '#F4C4A8';
+    var skinShadow = '#E0A884';
+    var cheekColor = '#FF9999';
+    var hairColor = '#8B5E3C';
+    var hairHighlight = '#B07A4F';
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(24, 26 + bob, 7, 2, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.moveTo(21, 15.5 + headBob);
-    ctx.quadraticCurveTo(24, 18 + headBob, 27, 15.5 + headBob); ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(24, 30 + bob, 12, 5, 0, 0, Math.PI * 2); ctx.stroke();
-    ctx.lineWidth = 1.6;
+    var bodyGrad = ctx.createRadialGradient(24, 28 + bob, 2, 24, 32 + bob, 14);
+    bodyGrad.addColorStop(0, '#FFFFFF');
+    bodyGrad.addColorStop(0.5, color);
+    bodyGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath(); ctx.ellipse(24, 30 + bob, 13, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = skinBase;
+    ctx.lineWidth = 3.2;
     ctx.beginPath(); ctx.moveTo(14, 28 + bob);
     ctx.quadraticCurveTo(10 + armL, 23 - armL, 12 + armL, 18 - armL); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(34, 28 + bob);
     ctx.quadraticCurveTo(38 + armR, 23 - armR, 36 + armR, 18 - armR); ctx.stroke();
+    ctx.fillStyle = skinBase;
+    ctx.beginPath(); ctx.arc(12 + armL, 18 - armL, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(36 + armR, 18 - armR, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = skinBase;
+    ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(20, 35 + bob);
     ctx.quadraticCurveTo(17 + legL, 40 + legL, 15 + legL, 44 + legL); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(28, 35 + bob);
     ctx.quadraticCurveTo(31 + legR, 40 + legR, 33 + legR, 44 + legR); ctx.stroke();
-    ctx.lineWidth = 2;
+    ctx.fillStyle = skinShadow;
+    ctx.beginPath(); ctx.ellipse(15 + legL, 44 + legL, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(33 + legR, 44 + legR, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+    var headGrad = ctx.createRadialGradient(21, 11 + headBob, 1, 24, 14 + headBob, 8);
+    headGrad.addColorStop(0, skinLight);
+    headGrad.addColorStop(0.6, skinBase);
+    headGrad.addColorStop(1, skinShadow);
+    ctx.fillStyle = headGrad;
+    ctx.beginPath(); ctx.arc(24, 14 + headBob, 7.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = skinShadow;
+    ctx.lineWidth = 0.6; ctx.stroke();
+    var hairGrad = ctx.createLinearGradient(16, 6, 32, 12);
+    hairGrad.addColorStop(0, hairHighlight);
+    hairGrad.addColorStop(1, hairColor);
+    ctx.fillStyle = hairGrad;
+    ctx.beginPath(); ctx.moveTo(16, 11 + headBob);
+    ctx.quadraticCurveTo(18, 5 + headBob, 24, 5.5 + headBob);
+    ctx.quadraticCurveTo(30, 5 + headBob, 32, 11 + headBob);
+    ctx.quadraticCurveTo(28, 8 + headBob, 24, 8.5 + headBob);
+    ctx.quadraticCurveTo(20, 8 + headBob, 16, 11 + headBob);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = cheekColor;
+    ctx.beginPath(); ctx.arc(19, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(29, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#2D2D2D';
+    ctx.beginPath(); ctx.arc(21, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(27, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(21.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(27.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#C47070';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(21, 16 + headBob);
+    ctx.quadraticCurveTo(24, 18.5 + headBob, 27, 16 + headBob); ctx.stroke();
     ctx.restore();
   }
 
