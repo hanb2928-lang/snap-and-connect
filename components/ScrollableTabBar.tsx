@@ -33,7 +33,8 @@ const TAB_LABELS: Record<string, string> = {
   settings: '설정',
 };
 
-const TAB_WIDTH = 72;
+const TAB_WIDTH = 76;
+const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -81,14 +82,15 @@ export function ScrollableTabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityState={isFocused ? { selected: true } : {}}
               onPress={onPress}
               activeOpacity={0.6}
+              hitSlop={HIT_SLOP}
               style={styles.tabItem}
             >
               <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
                 <Icon
                   size={22}
-                  color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textFaint}
-                  strokeWidth={isFocused ? 2.5 : 2}
-                  fill={isFocused ? theme.colors.primary[400] + '20' : 'transparent'}
+                  color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textDim}
+                  strokeWidth={isFocused ? 2.5 : 2.2}
+                  fill={isFocused ? theme.colors.primary[400] + '28' : 'transparent'}
                 />
               </View>
               <Text
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderTopColor: theme.colors.dark.border,
     borderTopWidth: 1,
-    paddingTop: 8,
+    paddingTop: 10,
   },
   scrollContent: {
     alignItems: 'center',
@@ -126,20 +128,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   iconWrap: {
-    width: 44,
-    height: 36,
+    width: 48,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.full,
   },
   iconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '22',
+    backgroundColor: theme.colors.primary[500] + '26',
   },
   tabLabel: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textFaint,
-    marginTop: 5,
+    marginTop: 6,
   },
   tabLabelActive: {
     color: theme.colors.primary[400],

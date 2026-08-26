@@ -562,17 +562,19 @@ export default function CameraScreen() {
         <View style={[styles.topBar, { top: safeTop + 8 }]}>
           <View style={styles.topBarLeft}>
             <TouchableOpacity
-              style={styles.topButton}
+              style={[styles.topButton, gridVisible && styles.topButtonActive]}
               onPress={() => setGridVisible((g) => !g)}
               disabled={processing}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
             >
-              <Grid3x3 size={20} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2} />
+              <Grid3x3 size={20} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2.2} />
+              {gridVisible && <View style={styles.topBadgeDot} />}
             </TouchableOpacity>
           </View>
           <View style={styles.topBarRight}>
             <TouchableOpacity
-              style={styles.topButton}
+              style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
               onPress={() =>
                 setFlash((f) =>
                   f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off',
@@ -580,25 +582,28 @@ export default function CameraScreen() {
               }
               disabled={processing}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
             >
               {flash === 'on' ? (
-                <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
               ) : flash === 'auto' ? (
                 <View style={styles.flashAutoWrap}>
-                  <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
                   <Text style={styles.flashAutoLabel}>A</Text>
                 </View>
               ) : (
-                <ZapOff size={20} color={theme.colors.dark.text} strokeWidth={2} />
+                <ZapOff size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
               )}
+              {flash !== 'off' && <View style={styles.topBadgeDot} />}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.topButton}
               onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
               disabled={processing}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
             >
-              <RotateCcw size={20} color={theme.colors.dark.text} strokeWidth={2} />
+              <RotateCcw size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -643,7 +648,7 @@ export default function CameraScreen() {
             <ScanLine
               size={14}
               color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim}
-              strokeWidth={2}
+              strokeWidth={2.2}
             />
             <Text
               style={[
@@ -665,7 +670,7 @@ export default function CameraScreen() {
             <Layers
               size={14}
               color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim}
-              strokeWidth={2}
+              strokeWidth={2.2}
             />
             <Text
               style={[
@@ -812,7 +817,7 @@ export default function CameraScreen() {
             disabled={processing}
             activeOpacity={0.7}
           >
-            <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2} />
+            <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2.2} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -830,7 +835,7 @@ export default function CameraScreen() {
             disabled={processing}
             activeOpacity={0.7}
           >
-            <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2.2} />
           </TouchableOpacity>
         </View>
       )}
@@ -1350,12 +1355,28 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   topButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: theme.radius.full,
     backgroundColor: 'rgba(10, 15, 30, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  topButtonActive: {
+    backgroundColor: 'rgba(89, 189, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '60',
+  },
+  topBadgeDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: theme.colors.primary[400],
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.bg,
   },
   flashAutoWrap: {
     flexDirection: 'row',
