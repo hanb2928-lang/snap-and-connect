@@ -120,24 +120,29 @@ export async function saveScan(
   const settings = await getUserSettings();
   const affiliateLinks = generateAffiliateLinks(analysis, settings);
 
+  const scanPayload: Record<string, unknown> = {
+    image_url: imageUrl,
+    title: analysis.title,
+    summary: analysis.summary,
+    contacts: analysis.contacts,
+    tags: analysis.tags,
+    product_name: analysis.productName,
+    product_category: analysis.productCategory,
+    price_estimate: analysis.priceEstimate,
+    one_liner: analysis.oneLiner,
+    shopping_matches: analysis.shoppingMatches,
+    affiliate_links: affiliateLinks,
+    template_data: analysis.templateData,
+    detected_products: analysis.detectedProducts,
+  };
+
+  if (additionalImageUrls.length > 0) {
+    scanPayload.additional_image_urls = additionalImageUrls;
+  }
+
   const { data, error } = await supabase
     .from('scans')
-    .insert({
-      image_url: imageUrl,
-      title: analysis.title,
-      summary: analysis.summary,
-      contacts: analysis.contacts,
-      tags: analysis.tags,
-      product_name: analysis.productName,
-      product_category: analysis.productCategory,
-      price_estimate: analysis.priceEstimate,
-      one_liner: analysis.oneLiner,
-      shopping_matches: analysis.shoppingMatches,
-      affiliate_links: affiliateLinks,
-      template_data: analysis.templateData,
-      detected_products: analysis.detectedProducts,
-      additional_image_urls: additionalImageUrls,
-    })
+    .insert(scanPayload)
     .select('id')
     .single();
 
