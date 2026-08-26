@@ -68,6 +68,8 @@ export function CarouselGenerator({
   const rafRef = useRef<number | null>(null);
   const recorderRef = useRef<any>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const videoUrlRef = useRef<string | null>(null);
+  videoUrlRef.current = videoUrl;
 
   useEffect(() => {
     return () => {
@@ -76,6 +78,7 @@ export function CarouselGenerator({
         try { recorderRef.current.stop(); } catch { /* ignore */ }
       }
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
     };
   }, []);
 

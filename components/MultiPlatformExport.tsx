@@ -801,6 +801,7 @@ export function MultiPlatformExport({
   const handleGenerateWeb = useCallback(async () => {
     setState('generating');
     setProgress(0);
+    for (const r of results) URL.revokeObjectURL(r.url);
     setResults([]);
 
     try {

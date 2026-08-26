@@ -101,12 +101,19 @@ export default function WarmupScreen() {
     setTimeout(() => setToastMsg(null), 3000);
   }, []);
 
+  const selectedScheduleIdRef = useRef<string | null>(null);
+  selectedScheduleIdRef.current = selectedScheduleId;
+
   const loadData = useCallback(async () => {
     try {
       const data = await fetchActiveSchedules();
       setSchedules(data);
-      if (data.length > 0 && !selectedScheduleId) {
+      if (data.length > 0 && !selectedScheduleIdRef.current) {
         setSelectedScheduleId(data[0].id);
+      } else if (data.length > 0 && !data.some((s) => s.id === selectedScheduleIdRef.current)) {
+        setSelectedScheduleId(data[0].id);
+      } else if (data.length === 0) {
+        setSelectedScheduleId(null);
       }
     } catch {
       setSchedules([]);

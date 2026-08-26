@@ -136,6 +136,7 @@ export function useSoundPunch() {
     isStartingRef.current = true;
     if (!isWeb || typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setState((prev) => ({ ...prev, error: '이 브라우저에서는 마이크 녹음을 지원하지 않아요' }));
+      isStartingRef.current = false;
       return;
     }
     setState((prev) => ({ ...prev, error: null, markers: [], duration: 0, audioBlob: null }));

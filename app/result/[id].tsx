@@ -705,8 +705,8 @@ export default function ResultScreen() {
                     style={styles.opacityTrack}
                     onPress={(e) => {
                       const { locationX } = e.nativeEvent;
-                      const trackWidth = 200;
-                      const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
+                      const measuredWidth = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
+                      const ratio = Math.max(0, Math.min(1, locationX / measuredWidth));
                       setOverlayOpacity(Math.round(ratio * 100) / 100);
                     }}
                     activeOpacity={1}

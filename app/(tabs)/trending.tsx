@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -155,6 +155,7 @@ export default function TrendingScreen() {
       if (cached && Date.now() - cached.ts < PRODUCT_CACHE_TTL) {
         setCategories(cached.data);
         setActiveCategory(0);
+        setLoading(false);
         return;
       }
     }
@@ -275,7 +276,9 @@ export default function TrendingScreen() {
     }
   }, [router]);
 
+  const ideaRequestIdRef = useRef(0);
   const handleKeywordPress = useCallback(async (keyword: string) => {
+    const reqId = ++ideaRequestIdRef.current;
     setSelectedKeyword(keyword);
     setIdeaModalVisible(true);
     setIdeasLoading(true);
@@ -289,11 +292,13 @@ export default function TrendingScreen() {
       });
       if (!resp.ok) throw new Error('아이디어 생성 실패');
       const data = await resp.json();
+      if (reqId !== ideaRequestIdRef.current) return;
       setIdeas(data.ideas || []);
     } catch {
+      if (reqId !== ideaRequestIdRef.current) return;
       setIdeas([]);
     }
-    setIdeasLoading(false);
+    if (reqId === ideaRequestIdRef.current) setIdeasLoading(false);
   }, []);
 
   const handleCopyIdea = useCallback(async (idea: ContentIdea, index: number) => {
