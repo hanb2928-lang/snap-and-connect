@@ -101,6 +101,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   const [highlightSegments, setHighlightSegments] = useState<{ start: number; end: number }[] | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const urlsRef = useRef({ videoUrl, originalVideoUrl, outputUrl });
   urlsRef.current = { videoUrl, originalVideoUrl, outputUrl };
@@ -110,12 +112,15 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       if (v) URL.revokeObjectURL(v);
       if (ov) URL.revokeObjectURL(ov);
       if (o) URL.revokeObjectURL(o);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   const handleAiAutoEdit = useCallback(async () => {
@@ -183,8 +188,16 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       for (let i = 0; i < totalSteps; i++) {
         const t = i * stepSec;
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => { video.removeEventListener('seeked', onSeeked); resolve(); };
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            video.removeEventListener('seeked', onSeeked);
+            reject(new Error('영상 탐색 시간 초과'));
+          }, 5000);
+          const onSeeked = () => {
+            clearTimeout(timer);
+            video.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
           video.addEventListener('seeked', onSeeked);
           video.currentTime = t;
         });
@@ -389,7 +402,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           if (segElapsed >= segDur && segIdx < segments.length - 1) {
             segIdx++;
             video.currentTime = segments[segIdx].start;
-            video.play();
+            video.play().catch(() => {});
             segStartPerf = performance.now();
           }
         } else {
@@ -408,6 +421,10 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         ctx.fillRect(0, 0, W, H);
 
         if (contentElapsed < disclosureStart) {
+          if (!video.videoWidth || !video.videoHeight) {
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, 0, W, H);
+          } else {
           const vRatio = video.videoWidth / video.videoHeight;
           const cRatio = W / H;
           let drawW: number, drawH: number;
@@ -422,6 +439,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           const py = (H - drawH) / 2;
 
           ctx.drawImage(video, px, py, drawW, drawH);
+          }
 
           const grad = ctx.createLinearGradient(0, 0, 0, H);
           grad.addColorStop(0, 'rgba(10,15,30,0.15)');
@@ -477,15 +495,20 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         }
 
         if (elapsed < totalDuration) {
-          requestAnimationFrame(drawFrame);
+          rafRef.current = requestAnimationFrame(drawFrame);
         } else {
+          rafRef.current = null;
           if (recorder && recorder.state !== 'inactive') {
-            setTimeout(() => recorder.stop(), 200);
+            setTimeout(() => {
+              if (recorder.state !== 'inactive') {
+                try { recorder.stop(); } catch {}
+              }
+            }, 200);
           }
         }
       };
 
-      requestAnimationFrame(drawFrame);
+      rafRef.current = requestAnimationFrame(drawFrame);
 
       if (hasRecorder) {
         const blob = await done;

@@ -420,6 +420,9 @@ function WebClipGenerator({
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRafRef = useRef<number | null>(null);
   const previewImgRef = useRef<any>(null);
@@ -427,12 +430,16 @@ function WebClipGenerator({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+      if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
+      if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
     };
   }, []);
 
@@ -489,7 +496,8 @@ function WebClipGenerator({
     if (!result) return;
     bgmStopRef.current = result.stop;
     setPreviewPlaying(true);
-    setTimeout(() => {
+    if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
       stopPreview();
     }, 3000);
   }, [musicMood, previewPlaying, stopPreview]);
@@ -906,8 +914,10 @@ function WebClipGenerator({
         if (t < 1) {
           rafRef.current = requestAnimationFrame(drawFrame);
         } else {
-          setTimeout(() => {
-            if (recorder && recorder.state !== 'inactive') recorder.stop();
+          recorderTimerRef.current = setTimeout(() => {
+            if (recorder && recorder.state !== 'inactive') {
+              try { recorder.stop(); } catch {}
+            }
           }, 150);
         }
       };
