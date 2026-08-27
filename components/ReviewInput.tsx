@@ -18,9 +18,10 @@ interface ReviewInputProps {
     hook: string;
     productAdvantages: string[];
   } | null;
+  brandPersona?: string | null;
 }
 
-export function ReviewInput({ review, onSave, onClear, productData }: ReviewInputProps) {
+export function ReviewInput({ review, onSave, onClear, productData, brandPersona }: ReviewInputProps) {
   const [text, setText] = useState('');
   const [rating, setRating] = useState(5);
   const [saving, setSaving] = useState(false);
@@ -79,7 +80,7 @@ export function ReviewInput({ review, onSave, onClear, productData }: ReviewInpu
           Authorization: `Bearer ${supabaseAnonKey}`,
           apikey: supabaseAnonKey,
         },
-        body: JSON.stringify(productData),
+        body: JSON.stringify({ ...productData, brandPersona: brandPersona || undefined }),
       });
       if (!response.ok) throw new Error('generation failed');
       const data = await response.json();
@@ -91,7 +92,7 @@ export function ReviewInput({ review, onSave, onClear, productData }: ReviewInpu
       setGenError(true);
     }
     setGenerating(false);
-  }, [productData]);
+  }, [productData, brandPersona]);
 
   return (
     <View style={styles.container}>

@@ -30,6 +30,7 @@ interface ComicScenarioRequest {
   episodeMode?: boolean;
   mbtiMode?: boolean;
   multiverseMode?: boolean;
+  brandPersona?: string | null;
 }
 
 type MoodTemplate = 'cute-webtoon' | 'noir' | 'sale-popup' | 'retro' | 'premium-minimal' | 'energetic-popart';
@@ -199,6 +200,9 @@ async function generateWithOpenAI(
     "대사는 일상적이고 자연스러운 한국어 대화체로 작성해. 과장된 마케팅 톤은 금지.\n" +
     "효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!)를 사용해.\n" +
     "감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신).\n" +
+    (data.brandPersona && data.brandPersona.trim()
+      ? `\n다음 브랜드 톤앤매너를 만화 대사의 말투와 분위기에 반영해:\n${data.brandPersona.trim()}\n`
+      : "") +
     `${episodeGuidance}` +
     (mbtiMode ? "\n추가로 MBTI 유형별 구매 가이드를 만들어. 4개 유형(INTJ, ENFP, ISTP, ENFJ) 각각에 대해 이 제품을 왜 좋아할지 위트 있는 한 줄 멘트를 작성해.\n형식: \"type\": \"INTJ\", \"label\": \"계획형\", \"comment\": \"시간 절약템 - 이건 효율성이니까\"\n" : "") +
     (multiverseMode ? "\n이 만화는 '멀티버스 A/B 결말' 형식이야. 만화 마지막에 시청자가 선택할 수 있는 두 가지 갈림길을 제시해.\nchoicePrompt는 시청자에게 던지는 질문(예: '이 원피스, 데이트룩? vs 오피스룩?')이고,\nendings는 2개의 다른 결말 패널이야. 각 결말은 서로 다른 상황/감정을 보여줘.\n" : "") +
@@ -344,6 +348,20 @@ function generateLocalScenario(data: ComicScenarioRequest, panelCount: number, m
   ];
 
   const panels = allPanels.slice(0, panelCount);
+
+  if (data.brandPersona && data.brandPersona.trim()) {
+    const persona = data.brandPersona.trim();
+    if (persona.includes("반말") || persona.includes("편하게")) {
+      panels.forEach((p) => {
+        p.speech = p.speech
+          .replace(/요\./g, '어.')
+          .replace(/요\!/g, '어!')
+          .replace(/요\?/g, '어?')
+          .replace(/요$/g, '어')
+          .replace(/는데…/g, '는데…');
+      });
+    }
+  }
 
   if (panelCount === 1) {
     panels[0] = {

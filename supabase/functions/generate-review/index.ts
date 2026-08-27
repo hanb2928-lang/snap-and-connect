@@ -24,6 +24,7 @@ interface ReviewRequest {
   oneLiner: string;
   hook: string;
   productAdvantages: string[];
+  brandPersona?: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -110,6 +111,9 @@ async function generateWithOpenAI(
     "The review should feel like a real customer wrote it after using the product — conversational, honest, with specific details. " +
     "Return JSON with 'text' (the review, 80-200 characters in Korean) and 'rating' (integer 4 or 5). " +
     "Do NOT use hashtags, emojis, or marketing speak. Write as if posting on a shopping mall review section. " +
+    (data.brandPersona && data.brandPersona.trim()
+      ? `\nThe following brand tone & manner must be reflected in the review's voice and style:\n${data.brandPersona.trim()}\n`
+      : "") +
     "Return ONLY valid JSON.";
 
   const userPrompt =
@@ -205,6 +209,22 @@ function generateContextualReview(data: ReviewRequest): { text: string; rating: 
   ];
 
   const pool = templates[category] || fallback;
-  const text = pool[Math.floor(Math.random() * pool.length)].slice(0, 300);
+  let text = pool[Math.floor(Math.random() * pool.length)].slice(0, 300);
+  if (data.brandPersona && data.brandPersona.trim()) {
+    const persona = data.brandPersona.trim();
+    if (persona.includes("반말") || persona.includes("편하게")) {
+      text = text
+        .replace(/요\./g, '어.')
+        .replace(/요\!/g, '어!')
+        .replace(/요\n/g, '어\n')
+        .replace(/요$/g, '어')
+        .replace(/습니다\./g, '다.')
+        .replace(/습니다\!/g, '다!')
+        .replace(/습니다\n/g, '다\n')
+        .replace(/습니다$/g, '다')
+        .replace(/네요\./g, '네.')
+        .replace(/네요\!/g, '네!');
+    }
+  }
   return { text, rating: 5 };
 }

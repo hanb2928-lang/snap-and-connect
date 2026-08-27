@@ -872,6 +872,7 @@ export default function ResultScreen() {
               oneLiner={activeOneLiner || ''}
               productAdvantages={td?.productAdvantages || []}
               localStoreInfo={localStoreInfo}
+              brandPersona={settings?.brand_persona}
             />
           ),
         },
@@ -1310,6 +1311,7 @@ export default function ResultScreen() {
                   hook: activeHook,
                   productAdvantages: td?.productAdvantages || [],
                 }}
+                brandPersona={settings?.brand_persona}
               />
             </View>
           )}

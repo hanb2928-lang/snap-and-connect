@@ -62,6 +62,7 @@ interface ComicShortGeneratorProps {
   oneLiner?: string;
   productAdvantages?: string[];
   localStoreInfo?: LocalStoreInfo | null;
+  brandPersona?: string | null;
 }
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';
@@ -1022,6 +1023,7 @@ export function ComicShortGenerator({
   oneLiner = '',
   productAdvantages = [],
   localStoreInfo = null,
+  brandPersona = null,
 }: ComicShortGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
@@ -1253,6 +1255,7 @@ export function ComicShortGenerator({
             trendingHashtags: hashtags.slice(0, 5),
             episodeMode,
             mbtiMode,
+            brandPersona: brandPersona || undefined,
           }),
           timeoutMs: 20000,
         });
@@ -1381,7 +1384,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
 
 
 
