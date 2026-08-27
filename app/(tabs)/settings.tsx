@@ -59,6 +59,9 @@ export default function SettingsScreen() {
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
+  const [brandPersona, setBrandPersona] = useState('');
+  const [savingPersona, setSavingPersona] = useState(false);
+  const [savedPersona, setSavedPersona] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -73,6 +76,7 @@ export default function SettingsScreen() {
       setDefaultVideoDuration(data?.default_video_duration || '15s');
       setDefaultTtsVoice(data?.default_tts_voice || 'alloy');
       setAutoDisclosure(data?.auto_disclosure ?? true);
+      setBrandPersona(data?.brand_persona || '');
     } catch {
       setSettings(null);
     } finally {
@@ -534,6 +538,65 @@ export default function SettingsScreen() {
             <>
               <Check size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.saveIdButtonText}>기본 설정 저장</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>브랜드 톤앤매너 (페르소나)</Text>
+        <Text style={styles.sectionDesc}>
+          우리 매장/브랜드만의 말투와 분위기를 설정하면, AI가 생성하는 모든 카피에 이 톤앤매너가 자동으로 반영됩니다. 비워두면 기본 톤(친근한 존댓말)으로 생성됩니다.
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.accent[400] + '20' }]}>
+              <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>브랜드 톤앤매너</Text>
+              <TextInput
+                style={[styles.idInput, { minHeight: 80, textAlignVertical: 'top' }]}
+                value={brandPersona}
+                onChangeText={setBrandPersona}
+                placeholder="예: 친근하고 발랄한 2030 화장품 브랜드, 반말 톤, 이모지 적극 활용, 가격보다 감성 어필 우선"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCorrect={false}
+                multiline
+                maxLength={500}
+              />
+              <Text style={styles.charCount}>{brandPersona.length}/500</Text>
+            </View>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[styles.saveIdButton, savedPersona && styles.saveIdButtonDone]}
+          onPress={async () => {
+            setSavingPersona(true);
+            setSavedPersona(false);
+            try {
+              await updateUserSettings({ brand_persona: brandPersona.trim() || null });
+              setSavedPersona(true);
+              setTimeout(() => setSavedPersona(false), 2500);
+            } catch (err) {
+              Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+            }
+            setSavingPersona(false);
+          }}
+          disabled={savingPersona}
+          activeOpacity={0.8}
+        >
+          {savingPersona ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : savedPersona ? (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.saveIdButtonText}>저장됨</Text>
+            </>
+          ) : (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>톤앤매너 저장</Text>
             </>
           )}
         </TouchableOpacity>
@@ -1932,6 +1995,13 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 8,
+  },
+  charCount: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'right',
+    marginTop: 4,
   },
   tossSignupLink: {
     flexDirection: 'row',

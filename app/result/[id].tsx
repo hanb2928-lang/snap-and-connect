@@ -621,6 +621,7 @@ export default function ResultScreen() {
               oneLiner={activeOneLiner}
               productAdvantages={td?.productAdvantages || []}
               platform={activePlatform}
+              brandPersona={settings?.brand_persona}
             />
           ),
         },

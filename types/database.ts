@@ -117,6 +117,7 @@ export interface UserSettings {
   default_video_duration: string | null;
   default_tts_voice: string | null;
   auto_disclosure: boolean | null;
+  brand_persona: string | null;
 }
 
 export interface SavedAsset {

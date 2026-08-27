@@ -27,6 +27,7 @@ interface CopyWriterProps {
   oneLiner: string;
   productAdvantages: string[];
   platform: PlatformKey;
+  brandPersona?: string | null;
 }
 
 const VERSION_TABS: { key: CopyType; label: string; icon: typeof Heart; color: string; short: string }[] = [
@@ -54,6 +55,7 @@ export function CopyWriter({
   oneLiner,
   productAdvantages,
   platform,
+  brandPersona,
 }: CopyWriterProps) {
   const [count, setCount] = useState(3);
   const [groups, setGroups] = useState<CopyGroup[] | null>(null);
@@ -90,6 +92,7 @@ export function CopyWriter({
           copyType: 'all',
           platform,
           count,
+          brandPersona: brandPersona || undefined,
         }),
       });
       if (!response.ok) throw new Error('generation failed');
@@ -105,7 +108,7 @@ export function CopyWriter({
       setError(true);
     }
     setGenerating(false);
-  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count]);
+  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count, brandPersona]);
 
   const handleCopy = useCallback(async (item: CopyItem, cardKey: string) => {
     const text = `${item.hook}\n\n${item.caption}\n\n${item.hashtags.map((h) => `#${h}`).join(' ')}`;

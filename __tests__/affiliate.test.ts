@@ -38,6 +38,7 @@ const fullSettings: UserSettings = {
   default_video_duration: null,
   default_tts_voice: null,
   auto_disclosure: null,
+  brand_persona: null,
 };
 
 describe('isCoupangUrl', () => {

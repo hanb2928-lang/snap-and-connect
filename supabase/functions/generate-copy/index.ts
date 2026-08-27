@@ -45,6 +45,7 @@ interface CopyRequest {
   platform: CopyPlatform;
   count: number;
   localStoreInfo?: LocalStoreInfo | null;
+  brandPersona?: string | null;
 }
 
 interface CopyGroup {
@@ -78,6 +79,7 @@ Deno.serve(async (req: Request) => {
       })(),
       count: Math.min(Math.max(Number(raw?.count) || 3, 1), 5),
       localStoreInfo: raw?.localStoreInfo ?? null,
+      brandPersona: raw?.brandPersona ? String(raw.brandPersona).slice(0, 1000) : null,
     };
 
     if (!body.productName) {
@@ -220,6 +222,14 @@ async function generateWithOpenAI(
     "'caption'(50~200자, 진짜 후기처럼 줄바꿈 있는 본문), " +
     "'hashtags'(5~12개, # 없이 문자열 배열)를 가져야 해.\n" +
     "해시태그도 너무 상업적인 건 빼고 실제 SNS에서 많이 쓰는 자연스러운 걸로.\n";
+
+  if (data.brandPersona && data.brandPersona.trim()) {
+    systemPrompt +=
+      "\n" +
+      "다음은 이 브랜드의 톤앤매너야. 반드시 이 톤앤매너에 맞춰서 카피를 써:\n" +
+      `${data.brandPersona.trim()}\n` +
+      "위 톤앤매너의 말투, 이모지 사용 여부, 호칭, 어조를 최우선으로 반영해. 기본 안내 사항보다 브랜드 톤앤매너가 우선이야.\n";
+  }
 
   if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) {
     const ls = data.localStoreInfo;
