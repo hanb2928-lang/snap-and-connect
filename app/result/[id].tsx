@@ -917,8 +917,8 @@ export default function ResultScreen() {
       ],
     },
     {
-      key: 'marketing',
-      label: '마케팅 툴',
+      key: 'copyText',
+      label: '문구 / 카피',
       tiles: [
         {
           key: 'copyWriter',
@@ -991,6 +991,47 @@ export default function ResultScreen() {
           ),
         },
         {
+          key: 'globalLocalizer',
+          label: '글로벌 로컬라이저',
+          description: '해외 타겟 맞춤 번역 및 현지화 콘텐츠 생성',
+          category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <GlobalLocalizer
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              caption={baseCaption}
+              hashtags={allDisplayHashtags}
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              narrationText={activeHook || activeOneLiner}
+              affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
+            />
+          ),
+        },
+        {
+          key: 'socialShortForm',
+          label: '숏폼 인트로/아웃트로',
+          description: '숏폼 도입부 후킹 문구 및 마무리 멘트 생성',
+          category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <SocialShortFormShare
+              shareText={shareText}
+              affiliateUrl={primaryAffiliateUrl}
+              shortUrl={shortUrl}
+            />
+          ),
+        },
+      ],
+    },
+    {
+      key: 'analysis',
+      label: '분석 / 전략',
+      tiles: [
+        {
           key: 'shortFormTips',
           label: '숏폼 팁',
           description: '트렌디한 편집 팁과 플랫폼별 최적화 정보',
@@ -1062,41 +1103,6 @@ export default function ResultScreen() {
               oneLiner={activeOneLiner}
               productAdvantages={td?.productAdvantages || []}
               hook={activeHook}
-            />
-          ),
-        },
-        {
-          key: 'globalLocalizer',
-          label: '글로벌 로컬라이저',
-          description: '해외 타겟 맞춤 번역 및 현지화 콘텐츠 생성',
-          category: 'export',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <GlobalLocalizer
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              caption={baseCaption}
-              hashtags={allDisplayHashtags}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              narrationText={activeHook || activeOneLiner}
-              affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
-            />
-          ),
-        },
-        {
-          key: 'socialShortForm',
-          label: '숏폼 인트로/아웃트로',
-          description: '숏폼 도입부 후킹 문구 및 마무리 멘트 생성',
-          category: 'export',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <SocialShortFormShare
-              shareText={shareText}
-              affiliateUrl={primaryAffiliateUrl}
-              shortUrl={shortUrl}
             />
           ),
         },
