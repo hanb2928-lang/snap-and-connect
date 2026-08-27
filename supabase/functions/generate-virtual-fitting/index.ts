@@ -1,3 +1,4 @@
+// Virtual fitting edge function: generates AI model fitting images via OpenAI gpt-image-1
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
@@ -73,7 +74,10 @@ Deno.serve(async (req: Request) => {
 async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!supabaseUrl || !serviceRoleKey) throw new Error("Storage not configured");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!supabaseUrl) throw new Error("Storage not configured: missing SUPABASE_URL");
+  const authKey = anonKey || serviceRoleKey;
+  if (!authKey) throw new Error("Storage not configured: missing auth key");
 
   const ext = mimeType === "image/png" ? "png" : "jpg";
   const fileName = `fitting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
@@ -86,7 +90,8 @@ async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
   const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/scans/${fileName}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
+      Authorization: `Bearer ${authKey}`,
+      apikey: authKey,
       "Content-Type": mimeType,
     },
     body: blob,
@@ -132,23 +137,25 @@ async function resolveOpenAIKey(): Promise<string | null> {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const dbKey = serviceRoleKey || anonKey;
 
-  if (supabaseUrl && serviceRoleKey) {
+  if (supabaseUrl && dbKey) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
+      const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&order=created_at.desc&limit=1`, {
         headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: dbKey,
+          Authorization: `Bearer ${dbKey}`,
         },
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
       if (resp.ok) {
         const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
-        const dbKey = rows[0]?.openai_api_key;
-        if (dbKey) return dbKey;
+        const dbKeyVal = rows[0]?.openai_api_key;
+        if (dbKeyVal) return dbKeyVal;
       }
     } catch {
       // fall through to env var
@@ -190,6 +197,7 @@ async function generateFittingImages(
     ? ` This is a ${productCategory || 'fashion/beauty product'}${productName ? ` called "${productName}"` : ''}.`
     : ' This is a fashion or beauty product.';
 
+  const errors: string[] = [];
   const results = await Promise.all(
     MODEL_PRESETS.map(async (preset) => {
       try {
@@ -201,7 +209,9 @@ async function generateFittingImages(
           imageUrl,
         } satisfies FittingResult;
       } catch (err) {
-        console.error(`Fitting ${preset.type} failed:`, err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Fitting ${preset.type} failed:`, msg);
+        errors.push(`${preset.label}: ${msg}`);
         return null;
       }
     }),
@@ -209,7 +219,7 @@ async function generateFittingImages(
 
   const valid = results.filter((r): r is FittingResult => r !== null);
   if (valid.length === 0) {
-    throw new Error('모든 가상 피팅 생성에 실패했습니다. OpenAI API 키를 확인하거나 이미지를 다시 시도해주세요.');
+    throw new Error(`모든 가상 피팅 생성에 실패했습니다: ${errors[0] ?? '알 수 없는 오류'}`);
   }
   return { results: valid, failedCount: results.length - valid.length, totalRequested: results.length };
 }
@@ -317,3 +327,4 @@ function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
 
   return formData;
 }
+ 
