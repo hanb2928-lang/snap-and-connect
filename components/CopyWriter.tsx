@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
-import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
+import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
@@ -57,12 +57,13 @@ export function CopyWriter({
 }: CopyWriterProps) {
   const [count, setCount] = useState(3);
   const [groups, setGroups] = useState<CopyGroup[] | null>(null);
-  const [activeTab, setActiveTab] = useState<CopyType>('viral');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [showOtherVersions, setShowOtherVersions] = useState(false);
+  const [otherVersionTab, setOtherVersionTab] = useState<CopyType>('info');
 
   const handleGenerate = useCallback(async () => {
     if (!productName) return;
@@ -71,6 +72,7 @@ export function CopyWriter({
     setGroups(null);
     setIsFallback(false);
     setExpandedIndex(null);
+    setShowOtherVersions(false);
     try {
       const response = await fetch(COPY_FUNCTION_URL, {
         method: 'POST',
@@ -124,9 +126,97 @@ export function CopyWriter({
     setExpandedIndex(expandedIndex === index ? null : index);
   };
 
-  const activeGroup = groups?.find((g) => g.type === activeTab) ?? null;
-  const activeTabMeta = VERSION_TABS.find((t) => t.key === activeTab)!;
+  const toggleOtherVersions = () => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowOtherVersions((v) => !v);
+  };
+
+  const bestGroup = groups?.find((g) => g.type === 'viral') ?? groups?.[0] ?? null;
+  const otherGroups = groups?.filter((g) => g !== bestGroup) ?? [];
+  const otherActiveGroup = otherGroups.find((g) => g.type === otherVersionTab) ?? otherGroups[0] ?? null;
+  const otherTabMeta = VERSION_TABS.find((t) => t.key === otherVersionTab)!;
   const platformLabel = PLATFORM_LABELS[platform] ?? 'SNS';
+
+  const renderCopyCard = (item: CopyItem, i: number, color: string, isBest: boolean) => {
+    const isExpanded = expandedIndex === i;
+    const isCopied = copiedIndex === i;
+    return (
+      <View key={i} style={[styles.copyCard, isBest && styles.copyCardBest]}>
+        <TouchableOpacity
+          style={styles.copyHeader}
+          onPress={() => toggleExpand(i)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.copyIndexWrap, { backgroundColor: color + '30' }]}>
+            {isBest ? (
+              <Crown size={12} color={color} strokeWidth={2.5} />
+            ) : (
+              <Text style={[styles.copyIndex, { color: color }]}>{i + 1}</Text>
+            )}
+          </View>
+          <Text style={styles.copyHook} numberOfLines={isExpanded ? 0 : 1}>{item.hook}</Text>
+          {isExpanded ? (
+            <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          ) : (
+            <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.copyBody}>
+            <Text style={styles.copyCaption}>{item.caption}</Text>
+            {item.hashtags.length > 0 && (
+              <Text style={styles.copyHashtags}>
+                {item.hashtags.map((h) => `#${h}`).join(' ')}
+              </Text>
+            )}
+          </View>
+        )}
+
+        <View style={styles.copyActions}>
+          <TouchableOpacity
+            style={[styles.copyBtn, isCopied && styles.copyBtnDone]}
+            onPress={() => handleCopy(item, i)}
+            activeOpacity={0.7}
+          >
+            {isCopied ? (
+              <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+            ) : (
+              <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+            <Text style={[styles.copyBtnText, isCopied && { color: theme.colors.success[400] }]}>
+              {isCopied ? '복사됨' : '전체 복사'}
+            </Text>
+          </TouchableOpacity>
+          {isExpanded && (
+            <TouchableOpacity
+              style={styles.copyBtn}
+              onPress={async () => {
+                try {
+                  if (Platform.OS === 'web' && navigator.clipboard) {
+                    await navigator.clipboard.writeText(item.hook);
+                  } else {
+                    await Clipboard.setStringAsync(item.hook);
+                  }
+                  setCopiedIndex(i);
+                  setTimeout(() => setCopiedIndex(null), 2000);
+                } catch {
+                  // clipboard failed silently
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.copyBtnText}>후킹만 복사</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -187,7 +277,7 @@ export function CopyWriter({
         </View>
       )}
 
-      {groups && groups.length > 0 && (
+      {groups && groups.length > 0 && bestGroup && (
         <View style={styles.resultsWrap}>
           <View style={styles.resultsHeader}>
             <View style={styles.resultsHeaderLeft}>
@@ -206,110 +296,63 @@ export function CopyWriter({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.versionTabs}>
-            {VERSION_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              const tabGroup = groups.find((g) => g.type === tab.key);
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[styles.versionTab, isActive && { backgroundColor: tab.color + '20', borderColor: tab.color }]}
-                  onPress={() => { setActiveTab(tab.key); setExpandedIndex(null); }}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={14} color={isActive ? tab.color : theme.colors.dark.textDim} strokeWidth={2} />
-                  <View style={styles.versionTabTextWrap}>
-                    <Text style={[styles.versionTabText, isActive && { color: tab.color }]}>{tab.label}</Text>
-                    {tabGroup && (
-                      <Text style={styles.versionTabCount}>{tabGroup.copies.length}개</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.bestLabelRow}>
+            <Crown size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+            <Text style={styles.bestLabelText}>추천 베스트 카피</Text>
           </View>
+          <ScrollView style={styles.copiesScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            {bestGroup.copies.slice(0, 1).map((item, i) => renderCopyCard(item, i, theme.colors.accent[400], true))}
+          </ScrollView>
 
-          <Text style={styles.versionSubLabel}>{activeTabMeta.short}</Text>
+          {otherGroups.length > 0 && (
+            <View style={styles.otherVersionsSection}>
+              <TouchableOpacity
+                style={styles.otherVersionsToggle}
+                onPress={toggleOtherVersions}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.otherVersionsToggleText}>
+                  {showOtherVersions ? '다른 버전 접기' : `다른 버전 보기 (${otherGroups.length}개)`}
+                </Text>
+                {showOtherVersions ? (
+                  <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
 
-          {activeGroup && activeGroup.copies.length > 0 ? (
-            <ScrollView style={styles.copiesScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-              {activeGroup.copies.map((item, i) => {
-                const isExpanded = expandedIndex === i;
-                const isCopied = copiedIndex === i;
-                return (
-                  <View key={i} style={styles.copyCard}>
-                    <TouchableOpacity
-                      style={styles.copyHeader}
-                      onPress={() => toggleExpand(i)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.copyIndexWrap, { backgroundColor: activeTabMeta.color + '30' }]}>
-                        <Text style={[styles.copyIndex, { color: activeTabMeta.color }]}>{i + 1}</Text>
-                      </View>
-                      <Text style={styles.copyHook} numberOfLines={isExpanded ? 0 : 1}>{item.hook}</Text>
-                      {isExpanded ? (
-                        <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      ) : (
-                        <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      )}
-                    </TouchableOpacity>
-
-                    {isExpanded && (
-                      <View style={styles.copyBody}>
-                        <Text style={styles.copyCaption}>{item.caption}</Text>
-                        {item.hashtags.length > 0 && (
-                          <Text style={styles.copyHashtags}>
-                            {item.hashtags.map((h) => `#${h}`).join(' ')}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-
-                    <View style={styles.copyActions}>
-                      <TouchableOpacity
-                        style={[styles.copyBtn, isCopied && styles.copyBtnDone]}
-                        onPress={() => handleCopy(item, i)}
-                        activeOpacity={0.7}
-                      >
-                        {isCopied ? (
-                          <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
-                        ) : (
-                          <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-                        )}
-                        <Text style={[styles.copyBtnText, isCopied && { color: theme.colors.success[400] }]}>
-                          {isCopied ? '복사됨' : '전체 복사'}
-                        </Text>
-                      </TouchableOpacity>
-                      {isExpanded && (
+              {showOtherVersions && otherActiveGroup && (
+                <View style={styles.otherVersionsBody}>
+                  <View style={styles.versionTabs}>
+                    {otherGroups.map((group) => {
+                      const tab = VERSION_TABS.find((t) => t.key === group.type)!;
+                      const Icon = tab.icon;
+                      const isActive = otherVersionTab === group.type;
+                      return (
                         <TouchableOpacity
-                          style={styles.copyBtn}
-                          onPress={async () => {
-                            try {
-                              if (Platform.OS === 'web' && navigator.clipboard) {
-                                await navigator.clipboard.writeText(item.hook);
-                              } else {
-                                await Clipboard.setStringAsync(item.hook);
-                              }
-                              setCopiedIndex(i);
-                              setTimeout(() => setCopiedIndex(null), 2000);
-                            } catch {
-                              // clipboard failed silently
-                            }
-                          }}
+                          key={group.type}
+                          style={[styles.versionTab, isActive && { backgroundColor: tab.color + '20', borderColor: tab.color }]}
+                          onPress={() => { setOtherVersionTab(group.type); setExpandedIndex(null); }}
                           activeOpacity={0.7}
                         >
-                          <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={styles.copyBtnText}>후킹만 복사</Text>
+                          <Icon size={14} color={isActive ? tab.color : theme.colors.dark.textDim} strokeWidth={2} />
+                          <View style={styles.versionTabTextWrap}>
+                            <Text style={[styles.versionTabText, isActive && { color: tab.color }]}>{tab.label}</Text>
+                            <Text style={styles.versionTabCount}>{group.copies.length}개</Text>
+                          </View>
                         </TouchableOpacity>
-                      )}
-                    </View>
+                      );
+                    })}
                   </View>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <Text style={styles.hintText}>이 버전의 카피가 없습니다. 다시 생성해주세요.</Text>
+
+                  <Text style={styles.versionSubLabel}>{otherTabMeta.short}</Text>
+
+                  <ScrollView style={styles.copiesScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                    {otherActiveGroup.copies.map((item, i) => renderCopyCard(item, i, otherTabMeta.color, false))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
           )}
         </View>
       )}
@@ -477,44 +520,16 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  versionTabs: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
-  },
-  versionTab: {
-    flex: 1,
+  bestLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  versionTabTextWrap: {
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  versionTabText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  versionTabCount: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    marginTop: 1,
-  },
-  versionSubLabel: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
     marginBottom: theme.spacing.sm,
-    textAlign: 'center',
+  },
+  bestLabelText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
   },
   copiesScroll: {
     maxHeight: 600,
@@ -524,6 +539,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     marginBottom: theme.spacing.sm,
     overflow: 'hidden',
+  },
+  copyCardBest: {
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '40',
   },
   copyHeader: {
     flexDirection: 'row',
@@ -588,5 +608,66 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  otherVersionsSection: {
+    marginTop: theme.spacing.md,
+  },
+  otherVersionsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  otherVersionsToggleText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  otherVersionsBody: {
+    marginTop: theme.spacing.md,
+  },
+  versionTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  versionTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  versionTabTextWrap: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  versionTabText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  versionTabCount: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 1,
+  },
+  versionSubLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
   },
 });

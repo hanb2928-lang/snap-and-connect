@@ -35,6 +35,8 @@ import {
   MoveVertical,
   MoveDown,
   CircleAlert,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -369,6 +371,7 @@ export default function ResultScreen() {
   const [captionCopied, setCaptionCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [hookCopied, setHookCopied] = useState(false);
+  const [showDisclosure, setShowDisclosure] = useState(false);
 
   const handleCopyCaption = async () => {
     try {
@@ -1108,7 +1111,7 @@ export default function ResultScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom + 72 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.heroWrap}>
           <Image
             source={{ uri: scan.edited_image_url || scan.image_url }}
@@ -1441,6 +1444,26 @@ export default function ResultScreen() {
             </LazySection>
           )}
 
+          {disclosureText ? (
+            <View style={styles.disclosureSection}>
+              <TouchableOpacity
+                style={styles.disclosureToggle}
+                onPress={() => setShowDisclosure((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.disclosureToggleText}>제휴 마케팅 고지문구</Text>
+                {showDisclosure ? (
+                  <ChevronUp size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+              {showDisclosure && (
+                <Text style={styles.disclosureBody}>{disclosureText}</Text>
+              )}
+            </View>
+          ) : null}
+
           <Text style={styles.dateText}>
             {new Date(scan.created_at).toLocaleDateString('ko-KR', {
               year: 'numeric',
@@ -1453,6 +1476,50 @@ export default function ResultScreen() {
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+
+      <View style={[styles.floatingBar, { paddingBottom: insets.bottom }]}>
+        <TouchableOpacity
+          style={styles.floatingBarBtn}
+          onPress={handleCopyCaption}
+          activeOpacity={0.7}
+        >
+          {captionCopied ? (
+            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          ) : (
+            <Copy size={16} color={theme.colors.dark.text} strokeWidth={2} />
+          )}
+          <Text style={[styles.floatingBarBtnText, captionCopied && { color: theme.colors.success[400] }]}>
+            {captionCopied ? '복사됨' : '카피 복사'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.floatingBarBtn, styles.floatingBarBtnPrimary]}
+          onPress={async () => {
+            const textToCopy = shortUrl || captionWithLink;
+            try {
+              if (Platform.OS === 'web' && navigator.clipboard) {
+                await navigator.clipboard.writeText(textToCopy);
+              } else {
+                await Clipboard.setStringAsync(textToCopy);
+              }
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            } catch {
+              // clipboard failed silently
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          {linkCopied ? (
+            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          ) : (
+            <Link2 size={16} color="#fff" strokeWidth={2} />
+          )}
+          <Text style={[styles.floatingBarBtnTextPrimary, linkCopied && { color: theme.colors.success[400] }]}>
+            {linkCopied ? '복사됨' : '링크 복사'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -1910,6 +1977,67 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textFaint,
     marginTop: theme.spacing.xl,
     textAlign: 'center',
+  },
+  disclosureSection: {
+    marginTop: theme.spacing.lg,
+  },
+  disclosureToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+  },
+  disclosureToggleText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  disclosureBody: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 16,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 4,
+    textAlign: 'center',
+  },
+  floatingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+    ...theme.shadows.elevated,
+  },
+  floatingBarBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  floatingBarBtnPrimary: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  floatingBarBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  floatingBarBtnTextPrimary: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   errorTitle: {
     fontSize: theme.typography.heading,
