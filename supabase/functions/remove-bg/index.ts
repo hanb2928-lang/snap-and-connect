@@ -50,7 +50,10 @@ Deno.serve(async (req: Request) => {
 async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!supabaseUrl || !serviceRoleKey) throw new Error("Storage not configured");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!supabaseUrl) throw new Error("Storage not configured: missing SUPABASE_URL");
+  const authKey = anonKey || serviceRoleKey;
+  if (!authKey) throw new Error("Storage not configured: missing auth key");
 
   const fileName = `bg-removed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
 
@@ -62,7 +65,8 @@ async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
   const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/scans/${fileName}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
+      Authorization: `Bearer ${authKey}`,
+      apikey: authKey,
       "Content-Type": mimeType,
     },
     body: blob,
@@ -84,23 +88,30 @@ function ensureDataUrl(imageDataUrl: string, mimeType: string): string {
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {
+  const serverKey = Deno.env.get("OPENAI_API_KEY");
+  if (serverKey) return serverKey;
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const dbKey = serviceRoleKey || anonKey;
 
-  if (supabaseUrl && serviceRoleKey) {
+  if (supabaseUrl && dbKey) {
     try {
       const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-  const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&order=created_at.desc&limit=1`, {
         headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: dbKey,
+          Authorization: `Bearer ${dbKey}`,
         },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (resp.ok) {
         const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
-        const dbKey = rows[0]?.openai_api_key;
-        if (dbKey) return dbKey;
+        const dbKeyVal = rows[0]?.openai_api_key;
+        if (dbKeyVal) return dbKeyVal;
       }
     } catch {
       // fall through to env var
