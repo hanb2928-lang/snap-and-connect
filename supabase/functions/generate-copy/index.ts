@@ -455,6 +455,30 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
     hashtags = [...hashtags, ...localHashtags];
   }
 
+  if (data.brandPersona && data.brandPersona.trim()) {
+    const persona = data.brandPersona.trim();
+    const personaHashtags = persona
+      .split(/[\s,./]+/)
+      .filter((w) => w.length >= 2 && w.length <= 8)
+      .slice(0, 3);
+    hashtags = [...hashtags, ...personaHashtags];
+
+    hooks = hooks.map((h) => {
+      if (persona.includes("반말") || persona.includes("편하게")) return toBanmal(h);
+      return h;
+    });
+    captions = captions.map((c) => {
+      let adjusted = c;
+      if (persona.includes("반말") || persona.includes("편하게")) {
+        adjusted = toBanmal(adjusted);
+      }
+      if (persona.includes("이모지") || persona.includes("감성")) {
+        adjusted = adjusted.replace(/\.(\s|$)/g, '. ✨').replace(/\n/g, '\n');
+      }
+      return adjusted;
+    });
+  }
+
   const indices = pickUniqueIndices(hooks.length, count);
   const result: CopyItem[] = indices.map((hi, i) => {
     let hook = hooks[hi];
