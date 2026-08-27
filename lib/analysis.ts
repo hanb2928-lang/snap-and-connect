@@ -107,12 +107,14 @@ export async function saveScan(
   imageUrl: string,
   analysis: AnalysisResult,
   additionalImageUrls: string[] = [],
+  scanSource: 'single' | 'multi' | 'template' = 'single',
 ): Promise<string> {
   const settings = await getUserSettings();
   const affiliateLinks = generateAffiliateLinks(analysis, settings);
 
   const scanPayload: Record<string, unknown> = {
     image_url: imageUrl,
+    scan_source: scanSource,
     title: analysis.title,
     summary: analysis.summary,
     contacts: analysis.contacts,
@@ -148,6 +150,7 @@ export async function saveManualScan(
     .from('scans')
     .insert({
       image_url: imageUrl,
+      scan_source: 'template',
       title: '직접 만든 템플릿',
       summary: '',
       contacts: [],

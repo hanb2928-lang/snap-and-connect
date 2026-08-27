@@ -90,7 +90,7 @@ import { AIStyleCard } from '@/components/AIStyleCard';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
-import type { FeatureCategory } from '@/components/FeatureTileGrid';
+import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock } from 'lucide-react-native';
 
 export default function ResultScreen() {
@@ -584,6 +584,7 @@ export default function ResultScreen() {
           key: 'templateCard',
           label: '템플릿 카드',
           category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <LayoutTemplate size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
           render: () => (
             <View>
@@ -717,6 +718,7 @@ export default function ResultScreen() {
           key: 'aiStyle',
           label: 'AI 스타일',
           category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PaletteIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
           render: () => (
             <AIStyleCard
@@ -738,6 +740,7 @@ export default function ResultScreen() {
           key: 'clipGen',
           label: '클립 생성',
           category: 'template',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <FilmIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
           render: () => (
             <ClipGenerator
@@ -762,6 +765,7 @@ export default function ResultScreen() {
           key: 'timelineShort',
           label: '30초/60초 숏폼',
           category: 'template',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
           render: () => (
             <TimelineShortGenerator
@@ -783,6 +787,7 @@ export default function ResultScreen() {
           key: 'comicShort',
           label: '코믹 숏',
           category: 'template',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
           render: () => (
             <ComicShortGenerator
@@ -818,6 +823,7 @@ export default function ResultScreen() {
           key: 'shoppingMatch',
           label: '쇼핑커넥트',
           category: 'commerce',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <ShoppingBagIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
           render: () => (
             <ShoppingMatchCard
@@ -843,6 +849,7 @@ export default function ResultScreen() {
           key: 'localStore',
           label: '로컬 스토어',
           category: 'commerce',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
           render: () => (
             <LocalStoreCard
@@ -864,6 +871,7 @@ export default function ResultScreen() {
           key: 'multiExport',
           label: '멀티 내보내기',
           category: 'export',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <MultiPlatformExport
@@ -884,6 +892,7 @@ export default function ResultScreen() {
           key: 'shareBar',
           label: '공유하기',
           category: 'export',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <ShareBar
@@ -906,6 +915,7 @@ export default function ResultScreen() {
           key: 'trendCopy',
           label: '트렌드 카피',
           category: 'content',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <TrendCopyBar
@@ -921,6 +931,7 @@ export default function ResultScreen() {
           key: 'hashtag',
           label: '해시태그',
           category: 'content',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <HashtagCopyBar
@@ -934,6 +945,7 @@ export default function ResultScreen() {
           key: 'copyWriter',
           label: '카피라이터',
           category: 'content',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <CopyWriter
@@ -951,6 +963,7 @@ export default function ResultScreen() {
           key: 'shortFormGuide',
           label: '숏폼 가이드',
           category: 'content',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <ShortFormGuideCard
@@ -968,6 +981,7 @@ export default function ResultScreen() {
           key: 'trendMatch',
           label: '트렌드 매치',
           category: 'commerce',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
           render: () => (
             <TrendMatchCard
@@ -982,6 +996,7 @@ export default function ResultScreen() {
           key: 'shortFormTips',
           label: '숏폼 팁',
           category: 'insight',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Lightbulb size={16} color={theme.colors.success[400]} strokeWidth={2} />,
           render: () => (
             <ShortFormTipsCard
@@ -999,6 +1014,7 @@ export default function ResultScreen() {
           key: 'viralPredict',
           label: '바이럴 예측',
           category: 'insight',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Rocket size={16} color={theme.colors.success[400]} strokeWidth={2} />,
           render: () => (
             <ViralPredictor
@@ -1019,6 +1035,7 @@ export default function ResultScreen() {
           key: 'personaSim',
           label: '페르소나 시뮬',
           category: 'insight',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Users size={16} color={theme.colors.success[400]} strokeWidth={2} />,
           render: () => (
             <PersonaSimulator
@@ -1035,6 +1052,7 @@ export default function ResultScreen() {
           key: 'globalLocalizer',
           label: '글로벌 로컬라이저',
           category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <GlobalLocalizer
@@ -1053,6 +1071,7 @@ export default function ResultScreen() {
           key: 'socialShortForm',
           label: '숏폼 인트로/아웃트로',
           category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
           render: () => (
             <SocialShortFormShare
@@ -1416,7 +1435,7 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
-          <FeatureTileGrid categories={featureCategories} />
+          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} />
 
           {detectedProducts.length > 1 && (
             <LazySection delayMs={250}>

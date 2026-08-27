@@ -272,7 +272,7 @@ export default function CameraScreen() {
       setProgressStep(2);
       setProgressText('결과 저장 중...');
       progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, additionalUrls);
+      const scanId = await saveScan(imageUrl, analysis, additionalUrls, 'multi');
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -462,7 +462,7 @@ export default function CameraScreen() {
       setProgressStep(2);
       setProgressText('결과 저장 중...');
       progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis);
+      const scanId = await saveScan(imageUrl, analysis, [], 'single');
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1019,7 +1019,7 @@ function WebUploadScreen() {
       setProgressStep(2);
       setProgressText('결과 저장 중...');
       progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis);
+      const scanId = await saveScan(imageUrl, analysis, [], 'single');
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1109,7 +1109,7 @@ function WebUploadScreen() {
       setProgressStep(2);
       setProgressText('결과 저장 중...');
       progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, additionalUrls);
+      const scanId = await saveScan(imageUrl, analysis, additionalUrls, 'multi');
 
       setProgressStep(3);
       setProgressText('완료!');

@@ -82,6 +82,7 @@ export interface Scan {
   additional_image_urls?: string[] | null;
   custom_review?: CustomReview | null;
   local_store_info?: LocalStoreInfo | null;
+  scan_source?: 'single' | 'multi' | 'template' | null;
 }
 
 export interface DetectedProduct {

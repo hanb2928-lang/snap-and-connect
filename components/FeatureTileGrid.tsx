@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, ReactNode } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -19,11 +19,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+export type ScanMode = 'single' | 'multi' | 'template';
+
 export type FeatureTile = {
   key: string;
   label: string;
   icon: ReactNode;
   category: string;
+  modes?: ScanMode[];
   render: () => ReactNode;
 };
 
@@ -35,13 +38,14 @@ export type FeatureCategory = {
 
 type Props = {
   categories: FeatureCategory[];
+  scanMode?: ScanMode;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = theme.spacing.sm;
 const CARD_MIN_WIDTH = Math.max(150, (SCREEN_WIDTH - theme.spacing.lg * 2 - CARD_GAP * 2) / 3);
 
-export function FeatureTileGrid({ categories }: Props) {
+export function FeatureTileGrid({ categories, scanMode }: Props) {
   const [activeCategory, setActiveCategory] = useState(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const tabScrollRef = useRef<ScrollView>(null);
@@ -58,7 +62,17 @@ export function FeatureTileGrid({ categories }: Props) {
     setExpandedKey((prev) => (prev === key ? null : key));
   }, []);
 
-  const currentCategory = categories[activeCategory];
+  const filteredCategories = useMemo(() => {
+    if (!scanMode) return categories;
+    return categories
+      .map((cat) => ({
+        ...cat,
+        tiles: cat.tiles.filter((tile) => !tile.modes || tile.modes.includes(scanMode)),
+      }))
+      .filter((cat) => cat.tiles.length > 0);
+  }, [categories, scanMode]);
+
+  const currentCategory = filteredCategories[activeCategory] ?? filteredCategories[0];
 
   return (
     <View style={styles.wrap}>
@@ -69,7 +83,7 @@ export function FeatureTileGrid({ categories }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabBarScroll}
         >
-          {categories.map((category, index) => {
+          {filteredCategories.map((category, index) => {
             const isActive = index === activeCategory;
             return (
               <TouchableOpacity
