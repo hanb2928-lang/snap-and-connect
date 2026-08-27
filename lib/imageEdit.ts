@@ -209,9 +209,10 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
 }
 
 async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string): Promise<string> {
-  const canvasSize = 1080;
+  try {
+    const canvasSize = 1080;
 
-  const bgResult = await ImageManipulator.manipulateAsync(
+    const bgResult = await ImageManipulator.manipulateAsync(
     bgUrl,
     [{ resize: { width: canvasSize, height: canvasSize } }],
     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
@@ -243,6 +244,9 @@ async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string
     ],
     { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
   ).then((r) => r.uri).catch(() => productResult.uri);
+  } catch {
+    return productDataUrl;
+  }
 }
 
 export async function prepareImageForApi(

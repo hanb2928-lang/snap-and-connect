@@ -598,7 +598,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.topButton}
-              onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
+              onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
               disabled={processing}
               activeOpacity={0.7}
               hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
@@ -749,7 +749,7 @@ export default function CameraScreen() {
       {arMode && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
           <ARComicCamera
-            onClose={() => setArMode(false)}
+            onClose={() => { setCameraReady(false); setArMode(false); }}
             recognitionMode={recognitionMode}
             preferredStyle={preferredStyle}
           />

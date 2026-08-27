@@ -11,6 +11,8 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { Check, X, RotateCw, Crop } from 'lucide-react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 
@@ -135,7 +137,7 @@ export function ImageCropModal({
     try {
       const result = Platform.OS === 'web'
         ? await cropOnWeb(dataUrl, crop, imageRect, rotation, imageDim)
-        : dataUrl;
+        : await cropOnNative(dataUrl, crop, imageRect, rotation, imageDim);
       const b64 = cleanBase64(result);
       onConfirm(b64, result.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg');
     } catch {
@@ -292,6 +294,46 @@ function cropOnWeb(
     img.onerror = () => reject(new Error('image load error'));
     img.src = dataUrl;
   });
+}
+
+async function cropOnNative(
+  dataUrl: string,
+  crop: CropRect,
+  imageRect: { x: number; y: number; w: number; h: number },
+  rotation: number,
+  imageDim: { w: number; h: number },
+): Promise<string> {
+  const rotated = rotation % 180 === 0 ? imageDim : { w: imageDim.h, h: imageDim.w };
+  const scaleX = rotated.w / imageRect.w;
+  const scaleY = rotated.h / imageRect.h;
+
+  const actions: ImageManipulator.Action[] = [];
+  if (rotation > 0) {
+    actions.push({ rotate: rotation } as ImageManipulator.Action);
+  }
+
+  const cropX = Math.max(0, Math.round((crop.x - imageRect.x) * scaleX));
+  const cropY = Math.max(0, Math.round((crop.y - imageRect.y) * scaleY));
+  const cropW = Math.min(rotated.w - cropX, Math.round(crop.w * scaleX));
+  const cropH = Math.min(rotated.h - cropY, Math.round(crop.h * scaleY));
+
+  if (cropW > 0 && cropH > 0) {
+    actions.push({
+      crop: { originX: cropX, originY: cropY, width: cropW, height: cropH },
+    } as ImageManipulator.Action);
+  }
+
+  if (actions.length === 0) return dataUrl;
+
+  const result = await ImageManipulator.manipulateAsync(dataUrl, actions, {
+    compress: 0.85,
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  const base64 = await FileSystem.readAsStringAsync(result.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return `data:image/jpeg;base64,${base64}`;
 }
 
 const styles = StyleSheet.create({

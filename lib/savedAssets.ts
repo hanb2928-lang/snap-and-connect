@@ -43,23 +43,25 @@ export async function uploadAssetDataUrl(
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
     if (!fileInfo.exists) return null;
 
-    const formData = new FormData();
-    formData.append('file', {
-      uri: fileUri,
-      name: fileName,
-      type: mimeType,
-    } as unknown as Blob);
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: fileUri,
+        name: fileName,
+        type: mimeType,
+      } as unknown as Blob);
 
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(fileName, formData, { contentType: mimeType, upsert: true });
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(fileName, formData, { contentType: mimeType, upsert: true });
 
-    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+      if (error) return null;
 
-    if (error) return null;
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
-    return data.publicUrl;
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
+      return data.publicUrl;
+    } finally {
+      await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+    }
   }
 }
 
@@ -122,12 +124,11 @@ export async function fetchSavedAssets(): Promise<SavedAsset[]> {
 }
 
 export async function deleteSavedAsset(asset: SavedAsset): Promise<boolean> {
-  const filePath = `${asset.file_name}`;
-
-  const { error: storageError } = await supabase.storage.from(BUCKET).remove([filePath]);
-  if (storageError) return false;
-
   const { error: dbError } = await supabase.from('saved_assets').delete().eq('id', asset.id);
-  return !dbError;
+  if (dbError) return false;
+
+  const filePath = `${asset.file_name}`;
+  await supabase.storage.from(BUCKET).remove([filePath]).catch(() => {});
+  return true;
 }
 

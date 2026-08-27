@@ -1,5 +1,8 @@
+import { ApiError } from '@/lib/apiClient';
+
 export function friendlyError(err: unknown, fallback: string): string {
   if (!err) return fallback;
+  if (err instanceof ApiError) return err.message;
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
 
