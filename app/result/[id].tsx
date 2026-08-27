@@ -583,6 +583,7 @@ export default function ResultScreen() {
         {
           key: 'templateCard',
           label: '템플릿 카드',
+          description: '피팅 컷, 상세 컷 등 핵심 레이아웃으로 제품 카드 제작',
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <LayoutTemplate size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
@@ -717,6 +718,7 @@ export default function ResultScreen() {
         {
           key: 'aiStyle',
           label: 'AI 스타일',
+          description: '제품 이미지에 어울리는 AI 배경 및 분위기 스타일 변환',
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PaletteIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
@@ -738,7 +740,8 @@ export default function ResultScreen() {
         },
         {
           key: 'clipGen',
-          label: '클립 생성',
+          label: '클립 / 숏폼 (9:16)',
+          description: '릴스·숏츠·틱톡용 세로형 숏폼 영상 생성',
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <FilmIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
@@ -764,6 +767,7 @@ export default function ResultScreen() {
         {
           key: 'timelineShort',
           label: '30초/60초 숏폼',
+          description: '타임라인 기반 단계별 숏폼 영상 제작',
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
@@ -785,7 +789,8 @@ export default function ResultScreen() {
         },
         {
           key: 'comicShort',
-          label: '코믹 숏',
+          label: '코믹 숏폼',
+          description: '만화 컷 형식으로 제품 후기와 스토리를 풀어내는 콘텐츠',
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
@@ -822,6 +827,7 @@ export default function ResultScreen() {
         {
           key: 'shoppingMatch',
           label: '쇼핑커넥트',
+          description: '오픈마켓·자사몰 상품 링크와 단축 URL 연동',
           category: 'commerce',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <ShoppingBagIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
@@ -848,6 +854,7 @@ export default function ResultScreen() {
         {
           key: 'localStore',
           label: '로컬 스토어',
+          description: '지역 기반 상점 및 오프라인 마케팅 연계 정보 설정',
           category: 'commerce',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
@@ -870,6 +877,7 @@ export default function ResultScreen() {
         {
           key: 'multiExport',
           label: '멀티 내보내기',
+          description: '여러 플랫폼 규격에 맞춰 한 번에 결과물 추출',
           category: 'export',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
@@ -890,7 +898,8 @@ export default function ResultScreen() {
         },
         {
           key: 'shareBar',
-          label: '공유하기',
+          label: '공유하기 / 링크 복사',
+          description: '즉시 클립보드 복사 및 SNS 공유',
           category: 'export',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
@@ -912,38 +921,9 @@ export default function ResultScreen() {
       label: '마케팅 툴',
       tiles: [
         {
-          key: 'trendCopy',
-          label: '트렌드 카피',
-          category: 'content',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <TrendCopyBar
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              tags={scan?.tags || []}
-              platform={activePlatform}
-              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
-            />
-          ),
-        },
-        {
-          key: 'hashtag',
-          label: '해시태그',
-          category: 'content',
-          modes: ['single', 'multi', 'template'] as ScanMode[],
-          icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <HashtagCopyBar
-              hashtags={allDisplayHashtags}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              platform={activePlatform}
-            />
-          ),
-        },
-        {
           key: 'copyWriter',
           label: '카피라이터',
+          description: '브랜드 페르소나가 반영된 감성형·정보형·파격할인형 카피 생성',
           category: 'content',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
@@ -960,8 +940,41 @@ export default function ResultScreen() {
           ),
         },
         {
+          key: 'trendCopy',
+          label: '트렌드 카피',
+          description: '실시간 인기 키워드 기반 마케팅 문구 추천',
+          category: 'content',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <TrendCopyBar
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              tags={scan?.tags || []}
+              platform={activePlatform}
+              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
+            />
+          ),
+        },
+        {
+          key: 'hashtag',
+          label: '해시태그',
+          description: '최적의 해시태그 조합 추천 및 복사',
+          category: 'content',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <HashtagCopyBar
+              hashtags={allDisplayHashtags}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              platform={activePlatform}
+            />
+          ),
+        },
+        {
           key: 'shortFormGuide',
           label: '숏폼 가이드',
+          description: '영상 제작 시 자막 타이밍 및 구성 가이드 제공',
           category: 'content',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
@@ -978,23 +991,9 @@ export default function ResultScreen() {
           ),
         },
         {
-          key: 'trendMatch',
-          label: '트렌드 매치',
-          category: 'commerce',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
-          render: () => (
-            <TrendMatchCard
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              productName={activeProductName || scan?.product_name || ''}
-              platform={activePlatform}
-              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
-            />
-          ),
-        },
-        {
           key: 'shortFormTips',
           label: '숏폼 팁',
+          description: '트렌디한 편집 팁과 플랫폼별 최적화 정보',
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Lightbulb size={16} color={theme.colors.success[400]} strokeWidth={2} />,
@@ -1013,6 +1012,7 @@ export default function ResultScreen() {
         {
           key: 'viralPredict',
           label: '바이럴 예측',
+          description: '현재 콘텐츠의 바이럴 성공 확률 분석',
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Rocket size={16} color={theme.colors.success[400]} strokeWidth={2} />,
@@ -1032,8 +1032,25 @@ export default function ResultScreen() {
           ),
         },
         {
+          key: 'trendMatch',
+          label: '트렌드 매치',
+          description: '제품과 현재 트렌드의 매칭 점검 및 해시태그 추천',
+          category: 'commerce',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <TrendMatchCard
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              productName={activeProductName || scan?.product_name || ''}
+              platform={activePlatform}
+              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
+            />
+          ),
+        },
+        {
           key: 'personaSim',
           label: '페르소나 시뮬',
+          description: '타겟 고객 페르소나별 반응 시뮬레이션',
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Users size={16} color={theme.colors.success[400]} strokeWidth={2} />,
@@ -1051,6 +1068,7 @@ export default function ResultScreen() {
         {
           key: 'globalLocalizer',
           label: '글로벌 로컬라이저',
+          description: '해외 타겟 맞춤 번역 및 현지화 콘텐츠 생성',
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
@@ -1070,6 +1088,7 @@ export default function ResultScreen() {
         {
           key: 'socialShortForm',
           label: '숏폼 인트로/아웃트로',
+          description: '숏폼 도입부 후킹 문구 및 마무리 멘트 생성',
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,

@@ -24,6 +24,7 @@ export type ScanMode = 'single' | 'multi' | 'template';
 export type FeatureTile = {
   key: string;
   label: string;
+  description?: string;
   icon: ReactNode;
   category: string;
   modes?: ScanMode[];
@@ -123,12 +124,19 @@ export function FeatureTileGrid({ categories, scanMode }: Props) {
                 <View style={[styles.cardIconWrap, isExpanded && styles.cardIconWrapActive]}>
                   {tile.icon}
                 </View>
-                <Text
-                  style={[styles.cardLabel, isExpanded && styles.cardLabelActive]}
-                  numberOfLines={1}
-                >
-                  {tile.label}
-                </Text>
+                <View style={styles.cardTextWrap}>
+                  <Text
+                    style={[styles.cardLabel, isExpanded && styles.cardLabelActive]}
+                    numberOfLines={1}
+                  >
+                    {tile.label}
+                  </Text>
+                  {tile.description ? (
+                    <Text style={styles.cardDesc} numberOfLines={1}>
+                      {tile.description}
+                    </Text>
+                  ) : null}
+                </View>
                 <ChevronDown
                   size={14}
                   color={isExpanded ? theme.colors.primary[300] : theme.colors.dark.textFaint}
@@ -146,7 +154,12 @@ export function FeatureTileGrid({ categories, scanMode }: Props) {
               {currentCategory.tiles
                 .filter((t) => t.key === expandedKey)
                 .map((t) => (
-                  <View key={t.key}>{t.render()}</View>
+                  <View key={t.key}>
+                    {t.description ? (
+                      <Text style={styles.expandedDesc}>{t.description}</Text>
+                    ) : null}
+                    {t.render()}
+                  </View>
                 ))}
             </View>
           </LazySection>
@@ -221,6 +234,11 @@ const styles = StyleSheet.create({
     flex: 1,
     ...theme.shadows.card,
   },
+  cardTextWrap: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 2,
+  },
   cardExpanded: {
     backgroundColor: theme.colors.primary[500] + '15',
     borderWidth: 1.5,
@@ -241,10 +259,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[500] + '25',
   },
   cardLabel: {
-    flex: 1,
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.text,
+  },
+  cardDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 13,
   },
   cardLabelActive: {
     color: theme.colors.primary[300],
@@ -258,5 +281,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     ...theme.shadows.elevated,
+  },
+  expandedDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
+    marginBottom: theme.spacing.sm,
   },
 });
