@@ -866,19 +866,6 @@ export default function CameraScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.captureButton}
-              onPress={handleCapture}
-              disabled={processing}
-              activeOpacity={0.85}
-            >
-              <View style={styles.captureButtonRing}>
-                <View style={styles.captureButtonInner}>
-                  <Text style={styles.captureButtonText}>촬영</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={styles.subButton}
               onPress={handleTemplateOnly}
               disabled={processing}
@@ -888,6 +875,19 @@ export default function CameraScreen() {
               <Text style={styles.subButtonLabel}>편집</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleCapture}
+            disabled={processing}
+            activeOpacity={0.85}
+          >
+            <View style={styles.captureButtonRing}>
+              <View style={styles.captureButtonInner}>
+                <Text style={styles.captureButtonText}>촬영</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
 
           <Text style={styles.hintText}>
             {processing
