@@ -73,7 +73,7 @@ export default function CameraScreen() {
   const focusAnim = useRef(new RNAnimated.Value(0)).current;
   const progressWidth = useSharedValue(0);
   const [preferredStyle, setPreferredStyle] = useState<PlatformKey>('shortform');
-  const [templateMode, setTemplateMode] = useState<'manual' | 'auto'>('manual');
+  const [templateMode, setTemplateMode] = useState<'manual' | 'auto'>('auto');
   const [stylePickerVisible, setStylePickerVisible] = useState(false);
   const [showOnboardingCapture, setShowOnboardingCapture] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
