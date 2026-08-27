@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -60,8 +60,8 @@ export function CopyWriter({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showOtherVersions, setShowOtherVersions] = useState(false);
   const [otherVersionTab, setOtherVersionTab] = useState<CopyType>('info');
 
@@ -71,7 +71,7 @@ export function CopyWriter({
     setError(false);
     setGroups(null);
     setIsFallback(false);
-    setExpandedIndex(null);
+    setExpandedKey(null);
     setShowOtherVersions(false);
     try {
       const response = await fetch(COPY_FUNCTION_URL, {
@@ -107,7 +107,7 @@ export function CopyWriter({
     setGenerating(false);
   }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count]);
 
-  const handleCopy = useCallback(async (item: CopyItem, index: number) => {
+  const handleCopy = useCallback(async (item: CopyItem, cardKey: string) => {
     const text = `${item.hook}\n\n${item.caption}\n\n${item.hashtags.map((h) => `#${h}`).join(' ')}`;
     try {
       if (Platform.OS === 'web' && navigator.clipboard) {
@@ -115,15 +115,15 @@ export function CopyWriter({
       } else {
         await Clipboard.setStringAsync(text);
       }
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
+      setCopiedKey(cardKey);
+      setTimeout(() => setCopiedKey(null), 2000);
     } catch {
       // clipboard failed silently
     }
   }, []);
 
-  const toggleExpand = (index: number) => {
-    setExpandedIndex(expandedIndex === index ? null : index);
+  const toggleExpand = (key: string) => {
+    setExpandedKey(expandedKey === key ? null : key);
   };
 
   const toggleOtherVersions = () => {
@@ -137,17 +137,24 @@ export function CopyWriter({
   const bestGroup = groups?.find((g) => g.type === 'viral') ?? groups?.[0] ?? null;
   const otherGroups = groups?.filter((g) => g !== bestGroup) ?? [];
   const otherActiveGroup = otherGroups.find((g) => g.type === otherVersionTab) ?? otherGroups[0] ?? null;
-  const otherTabMeta = VERSION_TABS.find((t) => t.key === otherVersionTab)!;
+  const otherTabMeta = VERSION_TABS.find((t) => t.key === (otherActiveGroup?.type ?? otherVersionTab))!;
   const platformLabel = PLATFORM_LABELS[platform] ?? 'SNS';
 
+  useEffect(() => {
+    if (otherGroups.length > 0 && !otherGroups.some((g) => g.type === otherVersionTab)) {
+      setOtherVersionTab(otherGroups[0].type);
+    }
+  }, [otherGroups, otherVersionTab]);
+
   const renderCopyCard = (item: CopyItem, i: number, color: string, isBest: boolean) => {
-    const isExpanded = expandedIndex === i;
-    const isCopied = copiedIndex === i;
+    const cardKey = isBest ? `best-${i}` : `other-${otherVersionTab}-${i}`;
+    const isExpanded = expandedKey === cardKey;
+    const isCopied = copiedKey === cardKey;
     return (
       <View key={i} style={[styles.copyCard, isBest && styles.copyCardBest]}>
         <TouchableOpacity
           style={styles.copyHeader}
-          onPress={() => toggleExpand(i)}
+          onPress={() => toggleExpand(cardKey)}
           activeOpacity={0.8}
         >
           <View style={[styles.copyIndexWrap, { backgroundColor: color + '30' }]}>
@@ -179,7 +186,7 @@ export function CopyWriter({
         <View style={styles.copyActions}>
           <TouchableOpacity
             style={[styles.copyBtn, isCopied && styles.copyBtnDone]}
-            onPress={() => handleCopy(item, i)}
+            onPress={() => handleCopy(item, cardKey)}
             activeOpacity={0.7}
           >
             {isCopied ? (
@@ -201,8 +208,8 @@ export function CopyWriter({
                   } else {
                     await Clipboard.setStringAsync(item.hook);
                   }
-                  setCopiedIndex(i);
-                  setTimeout(() => setCopiedIndex(null), 2000);
+                  setCopiedKey(cardKey);
+                  setTimeout(() => setCopiedKey(null), 2000);
                 } catch {
                   // clipboard failed silently
                 }
@@ -332,7 +339,7 @@ export function CopyWriter({
                         <TouchableOpacity
                           key={group.type}
                           style={[styles.versionTab, isActive && { backgroundColor: tab.color + '20', borderColor: tab.color }]}
-                          onPress={() => { setOtherVersionTab(group.type); setExpandedIndex(null); }}
+                          onPress={() => { setOtherVersionTab(group.type); setExpandedKey(null); }}
                           activeOpacity={0.7}
                         >
                           <Icon size={14} color={isActive ? tab.color : theme.colors.dark.textDim} strokeWidth={2} />
