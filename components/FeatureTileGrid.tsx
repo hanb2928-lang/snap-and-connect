@@ -51,11 +51,11 @@ export function FeatureTileGrid({ categories, scanMode }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const tabScrollRef = useRef<ScrollView>(null);
   const indicatorX = useRef(new RNAnimated.Value(0)).current;
+  const isFirstRender = useRef(true);
 
   const selectCategory = useCallback((index: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveCategory(index);
-    setExpandedKey(null);
   }, []);
 
   const toggle = useCallback((key: string) => {
@@ -74,6 +74,15 @@ export function FeatureTileGrid({ categories, scanMode }: Props) {
   }, [categories, scanMode]);
 
   const currentCategory = filteredCategories[activeCategory] ?? filteredCategories[0];
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    }
+    if (currentCategory && currentCategory.tiles.length > 0) {
+      setExpandedKey(currentCategory.tiles[0].key);
+    }
+  }, [currentCategory]);
 
   return (
     <View style={styles.wrap}>
