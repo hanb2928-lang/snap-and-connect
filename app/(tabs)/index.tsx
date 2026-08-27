@@ -869,7 +869,11 @@ export default function CameraScreen() {
             disabled={processing}
             activeOpacity={0.8}
           >
-            <View style={styles.captureButtonInner} />
+            <View style={styles.captureButtonRing}>
+              <View style={styles.captureButtonInner}>
+                <Text style={styles.captureButtonText}>촬영</Text>
+              </View>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1702,19 +1706,37 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accent[400] + '40',
   },
   captureButton: {
-    width: 72,
-    height: 72,
+    width: 80,
+    height: 80,
     borderRadius: theme.radius.full,
-    borderWidth: 4,
-    borderColor: theme.colors.primary[400],
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButtonInner: {
-    width: 64,
-    height: 64,
+  captureButtonRing: {
+    width: 80,
+    height: 80,
     borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.primary[400],
+    borderWidth: 3,
+    borderColor: theme.colors.neutral[0],
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.elevated,
+  },
+  captureButtonInner: {
+    width: 66,
+    height: 66,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.accent[400],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.neutral[0],
+  },
+  captureButtonText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+    letterSpacing: -0.3,
   },
   hintText: {
     textAlign: 'center',
