@@ -417,12 +417,12 @@ export function CarouselGenerator({
 
       {exportState === 'done' && videoUrl && (
         <View style={styles.resultWrap}>
+          <Text style={styles.doneNotice}>영상이 생성됐어요. 미리보기 후 저장하세요.</Text>
           {/* @ts-ignore video element on web */}
           <video
             src={videoUrl}
             style={styles.videoPreview}
             controls
-            autoPlay
             loop
             playsInline
           />
@@ -598,6 +598,13 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  doneNotice: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 20,
+    marginBottom: theme.spacing.sm,
   },
   resultWrap: {
     marginTop: theme.spacing.md,

@@ -841,13 +841,14 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
         {state === 'done' && outputUrl && (
           <View style={styles.resultWrap}>
+            <Text style={styles.doneNotice}>결과가 완성됐어요. 미리보기 후 저장하세요.</Text>
             {Platform.OS === 'web' && outputMime.includes('png') && (
               // @ts-ignore img element on web
               <img src={outputUrl} style={isVertical ? styles.videoVertical : styles.videoHorizontal} />
             )}
             {Platform.OS === 'web' && !outputMime.includes('png') && (
               // @ts-ignore video element on web
-              <video src={outputUrl} style={isVertical ? styles.videoVertical : styles.videoHorizontal} controls autoPlay loop playsInline />
+              <video src={outputUrl} style={isVertical ? styles.videoVertical : styles.videoHorizontal} controls loop playsInline />
             )}
             <View style={styles.resultButtons}>
               <TouchableOpacity style={styles.downloadButton} onPress={handleDownload} activeOpacity={0.8}>
@@ -1347,6 +1348,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  doneNotice: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 20,
   },
   resultWrap: {
     alignItems: 'center',

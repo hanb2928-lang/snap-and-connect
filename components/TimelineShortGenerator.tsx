@@ -695,13 +695,14 @@ function WebTimelineGenerator({
 
       {state === 'done' && videoUrl && (
         <View style={styles.resultWrap}>
+          <Text style={styles.doneNotice}>영상이 생성됐어요. 미리보기 후 저장하세요.</Text>
           <View style={styles.videoVerticalWrap}>
             {videoMime.includes('png') ? (
               // @ts-ignore
               <img src={videoUrl} style={styles.videoVertical} />
             ) : (
               // @ts-ignore
-              <video src={videoUrl} style={styles.videoVertical} controls autoPlay loop playsInline />
+              <video src={videoUrl} style={styles.videoVertical} controls loop playsInline />
             )}
             {shortUrl && (
               <RoamingBabyOverlay linkUrl={shortUrl} containerWidth={280} containerHeight={400} />
@@ -1460,6 +1461,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     lineHeight: 16,
+  },
+  doneNotice: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 20,
   },
   resultWrap: {
     gap: theme.spacing.md,

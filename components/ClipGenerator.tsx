@@ -1498,6 +1498,7 @@ function WebClipGenerator({
 
       {state === 'done' && videoUrl && (
         <View style={styles.resultWrap}>
+          <Text style={styles.doneNotice}>영상이 생성됐어요. 미리보기 후 저장하세요.</Text>
           <View style={isVertical ? styles.videoVerticalWrap : styles.videoHorizontalWrap}>
             {Platform.OS === 'web' && videoMime.includes('png') && (
               // @ts-ignore img element on web
@@ -1512,7 +1513,6 @@ function WebClipGenerator({
                 src={videoUrl}
                 style={isVertical ? styles.videoVertical : styles.videoHorizontal}
                 controls
-                autoPlay
                 loop
                 playsInline
               />
@@ -1976,6 +1976,12 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  doneNotice: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 20,
   },
   resultWrap: {
     gap: theme.spacing.md,
