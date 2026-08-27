@@ -1007,6 +1007,7 @@ export default function ResultScreen() {
               productCategory={selectedProduct?.productCategory || scan.product_category || ''}
               narrationText={activeHook || activeOneLiner}
               affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
+              preloadedKoreanTtsUrl={scan.tts_url}
             />
           ),
         },

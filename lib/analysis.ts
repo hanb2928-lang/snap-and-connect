@@ -1,5 +1,5 @@
 import type { AnalysisResult } from '@/types/database';
-import { supabase, ANALYSIS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { supabase, ANALYSIS_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { safeFetch } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
@@ -140,7 +140,43 @@ export async function saveScan(
     .single();
 
   if (error) throw new Error(`Failed to save scan: ${error.message}`);
+
+  const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
+  if (hookText) {
+    generateAndUploadTTS(data.id, hookText).catch(() => {});
+  }
+
   return data.id;
+}
+
+async function generateAndUploadTTS(scanId: string, text: string): Promise<void> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const response = await fetch(TTS_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ text, voice: 'ko-KR', speed: 1.0 }),
+    signal: controller.signal,
+  });
+  clearTimeout(timeoutId);
+  if (!response.ok) return;
+  const data = await response.json();
+  if (!data.audioBase64) return;
+
+  const audioBytes = base64ToUint8Array(data.audioBase64);
+  const fileName = `tts-${scanId}-${Date.now()}.mp3`;
+  const { error: uploadError } = await supabase.storage
+    .from('scans')
+    .upload(fileName, audioBytes, { contentType: 'audio/mpeg' });
+  if (uploadError) return;
+
+  const { data: urlData } = supabase.storage.from('scans').getPublicUrl(fileName);
+  if (!urlData.publicUrl) return;
+
+  await supabase.from('scans').update({ tts_url: urlData.publicUrl }).eq('id', scanId);
 }
 
 export async function saveManualScan(

@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 
-import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info } from 'lucide-react-native';
+import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 
@@ -35,6 +35,7 @@ interface GlobalLocalizerProps {
   productCategory: string;
   narrationText?: string;
   affiliateUrl?: string;
+  preloadedKoreanTtsUrl?: string | null;
 }
 
 const TARGET_LANGUAGES = [
@@ -56,6 +57,7 @@ export function GlobalLocalizer({
   productCategory,
   narrationText,
   affiliateUrl,
+  preloadedKoreanTtsUrl,
 }: GlobalLocalizerProps) {
   const [selectedLangs, setSelectedLangs] = useState<string[]>(['en', 'ja']);
   const [localizations, setLocalizations] = useState<LocalizedContent[]>([]);
@@ -65,6 +67,23 @@ export function GlobalLocalizer({
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [ttsResults, setTtsResults] = useState<Record<string, string>>({});
   const [guideExpanded, setGuideExpanded] = useState(false);
+  const [koreanTtsPlaying, setKoreanTtsPlaying] = useState(false);
+
+  const handlePlayKoreanTTS = useCallback(async () => {
+    if (!preloadedKoreanTtsUrl) return;
+    if (Platform.OS !== 'web') return;
+    try {
+      if (audioRef.current) { audioRef.current.pause(); }
+      const audio = new Audio(preloadedKoreanTtsUrl);
+      audioRef.current = audio;
+      audio.onended = () => setKoreanTtsPlaying(false);
+      audio.onpause = () => setKoreanTtsPlaying(false);
+      await audio.play();
+      setKoreanTtsPlaying(true);
+    } catch {
+      setKoreanTtsPlaying(false);
+    }
+  }, [preloadedKoreanTtsUrl]);
 
 
   const toggleLang = useCallback((code: string) => {
@@ -241,6 +260,30 @@ export function GlobalLocalizer({
         <View style={styles.errorBox}>
           <AlertCircle size={14} color={theme.colors.error[400]} strokeWidth={2} />
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {preloadedKoreanTtsUrl && (
+        <View style={styles.koreanTtsCard}>
+          <View style={styles.koreanTtsLeft}>
+            <Volume2 size={16} color={theme.colors.success[400]} strokeWidth={2} />
+            <View>
+              <Text style={styles.koreanTtsTitle}>한국어 내레이션 자동 생성됨</Text>
+              <Text style={styles.koreanTtsSub}>후킹 문구로 AI 음성을 만들었어요</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.koreanTtsPlayBtn}
+            onPress={handlePlayKoreanTTS}
+            activeOpacity={0.7}
+          >
+            {koreanTtsPlaying ? (
+              <Pause size={14} color="#fff" strokeWidth={2} />
+            ) : (
+              <Play size={14} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.koreanTtsPlayText}>{koreanTtsPlaying ? '정지' : '재생'}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -574,5 +617,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
+  },
+  koreanTtsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.success[500] + '12',
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.success[500] + '30',
+  },
+  koreanTtsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  koreanTtsTitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  koreanTtsSub: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  koreanTtsPlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.success[500],
+  },
+  koreanTtsPlayText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });

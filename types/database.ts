@@ -83,6 +83,7 @@ export interface Scan {
   custom_review?: CustomReview | null;
   local_store_info?: LocalStoreInfo | null;
   scan_source?: 'single' | 'multi' | 'template' | null;
+  tts_url?: string | null;
 }
 
 export interface DetectedProduct {
