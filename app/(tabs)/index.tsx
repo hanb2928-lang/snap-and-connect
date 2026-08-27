@@ -888,21 +888,19 @@ export default function CameraScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        </View>
-      )}
 
-      {!arMode && (
-        <Text style={[styles.hintText, { paddingBottom: theme.spacing.xl + insets.bottom }]}>
-          {processing
-            ? progressText
-            : recognitionMode === 'single'
-              ? templateMode === 'auto'
-                ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: AI 자동 추천 — 촬영 후 가장 어울리는 스타일이 자동 적용됩니다'
-                : `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 적용됩니다`
-              : multiShots.length === 0
-                ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
-                : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
-        </Text>
+          <Text style={styles.hintText}>
+            {processing
+              ? progressText
+              : recognitionMode === 'single'
+                ? templateMode === 'auto'
+                  ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: AI 자동 추천 — 촬영 후 가장 어울리는 스타일이 자동 적용됩니다'
+                  : `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 적용됩니다`
+                : multiShots.length === 0
+                  ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
+                  : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
+          </Text>
+        </View>
       )}
 
       {!arMode && recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
@@ -1750,7 +1748,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
     paddingHorizontal: theme.spacing.xl,
-    paddingBottom: theme.spacing.md,
+    marginTop: theme.spacing.sm,
   },
   errorBanner: {
     position: 'absolute',
