@@ -473,7 +473,14 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
         adjusted = toBanmal(adjusted);
       }
       if (persona.includes("이모지") || persona.includes("감성")) {
-        adjusted = adjusted.replace(/\.(\s|$)/g, '. ✨').replace(/\n/g, '\n');
+        const sentences = adjusted.split('\n');
+        adjusted = sentences.map((s) => {
+          const trimmed = s.trim();
+          if (trimmed && !trimmed.endsWith('!') && !trimmed.endsWith('?') && !trimmed.endsWith('✨')) {
+            return trimmed + ' ✨';
+          }
+          return s;
+        }).join('\n');
       }
       return adjusted;
     });
