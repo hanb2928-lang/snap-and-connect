@@ -154,6 +154,7 @@ function buildWebViewHTML(params: {
   var musicMood=${JSON.stringify(musicMood)};
   var motionPreset=${JSON.stringify(motionPreset)};
   var hybridMode=${JSON.stringify(hybridMode)};
+  var cardStyle=${JSON.stringify(cardStyle)};
   var FPS=${FPS};
   var imageUrl=${JSON.stringify(imageUrl)};
 
@@ -357,15 +358,67 @@ function buildWebViewHTML(params: {
 
       ctx.fillStyle=cachedGrad;ctx.fillRect(0,0,W,H);
 
-      // Hook
+      // Badge (top-left, fades in early)
+      var badgeT=Math.max(0,(t-0.03)/0.12);
+      if(badgeT>0&&L.badge){
+        var badgeAlpha=Math.min(badgeT*5,1);
+        ctx.globalAlpha=badgeAlpha;
+        ctx.fillStyle=accentColor;
+        roundRect(ctx,L.badge.x,L.badge.y,L.badge.w,L.badge.h,L.badge.r);ctx.fill();
+        ctx.fillStyle='#fff';ctx.font=L.badgeText.font;ctx.textBaseline='middle';ctx.textAlign='left';
+        ctx.fillText(tagText,L.badgeText.x,L.badgeText.y);
+        ctx.textAlign='left';ctx.globalAlpha=1;
+      }
+
+      // Category tag (top-right)
+      if(badgeT>0&&L.catTag){
+        ctx.globalAlpha=Math.min(badgeT*5,1);
+        ctx.fillStyle='rgba(255,255,255,0.15)';
+        roundRect(ctx,L.catTag.x,L.catTag.y,L.catTag.w,L.catTag.h,L.catTag.r);ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='500 16px sans-serif';ctx.textBaseline='middle';
+        ctx.fillText('\u00b7',L.catText.x,L.catText.y);
+        ctx.globalAlpha=1;
+      }
+
+      // Hook text
       var hookT=Math.max(0,(t-0.15)/0.3);
       if(hookT>0){var hookAlpha=Math.min(hookT*4,1);var hookOffset=(1-easeOutBack(Math.min(hookT,1)))*50;
-        var hookY=H*0.72+hookOffset;ctx.globalAlpha=hookAlpha;
-        ctx.fillStyle='#fff';ctx.font='700 44px sans-serif';ctx.textBaseline='top';
+        var hookY=H*L.hookBox.yBase+hookOffset;ctx.globalAlpha=hookAlpha;
+        ctx.fillStyle='#fff';ctx.font=L.hookText.font;ctx.textBaseline='top';
         ctx.shadowColor='rgba(0,0,0,0.85)';ctx.shadowBlur=12;ctx.shadowOffsetY=3;
-        drawTextLines(ctx,hook,60,hookY,W-120,56);
+        drawTextLines(ctx,hook,L.hookText.x,hookY+L.hookText.yOffset,L.hookText.maxWidth,L.hookText.lineHeight);
         ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
         ctx.globalAlpha=1;}
+
+      // Title text (appears after hook)
+      var titleT=Math.max(0,(t-0.3)/0.2);
+      if(titleT>0&&title){var titleAlpha=Math.min(titleT*5,1);
+        ctx.globalAlpha=titleAlpha;ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.font=L.title.font;ctx.textBaseline='top';
+        ctx.shadowColor='rgba(0,0,0,0.7)';ctx.shadowBlur=8;ctx.shadowOffsetY=2;
+        drawTextLines(ctx,title,L.title.x,H*L.title.yBase,L.title.maxWidth,L.title.lineHeight);
+        ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+        ctx.globalAlpha=1;}
+
+      // Hashtags (appears after title)
+      var tagT=Math.max(0,(t-0.4)/0.2);
+      if(tagT>0&&hasHashtags){var tagAlpha=Math.min(tagT*5,1);
+        ctx.globalAlpha=tagAlpha;ctx.fillStyle=accentColor;
+        ctx.font=L.hashtags.font;ctx.textBaseline='top';
+        drawTextLines(ctx,hashtagStr,L.hashtags.x,H*L.hashtags.yBase,L.hashtags.maxWidth,L.hashtags.lineHeight);
+        ctx.globalAlpha=1;}
+
+      // CTA button (appears mid-video)
+      var ctaT=Math.max(0,(t-0.45)/0.15);
+      if(ctaT>0&&shortUrl){var ctaAlpha=Math.min(ctaT*5,1);
+        ctx.globalAlpha=ctaAlpha;
+        ctx.fillStyle=accentColor;
+        roundRect(ctx,L.cta.x,L.cta.y,L.cta.w,L.cta.h,L.cta.r);ctx.fill();
+        ctx.fillStyle='#fff';ctx.font=L.ctaText.font;ctx.textBaseline='middle';ctx.textAlign='center';
+        ctx.fillText('\uc790\uc138\ud788 \ubcf4\uae30',L.ctaText.x,L.ctaText.y);
+        if(L.ctaShortUrl){ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='400 14px sans-serif';
+          ctx.fillText(shortUrl,L.ctaShortUrl.x,L.ctaShortUrl.y);}
+        ctx.textAlign='left';ctx.globalAlpha=1;}
 
       // Baby + link sticker composited into the video frame
       if(shortUrl&&t<0.667){
@@ -449,6 +502,7 @@ export function MobileClipGenerator({
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [webviewKey, setWebviewKey] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -870,6 +924,23 @@ export function MobileClipGenerator({
             <Film size={20} color="#fff" strokeWidth={2} />
             <Text style={styles.generateButtonText}>{Platform.OS === 'ios' ? '이미지 만들기' : '동영상 만들기'}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.previewToggleButton} onPress={() => setShowPreview(!showPreview)} activeOpacity={0.7}>
+            <Play size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.previewToggleText}>{showPreview ? '미리보기 닫기' : '미리보기'}</Text>
+          </TouchableOpacity>
+
+          {showPreview && (
+            <View style={styles.previewWebViewWrap}>
+              <WebView
+                source={{ html: html }}
+                javaScriptEnabled
+                originWhitelist={['*']}
+                style={styles.previewWebView as ViewStyle}
+                scrollEnabled={false}
+              />
+            </View>
+          )}
         </View>
       )}
 
@@ -1257,6 +1328,35 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  previewToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.primary[400] + '30',
+  },
+  previewToggleText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  previewWebViewWrap: {
+    width: '100%',
+    aspectRatio: 9 / 16,
+    maxHeight: 360,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    marginTop: theme.spacing.sm,
+    backgroundColor: '#000',
+  },
+  previewWebView: {
+    flex: 1,
   },
   progressWrap: {
     gap: 10,

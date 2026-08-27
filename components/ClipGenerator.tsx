@@ -629,22 +629,83 @@ function WebClipGenerator({
         ctx.fillStyle = cachedGrad;
         ctx.fillRect(0, 0, L.width, L.height);
 
+        const tagText = STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT';
+        const hashtagStr = hashtags.slice(0, 8).map((h) => `#${h}`).join(' ');
+
+        // Badge
+        const badgeT = Math.max(0, (t - 0.03) / 0.12);
+        if (badgeT > 0) {
+          ctx.globalAlpha = Math.min(badgeT * 5, 1);
+          ctx.fillStyle = accentColor;
+          roundRect(ctx, L.badge.x, L.badge.y, L.badge.w, L.badge.h, L.badge.r);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = L.badgeText.font;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'left';
+          ctx.fillText(tagText, L.badgeText.x, L.badgeText.y);
+          ctx.textAlign = 'left';
+          ctx.globalAlpha = 1;
+        }
+
+        // Hook text
         const hookT = Math.max(0, (t - 0.15) / 0.3);
         if (hookT > 0) {
           const hookAlpha = Math.min(hookT * 4, 1);
           const hookOffset = (1 - easeOutBack(Math.min(hookT, 1))) * 50;
-          const hookY = L.height * 0.72 + hookOffset;
+          const hookY = L.height * L.hookBox.yBase + hookOffset;
           ctx.globalAlpha = hookAlpha;
           ctx.fillStyle = '#fff';
-          ctx.font = '700 44px sans-serif';
+          ctx.font = L.hookText.font;
           ctx.textBaseline = 'top';
           ctx.shadowColor = 'rgba(0,0,0,0.85)';
           ctx.shadowBlur = 12;
           ctx.shadowOffsetY = 3;
-          drawTextLines(ctx, hook, 60, hookY, L.width - 120, 56);
+          drawTextLines(ctx, hook, L.hookText.x, hookY + L.hookText.yOffset, L.hookText.maxWidth, L.hookText.lineHeight);
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
           ctx.shadowOffsetY = 0;
+          ctx.globalAlpha = 1;
+        }
+
+        // Title text
+        const titleT = Math.max(0, (t - 0.3) / 0.2);
+        if (titleT > 0 && title) {
+          ctx.globalAlpha = Math.min(titleT * 5, 1);
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.font = L.title.font;
+          ctx.textBaseline = 'top';
+          drawTextLines(ctx, title, L.title.x, L.height * L.title.yBase, L.title.maxWidth, L.title.lineHeight);
+          ctx.globalAlpha = 1;
+        }
+
+        // Hashtags
+        const tagTextT = Math.max(0, (t - 0.4) / 0.2);
+        if (tagTextT > 0 && hashtags.length > 0) {
+          ctx.globalAlpha = Math.min(tagTextT * 5, 1);
+          ctx.fillStyle = accentColor;
+          ctx.font = L.hashtags.font;
+          ctx.textBaseline = 'top';
+          drawTextLines(ctx, hashtagStr, L.hashtags.x, L.height * L.hashtags.yBase, L.hashtags.maxWidth, L.hashtags.lineHeight);
+          ctx.globalAlpha = 1;
+        }
+
+        // CTA button
+        const ctaT = Math.max(0, (t - 0.45) / 0.15);
+        if (ctaT > 0 && shortUrl) {
+          ctx.globalAlpha = Math.min(ctaT * 5, 1);
+          ctx.fillStyle = accentColor;
+          roundRect(ctx, L.cta.x, L.cta.y, L.cta.w, L.cta.h, L.cta.r);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = L.ctaText.font;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center';
+          ctx.fillText('자세히 보기', L.ctaText.x, L.ctaText.y);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.font = '400 14px sans-serif';
+          ctx.fillText(shortUrl, L.ctaShortUrl.x, L.ctaShortUrl.y);
+          ctx.textAlign = 'left';
           ctx.globalAlpha = 1;
         }
 
@@ -678,7 +739,7 @@ function WebClipGenerator({
     } catch {
       showToast('미리보기를 시작할 수 없어요. 잠시 후 다시 시도해주세요');
     }
-  }, [imageUrl, format, musicMood, clipDuration, hybridMode, accentColor, motionPreset, hook, shortUrl, affiliatePlatforms, livePreviewPlaying, stopLivePreview, showToast]);
+  }, [imageUrl, format, musicMood, clipDuration, hybridMode, accentColor, motionPreset, hook, title, hashtags, cardStyle, shortUrl, affiliatePlatforms, livePreviewPlaying, stopLivePreview, showToast]);
 
   useEffect(() => {
     return () => {
@@ -861,31 +922,92 @@ function WebClipGenerator({
         ctx.fillStyle = cachedGrad;
         ctx.fillRect(0, 0, L.width, L.height);
 
-        // Hook text (0.15 - 0.45)
+        const tagText = STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT';
+        const hashtagStr = hashtags.slice(0, 8).map((h) => `#${h}`).join(' ');
+
+        // Badge (top-left, fades in early)
+        const badgeT = Math.max(0, (t - 0.03) / 0.12);
+        if (badgeT > 0) {
+          const badgeAlpha = Math.min(badgeT * 5, 1);
+          ctx.globalAlpha = badgeAlpha;
+          ctx.fillStyle = accentColor;
+          roundRect(ctx, L.badge.x, L.badge.y, L.badge.w, L.badge.h, L.badge.r);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = L.badgeText.font;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'left';
+          ctx.fillText(tagText, L.badgeText.x, L.badgeText.y);
+          ctx.textAlign = 'left';
+          ctx.globalAlpha = 1;
+        }
+
+        // Hook text
         const hookT = Math.max(0, (t - 0.15) / 0.3);
         if (hookT > 0) {
           const hookAlpha = Math.min(hookT * 4, 1);
           const hookOffset = (1 - easeOutBack(Math.min(hookT, 1))) * 50;
-          const hookY = L.height * 0.72 + hookOffset;
+          const hookY = L.height * L.hookBox.yBase + hookOffset;
           ctx.globalAlpha = hookAlpha;
 
           ctx.fillStyle = '#fff';
-          ctx.font = '700 44px sans-serif';
+          ctx.font = L.hookText.font;
           ctx.textBaseline = 'top';
           ctx.shadowColor = 'rgba(0,0,0,0.85)';
           ctx.shadowBlur = 12;
           ctx.shadowOffsetY = 3;
-          drawTextLines(
-            ctx,
-            hook,
-            60,
-            hookY,
-            L.width - 120,
-            56,
-          );
+          drawTextLines(ctx, hook, L.hookText.x, hookY + L.hookText.yOffset, L.hookText.maxWidth, L.hookText.lineHeight);
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
           ctx.shadowOffsetY = 0;
+          ctx.globalAlpha = 1;
+        }
+
+        // Title text
+        const titleT = Math.max(0, (t - 0.3) / 0.2);
+        if (titleT > 0 && title) {
+          const titleAlpha = Math.min(titleT * 5, 1);
+          ctx.globalAlpha = titleAlpha;
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.font = L.title.font;
+          ctx.textBaseline = 'top';
+          ctx.shadowColor = 'rgba(0,0,0,0.7)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetY = 2;
+          drawTextLines(ctx, title, L.title.x, L.height * L.title.yBase, L.title.maxWidth, L.title.lineHeight);
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.globalAlpha = 1;
+        }
+
+        // Hashtags
+        const tagTextT = Math.max(0, (t - 0.4) / 0.2);
+        if (tagTextT > 0 && hashtags.length > 0) {
+          ctx.globalAlpha = Math.min(tagTextT * 5, 1);
+          ctx.fillStyle = accentColor;
+          ctx.font = L.hashtags.font;
+          ctx.textBaseline = 'top';
+          drawTextLines(ctx, hashtagStr, L.hashtags.x, L.height * L.hashtags.yBase, L.hashtags.maxWidth, L.hashtags.lineHeight);
+          ctx.globalAlpha = 1;
+        }
+
+        // CTA button
+        const ctaT = Math.max(0, (t - 0.45) / 0.15);
+        if (ctaT > 0 && shortUrl) {
+          ctx.globalAlpha = Math.min(ctaT * 5, 1);
+          ctx.fillStyle = accentColor;
+          roundRect(ctx, L.cta.x, L.cta.y, L.cta.w, L.cta.h, L.cta.r);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = L.ctaText.font;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center';
+          ctx.fillText('자세히 보기', L.ctaText.x, L.ctaText.y);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.font = '400 14px sans-serif';
+          ctx.fillText(shortUrl, L.ctaShortUrl.x, L.ctaShortUrl.y);
+          ctx.textAlign = 'left';
           ctx.globalAlpha = 1;
         }
 
