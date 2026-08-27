@@ -861,8 +861,21 @@ export default function CameraScreen() {
               disabled={processing}
               activeOpacity={0.7}
             >
-              <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2.2} />
+              <ImageIcon size={20} color={theme.colors.dark.text} strokeWidth={2} />
               <Text style={styles.subButtonLabel}>갤러리</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={handleCapture}
+              disabled={processing}
+              activeOpacity={0.85}
+            >
+              <View style={styles.captureButtonRing}>
+                <View style={styles.captureButtonInner}>
+                  <Text style={styles.captureButtonText}>촬영</Text>
+                </View>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -871,23 +884,10 @@ export default function CameraScreen() {
               disabled={processing}
               activeOpacity={0.7}
             >
-              <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2.2} />
+              <Wand2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
               <Text style={styles.subButtonLabel}>편집</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCapture}
-            disabled={processing}
-            activeOpacity={0.8}
-          >
-            <View style={styles.captureButtonRing}>
-              <View style={styles.captureButtonInner}>
-                <Text style={styles.captureButtonText}>촬영</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
 
           <Text style={styles.hintText}>
             {processing
@@ -1684,9 +1684,9 @@ const styles = StyleSheet.create({
   },
   bottomControlsWrap: {
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   subButtonRow: {
     flexDirection: 'row',
@@ -1696,13 +1696,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
   },
   subButton: {
-    width: 80,
-    height: 56,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    width: 72,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(19, 26, 46, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   subButtonLabel: {
     fontSize: 11,
@@ -1710,31 +1712,31 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
   },
   captureButton: {
-    width: 80,
-    height: 80,
+    width: 88,
+    height: 88,
     borderRadius: theme.radius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureButtonRing: {
-    width: 80,
-    height: 80,
+    width: 88,
+    height: 88,
     borderRadius: theme.radius.full,
-    borderWidth: 3,
-    borderColor: theme.colors.neutral[0],
+    borderWidth: 2.5,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.elevated,
   },
   captureButtonInner: {
-    width: 66,
-    height: 66,
+    width: 72,
+    height: 72,
     borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.neutral[0],
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   captureButtonText: {
     fontSize: theme.typography.caption,
