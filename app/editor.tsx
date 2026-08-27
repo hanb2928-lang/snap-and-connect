@@ -38,7 +38,7 @@ import {
 } from '@/lib/imageEdit';
 import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundPicker';
 import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
-import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { cleanBase64 } from '@/lib/base64';
 import { getHtml2Canvas } from '@/lib/html2canvas';
 import { captureRef } from 'react-native-view-shot';
 import type { Scan } from '@/types/database';

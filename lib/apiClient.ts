@@ -96,7 +96,6 @@ export async function safeFetch(
         continue;
       }
 
-      if (lastError instanceof ApiError) throw lastError;
       throw lastError;
     }
   }

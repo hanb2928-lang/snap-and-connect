@@ -208,45 +208,8 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
-async function compositeOnBackgroundNative(productDataUrl: string, bgUrl: string): Promise<string> {
-  try {
-    const canvasSize = 1080;
-
-    const bgResult = await ImageManipulator.manipulateAsync(
-    bgUrl,
-    [{ resize: { width: canvasSize, height: canvasSize } }],
-    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
-  );
-
-  const productResult = await ImageManipulator.manipulateAsync(
-    productDataUrl,
-    [{ resize: { width: canvasSize } }],
-    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
-  );
-
-  const bgInfo = await FileSystem.getInfoAsync(bgResult.uri);
-  const prodInfo = await FileSystem.getInfoAsync(productResult.uri);
-  if (!bgInfo.exists || !prodInfo.exists) return productResult.uri;
-
-  const bgBase64 = await FileSystem.readAsStringAsync(bgResult.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const prodBase64 = await FileSystem.readAsStringAsync(productResult.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  return ImageManipulator.manipulateAsync(
-    `data:image/jpeg;base64,${bgBase64}`,
-    [
-      {
-        overlay: `data:image/jpeg;base64,${prodBase64}`,
-      } as any,
-    ],
-    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
-  ).then((r) => r.uri).catch(() => productResult.uri);
-  } catch {
-    return productDataUrl;
-  }
+async function compositeOnBackgroundNative(productDataUrl: string, _bgUrl: string): Promise<string> {
+  return productDataUrl;
 }
 
 export async function prepareImageForApi(

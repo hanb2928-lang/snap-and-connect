@@ -67,16 +67,23 @@ export async function pickImageWeb(multiple = false, maxCount = 4): Promise<Pick
     if (multiple) {
       input.multiple = true;
     }
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
 
     let settled = false;
     const cleanup = () => {
       input.onchange = null;
       input.onerror = null;
       window.removeEventListener('focus', onFocus);
+      if (document.body.contains(input)) {
+        document.body.removeChild(input);
+      }
     };
     const onFocus = () => {
       setTimeout(() => {
-        if (!settled && (!input.files || input.files.length === 0) && document.contains(input)) {
+        if (!settled && (!input.files || input.files.length === 0)) {
           settled = true;
           cleanup();
           resolve([]);

@@ -5,15 +5,13 @@ import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
-import { prepareImageForApi } from '@/lib/imageEdit';
 
 export async function uploadImage(
   base64: string,
   mimeType: string,
 ): Promise<string> {
-  const uploadMime = 'image/jpeg';
-
-  const ext = 'jpg';
+  const uploadMime = mimeType || 'image/jpeg';
+  const ext = uploadMime === 'image/png' ? 'png' : uploadMime === 'image/webp' ? 'webp' : 'jpg';
   const fileName = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
@@ -32,14 +30,13 @@ export async function analyzeImage(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
-  const compressedDataUrl = await prepareImageForApi(imageDataUrl, 1080, 0.8);
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ imageDataUrl: compressedDataUrl, fileName, mimeType: 'image/jpeg', mode }),
+    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
     timeoutMs: 60000,
   });
 
@@ -59,9 +56,6 @@ export async function analyzeMultiShot(
   fileName: string,
 ): Promise<AnalysisResult> {
   const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
-  const compressedImages = await Promise.all(
-    dataUrls.map((url) => prepareImageForApi(url, 1080, 0.8)),
-  );
 
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
@@ -69,7 +63,7 @@ export async function analyzeMultiShot(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ images: compressedImages, fileName, mode: 'multi-shot' }),
+    body: JSON.stringify({ images: dataUrls, fileName, mode: 'multi-shot' }),
     timeoutMs: 90000,
   });
 
@@ -194,10 +188,9 @@ export async function analyzeImageQueued(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
-  const compressedDataUrl = await prepareImageForApi(imageDataUrl, 1080, 0.8);
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
-    { imageDataUrl: compressedDataUrl, fileName, mimeType: 'image/jpeg', mode },
+    { imageDataUrl, fileName, mimeType, mode },
     { timeoutMs: 180000 },
   );
 
@@ -212,12 +205,9 @@ export async function analyzeMultiShotQueued(
   fileName: string,
 ): Promise<AnalysisResult> {
   const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
-  const compressedImages = await Promise.all(
-    dataUrls.map((url) => prepareImageForApi(url, 1080, 0.8)),
-  );
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
-    { images: compressedImages, fileName, mode: 'multi-shot' },
+    { images: dataUrls, fileName, mode: 'multi-shot' },
     { timeoutMs: 180000 },
   );
 
