@@ -89,6 +89,20 @@ export function MobileVideoImport({
 
       const asset = result.assets[0];
       const uri = asset.uri;
+
+      if (Platform.OS !== 'web') {
+        try {
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists && 'size' in info && info.size && info.size > 200 * 1024 * 1024) {
+            setError('200MB 이하의 영상만 지원됩니다.');
+            setStage('error');
+            return;
+          }
+        } catch {
+          // size check failed — proceed and let upload handle it
+        }
+      }
+
       setVideoUri(uri);
       setDuration(asset.duration ? Math.min(Math.round(asset.duration), 60) : 6);
       setStage('uploaded');
@@ -208,8 +222,10 @@ export function MobileVideoImport({
     if (!videoUri) return;
     try {
       if (await Sharing.isAvailableAsync()) {
+        const ext = videoUri.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase() || 'mp4';
+        const shareMime = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
         await Sharing.shareAsync(videoUri, {
-          mimeType: 'video/mp4',
+          mimeType: shareMime,
           dialogTitle: '영상 공유하기',
         });
       } else if (Platform.OS === 'web') {
