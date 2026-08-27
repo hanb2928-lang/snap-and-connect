@@ -79,6 +79,7 @@ export default function CameraScreen() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [arMode, setArMode] = useState(false);
   const [videoImportVisible, setVideoImportVisible] = useState(false);
+  const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
@@ -701,17 +702,8 @@ export default function CameraScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.videoImportBtn}
-            onPress={() => setVideoImportVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Film size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-            <Text style={styles.videoImportText}>영상</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
             style={styles.stylePickerBtn}
-            onPress={() => setStylePickerVisible((v) => !v)}
+            onPress={() => { setStylePickerVisible((v) => !v); setMediaPickerVisible(false); }}
             activeOpacity={0.7}
           >
             <Palette size={12} color={theme.colors.accent[400]} strokeWidth={2} />
@@ -870,12 +862,12 @@ export default function CameraScreen() {
           <View style={styles.subButtonRow}>
             <TouchableOpacity
               style={styles.subButton}
-              onPress={handlePickImage}
+              onPress={() => setMediaPickerVisible((v) => !v)}
               disabled={processing}
               activeOpacity={0.7}
             >
-              <ImageIcon size={20} color={theme.colors.dark.text} strokeWidth={2} />
-              <Text style={styles.subButtonLabel}>갤러리</Text>
+              <ImageIcon size={20} color={mediaPickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
+              <Text style={[styles.subButtonLabel, mediaPickerVisible && { color: theme.colors.accent[400] }]}>갤러리</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -888,6 +880,40 @@ export default function CameraScreen() {
               <Text style={styles.subButtonLabel}>편집</Text>
             </TouchableOpacity>
           </View>
+
+          {mediaPickerVisible && (
+            <View style={styles.mediaPickerPanel}>
+              <TouchableOpacity
+                style={styles.mediaPickerOption}
+                onPress={() => {
+                  setMediaPickerVisible(false);
+                  handlePickImage();
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.mediaPickerIcon, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+                  <ImageIcon size={20} color={theme.colors.primary[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.mediaPickerLabel}>사진 선택</Text>
+                <Text style={styles.mediaPickerDesc}>갤러리에서 사진을 불러와 AI 분석</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.mediaPickerOption}
+                onPress={() => {
+                  setMediaPickerVisible(false);
+                  setVideoImportVisible(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.mediaPickerIcon, { backgroundColor: theme.colors.warning[500] + '20' }]}>
+                  <Film size={20} color={theme.colors.warning[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.mediaPickerLabel}>동영상 선택</Text>
+                <Text style={styles.mediaPickerDesc}>영상에서 숏폼 클립 생성</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <Text style={styles.hintText}>
             {processing
@@ -1709,6 +1735,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
+  },
+  mediaPickerPanel: {
+    position: 'absolute',
+    bottom: 140,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
+    zIndex: 30,
+    ...theme.shadows.elevated,
+  },
+  mediaPickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  mediaPickerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaPickerLabel: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  mediaPickerDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
   captureButton: {
     width: 76,
