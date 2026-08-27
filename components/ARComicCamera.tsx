@@ -18,6 +18,7 @@ import {
   Zap,
   ZapOff,
   X,
+  ChevronLeft,
   CircleAlert as AlertCircle,
   Grid3x3,
   ScanLine,
@@ -756,6 +757,14 @@ export function ARComicCamera({
         <View style={[styles.topBar, { top: safeTop + 8 }]}>
           <View style={styles.topBarLeft}>
             <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleClose}
+              activeOpacity={0.7}
+            >
+              <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.backButtonText}>뒤로가기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.topButton}
               onPress={() => setGridVisible((g) => !g)}
               disabled={processing}
@@ -799,13 +808,6 @@ export function ARComicCamera({
               activeOpacity={0.7}
             >
               <RotateCcw size={20} color={theme.colors.dark.text} strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.topButton}
-              onPress={handleClose}
-              activeOpacity={0.7}
-            >
-              <X size={22} color="#fff" strokeWidth={2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1253,7 +1255,22 @@ const styles = StyleSheet.create({
   },
   topBarLeft: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: theme.spacing.sm,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'rgba(10, 15, 30, 0.6)',
+  },
+  backButtonText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   topBarRight: {
     flexDirection: 'row',
