@@ -556,7 +556,7 @@ export default function CameraScreen() {
         )}
 
         {!arMode && (
-        <View style={styles.touchLayer} {...cameraPanResponder.panHandlers} pointerEvents={processing ? 'none' : 'auto'} />
+        <View style={styles.touchLayer} {...cameraPanResponder.panHandlers} pointerEvents={processing || stylePickerVisible ? 'none' : 'auto'} />
         )}
 
         {!arMode && (
