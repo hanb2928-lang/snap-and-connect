@@ -127,19 +127,24 @@ function detectImageMime(b64: string): string | null {
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {
+  const serverKey = Deno.env.get("OPENAI_API_KEY");
+  if (serverKey) return serverKey;
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   if (supabaseUrl && serviceRoleKey) {
     try {
       const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-  const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
         headers: {
           apikey: serviceRoleKey,
           Authorization: `Bearer ${serviceRoleKey}`,
         },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (resp.ok) {
         const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
         const dbKey = rows[0]?.openai_api_key;
@@ -220,7 +225,7 @@ async function editWithOpenAI(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const formData = buildMultipartForm(imageDataUrl, prompt);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 50000);
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     try {
       const response = await fetch("https://api.openai.com/v1/images/edits", {

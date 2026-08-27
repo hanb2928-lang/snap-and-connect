@@ -11,7 +11,7 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_ATTEMPTS = 3;
 const MAX_JOBS_PER_RUN = 1;
-const JOB_TIMEOUT_MS = 140000;
+const JOB_TIMEOUT_MS = 200000;
 
 const ALLOWED_JOB_TYPES = new Set([
   "analyze-photo",
