@@ -174,6 +174,23 @@ export default function ResultScreen() {
   }, [fetchScan]);
 
   useEffect(() => {
+    if (!scan || scan.tts_url) return;
+    const interval = setInterval(() => {
+      supabase
+        .from('scans')
+        .select('tts_url')
+        .eq('id', scan.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.tts_url && mountedRef.current) {
+            setScan((prev) => (prev ? { ...prev, tts_url: data.tts_url } : prev));
+          }
+        });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [scan]);
+
+  useEffect(() => {
     (async () => {
       const saved = await getItem('preferred_template_style');
       if (saved) setActivePlatform(saved as PlatformKey);
