@@ -508,9 +508,10 @@ export function MobileClipGenerator({
       } else if (msg.type === 'done') {
         if (stateRef.current !== 'generating') return;
         if (generateTimeoutRef.current) { clearTimeout(generateTimeoutRef.current); generateTimeoutRef.current = null; }
-        const { base64, size, mimeType } = msg.data;
+        const { base64, size, mimeType: rawMime } = msg.data;
+        const mimeType = rawMime || 'video/webm';
         const isImage = msg.data.isImage === true;
-        setVideoMime(mimeType || 'video/webm');
+        setVideoMime(mimeType);
         setVideoSize(size || 0);
         const ext = isImage ? 'png' : (mimeType.includes('webm') ? 'webm' : 'mp4');
         const fileUri = `${FileSystem.cacheDirectory}${fileName.replace(/\.png$|\.webm$/, '')}-${Date.now()}.${ext}`;

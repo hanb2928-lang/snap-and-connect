@@ -69,7 +69,9 @@ export function VirtualFittingGallery({
     };
   }, []);
 
+  const imageRef = useRef(imageDataUrl);
   useEffect(() => {
+    imageRef.current = imageDataUrl;
     setResults([]);
     setSelected(null);
     setDownloaded(null);
@@ -99,6 +101,7 @@ export function VirtualFittingGallery({
   const generate = useCallback(async () => {
     if (isGeneratingRef.current || !imageDataUrl) return;
     isGeneratingRef.current = true;
+    const targetImage = imageDataUrl;
     setLoading(true);
     setError(null);
     setResults([]);
@@ -110,9 +113,9 @@ export function VirtualFittingGallery({
     setQueueStatus('queued');
     startProgressCycle();
     try {
-      const dataUrl = imageDataUrl.startsWith('data:')
-        ? imageDataUrl
-        : await urlToDataUrl(imageDataUrl);
+      const dataUrl = targetImage.startsWith('data:')
+        ? targetImage
+        : await urlToDataUrl(targetImage);
       const preparedImage = await prepareImageForEdit(normalizeImageDataUrl(dataUrl));
       setQueueStatus('processing');
       const jobResult = await enqueueAndWait<Record<string, unknown>>(
@@ -120,6 +123,7 @@ export function VirtualFittingGallery({
         { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
         { timeoutMs: 300000 },
       );
+      if (targetImage !== imageRef.current) return;
       if (!jobResult.success || !jobResult.result) {
         throw new Error(jobResult.error ?? '가상 피팅 생성 실패');
       }
@@ -128,10 +132,11 @@ export function VirtualFittingGallery({
 
       const raw: Array<{ modelType: ModelType; label: string; imageUrl: string }> =
         (data.results as Array<{ modelType: ModelType; label: string; imageUrl: string }>) || [];
-      const uploaded: FittingImage[] = raw.filter((r) => r.imageUrl);
+      const uploaded: FittingImage[] = Array.isArray(raw) ? raw.filter((r) => r.imageUrl) : [];
 
       setResults(uploaded);
       if (uploaded.length === 0) {
+        setQueueStatus('error');
         setError('AI가 착용 컷을 생성하지 못했어요. 다시 시도해주세요.');
       } else {
         const failedCount = data.failedCount as number | undefined;
@@ -196,7 +201,7 @@ export function VirtualFittingGallery({
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       } else {
         await Share.share({ url, message: '가상 피팅 이미지' });
       }
@@ -245,7 +250,7 @@ export function VirtualFittingGallery({
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          URL.revokeObjectURL(objectUrl);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           downloadedCount++;
           if (i < results.length - 1) await new Promise((r) => setTimeout(r, 400));
         } catch {

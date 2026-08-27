@@ -478,7 +478,7 @@ function WebTimelineGenerator({
 
         // Draw roaming baby + link sticker overlay into the video frame
         if (shortUrl) {
-          drawRoamingBabyWithLink(ctx, elapsed, CANVAS_W, CANVAS_H, shortUrl, accentColor);
+          drawRoamingBabyWithLink(ctx, elapsed * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor);
         }
 
         if (t < 1) {

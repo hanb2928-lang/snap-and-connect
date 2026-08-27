@@ -64,7 +64,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     };
   }, []);
 
+  const imageRef = useRef(imageDataUrl);
   useEffect(() => {
+    imageRef.current = imageDataUrl;
     setCuts([]);
     setSelectedCut(null);
     setDownloaded(null);
@@ -94,6 +96,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const generateCuts = useCallback(async () => {
     if (isGeneratingRef.current || !imageDataUrl) return;
     isGeneratingRef.current = true;
+    const targetImage = imageDataUrl;
     setLoading(true);
     setError(null);
     setCuts([]);
@@ -105,9 +108,9 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
     setQueueStatus('queued');
     startProgressCycle();
     try {
-      const dataUrl = imageDataUrl.startsWith('data:')
-        ? imageDataUrl
-        : await urlToDataUrl(imageDataUrl);
+      const dataUrl = targetImage.startsWith('data:')
+        ? targetImage
+        : await urlToDataUrl(targetImage);
       const preparedImage = await prepareImageForEdit(normalizeImageDataUrl(dataUrl));
       setQueueStatus('processing');
       const jobResult = await enqueueAndWait<Record<string, unknown>>(
@@ -115,6 +118,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
         { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
         { timeoutMs: 300000 },
       );
+      if (targetImage !== imageRef.current) return;
       if (!jobResult.success || !jobResult.result) {
         throw new Error(jobResult.error ?? '가상 컷 생성 실패');
       }
@@ -122,7 +126,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       setQueueStatus('done');
 
       const cutsFromServer: Array<{ angle: CutAngle; label: string; imageUrl: string }> = (data.cuts as Array<{ angle: CutAngle; label: string; imageUrl: string }>) || [];
-      const validCuts: VirtualCut[] = cutsFromServer.filter((c) => c.imageUrl);
+      const validCuts: VirtualCut[] = Array.isArray(cutsFromServer) ? cutsFromServer.filter((c) => c.imageUrl) : [];
 
       if (validCuts.length === 0) {
         throw new Error('가상 컷을 생성하지 못했습니다. 다시 시도해주세요.');
@@ -191,7 +195,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       } else {
         await Share.share({ url, message: '가상 컷 이미지' });
       }
@@ -240,7 +244,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          URL.revokeObjectURL(objectUrl);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
           downloadedCount++;
           if (i < cuts.length - 1) await new Promise((r) => setTimeout(r, 400));
         } catch {

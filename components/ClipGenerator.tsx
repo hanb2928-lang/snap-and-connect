@@ -440,6 +440,10 @@ function WebClipGenerator({
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
       if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
       if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
+      if (bgmStopRef.current) {
+        bgmStopRef.current();
+        bgmStopRef.current = null;
+      }
     };
   }, []);
 
