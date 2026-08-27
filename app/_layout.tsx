@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -11,7 +11,7 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync } from 'expo-keep-awake';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { initStorage } from '@/lib/storage';
 import { theme } from '@/lib/theme';
@@ -25,9 +25,18 @@ SplashScreen.preventAutoHideAsync();
 
 type ReadyState = 'loading' | 'app' | 'error';
 
+function useSafeKeepAwake() {
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let active = true;
+    activateKeepAwakeAsync('screen').catch(() => {});
+    return () => { active = false; };
+  }, []);
+}
+
 export default function RootLayout() {
   useFrameworkReady();
-  useKeepAwake();
+  useSafeKeepAwake();
   const [ready, setReady] = useState<ReadyState>('loading');
   const startedRef = useRef(false);
 

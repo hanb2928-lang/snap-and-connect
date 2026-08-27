@@ -65,32 +65,41 @@ export async function createWarmupSchedule(params: {
 }
 
 export async function fetchActiveSchedules(): Promise<WarmupScheduleWithTasks[]> {
-  const { data: schedules } = await supabase
-    .from('warmup_schedules')
-    .select('*')
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
+  try {
+    const { data: schedules, error } = await supabase
+      .from('warmup_schedules')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-  if (!schedules || schedules.length === 0) return [];
+    if (error) {
+      if (error.code === 'PGRST205' || error.message.includes('schema cache')) return [];
+      return [];
+    }
 
-  const scheduleIds = schedules.map((s) => s.id);
-  const { data: tasks } = await supabase
-    .from('warmup_tasks')
-    .select('*')
-    .in('schedule_id', scheduleIds)
-    .order('scheduled_date', { ascending: true })
-    .order('day_number', { ascending: true });
+    if (!schedules || schedules.length === 0) return [];
 
-  const tasksBySchedule = new Map<string, WarmupTask[]>();
-  for (const t of (tasks ?? []) as WarmupTask[]) {
-    const arr = tasksBySchedule.get(t.schedule_id) || [];
-    arr.push(t);
-    tasksBySchedule.set(t.schedule_id, arr);
+    const scheduleIds = schedules.map((s) => s.id);
+    const { data: tasks } = await supabase
+      .from('warmup_tasks')
+      .select('*')
+      .in('schedule_id', scheduleIds)
+      .order('scheduled_date', { ascending: true })
+      .order('day_number', { ascending: true });
+
+    const tasksBySchedule = new Map<string, WarmupTask[]>();
+    for (const t of (tasks ?? []) as WarmupTask[]) {
+      const arr = tasksBySchedule.get(t.schedule_id) || [];
+      arr.push(t);
+      tasksBySchedule.set(t.schedule_id, arr);
+    }
+
+    return (schedules as WarmupSchedule[]).map((s) =>
+      buildScheduleWithTasks(s, tasksBySchedule.get(s.id) || [])
+    );
+  } catch {
+    return [];
   }
-
-  return (schedules as WarmupSchedule[]).map((s) =>
-    buildScheduleWithTasks(s, tasksBySchedule.get(s.id) || [])
-  );
 }
 
 export async function updateTaskStatus(
