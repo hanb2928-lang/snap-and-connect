@@ -853,15 +853,28 @@ export default function CameraScreen() {
       )}
 
       {!arMode && (
-        <View style={[styles.controls, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
-          <TouchableOpacity
-            style={styles.galleryButton}
-            onPress={handlePickImage}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2.2} />
-          </TouchableOpacity>
+        <View style={[styles.bottomControlsWrap, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+          <View style={styles.subButtonRow}>
+            <TouchableOpacity
+              style={styles.subButton}
+              onPress={handlePickImage}
+              disabled={processing}
+              activeOpacity={0.7}
+            >
+              <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2.2} />
+              <Text style={styles.subButtonLabel}>갤러리</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.subButton}
+              onPress={handleTemplateOnly}
+              disabled={processing}
+              activeOpacity={0.7}
+            >
+              <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2.2} />
+              <Text style={styles.subButtonLabel}>편집</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={styles.captureButton}
@@ -874,15 +887,6 @@ export default function CameraScreen() {
                 <Text style={styles.captureButtonText}>촬영</Text>
               </View>
             </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.templateOnlyButton}
-            onPress={handleTemplateOnly}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2.2} />
           </TouchableOpacity>
         </View>
       )}
@@ -1680,30 +1684,32 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginTop: 2,
   },
-  controls: {
-    flexDirection: 'row',
+  bottomControlsWrap: {
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
-  galleryButton: {
-    width: 52,
-    height: 52,
+  subButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  subButton: {
+    width: 80,
+    height: 56,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 2,
   },
-  templateOnlyButton: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent[400] + '40',
+  subButtonLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
   captureButton: {
     width: 80,
