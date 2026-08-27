@@ -1078,7 +1078,17 @@ export default function ResultScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.topBar, { paddingTop: safeTop + 12 }]}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => {
+            if (activePlatform !== 'shortform') {
+              setActivePlatform('shortform');
+            } else {
+              router.back();
+            }
+          }}
+          activeOpacity={0.7}
+        >
           <ArrowLeft size={22} color={theme.colors.dark.text} strokeWidth={2} />
         </TouchableOpacity>
         <View style={styles.topActions}>
