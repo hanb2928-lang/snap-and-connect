@@ -1,0 +1,59 @@
+[functions.analyze-photo]
+verify_jwt = false
+
+[functions.generate-comic-scenario]
+verify_jwt = false
+
+[functions.generate-copy]
+verify_jwt = false
+
+[functions.generate-review]
+verify_jwt = false
+
+[functions.generate-shortform-guide]
+verify_jwt = false
+
+[functions.generate-tts]
+verify_jwt = false
+
+[functions.generate-virtual-cuts]
+verify_jwt = false
+
+[functions.generate-virtual-fitting]
+verify_jwt = false
+
+[functions.keyword-trends]
+verify_jwt = false
+
+[functions.naver-trending]
+verify_jwt = false
+
+[functions.persona-simulator]
+verify_jwt = false
+
+[functions.process-queue]
+verify_jwt = false
+
+[functions.process-queue-trigger]
+verify_jwt = false
+
+[functions.r]
+verify_jwt = false
+
+[functions.recommend-style]
+verify_jwt = false
+
+[functions.remove-bg]
+verify_jwt = false
+
+[functions.translate-localize]
+verify_jwt = false
+
+[functions.trend-copy]
+verify_jwt = false
+
+[functions.trend-match]
+verify_jwt = false
+
+[functions.viral-predict]
+verify_jwt = false

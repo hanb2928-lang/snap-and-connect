@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function stripJsonFence(s: string): string {
+  let t = s.trim();
+  if (t.startsWith("```")) {
+    t = t.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "").trim();
+  }
+  return t;
+}
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -145,7 +153,12 @@ async function generateWithOpenAI(
   const content = result.choices?.[0]?.message?.content;
   if (!content) throw new Error("No content returned from OpenAI");
 
-  const parsed = JSON.parse(content);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(stripJsonFence(content));
+  } catch {
+    return generateLocalGuide(data);
+  }
   return normalizeGuide(parsed);
 }
 

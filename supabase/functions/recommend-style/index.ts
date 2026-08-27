@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function stripJsonFence(s: string): string {
+  let t = s.trim();
+  if (t.startsWith("```")) {
+    t = t.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "").trim();
+  }
+  return t;
+}
+
 interface StyleRecommendation {
   cardStyle: "bold" | "magazine" | "feed" | "minimal";
   musicMood: "upbeat" | "calm" | "emotional" | "none";
@@ -176,7 +184,12 @@ async function recommendWithOpenAI(
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error("No content from OpenAI");
 
-    const parsed = JSON.parse(content);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(stripJsonFence(content));
+    } catch {
+      return fallbackRecommendation(productCategory, platform);
+    }
     return normalizeRecommendation(parsed, productCategory, platform);
   } finally {
     clearTimeout(timeout);

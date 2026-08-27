@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function stripJsonFence(s: string): string {
+  let t = s.trim();
+  if (t.startsWith("```")) {
+    t = t.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "").trim();
+  }
+  return t;
+}
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -360,16 +368,16 @@ async function callOpenAIWithRetry(
             const retryContent = retryData.choices?.[0]?.message?.content;
             if (retryContent) {
               try {
-                const base = JSON.parse(content);
+                const base = JSON.parse(stripJsonFence(content));
                 try {
-                  const ext = JSON.parse(retryContent);
+                  const ext = JSON.parse(stripJsonFence(retryContent));
                   return normalizeResult({ ...base, ...ext });
                 } catch {
                   return normalizeResult(base);
                 }
               } catch {
                 try {
-                  return normalizeResult(JSON.parse(retryContent));
+                  return normalizeResult(JSON.parse(stripJsonFence(retryContent)));
                 } catch {
                   // retry content wasn't valid JSON either
                 }
@@ -384,7 +392,7 @@ async function callOpenAIWithRetry(
       }
 
       try {
-        const parsed = JSON.parse(content);
+        const parsed = JSON.parse(stripJsonFence(content));
         return normalizeResult(parsed);
       } catch {
         return normalizeResult({});

@@ -129,6 +129,7 @@ export default function ResultScreen() {
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
   const cardRef = useRef<View>(null);
+  const mountedRef = useRef(true);
   const styleApplyCounter = useRef(0);
 
   const fetchScan = useCallback(async () => {
@@ -143,22 +144,28 @@ export default function ResultScreen() {
         getUserSettings(),
       ]);
 
+      if (!mountedRef.current) return;
       if (scanResult.error) {
         setError(friendlyError(scanResult.error, '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
       } else if (!scanResult.data) {
-        setError('스캔을 찾을 수 없습니다');
+        if (mountedRef.current) setError('스캔을 찾을 수 없습니다');
       } else {
+        if (!mountedRef.current) return;
         setScan(scanResult.data as Scan);
         setCustomAffiliateLinks((scanResult.data as Scan).custom_affiliate_links ?? []);
         setLocalStoreInfo((scanResult.data as Scan).local_store_info ?? null);
       }
-      setSettings(settingsResult);
+      if (mountedRef.current) setSettings(settingsResult);
     } catch (err) {
-      setError(friendlyError(err, '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
+      if (mountedRef.current) setError(friendlyError(err, '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     fetchScan();
@@ -263,7 +270,7 @@ export default function ResultScreen() {
       }
       setEditingProduct(false);
     } catch (err) {
-      setError(friendlyError(err, '제품 정보 저장에 실패했습니다. 다시 시도해주세요.'));
+      if (mountedRef.current) setError(friendlyError(err, '제품 정보 저장에 실패했습니다. 다시 시도해주세요.'));
     } finally {
       setSavingProduct(false);
     }
