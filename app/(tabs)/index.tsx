@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
   },
   frameCornerTL: {
     position: 'absolute',
-    top: 56,
+    top: 112,
     left: 28,
     width: 40,
     height: 40,
@@ -1307,7 +1307,7 @@ const styles = StyleSheet.create({
   },
   frameCornerTR: {
     position: 'absolute',
-    top: 56,
+    top: 112,
     right: 28,
     width: 40,
     height: 40,
@@ -1318,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   frameCornerBL: {
     position: 'absolute',
-    bottom: 56,
+    bottom: 120,
     left: 28,
     width: 40,
     height: 40,
@@ -1329,7 +1329,7 @@ const styles = StyleSheet.create({
   },
   frameCornerBR: {
     position: 'absolute',
-    bottom: 56,
+    bottom: 120,
     right: 28,
     width: 40,
     height: 40,
@@ -1384,12 +1384,13 @@ const styles = StyleSheet.create({
   },
   zoomIndicator: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 130,
     alignSelf: 'center',
     backgroundColor: 'rgba(10, 15, 30, 0.7)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: theme.radius.full,
+    zIndex: 8,
   },
   zoomIndicatorText: {
     fontSize: theme.typography.micro,
@@ -1521,15 +1522,15 @@ const styles = StyleSheet.create({
   },
   stylePickerPanel: {
     position: 'absolute',
-    bottom: 180,
+    bottom: 220,
     left: theme.spacing.md,
     right: theme.spacing.md,
-    maxHeight: '60%',
+    maxHeight: '50%',
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     overflow: 'hidden',
-    zIndex: 20,
+    zIndex: 25,
     ...theme.shadows.elevated,
   },
   styleOptionScroll: {
@@ -1705,7 +1706,11 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   gridOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 112,
+    bottom: 120,
+    left: 0,
+    right: 0,
   },
   gridLineVerticalLeft: {
     position: 'absolute',
@@ -1713,7 +1718,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: '33.33%',
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   gridLineVerticalRight: {
     position: 'absolute',
@@ -1721,7 +1726,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: '66.66%',
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   gridLineHorizontalTop: {
     position: 'absolute',
@@ -1729,7 +1734,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: '33.33%',
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   gridLineHorizontalBottom: {
     position: 'absolute',
@@ -1737,10 +1742,14 @@ const styles = StyleSheet.create({
     right: 0,
     top: '66.66%',
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   touchLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 112,
+    bottom: 120,
+    left: 0,
+    right: 0,
     zIndex: 5,
   },
   focusIndicator: {
@@ -2014,11 +2023,11 @@ const styles = StyleSheet.create({
   },
   nativeAngleGuide: {
     position: 'absolute',
-    bottom: 140,
+    bottom: 220,
     left: theme.spacing.lg,
     right: theme.spacing.lg,
     alignItems: 'center',
-    zIndex: 5,
+    zIndex: 8,
   },
   nativeAngleTooltip: {
     backgroundColor: 'rgba(10, 15, 30, 0.9)',
