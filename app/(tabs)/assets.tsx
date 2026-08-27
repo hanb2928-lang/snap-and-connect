@@ -92,7 +92,11 @@ export default function AssetsScreen() {
       }
       const mediaAsset = await MediaLibrary.createAssetAsync(downloadRes.uri);
       const albumName = asset.asset_type === 'video' ? '숏커넥트 영상' : '숏커넥트';
-      await MediaLibrary.createAlbumAsync(albumName, mediaAsset, false);
+      try {
+        await MediaLibrary.createAlbumAsync(albumName, mediaAsset, false);
+      } catch {
+        // Album creation can fail on scoped storage; the asset is already saved to gallery.
+      }
       Alert.alert('저장 완료', '갤러리에 저장됐어요.');
     } catch {
       Alert.alert('오류', '다운로드 중 문제가 발생했어요.');
