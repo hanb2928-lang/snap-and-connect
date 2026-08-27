@@ -74,7 +74,6 @@ export default function CameraScreen() {
   const progressWidth = useSharedValue(0);
   const [preferredStyle, setPreferredStyle] = useState<PlatformKey>('shortform');
   const [stylePickerVisible, setStylePickerVisible] = useState(false);
-  const [showOnboardingStyle, setShowOnboardingStyle] = useState(false);
   const [showOnboardingCapture, setShowOnboardingCapture] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [arMode, setArMode] = useState(false);
@@ -716,8 +715,6 @@ export default function CameraScreen() {
 
         {stylePickerVisible && (
           <View style={styles.stylePickerPanel}>
-            <Text style={styles.stylePickerTitle}>템플릿 스타일 선택</Text>
-            <Text style={styles.stylePickerSubtitle}>촬영 후 이 스타일이 자동 적용됩니다</Text>
             <ScrollView style={styles.styleOptionScroll}>
               {STYLE_PRESETS.map((preset) => (
                 <TouchableOpacity
@@ -845,7 +842,7 @@ export default function CameraScreen() {
           {processing
             ? progressText
             : recognitionMode === 'single'
-              ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다'
+              ? `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿 스타일: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 자동 적용됩니다`
               : multiShots.length === 0
                 ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
                 : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
@@ -882,21 +879,11 @@ export default function CameraScreen() {
         visible={showOnboardingModal}
         onComplete={() => {
           setShowOnboardingModal(false);
-          setShowOnboardingStyle(true);
+          setShowOnboardingCapture(true);
         }}
       />
 
-      <OnboardingTooltip
-        visible={showOnboardingStyle}
-        onDismiss={() => {
-          setShowOnboardingStyle(false);
-          setShowOnboardingCapture(true);
-        }}
-        message="여기서 템플릿 스타일을 선택하세요"
-        bottom={170}
-        direction="down"
-        duration={3000}
-      />
+
 
       <OnboardingTooltip
         visible={showOnboardingCapture}
@@ -1547,18 +1534,6 @@ const styles = StyleSheet.create({
   },
   styleOptionScroll: {
     maxHeight: '100%',
-  },
-  stylePickerTitle: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-    marginBottom: 2,
-  },
-  stylePickerSubtitle: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginBottom: theme.spacing.sm,
   },
   styleOption: {
     flexDirection: 'row',
