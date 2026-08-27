@@ -40,9 +40,16 @@ function isBot(userAgent: string): boolean {
 
 function detectPlatform(url: string): string {
   if (/coupang\.com/i.test(url)) return "Coupang";
-  if (/brandconnect\.naver\.com|brand\.naver\.com/i.test(url)) return "BrandConnect";
-  if (/smartstore\.naver\.com|search\.shopping\.naver\.com/i.test(url)) return "NaverShopping";
+  if (/brandconnect\.naver\.com|brand\.naver\.com|smartstore\.naver\.com|search\.shopping\.naver\.com/i.test(url)) return "BrandConnect";
   if (/toss\.(to|im)/i.test(url)) return "Toss";
+  if (/oliveyoung\.co\.kr/i.test(url)) return "OliveYoung";
+  if (/ably\.co|a-bly\.com/i.test(url)) return "Ablely";
+  if (/zigzag\.(kr|be)/i.test(url)) return "Zigzag";
+  if (/ohou\.se/i.test(url)) return "TodayHouse";
+  if (/kurly\.com/i.test(url)) return "Kurly";
+  if (/aliexpress\.(com|kr)/i.test(url)) return "AliExpress";
+  if (/myrealtrip\.com/i.test(url)) return "MyRealTrip";
+  if (/klook\.com/i.test(url)) return "Klook";
   return "기타";
 }
 
@@ -56,6 +63,7 @@ function isSafeRedirectUrl(url: string): boolean {
       "partners.coupang.com",
       "search.shopping.naver.com",
       "brandconnect.naver.com",
+      "brand.naver.com",
       "smartstore.naver.com",
       "sharelink.toss.im",
       "toss.to",
@@ -65,14 +73,23 @@ function isSafeRedirectUrl(url: string): boolean {
       "www.oliveyoung.co.kr",
       "m.ably.co",
       "ably.co",
+      "ably.co.kr",
+      "www.ably.co.kr",
+      "m.ably.co.kr",
+      "a-bly.com",
+      "www.a-bly.com",
       "zigzag.kr",
       "m.zigzag.kr",
+      "zigzag.be",
+      "www.zigzag.be",
       "ohou.se",
       "www.ohou.se",
       "kurly.com",
       "www.kurly.com",
       "aliexpress.com",
       "www.aliexpress.com",
+      "aliexpress.kr",
+      "www.aliexpress.kr",
       "myrealtrip.com",
       "www.myrealtrip.com",
       "klook.com",
