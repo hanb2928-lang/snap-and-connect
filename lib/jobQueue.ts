@@ -26,7 +26,7 @@ export interface RenderJob {
   attempts: number;
 }
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 3000;
 const DEFAULT_TIMEOUT_MS = 300000;
 
 export async function enqueueJob(
@@ -74,24 +74,62 @@ export async function waitForJob<T = Record<string, unknown>>(
   jobId: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<JobResult<T>> {
-  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    let settled = false;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-  while (Date.now() < deadline) {
-    const job = await getJob(jobId);
-    if (!job) return { success: false, error: 'Job not found' };
+    const cleanup = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      clearTimeout(timeoutTimer);
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+    };
 
-    if (job.status === 'done') {
-      return { success: true, result: (job.result ?? {}) as T };
-    }
+    const finish = (result: JobResult<T>) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
 
-    if (job.status === 'error') {
-      return { success: false, error: job.error_message ?? 'Job failed' };
-    }
+    const channel = supabase
+      .channel(`job-wait:${jobId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
+        (payload) => {
+          const job = payload.new as RenderJob;
+          if (job.status === 'done') {
+            finish({ success: true, result: (job.result ?? {}) as T });
+          } else if (job.status === 'error') {
+            finish({ success: false, error: job.error_message ?? 'Job failed' });
+          }
+        },
+      )
+      .subscribe();
 
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
+    const timeoutTimer = setTimeout(() => {
+      finish({ success: false, error: 'Job timed out' });
+    }, timeoutMs);
 
-  return { success: false, error: 'Job timed out' };
+    const poll = async () => {
+      if (settled) return;
+      try {
+        const job = await getJob(jobId);
+        if (!job) { finish({ success: false, error: 'Job not found' }); return; }
+        if (job.status === 'done') {
+          finish({ success: true, result: (job.result ?? {}) as T });
+        } else if (job.status === 'error') {
+          finish({ success: false, error: job.error_message ?? 'Job failed' });
+        }
+      } catch {
+        // ignore poll errors — realtime will handle it
+      }
+    };
+
+    setTimeout(poll, 5000);
+    pollInterval = setInterval(poll, POLL_INTERVAL_MS);
+  });
 }
 
 export function subscribeToJob(

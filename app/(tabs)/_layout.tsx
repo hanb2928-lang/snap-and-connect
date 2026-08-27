@@ -21,10 +21,11 @@ export default function TabLayout() {
         if (!cancelled) setBadges({});
       }
     };
-    checkBadges();
-    const interval = setInterval(checkBadges, 30000);
+    const timeoutId = setTimeout(checkBadges, 2000);
+    const interval = setInterval(checkBadges, 60000);
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       clearInterval(interval);
     };
   }, []);

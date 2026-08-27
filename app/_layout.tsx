@@ -39,19 +39,17 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (!(fontsLoaded || fontError) || startedRef.current) return;
+    if (startedRef.current) return;
     startedRef.current = true;
-
-    if (fontError && !fontsLoaded) {
-      SplashScreen.hideAsync();
-      setReady('error');
-      return;
-    }
 
     (async () => {
       try {
         await initStorage();
-        setReady('app');
+        if (fontError && !fontsLoaded) {
+          setReady('error');
+        } else {
+          setReady('app');
+        }
         SplashScreen.hideAsync();
       } catch {
         startedRef.current = false;
@@ -59,7 +57,7 @@ export default function RootLayout() {
         SplashScreen.hideAsync();
       }
     })();
-  }, [fontsLoaded, fontError, ready]);
+  }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     const handleDeepLink = (url: string) => {

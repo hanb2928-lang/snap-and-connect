@@ -132,7 +132,9 @@ async function resolveOpenAIKey(): Promise<string | null> {
 
   if (supabaseUrl && serviceRoleKey) {
     try {
-      const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
+      const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const resp = await fetch(`${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.1`, {
         headers: {
           apikey: serviceRoleKey,
           Authorization: `Bearer ${serviceRoleKey}`,

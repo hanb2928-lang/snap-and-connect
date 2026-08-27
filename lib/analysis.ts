@@ -3,7 +3,7 @@ import { supabase, ANALYSIS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase
 import { safeFetch } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
-import { base64ToUint8Array, buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
@@ -11,9 +11,6 @@ export async function uploadImage(
   base64: string,
   mimeType: string,
 ): Promise<string> {
-  const dataUrl = buildDataUrl(base64, mimeType);
-  const compressedDataUrl = await prepareImageForApi(dataUrl, 1080, 0.8);
-  const compressedBase64 = cleanBase64(compressedDataUrl);
   const uploadMime = 'image/jpeg';
 
   const ext = 'jpg';
@@ -21,7 +18,7 @@ export async function uploadImage(
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, base64ToUint8Array(compressedBase64), { contentType: uploadMime });
+    .upload(fileName, base64ToUint8Array(base64), { contentType: uploadMime });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
