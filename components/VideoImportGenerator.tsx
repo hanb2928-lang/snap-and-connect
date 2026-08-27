@@ -133,6 +133,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
         },
         body: JSON.stringify({
           productName: '이 제품',
