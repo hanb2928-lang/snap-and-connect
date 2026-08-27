@@ -10,6 +10,7 @@ interface QueuedJobState {
 
 const DEFAULT_TIMEOUT_MS = 120000;
 const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_ERRORS = 5;
 
 export function useQueuedJob() {
   const [state, setState] = useState<QueuedJobState>({
@@ -87,12 +88,26 @@ export function useQueuedJob() {
       }
     }).catch(() => {});
 
+    let pollErrors = 0;
+
     pollRef.current = setInterval(() => {
       if (mySubmitId !== submitIdRef.current) return;
       getJob(jobId).then((job) => {
         if (mySubmitId !== submitIdRef.current) return;
+        pollErrors = 0;
         if (job) handleUpdate(job);
-      }).catch(() => {});
+      }).catch(() => {
+        pollErrors++;
+        if (pollErrors >= MAX_POLL_ERRORS) {
+          if (mySubmitId !== submitIdRef.current) return;
+          clearAll();
+          setState((prev) => ({
+            ...prev,
+            status: 'error',
+            error: '네트워크 연결이 불안정합니다. 다시 시도해주세요.',
+          }));
+        }
+      });
     }, POLL_INTERVAL_MS);
 
     return jobId;

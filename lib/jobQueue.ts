@@ -28,6 +28,7 @@ export interface RenderJob {
 
 const POLL_INTERVAL_MS = 3000;
 const DEFAULT_TIMEOUT_MS = 300000;
+const MAX_POLL_ERRORS = 5;
 
 export async function enqueueJob(
   jobType: JobType,
@@ -112,10 +113,13 @@ export async function waitForJob<T = Record<string, unknown>>(
       finish({ success: false, error: 'Job timed out' });
     }, timeoutMs);
 
+    let pollErrors = 0;
+
     const poll = async () => {
       if (settled) return;
       try {
         const job = await getJob(jobId);
+        pollErrors = 0;
         if (!job) { finish({ success: false, error: 'Job not found' }); return; }
         if (job.status === 'done') {
           finish({ success: true, result: (job.result ?? {}) as T });
@@ -123,7 +127,10 @@ export async function waitForJob<T = Record<string, unknown>>(
           finish({ success: false, error: job.error_message ?? 'Job failed' });
         }
       } catch {
-        // ignore poll errors — realtime will handle it
+        pollErrors++;
+        if (pollErrors >= MAX_POLL_ERRORS) {
+          finish({ success: false, error: '네트워크 연결이 불안정합니다. 다시 시도해주세요.' });
+        }
       }
     };
 
