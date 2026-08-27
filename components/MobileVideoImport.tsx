@@ -27,7 +27,7 @@ import {
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from '@/lib/errors';
-import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { COPY_FUNCTION_URL, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 
 interface MobileVideoImportProps {
   affiliatePlatforms?: string[];
@@ -104,26 +104,48 @@ export function MobileVideoImport({
     setError(null);
 
     try {
-      const fileExt = videoUri.split('.').pop()?.toLowerCase() || 'mp4';
+      const uriPath = videoUri.split('?')[0].split('#')[0];
+      const fileExt = uriPath.split('.').pop()?.toLowerCase() || 'mp4';
       const fileName = `video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+      const contentType = fileExt === 'mov'
+        ? 'video/quicktime'
+        : fileExt === 'webm'
+          ? 'video/webm'
+          : 'video/mp4';
 
-      const fileInfo = await FileSystem.getInfoAsync(videoUri);
-      if (!fileInfo.exists) {
-        throw new Error('영상 파일을 찾을 수 없습니다.');
+      if (Platform.OS === 'web') {
+        const response = await fetch(videoUri);
+        if (!response.ok) throw new Error('영상 파일을 읽을 수 없습니다.');
+        const blob = await response.blob();
+        const { error: uploadError } = await supabase.storage
+          .from('videos')
+          .upload(fileName, blob, { contentType, upsert: false });
+        if (uploadError) throw new Error(`업로드 실패: ${uploadError.message}`);
+      } else {
+        const uploadResult = await FileSystem.uploadAsync(
+          `${supabaseUrl}/storage/v1/object/videos/${encodeURIComponent(fileName)}`,
+          videoUri,
+          {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: {
+              Authorization: `Bearer ${supabaseAnonKey}`,
+              apikey: supabaseAnonKey,
+              'Content-Type': contentType,
+            },
+          },
+        );
+        if (uploadResult.status < 200 || uploadResult.status >= 300) {
+          let message = '영상 업로드에 실패했습니다.';
+          try {
+            const body = JSON.parse(uploadResult.body) as { message?: string; error?: string };
+            message = body.message || body.error || message;
+          } catch {
+            // Keep the friendly fallback when the server response is not JSON.
+          }
+          throw new Error(message); 
+        }
       }
-
-      const contentType = fileExt === 'mov' ? 'video/quicktime' : `video/${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(fileName, {
-          uri: videoUri,
-          type: contentType,
-          name: fileName,
-        } as any, {
-          contentType,
-        });
-
-      if (uploadError) throw new Error(`업로드 실패: ${uploadError.message}`);
 
       showToast('영상이 업로드되었습니다. 숏폼 가공은 웹에서 지원됩니다.');
 
