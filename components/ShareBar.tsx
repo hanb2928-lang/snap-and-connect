@@ -98,11 +98,16 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
           return;
         }
         const asset = await MediaLibrary.createAssetAsync(uri);
-        await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
+        try {
+          await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
+        } catch {
+          // Album creation can fail on scoped storage; the asset is already saved to gallery.
+        }
         showToast('갤러리에 저장됐어요');
       }
-    } catch {
-      showToast('저장 중 오류가 발생했어요');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      showToast(msg ? `저장 실패: ${msg}` : '저장 중 오류가 발생했어요');
     }
     setSharing(false);
   }, [captureCard, showToast, fileName]);
