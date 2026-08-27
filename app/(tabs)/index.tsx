@@ -693,23 +693,43 @@ export default function CameraScreen() {
 
         <View style={styles.extraButtonsRow}>
           <TouchableOpacity
-            style={styles.arModeButton}
-            onPress={() => setArMode(true)}
-            activeOpacity={0.8}
+            style={[styles.pillButton, mediaPickerVisible && styles.pillButtonActive]}
+            onPress={() => { setMediaPickerVisible((v) => !v); setStylePickerVisible(false); }}
+            disabled={processing}
+            activeOpacity={0.7}
           >
-            <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.arModeText}>AR</Text>
+            <ImageIcon size={12} color={mediaPickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
+            <Text style={[styles.pillButtonText, mediaPickerVisible && styles.pillButtonTextActive]}>갤러리</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.stylePickerBtn}
+            style={styles.pillButton}
+            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
+            activeOpacity={0.8}
+          >
+            <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.pillButtonText}>AR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.pillButton, stylePickerVisible && styles.pillButtonActive]}
             onPress={() => { setStylePickerVisible((v) => !v); setMediaPickerVisible(false); }}
             activeOpacity={0.7}
           >
-            <Palette size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.stylePickerLabel}>
+            <Palette size={12} color={stylePickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
+            <Text style={[styles.pillButtonText, stylePickerVisible && styles.pillButtonTextActive]}>
               {templateMode === 'auto' ? '자동' : STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pillButton}
+            onPress={() => { handleTemplateOnly(); setMediaPickerVisible(false); setStylePickerVisible(false); }}
+            disabled={processing}
+            activeOpacity={0.7}
+          >
+            <Wand2 size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.pillButtonText}>편집</Text>
           </TouchableOpacity>
         </View>
 
@@ -858,28 +878,6 @@ export default function CameraScreen() {
               </View>
             </View>
           </TouchableOpacity>
-
-          <View style={styles.subButtonRow}>
-            <TouchableOpacity
-              style={styles.subButton}
-              onPress={() => setMediaPickerVisible((v) => !v)}
-              disabled={processing}
-              activeOpacity={0.7}
-            >
-              <ImageIcon size={20} color={mediaPickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
-              <Text style={[styles.subButtonLabel, mediaPickerVisible && { color: theme.colors.accent[400] }]}>갤러리</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.subButton}
-              onPress={handleTemplateOnly}
-              disabled={processing}
-              activeOpacity={0.7}
-            >
-              <Wand2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.subButtonLabel}>편집</Text>
-            </TouchableOpacity>
-          </View>
 
           {mediaPickerVisible && (
             <View style={styles.mediaPickerPanel}>
@@ -1549,55 +1547,28 @@ const styles = StyleSheet.create({
   modeButtonTextActive: {
     color: '#fff',
   },
-  stylePickerBtn: {
+  pillButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.dark.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.accent[500] + '40',
+    borderColor: theme.colors.dark.border,
   },
-  arModeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: theme.radius.full,
+  pillButtonActive: {
     backgroundColor: theme.colors.accent[500] + '20',
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent[400] + '60',
+    borderColor: theme.colors.accent[400] + '80',
   },
-  arModeText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.accent[400],
-  },
-  videoImportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.warning[500] + '20',
-    borderWidth: 1.5,
-    borderColor: theme.colors.warning[400] + '60',
-  },
-  videoImportText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.warning[400],
-  },
-  stylePickerLabel: {
+  pillButtonText: {
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  pillButtonTextActive: {
     color: theme.colors.accent[300],
   },
   stylePickerPanel: {
@@ -1713,28 +1684,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     gap: theme.spacing.md,
-  },
-  subButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-  },
-  subButton: {
-    width: 72,
-    height: 64,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(19, 26, 46, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  subButtonLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
   },
   mediaPickerPanel: {
     position: 'absolute',
