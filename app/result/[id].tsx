@@ -577,76 +577,8 @@ export default function ResultScreen() {
 
   const featureCategories: FeatureCategory[] = [
     {
-      key: 'content',
-      label: '콘텐츠 생성',
-      tiles: [
-        {
-          key: 'trendCopy',
-          label: '트렌드 카피',
-          category: 'content',
-          icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <TrendCopyBar
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              tags={scan?.tags || []}
-              platform={activePlatform}
-              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
-            />
-          ),
-        },
-        {
-          key: 'hashtag',
-          label: '해시태그',
-          category: 'content',
-          icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <HashtagCopyBar
-              hashtags={allDisplayHashtags}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              platform={activePlatform}
-            />
-          ),
-        },
-        {
-          key: 'copyWriter',
-          label: '카피라이터',
-          category: 'content',
-          icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <CopyWriter
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              priceEstimate={activePriceEstimate}
-              oneLiner={activeOneLiner}
-              productAdvantages={td?.productAdvantages || []}
-              platform={activePlatform}
-              brandPersona={settings?.brand_persona}
-            />
-          ),
-        },
-        {
-          key: 'shortFormGuide',
-          label: '숏폼 가이드',
-          category: 'content',
-          icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <ShortFormGuideCard
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              priceEstimate={activePriceEstimate}
-              oneLiner={activeOneLiner}
-              productAdvantages={td?.productAdvantages || []}
-              onApplyHook={(hook) => setHookOverride(hook)}
-              appliedHook={hookOverride}
-            />
-          ),
-        },
-      ],
-    },
-    {
       key: 'template',
-      label: '템플릿 & 이미지',
+      label: '핵심 템플릿',
       tiles: [
         {
           key: 'templateCard',
@@ -880,22 +812,8 @@ export default function ResultScreen() {
     },
     {
       key: 'commerce',
-      label: '커머스 & 링크',
+      label: '커머스 & 공유',
       tiles: [
-        {
-          key: 'trendMatch',
-          label: '트렌드 매치',
-          category: 'commerce',
-          icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
-          render: () => (
-            <TrendMatchCard
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              productName={activeProductName || scan?.product_name || ''}
-              platform={activePlatform}
-              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
-            />
-          ),
-        },
         {
           key: 'shoppingMatch',
           label: '쇼핑커넥트',
@@ -942,12 +860,124 @@ export default function ResultScreen() {
             />
           ),
         },
+        {
+          key: 'multiExport',
+          label: '멀티 내보내기',
+          category: 'export',
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <MultiPlatformExport
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.primary[400]}
+              category={td?.category || ''}
+              fileName={`snap-connect-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              shortUrl={shortUrl || ''}
+            />
+          ),
+        },
+        {
+          key: 'shareBar',
+          label: '공유하기',
+          category: 'export',
+          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <ShareBar
+              cardRef={cardRef}
+              shareText={shareText}
+              affiliateUrl={primaryAffiliateUrl}
+              shortUrl={shortUrl}
+              fileName={`snap-connect-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+            />
+          ),
+        },
       ],
     },
     {
-      key: 'insight',
-      label: '분석 & 전략',
+      key: 'marketing',
+      label: '마케팅 툴',
       tiles: [
+        {
+          key: 'trendCopy',
+          label: '트렌드 카피',
+          category: 'content',
+          icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <TrendCopyBar
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              tags={scan?.tags || []}
+              platform={activePlatform}
+              onApplyTrend={(phrase) => setAutoMarketingCopy(phrase)}
+            />
+          ),
+        },
+        {
+          key: 'hashtag',
+          label: '해시태그',
+          category: 'content',
+          icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <HashtagCopyBar
+              hashtags={allDisplayHashtags}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              platform={activePlatform}
+            />
+          ),
+        },
+        {
+          key: 'copyWriter',
+          label: '카피라이터',
+          category: 'content',
+          icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <CopyWriter
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              priceEstimate={activePriceEstimate}
+              oneLiner={activeOneLiner}
+              productAdvantages={td?.productAdvantages || []}
+              platform={activePlatform}
+              brandPersona={settings?.brand_persona}
+            />
+          ),
+        },
+        {
+          key: 'shortFormGuide',
+          label: '숏폼 가이드',
+          category: 'content',
+          icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <ShortFormGuideCard
+              productName={activeProductName}
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              priceEstimate={activePriceEstimate}
+              oneLiner={activeOneLiner}
+              productAdvantages={td?.productAdvantages || []}
+              onApplyHook={(hook) => setHookOverride(hook)}
+              appliedHook={hookOverride}
+            />
+          ),
+        },
+        {
+          key: 'trendMatch',
+          label: '트렌드 매치',
+          category: 'commerce',
+          icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => (
+            <TrendMatchCard
+              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
+              productName={activeProductName || scan?.product_name || ''}
+              platform={activePlatform}
+              onApplyHashtags={(tags) => setAddedHashtags((prev) => [...prev, ...tags.filter((t) => !prev.includes(t))])}
+            />
+          ),
+        },
         {
           key: 'shortFormTips',
           label: '숏폼 팁',
@@ -1001,32 +1031,6 @@ export default function ResultScreen() {
             />
           ),
         },
-      ],
-    },
-    {
-      key: 'export',
-      label: '내보내기 & 공유',
-      tiles: [
-        {
-          key: 'multiExport',
-          label: '멀티 내보내기',
-          category: 'export',
-          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <MultiPlatformExport
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.primary[400]}
-              category={td?.category || ''}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-            />
-          ),
-        },
         {
           key: 'globalLocalizer',
           label: '글로벌 로컬라이저',
@@ -1042,22 +1046,6 @@ export default function ResultScreen() {
               productCategory={selectedProduct?.productCategory || scan.product_category || ''}
               narrationText={activeHook || activeOneLiner}
               affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
-            />
-          ),
-        },
-        {
-          key: 'shareBar',
-          label: '공유하기',
-          category: 'export',
-          icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          render: () => (
-            <ShareBar
-              cardRef={cardRef}
-              shareText={shareText}
-              affiliateUrl={primaryAffiliateUrl}
-              shortUrl={shortUrl}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
             />
           ),
         },
