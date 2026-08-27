@@ -10,26 +10,41 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { History, Trash2, Tag, ShoppingBag } from 'lucide-react-native';
+import { History, Trash2, Tag, ShoppingBag, WifiOff } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import type { Scan } from '@/types/database';
-import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
+import { SkeletonList } from '@/components/Skeleton';
 
 type ScanListItem = Pick<Scan, 'id' | 'image_url' | 'title' | 'summary' | 'product_name' | 'product_category' | 'price_estimate' | 'one_liner' | 'tags' | 'created_at'>;
+
+const CACHE_KEY = 'scan_history';
 
 export default function HistoryScreen() {
   const router = useRouter();
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
+  const networkStatus = useNetworkStatus();
   const [scans, setScans] = useState<ScanListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingCache, setUsingCache] = useState(false);
 
-  const fetchScans = useCallback(async () => {
+  const fetchScans = useCallback(async (force = false) => {
+    if (!force) {
+      const cached = await getCached<ScanListItem[]>(CACHE_KEY);
+      if (cached && cached.length > 0) {
+        setScans(cached);
+        setUsingCache(true);
+        setLoading(false);
+      }
+    }
+
     try {
       const { data, error: err } = await supabase
         .from('scans')
@@ -38,13 +53,30 @@ export default function HistoryScreen() {
         .limit(100);
 
       if (err) {
-        setError(err.message);
+        const stale = await getStaleCached<ScanListItem[]>(CACHE_KEY);
+        if (stale && stale.length > 0) {
+          setScans(stale);
+          setUsingCache(true);
+          setError(null);
+        } else {
+          setError(err.message);
+        }
       } else {
-        setScans((data || []) as ScanListItem[]);
+        const items = (data || []) as ScanListItem[];
+        setScans(items);
+        setUsingCache(false);
         setError(null);
+        await setCached(CACHE_KEY, items);
       }
     } catch {
-      setError('네트워크 연결을 확인해주세요');
+      const stale = await getStaleCached<ScanListItem[]>(CACHE_KEY);
+      if (stale && stale.length > 0) {
+        setScans(stale);
+        setUsingCache(true);
+        setError(null);
+      } else {
+        setError('네트워크 연결을 확인해주세요');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,7 +89,7 @@ export default function HistoryScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchScans();
+    fetchScans(true);
   };
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -84,7 +116,14 @@ export default function HistoryScreen() {
   }, []);
 
   if (loading) {
-    return <LoadingScreen message="스캔 기록을 불러오는 중..." />;
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
+          <Text style={styles.headerTitle}>스캔 히스토리</Text>
+        </View>
+        <SkeletonList count={5} />
+      </View>
+    );
   }
 
   return (
@@ -99,6 +138,13 @@ export default function HistoryScreen() {
       {error && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {usingCache && !error && (
+        <View style={styles.cacheBanner}>
+          <WifiOff size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+          <Text style={styles.cacheText}>오프라인 · 저장된 데이터 표시 중</Text>
         </View>
       )}
 
@@ -209,6 +255,24 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: theme.colors.error[400],
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+  },
+  cacheBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.warning[500] + '15',
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning[400],
+  },
+  cacheText: {
+    color: theme.colors.warning[400],
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
   },

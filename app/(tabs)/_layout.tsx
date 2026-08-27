@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { ScrollableTabBar, type TabBadgeMap } from '@/components/ScrollableTabBar';
 import { fetchActiveSchedules } from '@/lib/warmup';
@@ -30,12 +31,26 @@ export default function TabLayout() {
     };
   }, []);
 
+  const screenOptions = Platform.select({
+    ios: {
+      headerShown: false,
+      tabBarShowLabel: false,
+      animation: 'fade' as const,
+      transitionSpec: {
+        animation: 'timing' as const,
+        config: { duration: 200 },
+      },
+    },
+    default: {
+      headerShown: false,
+      animation: 'none' as const,
+    },
+  });
+
   return (
     <Tabs
       tabBar={(props) => <ScrollableTabBar {...props} badges={badges} />}
-      screenOptions={{
-        headerShown: false,
-      }}
+      screenOptions={screenOptions}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="trending" />
