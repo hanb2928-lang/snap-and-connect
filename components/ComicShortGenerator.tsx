@@ -1496,10 +1496,15 @@ export function ComicShortGenerator({
         return;
       }
       const asset = await MediaLibrary.createAssetAsync(resultUri);
-      await MediaLibrary.createAlbumAsync('숏커넥트만화', asset, false);
+      try {
+        await MediaLibrary.createAlbumAsync('숏커넥트만화', asset, false);
+      } catch {
+        // Album creation can fail on scoped storage; the asset is already saved to gallery.
+      }
       showToast('갤러리에 저장됐어요');
-    } catch {
-      showToast('갤러리 저장 중 오류가 발생했어요');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      showToast(msg ? `저장 실패: ${msg}` : '갤러리 저장 중 오류가 발생했어요');
     }
   }, [resultUri, showToast]);
 

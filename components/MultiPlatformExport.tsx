@@ -875,7 +875,11 @@ export function MultiPlatformExport({
       for (const g of generated) {
         try {
           const asset = await MediaLibrary.createAssetAsync(g.uri);
-          await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
+          try {
+            await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
+          } catch {
+            // Album creation can fail on scoped storage; the asset is already saved to gallery.
+          }
         } catch {
           // continue
         }
