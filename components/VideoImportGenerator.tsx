@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
-import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Upload, Type, X, Check, Sparkles, Scissors } from 'lucide-react-native';
+import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Upload, Type, X, Check, Sparkles, Scissors, Image as ImageIcon } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -19,6 +19,7 @@ interface AICopyItem {
 
 type GenState = 'idle' | 'imported' | 'generating' | 'done' | 'error';
 type VideoFormat = 'vertical' | 'horizontal';
+type ImportType = 'video' | 'image';
 
 const FORMATS: Record<VideoFormat, { width: number; height: number }> = {
   vertical: { width: 1080, height: 1920 },
@@ -99,6 +100,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState(0);
   const [highlightSegments, setHighlightSegments] = useState<{ start: number; end: number }[] | null>(null);
+  const [importType, setImportType] = useState<ImportType>('video');
+  const [imageElRef, setImageElRef] = useState<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -279,36 +282,54 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     }
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'video/*';
+    input.accept = importType === 'image' ? 'image/*' : 'video/*';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       if (file.size > 200 * 1024 * 1024) {
-        showToast('200MB 이하의 영상만 지원됩니다');
+        showToast('200MB 이하의 파일만 지원됩니다');
         return;
       }
       const url = URL.createObjectURL(file);
       setVideoBlob(file);
 
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-      video.src = url;
-      video.onloadedmetadata = () => {
-        const dur = video.duration;
-        setVideoDuration(isFinite(dur) && dur > 0 ? Math.min(Math.round(dur), 60) : 6);
-        if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
-        setOriginalVideoUrl(url);
-        setVideoUrl(url);
-        setState('imported');
-        setError(null);
-      };
-      video.onerror = () => {
-        showToast('영상을 불러올 수 없습니다. 다른 파일을 시도해주세요');
-        URL.revokeObjectURL(url);
-      };
+      if (importType === 'image') {
+        const img = new Image();
+        img.onload = () => {
+          setImageElRef(img);
+          setVideoDuration(6);
+          if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
+          setOriginalVideoUrl(url);
+          setVideoUrl(url);
+          setState('imported');
+          setError(null);
+        };
+        img.onerror = () => {
+          showToast('이미지를 불러올 수 없습니다. 다른 파일을 시도해주세요');
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      } else {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.src = url;
+        video.onloadedmetadata = () => {
+          const dur = video.duration;
+          setVideoDuration(isFinite(dur) && dur > 0 ? Math.min(Math.round(dur), 60) : 6);
+          if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
+          setOriginalVideoUrl(url);
+          setVideoUrl(url);
+          setState('imported');
+          setError(null);
+        };
+        video.onerror = () => {
+          showToast('영상을 불러올 수 없습니다. 다른 파일을 시도해주세요');
+          URL.revokeObjectURL(url);
+        };
+      }
     };
     input.click();
-  }, [originalVideoUrl, showToast]);
+  }, [originalVideoUrl, showToast, importType]);
 
   const handleGenerate = useCallback(async () => {
     if (!videoUrl || !videoBlob) return;
@@ -333,31 +354,51 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       canvasRef.current = canvas;
 
-      const video = document.createElement('video');
-      video.src = videoUrl;
-      video.muted = true;
-      video.playsInline = true;
-      if (!videoUrl.startsWith('blob:')) video.crossOrigin = 'anonymous';
-      videoElRef.current = video;
+      const isImage = importType === 'image';
+      let video: HTMLVideoElement | null = null;
+      let img: HTMLImageElement | null = null;
 
-      await new Promise<void>((resolve, reject) => {
-        video.onloadeddata = () => resolve();
-        video.onerror = () => reject(new Error('영상을 로드할 수 없습니다'));
-      });
+      if (isImage) {
+        img = imageElRef ?? new Image();
+        if (img.src !== videoUrl) {
+          img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = videoUrl;
+          await new Promise<void>((resolve, reject) => {
+            img!.onload = () => resolve();
+            img!.onerror = () => reject(new Error('이미지를 로드할 수 없습니다'));
+          });
+        }
+      } else {
+        video = document.createElement('video');
+        video.src = videoUrl;
+        video.muted = true;
+        video.playsInline = true;
+        if (!videoUrl.startsWith('blob:')) video.crossOrigin = 'anonymous';
+        videoElRef.current = video;
 
-      const segments = highlightMode && highlightSegments ? highlightSegments : null;
-      const contentDuration = segments
-        ? segments.reduce((sum, s) => sum + (s.end - s.start), 0)
-        : videoDuration;
+        await new Promise<void>((resolve, reject) => {
+          if (!video) { reject(new Error('영상을 로드할 수 없습니다')); return; }
+          video.onloadeddata = () => resolve();
+          video.onerror = () => reject(new Error('영상을 로드할 수 없습니다'));
+        });
+      }
+
+      const segments = !isImage && highlightMode && highlightSegments ? highlightSegments : null;
+      const contentDuration = isImage
+        ? videoDuration
+        : segments
+          ? segments.reduce((sum, s) => sum + (s.end - s.start), 0)
+          : videoDuration;
       const totalDuration = contentDuration + DISCLOSURE_DURATION;
       const disclosureStart = contentDuration;
 
-      const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
+      const hasRecorder = !isImage && typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
       let recorder: any = null;
       let mimeType = 'video/webm';
       let done: Promise<any> = Promise.resolve(new Blob([], { type: 'video/webm' }));
 
-      if (hasRecorder) {
+      if (hasRecorder && video) {
         const canvasStream = (canvas as any).captureStream(FPS);
         mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
           ? 'video/webm;codecs=vp9'
@@ -379,21 +420,58 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       }
 
       let segIdx = 0;
-      if (segments && segments.length > 0) {
+      if (video && segments && segments.length > 0) {
         video.currentTime = segments[0].start;
-      } else {
+      } else if (video) {
         video.currentTime = 0;
       }
-      await video.play();
+      if (video) await video.play();
 
       const startTime = performance.now();
       let segStartPerf = performance.now();
       let lastPct = -1;
 
+      const drawContent = () => {
+        if (isImage && img) {
+          const iRatio = img.naturalWidth / img.naturalHeight;
+          const cRatio = W / H;
+          let drawW: number, drawH: number;
+          if (iRatio > cRatio) {
+            drawH = H;
+            drawW = drawH * iRatio;
+          } else {
+            drawW = W;
+            drawH = drawW / iRatio;
+          }
+          const px = (W - drawW) / 2;
+          const py = (H - drawH) / 2;
+          ctx.drawImage(img, px, py, drawW, drawH);
+        } else if (video) {
+          if (!video.videoWidth || !video.videoHeight) {
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, 0, W, H);
+          } else {
+            const vRatio = video.videoWidth / video.videoHeight;
+            const cRatio = W / H;
+            let drawW: number, drawH: number;
+            if (vRatio > cRatio) {
+              drawH = H;
+              drawW = drawH * vRatio;
+            } else {
+              drawW = W;
+              drawH = drawW / vRatio;
+            }
+            const px = (W - drawW) / 2;
+            const py = (H - drawH) / 2;
+            ctx.drawImage(video, px, py, drawW, drawH);
+          }
+        }
+      };
+
       const drawFrame = () => {
         let contentElapsed: number;
 
-        if (segments) {
+        if (segments && video) {
           const segElapsed = (performance.now() - segStartPerf) / 1000;
           const segDur = segments[segIdx].end - segments[segIdx].start;
           contentElapsed = 0;
@@ -422,25 +500,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         ctx.fillRect(0, 0, W, H);
 
         if (contentElapsed < disclosureStart) {
-          if (!video.videoWidth || !video.videoHeight) {
-            ctx.fillStyle = '#0a0f1e';
-            ctx.fillRect(0, 0, W, H);
-          } else {
-          const vRatio = video.videoWidth / video.videoHeight;
-          const cRatio = W / H;
-          let drawW: number, drawH: number;
-          if (vRatio > cRatio) {
-            drawH = H;
-            drawW = drawH * vRatio;
-          } else {
-            drawW = W;
-            drawH = drawW / vRatio;
-          }
-          const px = (W - drawW) / 2;
-          const py = (H - drawH) / 2;
-
-          ctx.drawImage(video, px, py, drawW, drawH);
-          }
+          drawContent();
 
           const grad = ctx.createLinearGradient(0, 0, 0, H);
           grad.addColorStop(0, 'rgba(10,15,30,0.15)');
@@ -490,7 +550,6 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           ctx.globalAlpha = 1;
         }
 
-        // Draw roaming baby + link sticker overlay into the video frame
         if (shortUrl) {
           drawRoamingBabyWithLink(ctx, elapsed * 1000, W, H, shortUrl, theme.colors.primary[500]);
         }
@@ -525,16 +584,16 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         setOutputMime('image/png');
       }
 
-      video.pause();
+      if (video) video.pause();
       setState('done');
       setProgress(100);
     } catch (err) {
       setState('error');
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
-      showToast('영상 가공에 실패했어요');
+      showToast('가공에 실패했어요');
     }
-  }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, shortUrl, outputUrl, showToast, highlightMode, highlightSegments]);
+  }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, shortUrl, outputUrl, showToast, highlightMode, highlightSegments, importType, imageElRef]);
 
   const handleDownload = useCallback(() => {
     if (!outputUrl) return;
@@ -586,30 +645,59 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         </View>
 
         <Text style={styles.description}>
-          기존 동영상을 불러와서 훅 문구, 자막, 공정위 문구를 얹어 숏폼으로 완성합니다.
+          기존 영상이나 사진을 불러와서 훅 문구, 자막, 공정위 문구를 얹어 숏폼으로 완성합니다.
         </Text>
 
         {state === 'idle' && (
           <View style={styles.idleWrap}>
+            <View style={styles.typeSelectorRow}>
+              <TouchableOpacity
+                style={[styles.typePill, importType === 'video' && styles.typePillActive]}
+                onPress={() => setImportType('video')}
+                activeOpacity={0.7}
+              >
+                <Film size={16} color={importType === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.typePillText, importType === 'video' && styles.typePillTextActive]}>동영상</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typePill, importType === 'image' && styles.typePillActive]}
+                onPress={() => setImportType('image')}
+                activeOpacity={0.7}
+              >
+                <ImageIcon size={16} color={importType === 'image' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.typePillText, importType === 'image' && styles.typePillTextActive]}>사진</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.importButton} onPress={handlePickVideo} activeOpacity={0.8}>
               <Upload size={24} color="#fff" strokeWidth={2} />
-              <Text style={styles.importButtonText}>원본 영상 불러오기</Text>
+              <Text style={styles.importButtonText}>
+                {importType === 'image' ? '사진 불러오기' : '원본 영상 불러오기'}
+              </Text>
             </TouchableOpacity>
             <Text style={styles.hintText}>
-              MP4, WebM 등 동영상 파일을 선택하세요 (최대 200MB)
+              {importType === 'image'
+                ? 'JPG, PNG 등 이미지 파일을 선택하세요 (최대 200MB)'
+                : 'MP4, WebM 등 동영상 파일을 선택하세요 (최대 200MB)'}
             </Text>
           </View>
         )}
 
         {state === 'imported' && (
           <ScrollView style={styles.optionsScroll} showsVerticalScrollIndicator={false}>
-            {videoUrl && Platform.OS === 'web' && (
+            {videoUrl && Platform.OS === 'web' && importType === 'video' && (
               // @ts-ignore video element on web
               <video
                 src={videoUrl}
                 style={styles.previewVideo}
                 controls
                 playsInline
+              />
+            )}
+            {videoUrl && Platform.OS === 'web' && importType === 'image' && (
+              // @ts-ignore img element on web
+              <img
+                src={videoUrl}
+                style={styles.previewImage}
               />
             )}
 
@@ -690,6 +778,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
               </View>
             </View>
 
+            {importType === 'video' && (
             <View style={styles.highlightSection}>
               <TouchableOpacity
                 style={styles.highlightToggle}
@@ -760,6 +849,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
                 </>
               )}
             </View>
+            )}
 
             <TouchableOpacity style={styles.aiEditButton} onPress={handleAiAutoEdit} disabled={aiGenerating} activeOpacity={0.8}>
               {aiGenerating ? (
@@ -807,20 +897,20 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
             <View style={styles.buttonRow}>
               <TouchableOpacity style={styles.reimportButton} onPress={handlePickVideo} activeOpacity={0.7}>
                 <RefreshCw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={styles.reimportText}>영상 다시 선택</Text>
+                <Text style={styles.reimportText}>{importType === 'image' ? '사진 다시 선택' : '영상 다시 선택'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.generateButton, highlightMode && !highlightSegments && styles.generateButtonDisabled]}
+                style={[styles.generateButton, importType === 'video' && highlightMode && !highlightSegments && styles.generateButtonDisabled]}
                 onPress={handleGenerate}
-                disabled={highlightMode && !highlightSegments}
+                disabled={importType === 'video' && highlightMode && !highlightSegments}
                 activeOpacity={0.8}
               >
                 <Film size={20} color="#fff" strokeWidth={2} />
                 <Text style={styles.generateButtonText}>
-                  {highlightMode ? '하이라이트 숏폼 만들기' : '숏폼 만들기'}
+                  {importType === 'video' && highlightMode ? '하이라이트 숏폼 만들기' : '숏폼 만들기'}
                 </Text>
               </TouchableOpacity>
-              {highlightMode && !highlightSegments && (
+              {importType === 'video' && highlightMode && !highlightSegments && (
                 <Text style={styles.hintText}>먼저 하이라이트 분석을 실행해주세요</Text>
               )}
             </View>
@@ -938,6 +1028,31 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xl,
     gap: theme.spacing.md,
   },
+  typeSelectorRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: theme.spacing.sm,
+  },
+  typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  typePillActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  typePillText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  typePillTextActive: {
+    color: '#fff',
+  },
   importButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -969,6 +1084,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     alignSelf: 'center',
     backgroundColor: '#000',
+  },
+  previewImage: {
+    width: '100%',
+    maxWidth: 300,
+    maxHeight: 200,
+    borderRadius: theme.radius.md,
+    marginBottom: theme.spacing.md,
+    alignSelf: 'center',
+    objectFit: 'contain' as any,
   },
   sectionLabel: {
     flexDirection: 'row',

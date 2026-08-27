@@ -23,6 +23,7 @@ import {
   Type,
   CircleAlert as AlertCircle,
   Play,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +42,7 @@ interface AICopyItem {
 }
 
 type Stage = 'idle' | 'picking' | 'uploaded' | 'generating' | 'done' | 'error';
+type ImportType = 'video' | 'image';
 
 const FONT_SIZES = [
   { label: '작게', value: 36 },
@@ -54,6 +56,7 @@ export function MobileVideoImport({
   onClose,
 }: MobileVideoImportProps) {
   const [stage, setStage] = useState<Stage>('idle');
+  const [importType, setImportType] = useState<ImportType>('video');
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [duration, setDuration] = useState(6);
   const [hookText, setHookText] = useState('');
@@ -76,7 +79,9 @@ export function MobileVideoImport({
     setError(null);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: importType === 'image'
+          ? ImagePicker.MediaTypeOptions.Images
+          : ImagePicker.MediaTypeOptions.Videos,
         quality: 0.8,
         videoQuality: ImagePicker.UIImagePickerControllerQualityType.High,
         allowsEditing: false,
@@ -94,7 +99,7 @@ export function MobileVideoImport({
         try {
           const info = await FileSystem.getInfoAsync(uri);
           if (info.exists && 'size' in info && info.size && info.size > 200 * 1024 * 1024) {
-            setError('200MB 이하의 영상만 지원됩니다.');
+            setError('200MB 이하의 파일만 지원됩니다.');
             setStage('error');
             return;
           }
@@ -107,10 +112,10 @@ export function MobileVideoImport({
       setDuration(asset.duration ? Math.min(Math.round(asset.duration), 60) : 6);
       setStage('uploaded');
     } catch (err) {
-      setError(friendlyError(err, '영상을 불러오지 못했습니다. 다시 시도해주세요.'));
+      setError(friendlyError(err, '파일을 불러오지 못했습니다. 다시 시도해주세요.'));
       setStage('error');
     }
-  }, []);
+  }, [importType]);
 
   const handleUploadAndProcess = useCallback(async () => {
     if (!videoUri) return;
@@ -119,17 +124,19 @@ export function MobileVideoImport({
 
     try {
       const uriPath = videoUri.split('?')[0].split('#')[0];
-      const fileExt = uriPath.split('.').pop()?.toLowerCase() || 'mp4';
-      const fileName = `video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
-      const contentType = fileExt === 'mov'
-        ? 'video/quicktime'
-        : fileExt === 'webm'
-          ? 'video/webm'
-          : 'video/mp4';
+      const fileExt = uriPath.split('.').pop()?.toLowerCase() || (importType === 'image' ? 'jpg' : 'mp4');
+      const fileName = `${importType === 'image' ? 'image' : 'video'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+      const contentType = importType === 'image'
+        ? (fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg')
+        : (fileExt === 'mov'
+          ? 'video/quicktime'
+          : fileExt === 'webm'
+            ? 'video/webm'
+            : 'video/mp4');
 
       if (Platform.OS === 'web') {
         const response = await fetch(videoUri);
-        if (!response.ok) throw new Error('영상 파일을 읽을 수 없습니다.');
+        if (!response.ok) throw new Error('파일을 읽을 수 없습니다.');
         const blob = await response.blob();
         const { error: uploadError } = await supabase.storage
           .from('videos')
@@ -150,7 +157,7 @@ export function MobileVideoImport({
           },
         );
         if (uploadResult.status < 200 || uploadResult.status >= 300) {
-          let message = '영상 업로드에 실패했습니다.';
+          let message = '업로드에 실패했습니다.';
           try {
             const body = JSON.parse(uploadResult.body) as { message?: string; error?: string };
             message = body.message || body.error || message;
@@ -161,14 +168,14 @@ export function MobileVideoImport({
         }
       }
 
-      showToast('영상이 업로드되었습니다. 숏폼 가공은 웹에서 지원됩니다.');
+      showToast(importType === 'image' ? '이미지가 업로드되었습니다.' : '영상이 업로드되었습니다. 숏폼 가공은 웹에서 지원됩니다.');
 
       setStage('done');
     } catch (err) {
-      setError(friendlyError(err, '영상 처리 중 오류가 발생했습니다.'));
+      setError(friendlyError(err, '처리 중 오류가 발생했습니다.'));
       setStage('error');
     }
-  }, [videoUri, affiliatePlatforms, showToast]);
+  }, [videoUri, affiliatePlatforms, showToast, importType]);
 
   const handleAiAutoEdit = useCallback(async () => {
     setAiGenerating(true);
@@ -222,11 +229,13 @@ export function MobileVideoImport({
     if (!videoUri) return;
     try {
       if (await Sharing.isAvailableAsync()) {
-        const ext = videoUri.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase() || 'mp4';
-        const shareMime = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+        const ext = videoUri.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase() || (importType === 'image' ? 'jpg' : 'mp4');
+        const shareMime = importType === 'image'
+          ? (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg')
+          : (ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4');
         await Sharing.shareAsync(videoUri, {
           mimeType: shareMime,
-          dialogTitle: '영상 공유하기',
+          dialogTitle: importType === 'image' ? '이미지 공유하기' : '영상 공유하기',
         });
       } else if (Platform.OS === 'web') {
         Alert.alert('공유 불가', '이 기기에서는 공유를 지원하지 않습니다.');
@@ -234,7 +243,7 @@ export function MobileVideoImport({
     } catch {
       showToast('공유에 실패했습니다.');
     }
-  }, [videoUri, showToast]);
+  }, [videoUri, showToast, importType]);
 
   const handleReset = useCallback(() => {
     setVideoUri(null);
@@ -254,7 +263,7 @@ export function MobileVideoImport({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Film size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-            <Text style={styles.headerTitle}>동영상 불러오기</Text>
+            <Text style={styles.headerTitle}>불러오기</Text>
           </View>
           <TouchableOpacity onPress={handleClose} activeOpacity={0.7} style={styles.closeBtn}>
             <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
@@ -262,17 +271,39 @@ export function MobileVideoImport({
         </View>
 
         <Text style={styles.description}>
-          갤러리에서 동영상을 선택하여 숏폼 가공에 사용할 수 있습니다. 선택한 영상은 서버에 업로드됩니다.
+          갤러리에서 동영상 또는 사진을 선택하여 숏폼 가공에 사용할 수 있습니다. 선택한 파일은 서버에 업로드됩니다.
         </Text>
 
         {stage === 'idle' && (
           <View style={styles.idleWrap}>
+            <View style={styles.typeSelectorRow}>
+              <TouchableOpacity
+                style={[styles.typePill, importType === 'video' && styles.typePillActive]}
+                onPress={() => setImportType('video')}
+                activeOpacity={0.7}
+              >
+                <Film size={16} color={importType === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.typePillText, importType === 'video' && styles.typePillTextActive]}>동영상</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.typePill, importType === 'image' && styles.typePillActive]}
+                onPress={() => setImportType('image')}
+                activeOpacity={0.7}
+              >
+                <ImageIcon size={16} color={importType === 'image' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.typePillText, importType === 'image' && styles.typePillTextActive]}>사진</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.importButton} onPress={handlePickVideo} activeOpacity={0.8}>
               <Upload size={24} color="#fff" strokeWidth={2} />
-              <Text style={styles.importButtonText}>갤러리에서 영상 선택</Text>
+              <Text style={styles.importButtonText}>
+                {importType === 'image' ? '갤러리에서 사진 선택' : '갤러리에서 영상 선택'}
+              </Text>
             </TouchableOpacity>
             <Text style={styles.hintText}>
-              MP4, MOV 등 동영상 파일을 선택하세요 (최대 200MB 권장)
+              {importType === 'image'
+                ? 'JPG, PNG 등 이미지 파일을 선택하세요 (최대 200MB 권장)'
+                : 'MP4, MOV 등 동영상 파일을 선택하세요 (최대 200MB 권장)'}
             </Text>
           </View>
         )}
@@ -280,20 +311,29 @@ export function MobileVideoImport({
         {stage === 'picking' && (
           <View style={styles.loadingWrap}>
             <Loader2 size={32} color={theme.colors.primary[400]} strokeWidth={2.5} />
-            <Text style={styles.loadingText}>영상을 불러오는 중...</Text>
+            <Text style={styles.loadingText}>불러오는 중...</Text>
           </View>
         )}
 
         {stage === 'uploaded' && videoUri && (
           <ScrollView style={styles.optionsScroll} showsVerticalScrollIndicator={false}>
             <View style={styles.videoPreviewWrap}>
-              {Platform.OS === 'web' ? (
+              {Platform.OS === 'web' && importType === 'video' ? (
                 <video src={videoUri} style={styles.previewVideoWeb} controls playsInline />
+              ) : Platform.OS === 'web' && importType === 'image' ? (
+                // @ts-ignore img element on web
+                <img src={videoUri} style={styles.previewImageWeb} />
               ) : (
                 <View style={styles.previewPlaceholder}>
-                  <Film size={40} color={theme.colors.dark.textDim} strokeWidth={1.5} />
-                  <Text style={styles.previewText}>영상이 선택되었습니다</Text>
-                  <Text style={styles.previewDuration}>약 {duration}초</Text>
+                  {importType === 'image' ? (
+                    <ImageIcon size={40} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+                  ) : (
+                    <Film size={40} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+                  )}
+                  <Text style={styles.previewText}>
+                    {importType === 'image' ? '이미지가 선택되었습니다' : '영상이 선택되었습니다'}
+                  </Text>
+                  {importType === 'video' && <Text style={styles.previewDuration}>약 {duration}초</Text>}
                 </View>
               )}
             </View>
@@ -416,7 +456,7 @@ export function MobileVideoImport({
         {stage === 'generating' && (
           <View style={styles.loadingWrap}>
             <Loader2 size={32} color={theme.colors.primary[400]} strokeWidth={2.5} />
-            <Text style={styles.loadingText}>영상을 업로드하는 중...</Text>
+            <Text style={styles.loadingText}>업로드하는 중...</Text>
             <Text style={styles.loadingHint}>네트워크 환경에 따라 시간이 걸릴 수 있습니다</Text>
           </View>
         )}
@@ -428,17 +468,21 @@ export function MobileVideoImport({
             </View>
             <Text style={styles.resultTitle}>업로드 완료</Text>
             <Text style={styles.resultDesc}>
-              영상이 서버에 저장되었습니다. 숏폼 가공(자막, 훅 문구, 공정위 문구 추가)은 웹 버전에서 지원됩니다.
+              {importType === 'image'
+                ? '이미지가 서버에 저장되었습니다. 숏폼 가공(자막, 훅 문구, 공정위 문구 추가)은 웹 버전에서 지원됩니다.'
+                : '영상이 서버에 저장되었습니다. 숏폼 가공(자막, 훅 문구, 공정위 문구 추가)은 웹 버전에서 지원됩니다.'}
             </Text>
             {videoUri && (
               <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.8}>
                 <Play size={16} color="#fff" strokeWidth={2} />
-                <Text style={styles.shareButtonText}>원본 영상 공유하기</Text>
+                <Text style={styles.shareButtonText}>
+                  {importType === 'image' ? '원본 이미지 공유하기' : '원본 영상 공유하기'}
+                </Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.doneButton} onPress={handleReset} activeOpacity={0.7}>
               <RefreshCw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.doneButtonText}>다른 영상 선택</Text>
+              <Text style={styles.doneButtonText}>다른 파일 선택</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -521,6 +565,31 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xl,
     gap: theme.spacing.md,
   },
+  typeSelectorRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: theme.spacing.sm,
+  },
+  typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  typePillActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  typePillText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  typePillTextActive: {
+    color: '#fff',
+  },
   importButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -569,6 +638,13 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: theme.radius.md,
     backgroundColor: '#000',
+  },
+  previewImageWeb: {
+    width: '100%',
+    maxWidth: 300,
+    maxHeight: 200,
+    borderRadius: theme.radius.md,
+    objectFit: 'contain' as any,
   },
   previewPlaceholder: {
     width: '100%',
