@@ -1091,7 +1091,7 @@ export default function ResultScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.heroWrap}>

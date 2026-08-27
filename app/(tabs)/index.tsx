@@ -1412,6 +1412,7 @@ const styles = StyleSheet.create({
   bottomControls: {
     paddingHorizontal: theme.spacing.lg,
     paddingTop: 4,
+    zIndex: 10,
   },
   extraButtonsRow: {
     flexDirection: 'row',

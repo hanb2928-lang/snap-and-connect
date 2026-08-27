@@ -214,7 +214,7 @@ export default function SettingsScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
