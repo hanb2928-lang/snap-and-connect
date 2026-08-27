@@ -7,7 +7,6 @@ export type AffiliatePlatformKey =
   | 'Toss'
   | 'BrandConnect'
   | 'OliveYoung'
-  | 'Ablely'
   | 'Zigzag'
   | 'TodayHouse'
   | 'Kurly'
@@ -26,7 +25,6 @@ const PLATFORMS: { key: AffiliatePlatformKey; label: string; icon: typeof Shoppi
   { key: 'Toss', label: '토스', icon: Send, color: '#0064FF' },
   { key: 'BrandConnect', label: '네이버', icon: Globe, color: '#03C75A' },
   { key: 'OliveYoung', label: '올리브영', icon: ShoppingBasket, color: '#1A1A1A' },
-  { key: 'Ablely', label: '에이블리', icon: ShoppingBag, color: '#000000' },
   { key: 'Zigzag', label: '지그재그', icon: ShoppingBag, color: '#FF4C00' },
   { key: 'TodayHouse', label: '오늘의집', icon: Home, color: '#35C5F0' },
   { key: 'Kurly', label: '컬리', icon: ShoppingBasket, color: '#5F0080' },

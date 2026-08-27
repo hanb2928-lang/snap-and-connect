@@ -56,11 +56,6 @@ const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
     short: '올리브영 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
     full: '이 포스팅은 올리브영 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
   },
-  Ablely: {
-    platform: 'Ablely',
-    short: '에이블리 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
-    full: '이 포스팅은 에이블리 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
-  },
   Zigzag: {
     platform: 'Zigzag',
     short: '지그재그 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',

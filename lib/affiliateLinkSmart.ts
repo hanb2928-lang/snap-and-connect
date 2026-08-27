@@ -14,7 +14,6 @@ const SMARTSTORE = /smartstore\.naver\.com|brand\.naver\.com|search\.shopping\.n
 const TOSS = /toss\.(to|im)/i;
 const TOSS_SEND = /toss\.to\/send\//i;
 const OLIVEYOUNG = /oliveyoung\.co\.kr/i;
-const ABLELY = /ably\.co\.kr|a-bly\.com/i;
 const ZIGZAG = /zigzag\.be/i;
 const TODAYHOUSE = /ohou\.se|todayhouse\.com/i;
 const KURLY = /kurly\.com/i;
@@ -27,7 +26,6 @@ const PLATFORM_PATTERNS: { pattern: RegExp; key: AffiliatePlatformKey }[] = [
   { pattern: TOSS, key: 'Toss' },
   { pattern: SMARTSTORE, key: 'BrandConnect' },
   { pattern: OLIVEYOUNG, key: 'OliveYoung' },
-  { pattern: ABLELY, key: 'Ablely' },
   { pattern: ZIGZAG, key: 'Zigzag' },
   { pattern: TODAYHOUSE, key: 'TodayHouse' },
   { pattern: KURLY, key: 'Kurly' },
@@ -111,7 +109,6 @@ export function generateMarketingCopy(url: string, productName: string, priceLab
     Toss: { label: '', hint: '', copy: '', tag: '' },
     BrandConnect: { label: '', hint: '', copy: '', tag: '' },
     OliveYoung: { label: '올리브영', hint: '올리브영 링크', tag: '올리브영', copy: `${name}${price} 확인하기\n올리브영에서 만나보세요!\n#올리브영 #뷰티 #${name.replace(/\s+/g, '')}` },
-    Ablely: { label: '에이블리', hint: '에이블리 링크', tag: '에이블리', copy: `${name}${price} 확인하기\n에이블리에서 스타일링하세요!\n#에이블리 #패션 #${name.replace(/\s+/g, '')}` },
     Zigzag: { label: '지그재그', hint: '지그재그 링크', tag: '지그재그', copy: `${name}${price} 확인하기\n지그재그에서 최저가로 만나보세요!\n#지그재그 #패션 #${name.replace(/\s+/g, '')}` },
     TodayHouse: { label: '오늘의집', hint: '오늘의집 링크', tag: '오늘의집', copy: `${name}${price} 확인하기\n오늘의집에서 홈스타일링하세요!\n#오늘의집 #홈데코 #${name.replace(/\s+/g, '')}` },
     Kurly: { label: '컬리', hint: '컬리 링크', tag: '컬리', copy: `${name}${price} 확인하기\n컬리에서 신선하게 만나보세요!\n#컬리 #신선식품 #${name.replace(/\s+/g, '')}` },
