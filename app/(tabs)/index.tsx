@@ -73,6 +73,7 @@ export default function CameraScreen() {
   const focusAnim = useRef(new RNAnimated.Value(0)).current;
   const progressWidth = useSharedValue(0);
   const [preferredStyle, setPreferredStyle] = useState<PlatformKey>('shortform');
+  const [templateMode, setTemplateMode] = useState<'manual' | 'auto'>('manual');
   const [stylePickerVisible, setStylePickerVisible] = useState(false);
   const [showOnboardingCapture, setShowOnboardingCapture] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -127,6 +128,8 @@ export default function CameraScreen() {
     (async () => {
       const saved = await getItem('preferred_template_style');
       if (saved) setPreferredStyle(saved as PlatformKey);
+      const savedMode = await getItem('template_mode');
+      if (savedMode === 'auto' || savedMode === 'manual') setTemplateMode(savedMode);
       const seenOnboarding = await getItem('onboarding_seen');
       if (!seenOnboarding) {
         setShowOnboardingModal(true);
@@ -138,6 +141,11 @@ export default function CameraScreen() {
   const handleStyleChange = useCallback((style: PlatformKey) => {
     setPreferredStyle(style);
     setItem('preferred_template_style', style);
+  }, []);
+
+  const handleTemplateModeChange = useCallback((mode: 'manual' | 'auto') => {
+    setTemplateMode(mode);
+    setItem('template_mode', mode);
   }, []);
 
   const fadeIn = useCallback(() => {
@@ -708,36 +716,74 @@ export default function CameraScreen() {
           >
             <Palette size={12} color={theme.colors.accent[400]} strokeWidth={2} />
             <Text style={styles.stylePickerLabel}>
-              {STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
+              {templateMode === 'auto' ? '자동' : STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
             </Text>
           </TouchableOpacity>
         </View>
 
         {stylePickerVisible && (
           <View style={styles.stylePickerPanel}>
-            <ScrollView style={styles.styleOptionScroll}>
-              {STYLE_PRESETS.map((preset) => (
+            <View style={styles.templateModeRow}>
+              <TouchableOpacity
+                style={[styles.templateModePill, templateMode === 'manual' && styles.templateModePillActive]}
+                onPress={() => handleTemplateModeChange('manual')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.templateModePillText, templateMode === 'manual' && styles.templateModePillTextActive]}>
+                  수동 선택
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.templateModePill, templateMode === 'auto' && styles.templateModePillActive]}
+                onPress={() => handleTemplateModeChange('auto')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.templateModePillText, templateMode === 'auto' && styles.templateModePillTextActive]}>
+                  자동 추천
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {templateMode === 'manual' ? (
+              <ScrollView style={styles.styleOptionScroll}>
+                {STYLE_PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.key}
+                    style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
+                    onPress={() => {
+                      handleStyleChange(preset.key);
+                      setStylePickerVisible(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.styleOptionTextWrap}>
+                      <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
+                        {preset.label}
+                      </Text>
+                      <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
+                    </View>
+                    {preferredStyle === preset.key && (
+                      <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.autoTemplateInfo}>
+                <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={1.5} />
+                <Text style={styles.autoTemplateTitle}>AI 자동 추천</Text>
+                <Text style={styles.autoTemplateDesc}>
+                  촬영 후 AI가 사진을 분석하여 가장 어울리는 템플릿 스타일을 자동으로 선택합니다.
+                </Text>
                 <TouchableOpacity
-                  key={preset.key}
-                  style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
-                  onPress={() => {
-                    handleStyleChange(preset.key);
-                    setStylePickerVisible(false);
-                  }}
-                  activeOpacity={0.7}
+                  style={styles.autoTemplateConfirmBtn}
+                  onPress={() => setStylePickerVisible(false)}
+                  activeOpacity={0.8}
                 >
-                  <View style={styles.styleOptionTextWrap}>
-                    <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
-                      {preset.label}
-                    </Text>
-                    <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
-                  </View>
-                  {preferredStyle === preset.key && (
-                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                  )}
+                  <Text style={styles.autoTemplateConfirmText}>확인</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -842,7 +888,9 @@ export default function CameraScreen() {
           {processing
             ? progressText
             : recognitionMode === 'single'
-              ? `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿 스타일: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 자동 적용됩니다`
+              ? templateMode === 'auto'
+                ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: AI 자동 추천 — 촬영 후 가장 어울리는 스타일이 자동 적용됩니다'
+                : `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 적용됩니다`
               : multiShots.length === 0
                 ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
                 : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
@@ -1525,13 +1573,70 @@ const styles = StyleSheet.create({
     bottom: 220,
     left: theme.spacing.md,
     right: theme.spacing.md,
-    maxHeight: '50%',
+    maxHeight: '55%',
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     overflow: 'hidden',
     zIndex: 25,
     ...theme.shadows.elevated,
+  },
+  templateModeRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  templateModePill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    alignItems: 'center',
+  },
+  templateModePillActive: {
+    backgroundColor: theme.colors.accent[500] + '20',
+    borderColor: theme.colors.accent[400],
+  },
+  templateModePillText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  templateModePillTextActive: {
+    color: theme.colors.accent[300],
+  },
+  autoTemplateInfo: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  autoTemplateTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+    marginTop: theme.spacing.xs,
+  },
+  autoTemplateDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: theme.spacing.md,
+  },
+  autoTemplateConfirmBtn: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.accent[500],
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radius.full,
+  },
+  autoTemplateConfirmText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   styleOptionScroll: {
     maxHeight: '100%',
