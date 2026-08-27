@@ -41,6 +41,7 @@ export function TrendCopyBar({ productName, productCategory, tags, platform, onA
       const resp = await fetch(`${TREND_COPY_FUNCTION_URL}?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
           'Content-Type': 'application/json',
         },
       });

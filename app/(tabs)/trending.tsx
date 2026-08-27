@@ -191,6 +191,7 @@ export default function TrendingScreen() {
       const resp = await fetch(KEYWORD_TRENDS_URL, {
         headers: {
           Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
           'Content-Type': 'application/json',
         },
       });
@@ -287,6 +288,7 @@ export default function TrendingScreen() {
       const resp = await fetch(`${KEYWORD_TRENDS_URL}?ideas=${encodeURIComponent(keyword)}`, {
         headers: {
           Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
           'Content-Type': 'application/json',
         },
       });
