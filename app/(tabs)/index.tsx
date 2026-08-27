@@ -453,7 +453,7 @@ export default function CameraScreen() {
       try {
         [imageUrl, analysis] = await Promise.all([
           uploadImage(base64, mimeType),
-          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode),
+          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode, templateMode === 'auto' ? undefined : preferredStyle),
         ]);
       } finally {
         clearInterval(progressTimer);
@@ -854,6 +854,19 @@ export default function CameraScreen() {
 
       {!arMode && (
         <View style={[styles.bottomControlsWrap, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleCapture}
+            disabled={processing}
+            activeOpacity={0.85}
+          >
+            <View style={styles.captureButtonRing}>
+              <View style={styles.captureButtonInner}>
+                <Camera size={32} color="#fff" strokeWidth={2.5} />
+              </View>
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.subButtonRow}>
             <TouchableOpacity
               style={styles.subButton}
@@ -875,19 +888,6 @@ export default function CameraScreen() {
               <Text style={styles.subButtonLabel}>편집</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={handleCapture}
-            disabled={processing}
-            activeOpacity={0.85}
-          >
-            <View style={styles.captureButtonRing}>
-              <View style={styles.captureButtonInner}>
-                <Text style={styles.captureButtonText}>촬영</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
 
           <Text style={styles.hintText}>
             {processing
@@ -1686,14 +1686,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   subButtonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.md,
   },
   subButton: {
     width: 72,
@@ -1712,31 +1711,29 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
   },
   captureButton: {
-    width: 88,
-    height: 88,
+    width: 76,
+    height: 76,
     borderRadius: theme.radius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
   captureButtonRing: {
-    width: 88,
-    height: 88,
+    width: 76,
+    height: 76,
     borderRadius: theme.radius.full,
-    borderWidth: 2.5,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 3,
+    borderColor: theme.colors.accent[400],
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.elevated,
   },
   captureButtonInner: {
-    width: 72,
-    height: 72,
+    width: 62,
+    height: 62,
     borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.accent[500],
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   captureButtonText: {
     fontSize: theme.typography.caption,

@@ -226,10 +226,11 @@ export async function analyzeImageQueued(
   fileName: string,
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
+  preferredStyle?: string,
 ): Promise<AnalysisResult> {
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
-    { imageDataUrl, fileName, mimeType, mode },
+    { imageDataUrl, fileName, mimeType, mode, ...(preferredStyle ? { preferredStyle } : {}) },
     { timeoutMs: 180000 },
   );
 

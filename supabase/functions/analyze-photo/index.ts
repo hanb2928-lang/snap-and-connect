@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { imageDataUrl, images, fileName, mimeType, mode } = body;
+    const { imageDataUrl, images, fileName, mimeType, mode, preferredStyle } = body;
 
     if (!imageDataUrl && !images) {
       return new Response(
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
       const sanitizedDataUrl = ensureDataUrl(imageDataUrl, cleanMime);
       const recognitionMode = mode === "single" ? "single" : "multi";
       if (openaiKey) {
-        result = await analyzeWithOpenAI(sanitizedDataUrl, cleanMime, openaiKey, recognitionMode);
+        result = await analyzeWithOpenAI(sanitizedDataUrl, cleanMime, openaiKey, recognitionMode, preferredStyle);
       } else {
         result = generateContextualAnalysis(fileName || "snapshot");
       }
@@ -181,12 +181,17 @@ async function analyzeWithOpenAI(
   mimeType: string,
   apiKey: string,
   mode: "single" | "multi",
+  preferredStyle?: string,
 ): Promise<AnalysisResult> {
   const isSingle = mode === "single";
 
   const productInstruction = isSingle
     ? "Identify the SINGLE primary/main product visible in the photo. Focus on the most prominent item. Return a detectedProducts array with exactly ONE element."
     : "Identify ALL distinct products visible in the photo. Return a detectedProducts array with one element per product found. Maximum 4 products — if more than 4 are visible, pick the 4 most prominent and distinct ones. Each product must be genuinely different (not the same item from a different angle).";
+
+  const styleHint = preferredStyle
+    ? `\nThe user has selected the "${preferredStyle}" platform style as their preferred template. After generating all variants, populate the top-level hook, hashtags, productAdvantages, and caption with the ${preferredStyle.toUpperCase()} variant's values instead of the shortform variant. This is the user's chosen default view.`
+    : "";
 
   const systemPrompt =
     "You are a viral short-form marketing copywriter and product identification assistant. " +
@@ -223,7 +228,8 @@ async function analyzeWithOpenAI(
     productInstruction + "\n" +
     "For shoppingMatches, use the official Naver Brand Connect creator page: https://brandconnect.naver.com/about/creator\n" +
     "Also populate the top-level productName, productCategory, priceEstimate, oneLiner, shoppingMatches, and templateData with the FIRST/primary product's data for backward compatibility.\n" +
-    "Return ONLY valid JSON, no markdown.";
+    "Return ONLY valid JSON, no markdown." +
+    styleHint;
 
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
     {
