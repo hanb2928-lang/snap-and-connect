@@ -97,9 +97,12 @@ export default function AssetsScreen() {
     }
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
       const result = await addSnippet(title.trim(), content.trim(), snippetType);
       if (result) {
@@ -108,9 +111,11 @@ export default function AssetsScreen() {
         setTitle('');
         setContent('');
         setSnippetType('copy');
+      } else {
+        setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
       }
     } catch {
-      // ignore
+      setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -274,6 +279,10 @@ export default function AssetsScreen() {
               numberOfLines={4}
               textAlignVertical="top"
             />
+
+            {saveError && (
+              <Text style={styles.saveErrorText}>{saveError}</Text>
+            )}
 
             <TouchableOpacity
               style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -537,5 +546,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  saveErrorText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

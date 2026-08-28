@@ -49,7 +49,18 @@ export function useQueuedJob() {
 
     setState({ jobId: null, status: 'queued', error: null, result: null });
 
-    const jobId = await enqueueJob(jobType, payload, options);
+    let jobId: string;
+    try {
+      jobId = await enqueueJob(jobType, payload, options);
+    } catch (err) {
+      if (mySubmitId !== submitIdRef.current) return '';
+      setState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: err instanceof Error ? err.message : '작업 등록에 실패했습니다.',
+      }));
+      return '';
+    }
 
     if (mySubmitId !== submitIdRef.current) return jobId;
 

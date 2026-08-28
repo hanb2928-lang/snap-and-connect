@@ -18,6 +18,8 @@ function init() {
       window.addEventListener('online', () => notify('online'));
       window.addEventListener('offline', () => notify('offline'));
     }
+  } else {
+    currentStatus = 'online';
   }
 }
 

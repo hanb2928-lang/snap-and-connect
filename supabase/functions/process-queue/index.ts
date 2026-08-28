@@ -65,7 +65,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const hasRequeued = processed.some((p) => p.status === "requeued");
-    if (hasRequeued && processed.length > 0) {
+    const hasRemaining = processed.length > 0 ? await checkQueuedJobs() : false;
+    if ((hasRequeued || hasRemaining) && processed.length > 0) {
       // Re-trigger for remaining/requeued jobs so they don't sit idle
       fetch(`${supabaseUrl}/functions/v1/process-queue`, {
         method: "POST",

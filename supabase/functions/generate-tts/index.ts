@@ -13,7 +13,6 @@ interface TTSRequest {
   text: string;
   voice?: string;
   speed?: number;
-  pitch?: number;
 }
 
 Deno.serve(async (req: Request) => {
@@ -34,7 +33,6 @@ Deno.serve(async (req: Request) => {
     const text = body.text.slice(0, 500);
     const voice = body.voice || "alloy";
     const speed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
-    const pitch = Math.min(Math.max(body.pitch || 0, -12), 12);
 
     const openaiKey = await resolveOpenAIKey();
 
@@ -79,7 +77,6 @@ Deno.serve(async (req: Request) => {
         audioBase64: base64Audio,
         mimeType: "audio/mpeg",
         duration: estimateDuration(text, speed),
-        pitch,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

@@ -117,7 +117,7 @@ async function resolveOpenAIKey(): Promise<string | null> {
       // fall through to env var
     }
   }
-  return Deno.env.get("OPENAI_API_KEY") ?? null;
+  return null;
 }
 
 async function removeBackgroundWithOpenAI(

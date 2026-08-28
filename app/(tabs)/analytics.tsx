@@ -41,7 +41,6 @@ import {
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { getStaleCached, setCached } from '@/lib/offlineCache';
 
 const PLATFORM_META: Record<string, { label: string; icon: typeof ShoppingBag; color: string }> = {
@@ -72,7 +71,6 @@ export default function AnalyticsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [usingCache, setUsingCache] = useState(false);
-  const networkStatus = useNetworkStatus();
 
   const loadData = useCallback(async () => {
     try {

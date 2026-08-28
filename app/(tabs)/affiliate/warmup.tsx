@@ -234,7 +234,8 @@ export default function WarmupScreen() {
 
   const currentDay = useMemo(() => {
     if (!selectedSchedule) return 1;
-    const start = new Date(selectedSchedule.start_date);
+    const [sy, sm, sd] = selectedSchedule.start_date.split('-').map(Number);
+    const start = new Date(sy, sm - 1, sd);
     const now = new Date();
     const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return Math.max(1, Math.min(diff, selectedSchedule.duration_days));

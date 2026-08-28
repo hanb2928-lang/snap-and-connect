@@ -103,7 +103,11 @@ export default function HistoryScreen() {
       if (err) {
         setError(err.message);
       } else {
-        setScans((prev) => prev.filter((s) => s.id !== id));
+        setScans((prev) => {
+          const next = prev.filter((s) => s.id !== id);
+          setCached(CACHE_KEY, next);
+          return next;
+        });
       }
     } catch {
       setError('삭제 중 오류가 발생했어요');
