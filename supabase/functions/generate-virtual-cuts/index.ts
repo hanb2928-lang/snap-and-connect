@@ -319,8 +319,9 @@ function buildMultipartForm(imageDataUrl: string, prompt: string): FormData {
 
   const blob = new Blob([bytes], { type: mimeType });
   formData.append("image", blob, `input.${ext}`);
-  formData.append("model", "gpt-image-1");
+  formData.append("model", "gpt-image-1-mini");
   formData.append("size", "auto");
+  formData.append("quality", "low");
   formData.append("prompt", prompt);
 
   return formData;
