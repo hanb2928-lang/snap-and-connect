@@ -47,6 +47,7 @@ const fullSettings: UserSettings = {
   capture_guide_mode: null,
   ui_performance: null,
   theme_mode: null,
+  display_density: null,
 };
 
 describe('isCoupangUrl', () => {

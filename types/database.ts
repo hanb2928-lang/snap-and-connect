@@ -128,6 +128,7 @@ export interface UserSettings {
   capture_guide_mode: string | null;
   ui_performance: string | null;
   theme_mode: string | null;
+  display_density: string | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

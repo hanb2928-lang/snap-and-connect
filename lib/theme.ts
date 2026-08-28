@@ -74,6 +74,15 @@ export const theme = {
       textDim: '#94a3b8',
       textFaint: '#64748b',
     },
+    light: {
+      bg: '#f0f4fa',
+      surface: '#ffffff',
+      surfaceLight: '#eef3fb',
+      border: '#d6e0ee',
+      text: '#0f172a',
+      textDim: '#475569',
+      textFaint: '#94a3b8',
+    },
   },
   spacing: {
     xs: 4,
@@ -162,4 +171,30 @@ export const theme = {
         borderActive: '#2a4a6b',
         highlight: '#1e2740',
       },
+  glassLight: _isWeb
+    ? {
+        surface: 'rgba(255, 255, 255, 0.82)',
+        surfaceLight: 'rgba(238, 243, 251, 0.7)',
+        border: 'rgba(15, 23, 42, 0.08)',
+        borderActive: 'rgba(47, 157, 255, 0.25)',
+        highlight: 'rgba(15, 23, 42, 0.03)',
+      }
+    : {
+        surface: '#ffffff',
+        surfaceLight: '#eef3fb',
+        border: '#d6e0ee',
+        borderActive: '#a8c8e8',
+        highlight: '#eef3fb',
+      },
 } as const;
+
+export type ColorPalette = {
+  bg: string; surface: string; surfaceLight: string; border: string;
+  text: string; textDim: string; textFaint: string;
+};
+export type GlassColors = typeof theme.glass;
+export type Spacing = { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number };
+export type Typography = {
+  fontFamily: { regular: string; medium: string; semiBold: string; bold: string };
+  title: number; heading: number; body: number; caption: number; micro: number;
+};

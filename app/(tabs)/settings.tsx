@@ -70,6 +70,7 @@ export default function SettingsScreen() {
   const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
   const [uiPerformance, setUiPerformance] = useState<'high' | 'lite'>('high');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [displayDensity, setDisplayDensity] = useState<'compact' | 'standard' | 'wide'>('standard');
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
@@ -99,6 +100,7 @@ export default function SettingsScreen() {
       setCaptureGuideMode((data?.capture_guide_mode as 'beginner' | 'pro') || 'beginner');
       setUiPerformance((data?.ui_performance as 'high' | 'lite') || 'high');
       setThemeMode((data?.theme_mode as 'dark' | 'light') || 'dark');
+      setDisplayDensity((data?.display_density as 'compact' | 'standard' | 'wide') || 'standard');
       setBrandPersona(data?.brand_persona || '');
     } catch {
       setSettings(null);
@@ -989,7 +991,54 @@ export default function SettingsScreen() {
           <Text style={styles.ttsCategoryLabel}>
             {themeMode === 'dark'
               ? '다크 모드: 딥 다크 그라데이션의 세련된 감성을 유지합니다. 야외나 밝은 곳에서는 라이트 모드를 추천합니다'
-              : '라이트 모드: 밝고 화사한 분위기로, 야외 촬영이나 밝은 환경에서 가시성이 좋습니다 (현재 다크 테마가 기본 적용 중이며, 라이트 테마는 순차적으로 적용됩니다)'}
+              : '라이트 모드: 밝고 화사한 분위기로, 야외 촬영이나 밝은 환경에서 가시성이 좋습니다'}
+          </Text>
+
+          <Divider />
+
+          {/* Display Density */}
+          <Text style={styles.idInputLabel}>화면 밀도 및 텍스트 가독성</Text>
+          <View style={styles.progressStyleRow}>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, displayDensity === 'compact' && styles.progressStyleCardActive]}
+              onPress={() => setDisplayDensity('compact')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, displayDensity === 'compact' && styles.progressStyleIconActive]}>
+                <Smartphone size={22} color={displayDensity === 'compact' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, displayDensity === 'compact' && styles.progressStyleNameActive]}>컴팩트</Text>
+              <Text style={styles.progressStyleDesc}>작은 화면 최적화</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, displayDensity === 'standard' && styles.progressStyleCardActive]}
+              onPress={() => setDisplayDensity('standard')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, displayDensity === 'standard' && styles.progressStyleIconActive]}>
+                <LayoutTemplate size={22} color={displayDensity === 'standard' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, displayDensity === 'standard' && styles.progressStyleNameActive]}>스탠다드</Text>
+              <Text style={styles.progressStyleDesc}>균형 잡힌 여백</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, displayDensity === 'wide' && styles.progressStyleCardActive]}
+              onPress={() => setDisplayDensity('wide')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, displayDensity === 'wide' && styles.progressStyleIconActive]}>
+                <BookOpen size={22} color={displayDensity === 'wide' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, displayDensity === 'wide' && styles.progressStyleNameActive]}>와이드 텍스트</Text>
+              <Text style={styles.progressStyleDesc}>큰 폰트 가독성</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.ttsCategoryLabel}>
+            {displayDensity === 'compact'
+              ? '컴팩트 모드: 아이폰 미니/SE 등 작은 화면에서 여백을 줄여 한눈에 더 많은 정보를 볼 수 있습니다'
+              : displayDensity === 'wide'
+                ? '와이드 텍스트 모드: 본문 폰트 크기가 확대되고 여백이 넓어져 가독성이 크게 향상됩니다'
+                : '스탠다드 모드: 모든 화면 크기에서 균형 잡힌 여백과 폰트 크기를 제공합니다'}
           </Text>
         </View>
         <TouchableOpacity
@@ -1002,6 +1051,7 @@ export default function SettingsScreen() {
                 capture_guide_mode: captureGuideMode,
                 ui_performance: uiPerformance,
                 theme_mode: themeMode,
+                display_density: displayDensity,
               });
               setSavedPrefs(true);
               setTimeout(() => setSavedPrefs(false), 2500);

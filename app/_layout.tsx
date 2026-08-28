@@ -19,6 +19,7 @@ import { theme } from '@/lib/theme';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AffiliateToastProvider } from '@/components/AffiliateToast';
+import { AppThemeProvider } from '@/hooks/useAppTheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -129,19 +130,21 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <AffiliateToastProvider>
-        <SafeAreaProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="editor" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="light" />
-          </GestureHandlerRootView>
-        </SafeAreaProvider>
-      </AffiliateToastProvider>
+      <AppThemeProvider>
+        <AffiliateToastProvider>
+          <SafeAreaProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="editor" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="light" />
+            </GestureHandlerRootView>
+          </SafeAreaProvider>
+        </AffiliateToastProvider>
+      </AppThemeProvider>
     </ErrorBoundary>
   );
 }
