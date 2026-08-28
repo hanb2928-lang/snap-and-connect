@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -36,6 +36,7 @@ import { getItem, setItem } from '@/lib/storage';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
+import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
@@ -80,6 +81,7 @@ export default function CameraScreen() {
   const [arMode, setArMode] = useState(false);
   const [videoImportVisible, setVideoImportVisible] = useState(false);
   const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
+  const [workflowGuideVisible, setWorkflowGuideVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
@@ -579,6 +581,14 @@ export default function CameraScreen() {
               <Grid3x3 size={20} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2.2} />
               {gridVisible && <View style={styles.topBadgeDot} />}
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.topButton}
+              onPress={() => setWorkflowGuideVisible(true)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            >
+              <LayoutTemplate size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
+            </TouchableOpacity>
           </View>
           <View style={styles.topBarRight}>
             <TouchableOpacity
@@ -974,6 +984,24 @@ export default function CameraScreen() {
 
       <RecentWorkButton />
 
+      {workflowGuideVisible && (
+        <View style={styles.guideOverlay}>
+          <View style={styles.guideOverlayCard}>
+            <View style={styles.guideOverlayHeader}>
+              <Text style={styles.guideOverlayTitle}>작업 순서 가이드</Text>
+              <TouchableOpacity
+                onPress={() => setWorkflowGuideVisible(false)}
+                style={styles.guideCloseBtn}
+                activeOpacity={0.7}
+              >
+                <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+            <WorkflowGuide />
+          </View>
+        </View>
+      )}
+
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
           <AnalysisLoadingOverlay
@@ -1198,6 +1226,8 @@ function WebUploadScreen() {
             사진을 올리면 AI가 제품을 분석하고 마케팅 소재를 만들어 드립니다
           </Text>
         </View>
+
+        <WorkflowGuide />
 
         <View style={styles.webModeRow}>
           <TouchableOpacity
@@ -2229,5 +2259,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  guideOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 60,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  guideOverlayCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    width: '100%',
+    maxWidth: 440,
+    ...theme.shadows.elevated,
+  },
+  guideOverlayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
+  guideOverlayTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  guideCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
