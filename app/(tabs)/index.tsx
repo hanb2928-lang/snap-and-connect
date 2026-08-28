@@ -16,6 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, Lightbulb, Sun, Aperture } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
@@ -61,6 +62,7 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
+  const tabBarHeight = useTabBarHeight();
   const isMountedRef = useRef(true);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
@@ -547,7 +549,7 @@ export default function CameraScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={[
           styles.verticalScroll,
-          { paddingTop: safeTop + theme.spacing.sm, paddingBottom: theme.spacing.xxl + insets.bottom },
+          { paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + theme.spacing.lg },
         ]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!arMode}
