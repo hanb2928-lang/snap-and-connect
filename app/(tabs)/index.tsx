@@ -38,7 +38,7 @@ import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
 import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { StepIndicator } from '@/components/StepIndicator';
-import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
+import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -982,7 +982,7 @@ export default function CameraScreen() {
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
-          <AnalysisLoadingOverlay
+          <ProgressOverlay
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
@@ -1356,7 +1356,7 @@ function WebUploadScreen() {
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
-          <AnalysisLoadingOverlay
+          <ProgressOverlay
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}

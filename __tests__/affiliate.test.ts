@@ -39,6 +39,7 @@ const fullSettings: UserSettings = {
   default_tts_voice: null,
   tts_speed: null,
   tts_pitch: null,
+  progress_style: null,
   auto_disclosure: null,
   brand_persona: null,
 };

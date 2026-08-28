@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -60,6 +60,7 @@ export default function SettingsScreen() {
   const [defaultTtsVoice, setDefaultTtsVoice] = useState(DEFAULT_TTS_VOICE);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(0);
+  const [progressStyle, setProgressStyle] = useState<'circular' | 'baby-run' | 'status-bar'>('circular');
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
@@ -83,6 +84,7 @@ export default function SettingsScreen() {
       setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
       setTtsSpeed(data?.tts_speed ?? 1.0);
       setTtsPitch(data?.tts_pitch ?? 0);
+      setProgressStyle((data?.progress_style as 'circular' | 'baby-run' | 'status-bar') || 'circular');
       setAutoDisclosure(data?.auto_disclosure ?? true);
       setBrandPersona(data?.brand_persona || '');
     } catch {
@@ -685,6 +687,44 @@ export default function SettingsScreen() {
             ))}
           </View>
           <Divider />
+          <Text style={styles.idInputLabel}>진행 상태 표시 스타일</Text>
+          <Text style={styles.ttsCategoryLabel}>영상 제작 중 표시되는 로딩 UI를 선택하세요</Text>
+          <View style={styles.progressStyleRow}>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, progressStyle === 'circular' && styles.progressStyleCardActive]}
+              onPress={() => setProgressStyle('circular')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, progressStyle === 'circular' && styles.progressStyleIconActive]}>
+                <CircleDot size={22} color={progressStyle === 'circular' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, progressStyle === 'circular' && styles.progressStyleNameActive]}>원형 회전형</Text>
+              <Text style={styles.progressStyleDesc}>클래식한 원형 로딩</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, progressStyle === 'baby-run' && styles.progressStyleCardActive]}
+              onPress={() => setProgressStyle('baby-run')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, progressStyle === 'baby-run' && styles.progressStyleIconActive]}>
+                <Baby size={22} color={progressStyle === 'baby-run' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, progressStyle === 'baby-run' && styles.progressStyleNameActive]}>아기 달리기형</Text>
+              <Text style={styles.progressStyleDesc}>트랙을 달리는 아기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, progressStyle === 'status-bar' && styles.progressStyleCardActive]}
+              onPress={() => setProgressStyle('status-bar')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, progressStyle === 'status-bar' && styles.progressStyleIconActive]}>
+                <Activity size={22} color={progressStyle === 'status-bar' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, progressStyle === 'status-bar' && styles.progressStyleNameActive]}>실시간 상태 바형</Text>
+              <Text style={styles.progressStyleDesc}>옹알이 표정 변화</Text>
+            </TouchableOpacity>
+          </View>
+          <Divider />
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.featureTitle}>제휴 공시문 자동 포함</Text>
@@ -712,6 +752,7 @@ export default function SettingsScreen() {
                 default_tts_voice: defaultTtsVoice,
                 tts_speed: ttsSpeed,
                 tts_pitch: ttsPitch,
+                progress_style: progressStyle,
                 auto_disclosure: autoDisclosure,
               });
               setSavedDefaults(true);
@@ -2732,5 +2773,54 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.warning[400],
+  },
+  progressStyleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  progressStyleCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  progressStyleCardActive: {
+    backgroundColor: theme.colors.primary[600] + '15',
+    borderColor: theme.colors.primary[500],
+  },
+  progressStyleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  progressStyleIconActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[500],
+  },
+  progressStyleName: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  progressStyleNameActive: {
+    color: theme.colors.primary[300],
+  },
+  progressStyleDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'center',
   },
 });

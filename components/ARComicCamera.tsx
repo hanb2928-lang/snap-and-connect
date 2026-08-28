@@ -50,7 +50,7 @@ import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64'
 import { prepareImageForApi } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
-import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
+import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
@@ -1055,7 +1055,7 @@ export function ARComicCamera({
           style={[styles.processingOverlay, overlayStyle]}
           onLayout={fadeIn}
         >
-          <AnalysisLoadingOverlay
+          <ProgressOverlay
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}

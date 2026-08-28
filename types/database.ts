@@ -120,6 +120,7 @@ export interface UserSettings {
   default_tts_voice: string | null;
   tts_speed: number | null;
   tts_pitch: number | null;
+  progress_style: string | null;
   auto_disclosure: boolean | null;
   brand_persona: string | null;
 }
