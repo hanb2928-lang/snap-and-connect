@@ -1,7 +1,7 @@
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView, Platform } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { ShoppingBag, Flame, History, Sprout } from 'lucide-react-native';
+import { ShoppingBag, Flame, History, Sprout, Link2, LayoutGrid, ChartBar as BarChart3 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,9 @@ const SUBTABS = [
   { key: 'trending', label: '인기', icon: Flame },
   { key: 'history', label: '기록', icon: History },
   { key: 'warmup', label: '육성', icon: Sprout },
+  { key: 'links', label: '링크', icon: Link2 },
+  { key: 'assets', label: '소재', icon: LayoutGrid },
+  { key: 'dashboard', label: '분석', icon: BarChart3 },
 ] as const;
 
 function SubTabBar() {
@@ -87,6 +90,9 @@ export default function AffiliateLayout() {
         <Stack.Screen name="trending" />
         <Stack.Screen name="history" />
         <Stack.Screen name="warmup" />
+        <Stack.Screen name="links" />
+        <Stack.Screen name="assets" />
+        <Stack.Screen name="dashboard" />
       </Stack>
       <SubTabBar />
     </>

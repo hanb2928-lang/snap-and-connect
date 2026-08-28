@@ -153,3 +153,23 @@ export interface ShortLinkWithClicks {
   click_count: number;
   last_clicked_at: string | null;
 }
+
+export interface LinkBookmark {
+  id: string;
+  label: string;
+  url: string;
+  platform: string;
+  short_url: string | null;
+  scan_id: string | null;
+  click_count: number;
+  created_at: string;
+}
+
+export interface MarketingSnippet {
+  id: string;
+  title: string;
+  content: string;
+  snippet_type: 'copy' | 'hashtag' | 'hook';
+  platform: string | null;
+  created_at: string;
+}
