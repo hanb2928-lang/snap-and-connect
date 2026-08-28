@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,42 @@ import {
   Platform,
   Image,
   Dimensions,
-  Modal,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, ChevronRight, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, Eye, CreditCard as Edit3, Upload, FileText, Hash, Type, ChevronDown, ChevronUp, Wand as Wand2, Loader, Plus, X } from 'lucide-react-native';
+import {
+  ShoppingBag,
+  Send,
+  Globe,
+  ShoppingBasket,
+  Hop as Home,
+  Ticket,
+  TreePalm as Palmtree,
+  Store,
+  ExternalLink,
+  Settings as SettingsIcon,
+  TrendingUp,
+  Link2,
+  Copy,
+  Check,
+  Camera,
+  Image as ImageIcon,
+  Film,
+  Sparkles,
+  Eye,
+  CreditCard as Edit3,
+  Upload,
+  FileText,
+  Hash,
+  Type,
+  ChevronDown,
+  ChevronUp,
+  Loader,
+  Plus,
+  X,
+  ScanSearch,
+  Wand as Wand2,
+  Palette,
+  Share2,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -23,6 +56,7 @@ import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { StepIndicator } from '@/components/StepIndicator';
+import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -56,22 +90,26 @@ const CONTENT_TYPES = [
   { key: 'hook', label: '후킹 문장', icon: Sparkles, color: theme.colors.warning[400], hint: '시선을 끄는 첫 문장을 만드세요' },
 ] as const;
 
-type StepKey = 'media' | 'affiliate' | 'content' | 'preview' | 'upload';
+const TEMPLATE_STYLES = [
+  { key: 'shortform', label: '숏폼 영상', desc: '릴스·쇼츠용 임팩트', icon: Film },
+  { key: 'comic', label: '웹툰형 만화', desc: '스토리텔링 만화', icon: Palette },
+  { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText },
+] as const;
 
-const STEP_ORDER: StepKey[] = ['media', 'affiliate', 'content', 'preview', 'upload'];
+type StepKey = 'media' | 'analyze' | 'content' | 'upload';
+
+const STEP_ORDER: StepKey[] = ['media', 'analyze', 'content', 'upload'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   media: { num: 1, color: theme.colors.primary[400] },
-  affiliate: { num: 2, color: theme.colors.accent[400] },
+  analyze: { num: 2, color: theme.colors.accent[400] },
   content: { num: 3, color: theme.colors.warning[400] },
-  preview: { num: 4, color: theme.colors.success[400] },
-  upload: { num: 5, color: theme.colors.primary[300] },
+  upload: { num: 4, color: theme.colors.success[400] },
 };
 
 export default function AffiliateScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useSubTabBarHeight();
-  const scrollRef = useRef<ScrollView>(null);
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [revenue, setRevenue] = useState<RevenueRecord[]>([]);
@@ -79,15 +117,14 @@ export default function AffiliateScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
-  // Step state
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
-  const [expandedStep, setExpandedStep] = useState<StepKey | null>('media');
 
   // Step 1: Media
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
   const [mediaType, setMediaType] = useState<'photo' | 'video' | null>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
 
   // Step 2: Affiliate link
   const [affiliateUrl, setAffiliateUrl] = useState('');
@@ -96,15 +133,14 @@ export default function AffiliateScreen() {
   const [showAddPlatform, setShowAddPlatform] = useState(false);
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformUrl, setNewPlatformUrl] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
 
   // Step 3: Content
   const [contentText, setContentText] = useState('');
   const [contentType, setContentType] = useState<string>('copy');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('shortform');
 
-  // Step 4: Preview
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-
-  // Step 5: Upload
+  // Step 4: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -127,20 +163,8 @@ export default function AffiliateScreen() {
 
   const totalRevenue = revenue.reduce((sum, r) => sum + (r.amount || 0), 0);
 
-  const toggleStep = (key: StepKey) => {
-    setExpandedStep((prev) => (prev === key ? null : key));
-  };
-
   const markCompleted = (key: StepKey) => {
     setCompletedSteps((prev) => new Set(prev).add(key));
-  };
-
-  const scrollToNext = (currentKey: StepKey) => {
-    const idx = STEP_ORDER.indexOf(currentKey);
-    if (idx < STEP_ORDER.length - 1) {
-      const nextKey = STEP_ORDER[idx + 1];
-      setExpandedStep(nextKey);
-    }
   };
 
   const handleOpenUrl = (url: string) => {
@@ -170,7 +194,7 @@ export default function AffiliateScreen() {
     return false;
   };
 
-  // Step 1: Pick image
+  // Step 1: Pick photo — goes through CapturePreviewModal
   const handlePickPhoto = async () => {
     setMediaLoading(true);
     try {
@@ -180,11 +204,7 @@ export default function AffiliateScreen() {
           setMediaLoading(false);
           return;
         }
-        setSelectedImage(images[0].base64);
-        setSelectedImageMime(images[0].mimeType);
-        setMediaType('photo');
-        markCompleted('media');
-        scrollToNext('media');
+        setPreviewCapture({ base64: cleanBase64(images[0].base64), mimeType: images[0].mimeType });
       } else {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -196,22 +216,16 @@ export default function AffiliateScreen() {
           return;
         }
         const { base64, mimeType } = await compressImageToBase64(result.assets[0].uri, 1280, 0.7);
-        setSelectedImage(base64);
-        setSelectedImageMime(mimeType);
-        setMediaType('photo');
-        markCompleted('media');
-        scrollToNext('media');
+        setPreviewCapture({ base64, mimeType });
       }
-    } catch (err) {
+    } catch {
       setMediaLoading(false);
     }
     setMediaLoading(false);
   };
 
   const handlePickVideo = async () => {
-    if (isWebPlatform()) {
-      return;
-    }
+    if (isWebPlatform()) return;
     setMediaLoading(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -227,48 +241,51 @@ export default function AffiliateScreen() {
       setSelectedImageMime('video/mp4');
       setMediaType('video');
       markCompleted('media');
-      scrollToNext('media');
     } catch {
       setMediaLoading(false);
     }
     setMediaLoading(false);
   };
 
-  // Step 2: Save affiliate link
+  // CapturePreviewModal confirm → set image and advance
+  const handlePreviewConfirm = (base64: string, mimeType: string) => {
+    setSelectedImage(base64);
+    setSelectedImageMime(mimeType);
+    setMediaType('photo');
+    setPreviewCapture(null);
+    markCompleted('media');
+  };
+
+  const handlePreviewRetake = () => {
+    setPreviewCapture(null);
+  };
+
+  // Step 2: Save affiliate link and run AI analysis
   const handleSaveAffiliate = () => {
     if (!affiliateUrl.trim()) return;
-    markCompleted('affiliate');
-    scrollToNext('affiliate');
+    markCompleted('analyze');
+  };
+
+  const handleAnalyzePhoto = async () => {
+    if (!selectedImage || mediaType !== 'photo' || analyzing) return;
+    setAnalyzing(true);
+    try {
+      const imageUrl = await uploadImage(selectedImage, selectedImageMime);
+      const scanId = await saveManualScan(imageUrl);
+      markCompleted('analyze');
+      router.push({ pathname: '/result/[id]', params: { id: scanId } });
+    } catch (err) {
+      setAnalyzing(false);
+    }
   };
 
   // Step 3: Save content
   const handleSaveContent = () => {
     if (!contentText.trim()) return;
     markCompleted('content');
-    scrollToNext('content');
   };
 
-  // Step 4: Go to editor or upload
-  const handleEditInEditor = async () => {
-    if (!selectedImage) return;
-    try {
-      if (mediaType === 'photo') {
-        const imageUrl = await uploadImage(selectedImage, selectedImageMime);
-        const scanId = await saveManualScan(imageUrl);
-        router.push({ pathname: '/result/[id]', params: { id: scanId } });
-      }
-    } catch (err) {
-      // ignore
-    }
-  };
-
-  const handleConfirmPreview = () => {
-    setShowPreviewModal(false);
-    markCompleted('preview');
-    scrollToNext('preview');
-  };
-
-  // Step 5: Upload to platform
+  // Step 4: Upload to platform
   const handleUploadToPlatform = (platformKey: string) => {
     setUploadPlatform(platformKey);
     markCompleted('upload');
@@ -282,24 +299,27 @@ export default function AffiliateScreen() {
         : selectedImage
     : null;
 
+  const activeStep = Math.min(completedSteps.size + 1, 4);
+
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <Text style={styles.headerTitle}>제휴쇼핑 제작</Text>
-        <Text style={styles.headerSubtext}>
-          아래 5단계를 위에서부터 차례대로 따라 하시면 됩니다
-        </Text>
-      </View>
-
       <ScrollView
-        ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 40 }}
+        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + 40 }}
         showsVerticalScrollIndicator={false}
       >
         {loadError && (
           <ErrorRetryBanner message={loadError} onRetry={loadData} retrying={loading} />
         )}
+
+        {/* Header */}
+        <View style={styles.verticalHeader}>
+          <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
+          <Text style={styles.verticalSubtitle}>
+            아래 4단계를 위에서부터 차례대로 따라 하시면 됩니다. 각 단계를 완료하면 다음 단계로 자동 이동합니다.
+          </Text>
+        </View>
+
         {/* Revenue summary */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryLeft}>
@@ -319,14 +339,14 @@ export default function AffiliateScreen() {
 
         {/* Step indicator */}
         <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
-          <StepIndicator activeStep={Math.min(completedSteps.size + 1, 4)} />
+          <StepIndicator activeStep={activeStep} />
         </View>
 
         {/* STEP 1: Media import */}
         <VerticalSectionCard
           icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
-          title="1. 사진 / 영상 불러오기"
-          desc="판매할 상품의 사진이나 영상을 준비하세요."
+          title="1. 사진 · 영상 불러오기"
+          desc="기기 앨범에서 상품 사진이나 홍보 영상을 선택하세요."
           iconBg={theme.colors.primary[500] + '18'}
           accentColor={STEP_META.media.color}
           stepNumber={1}
@@ -334,7 +354,7 @@ export default function AffiliateScreen() {
         >
           <View style={styles.mediaHintBox}>
             <Text style={styles.mediaHintText}>
-              갤러리에서 사진이나 동영상을 선택하세요. 사진은 AI가 자동으로 분석하고, 영상은 숏폼 제작에 활용됩니다.
+              갤러리에서 사진이나 동영상을 선택하세요. 사진은 미리보기에서 자르기·회전 후 AI 분석으로 연결되고, 영상은 숏폼 제작에 활용됩니다.
             </Text>
           </View>
 
@@ -347,7 +367,11 @@ export default function AffiliateScreen() {
               />
               <TouchableOpacity
                 style={styles.mediaRemoveBtn}
-                onPress={() => { setSelectedImage(null); setMediaType(null); setCompletedSteps((prev) => { const n = new Set(prev); n.delete('media'); return n; }); }}
+                onPress={() => {
+                  setSelectedImage(null);
+                  setMediaType(null);
+                  setCompletedSteps((prev) => { const n = new Set(prev); n.delete('media'); return n; });
+                }}
                 activeOpacity={0.7}
               >
                 <Text style={styles.mediaRemoveText}>삭제</Text>
@@ -376,21 +400,40 @@ export default function AffiliateScreen() {
           )}
         </VerticalSectionCard>
 
-        {/* STEP 2: Affiliate link */}
+        {/* STEP 2: AI Analysis & Affiliate Matching */}
         <VerticalSectionCard
-          icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="2. 제휴 링크 연결"
-          desc="상품의 제휴 링크를 입력하면 단축 URL이 자동 생성됩니다."
+          icon={<ScanSearch size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          title="2. AI 분석 및 제휴 상품 매칭"
+          desc="업로드한 이미지를 AI가 분석하여 최적의 제휴 상품을 매칭합니다."
           iconBg={theme.colors.accent[500] + '18'}
-          accentColor={STEP_META.affiliate.color}
+          accentColor={STEP_META.analyze.color}
           stepNumber={2}
-          completed={completedSteps.has('affiliate')}
+          completed={completedSteps.has('analyze')}
         >
           <View style={styles.affiliateHintBox}>
             <Text style={styles.affiliateHintText}>
               아래 플랫폼에 가입하고 파트너스 ID를 설정하면, 링크에 자동으로 추적 코드가 포함됩니다.
             </Text>
           </View>
+
+          {/* AI analysis button */}
+          {selectedImage && mediaType === 'photo' && (
+            <TouchableOpacity
+              style={styles.analyzeBtn}
+              onPress={handleAnalyzePhoto}
+              disabled={analyzing}
+              activeOpacity={0.85}
+            >
+              {analyzing ? (
+                <Loader size={18} color="#fff" strokeWidth={2} />
+              ) : (
+                <ScanSearch size={18} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.analyzeBtnText}>
+                {analyzing ? 'AI 분석 중...' : 'AI 분석 시작하기'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {/* Platform quick select */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.platformChipsScroll}>
@@ -524,16 +567,41 @@ export default function AffiliateScreen() {
           />
         </VerticalSectionCard>
 
-        {/* STEP 3: Content creation */}
+        {/* STEP 3: Content & Template Editing */}
         <VerticalSectionCard
-          icon={<Sparkles size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="3. 마케팅 소재 만들기"
-          desc="제품을 소개할 문구, 해시태그, 후킹 문장을 작성하세요."
+          icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+          title="3. 콘텐츠 및 템플릿 편집"
+          desc="숏폼 영상, 웹툰형 만화, 카드뉴스 템플릿으로 변환하고 자막·효과음을 수정하세요."
           iconBg={theme.colors.warning[500] + '18'}
           accentColor={STEP_META.content.color}
           stepNumber={3}
           completed={completedSteps.has('content')}
         >
+          {/* Template style selection */}
+          <Text style={styles.sectionLabel}>템플릿 스타일</Text>
+          <View style={styles.templateRow}>
+            {TEMPLATE_STYLES.map((t) => {
+              const Icon = t.icon;
+              const isActive = selectedTemplate === t.key;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[styles.templateChip, isActive && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' }]}
+                  onPress={() => setSelectedTemplate(t.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={16} color={isActive ? theme.colors.warning[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                  <View style={styles.templateTextWrap}>
+                    <Text style={[styles.templateChipLabel, isActive && { color: theme.colors.warning[400] }]}>{t.label}</Text>
+                    <Text style={styles.templateChipDesc}>{t.desc}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Content type selection */}
+          <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
           <View style={styles.contentTypeRow}>
             {CONTENT_TYPES.map((t) => {
               const Icon = t.icon;
@@ -589,71 +657,28 @@ export default function AffiliateScreen() {
           </View>
         </VerticalSectionCard>
 
-        {/* STEP 4: Preview & edit */}
+        {/* STEP 4: Affiliate Link & Platform Upload */}
         <VerticalSectionCard
-          icon={<Eye size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="4. 미리보기 및 수정"
-          desc="완성된 콘텐츠를 확인하고 필요하면 수정하세요."
+          icon={<Share2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
+          title="4. 제휴 링크 연결 및 플랫폼 업로드"
+          desc="단축 제휴 링크를 삽입하고 릴스·쇼츠·틱톡·블로그에 원클릭 업로드하세요."
           iconBg={theme.colors.success[500] + '18'}
-          accentColor={STEP_META.preview.color}
-          stepNumber={4}
-          completed={completedSteps.has('preview')}
-        >
-          <View style={styles.previewSummary}>
-            {imagePreviewUri && (
-              <Image source={{ uri: imagePreviewUri }} style={styles.previewThumb} resizeMode="cover" />
-            )}
-            <View style={styles.previewInfo}>
-              {mediaType && (
-                <View style={styles.previewBadge}>
-                  <Text style={styles.previewBadgeText}>{mediaType === 'photo' ? '사진' : '동영상'}</Text>
-                </View>
-              )}
-              {affiliateUrl.trim() && (
-                <Text style={styles.previewLink} numberOfLines={1}>링크: {affiliateUrl}</Text>
-              )}
-              {contentText.trim() && (
-                <Text style={styles.previewContent} numberOfLines={3}>{contentText}</Text>
-              )}
-              {!imagePreviewUri && !affiliateUrl.trim() && !contentText.trim() && (
-                <Text style={styles.previewEmpty}>아직 입력된 내용이 없습니다. 위 단계부터 진행하세요.</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.previewActionRow}>
-            <TouchableOpacity
-              style={styles.previewEditBtn}
-              onPress={handleEditInEditor}
-              activeOpacity={0.7}
-              disabled={!selectedImage}
-            >
-              <Edit3 size={16} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={styles.previewEditBtnText}>편집기에서 수정</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.previewConfirmBtn}
-              onPress={() => setShowPreviewModal(true)}
-              activeOpacity={0.7}
-              disabled={!imagePreviewUri && !contentText.trim()}
-            >
-              <Eye size={16} color="#fff" strokeWidth={2} />
-              <Text style={styles.previewConfirmBtnText}>최종 확인</Text>
-            </TouchableOpacity>
-          </View>
-        </VerticalSectionCard>
-
-        {/* STEP 5: Platform upload */}
-        <VerticalSectionCard
-          icon={<Upload size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
-          title="5. 플랫폼에 업로드"
-          desc="완성된 콘텐츠를 SNS나 블로그에 바로 공유하세요."
-          iconBg={theme.colors.primary[500] + '18'}
           accentColor={STEP_META.upload.color}
-          stepNumber={5}
+          stepNumber={4}
           completed={completedSteps.has('upload')}
         >
+          {/* Link summary */}
+          {affiliateUrl.trim() ? (
+            <View style={styles.linkSummaryBox}>
+              <Link2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.linkSummaryText} numberOfLines={2}>{affiliateUrl}</Text>
+            </View>
+          ) : (
+            <View style={styles.linkEmptyBox}>
+              <Text style={styles.linkEmptyText}>2단계에서 제휴 링크를 먼저 입력해주세요</Text>
+            </View>
+          )}
+
           <Text style={styles.uploadHint}>
             업로드할 플랫폼을 선택하세요. 각 플랫폼에 맞는 형식으로 자동 변환됩니다.
           </Text>
@@ -700,7 +725,7 @@ export default function AffiliateScreen() {
         <Text style={styles.sectionTitle}>최근 수익 기록</Text>
         {revenue.length === 0 ? (
           <View style={styles.emptyRevenue}>
-            <Link2 size={40} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
+            <TrendingUp size={40} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
             <Text style={styles.emptyRevenueTitle}>아직 수익 기록이 없습니다</Text>
             <Text style={styles.emptyRevenueDesc}>
               제휴 링크를 공유하고 수익이 발생하면 여기에 표시됩니다
@@ -732,69 +757,16 @@ export default function AffiliateScreen() {
         </View>
       </ScrollView>
 
-      {/* Final preview modal */}
-      <Modal visible={showPreviewModal} transparent animationType="slide" onRequestClose={() => setShowPreviewModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <Eye size={20} color={theme.colors.success[400]} strokeWidth={2} />
-                <Text style={styles.modalTitle}>최종 미리보기</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowPreviewModal(false)} activeOpacity={0.7}>
-                <Text style={styles.modalCloseText}>닫기</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
-              {imagePreviewUri && (
-                <Image source={{ uri: imagePreviewUri }} style={styles.modalImage} resizeMode="contain" />
-              )}
-
-              {contentText.trim() && (
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionLabel}>마케팅 문구</Text>
-                  <Text style={styles.modalContentText}>{contentText}</Text>
-                </View>
-              )}
-
-              {affiliateUrl.trim() && (
-                <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionLabel}>제휴 링크</Text>
-                  <Text style={styles.modalLinkText} numberOfLines={2}>{affiliateUrl}</Text>
-                </View>
-              )}
-
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionLabel}>선택 플랫폼</Text>
-                <Text style={styles.modalPlatformText}>
-                  {selectedPlatform || '미선택'}
-                </Text>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.modalEditBtn}
-                onPress={() => setShowPreviewModal(false)}
-                activeOpacity={0.7}
-              >
-                <Edit3 size={16} color={theme.colors.dark.text} strokeWidth={2} />
-                <Text style={styles.modalEditBtnText}>수정하기</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                onPress={handleConfirmPreview}
-                activeOpacity={0.85}
-              >
-                <Check size={18} color="#fff" strokeWidth={2} />
-                <Text style={styles.modalConfirmBtnText}>확인 완료</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* CapturePreviewModal — same as camera tab */}
+      {previewCapture && (
+        <CapturePreviewModal
+          visible={!!previewCapture}
+          imageBase64={previewCapture.base64}
+          mimeType={previewCapture.mimeType}
+          onConfirm={handlePreviewConfirm}
+          onRetake={handlePreviewRetake}
+        />
+      )}
     </View>
   );
 }
@@ -880,24 +852,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.dark.bg,
   },
-  header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  headerSubtext: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginTop: 4,
-  },
   scroll: {
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
+  },
+  verticalHeader: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    gap: 4,
+  },
+  verticalTitle: {
+    fontSize: 22,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  verticalSubtitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: theme.spacing.md,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -1031,6 +1007,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 17,
+  },
+  analyzeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+    marginBottom: theme.spacing.sm,
+    ...theme.shadows.elevated,
+  },
+  analyzeBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   platformChipsScroll: {
     flexDirection: 'row',
@@ -1241,6 +1233,41 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: theme.spacing.sm,
+  },
+  templateRow: {
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  templateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  templateTextWrap: {
+    flex: 1,
+  },
+  templateChipLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  templateChipDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
   contentTypeRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1317,88 +1344,32 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  previewSummary: {
+  linkSummaryBox: {
     flexDirection: 'row',
-    gap: 12,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.accent[500] + '12',
     borderRadius: theme.radius.md,
     padding: theme.spacing.sm + 2,
     marginBottom: theme.spacing.sm,
   },
-  previewThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.md,
-    backgroundColor: '#000',
-  },
-  previewInfo: {
+  linkSummaryText: {
     flex: 1,
-  },
-  previewBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.primary[500] + '30',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: theme.radius.full,
-    marginBottom: 4,
-  },
-  previewBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primary[300],
-  },
-  previewLink: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginBottom: 4,
-  },
-  previewContent: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    lineHeight: 17,
+    color: theme.colors.accent[300],
   },
-  previewEmpty: {
+  linkEmptyBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  linkEmptyText: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
-  },
-  previewActionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  previewEditBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  previewEditBtnText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.success[400],
-  },
-  previewConfirmBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
-  },
-  previewConfirmBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
   },
   uploadHint: {
     fontSize: 12,
@@ -1547,115 +1518,5 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.accent[300],
     lineHeight: 17,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.md,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 440,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    padding: theme.spacing.lg,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  modalCloseText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  modalScroll: {
-    maxHeight: 400,
-  },
-  modalImage: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: theme.radius.md,
-    backgroundColor: '#000',
-    marginBottom: theme.spacing.md,
-  },
-  modalSection: {
-    marginBottom: theme.spacing.md,
-  },
-  modalSectionLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    marginBottom: 4,
-  },
-  modalContentText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    lineHeight: 20,
-  },
-  modalLinkText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.primary[300],
-  },
-  modalPlatformText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: theme.spacing.sm,
-  },
-  modalEditBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  modalEditBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  modalConfirmBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
-  },
-  modalConfirmBtnText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
 });
