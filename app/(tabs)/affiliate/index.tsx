@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -89,20 +89,23 @@ const TEMPLATE_STYLES = [
   { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText },
 ] as const;
 
-type StepKey = 'media' | 'analyze' | 'content' | 'upload';
+type StepKey = 'media' | 'affiliate' | 'analyze' | 'content' | 'upload';
 
-const STEP_ORDER: StepKey[] = ['media', 'analyze', 'content', 'upload'];
+const STEP_ORDER: StepKey[] = ['media', 'affiliate', 'analyze', 'content', 'upload'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   media: { num: 1, color: theme.colors.primary[400] },
-  analyze: { num: 2, color: theme.colors.accent[400] },
-  content: { num: 3, color: theme.colors.warning[400] },
-  upload: { num: 4, color: theme.colors.success[400] },
+  affiliate: { num: 2, color: theme.colors.accent[400] },
+  analyze: { num: 3, color: theme.colors.success[400] },
+  content: { num: 4, color: theme.colors.warning[400] },
+  upload: { num: 5, color: theme.colors.success[400] },
 };
 
 export default function AffiliateScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useSubTabBarHeight();
+  const scrollRef = useRef<ScrollView>(null);
+  const stepRefs = useRef<Record<number, View | null>>({});
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [revenue, setRevenue] = useState<RevenueRecord[]>([]);
@@ -126,8 +129,14 @@ export default function AffiliateScreen() {
   const [showAddPlatform, setShowAddPlatform] = useState(false);
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformUrl, setNewPlatformUrl] = useState('');
+
+  // Step 3: AI Analysis
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  // Step 4: Content
+  const [simpleMode, setSimpleMode] = useState(true);
+  const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
 
   // Step 3: Content
   const [contentText, setContentText] = useState('');
@@ -158,7 +167,26 @@ export default function AffiliateScreen() {
   const totalRevenue = revenue.reduce((sum, r) => sum + (r.amount || 0), 0);
 
   const markCompleted = (key: StepKey) => {
-    setCompletedSteps((prev) => new Set(prev).add(key));
+    setCompletedSteps((prev) => {
+      const next = new Set(prev).add(key);
+      const idx = STEP_ORDER.indexOf(key);
+      if (idx < STEP_ORDER.length - 1) {
+        const nextStepNum = idx + 2;
+        setTimeout(() => {
+          const targetRef = stepRefs.current[nextStepNum];
+          if (targetRef && scrollRef.current) {
+            targetRef.measureLayout(
+              scrollRef.current as any,
+              (_x, y) => {
+                scrollRef.current?.scrollTo({ y: y - 20, animated: true });
+              },
+              () => {},
+            );
+          }
+        }, 300);
+      }
+      return next;
+    });
   };
 
   const handleOpenUrl = (url: string) => {
@@ -254,10 +282,10 @@ export default function AffiliateScreen() {
     setPreviewCapture(null);
   };
 
-  // Step 2: Save affiliate link and run AI analysis
+  // Step 2: Save affiliate link
   const handleSaveAffiliate = () => {
     if (!affiliateUrl.trim()) return;
-    markCompleted('analyze');
+    markCompleted('affiliate');
   };
 
   const handleAnalyzePhoto = async () => {
@@ -268,6 +296,7 @@ export default function AffiliateScreen() {
       const imageUrl = await uploadImage(selectedImage, selectedImageMime);
       const scanId = await saveManualScan(imageUrl);
       markCompleted('analyze');
+      setAiRecommendation('웹툰형 만화');
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
@@ -305,6 +334,7 @@ export default function AffiliateScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={{ paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + 40 }}
         showsVerticalScrollIndicator={false}
@@ -317,7 +347,7 @@ export default function AffiliateScreen() {
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            아래 4단계를 위에서부터 차례대로 따라 하시면 됩니다. 각 단계를 완료하면 다음 단계로 자동 이동합니다.
+            아래 5단계를 위에서부터 차례대로 따라 하시면 됩니다. 각 단계를 완료하면 다음 단계로 자동 스크롤됩니다.
           </Text>
         </View>
 
@@ -340,7 +370,7 @@ export default function AffiliateScreen() {
 
         {/* Step indicator */}
         <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
-          <StepIndicator activeStep={activeStep} />
+          <StepIndicator activeStep={activeStep} stepCount={5} />
         </View>
 
         {/* STEP 1: Media import */}
@@ -401,46 +431,25 @@ export default function AffiliateScreen() {
           )}
         </VerticalSectionCard>
 
-        {/* STEP 2: AI Analysis & Affiliate Matching */}
+        {/* STEP 2: Affiliate Link Connection */}
+        <View
+          ref={(ref) => { stepRefs.current[2] = ref; }}
+          collapsable={false}
+        >
         <VerticalSectionCard
-          icon={<ScanSearch size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="2. AI 분석 및 제휴 상품 매칭"
-          desc="업로드한 이미지를 AI가 분석하여 최적의 제휴 상품을 매칭합니다."
+          icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          title="2. 제휴 링크 연결"
+          desc="먼저 어느 상품을 홍보할지 제휴 링크를 연결하세요. 각 플랫폼에 맞는 표준 공정위 문구가 자동으로 적용됩니다."
           iconBg={theme.colors.accent[500] + '18'}
-          accentColor={STEP_META.analyze.color}
+          accentColor={STEP_META.affiliate.color}
           stepNumber={2}
-          completed={completedSteps.has('analyze')}
+          completed={completedSteps.has('affiliate')}
         >
           <View style={styles.affiliateHintBox}>
             <Text style={styles.affiliateHintText}>
-              아래 플랫폼에 가입하고 파트너스 ID를 설정하면, 링크에 자동으로 추적 코드가 포함됩니다.
+              제휴 플랫폼을 선택하고 링크를 붙여넣으세요. 파트너스 ID가 설정되어 있으면 링크에 자동으로 추적 코드가 포함됩니다.
             </Text>
           </View>
-
-          {/* AI analysis button */}
-          {selectedImage && mediaType === 'photo' && (
-            <TouchableOpacity
-              style={styles.analyzeBtn}
-              onPress={handleAnalyzePhoto}
-              disabled={analyzing}
-              activeOpacity={0.85}
-            >
-              {analyzing ? (
-                <Loader size={18} color="#fff" strokeWidth={2} />
-              ) : (
-                <ScanSearch size={18} color="#fff" strokeWidth={2} />
-              )}
-              <Text style={styles.analyzeBtnText}>
-                {analyzing ? 'AI 분석 중...' : 'AI 분석 시작하기'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {analyzeError && (
-            <View style={styles.analyzeErrorBox}>
-              <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
-            </View>
-          )}
 
           {/* Platform quick select */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.platformChipsScroll}>
@@ -573,23 +582,128 @@ export default function AffiliateScreen() {
             onCopySignup={handleCopySignup}
           />
         </VerticalSectionCard>
+        </View>
 
-        {/* STEP 3: Content & Template Editing */}
+        {/* STEP 3: AI Analysis */}
+        <View
+          ref={(ref) => { stepRefs.current[3] = ref; }}
+          collapsable={false}
+        >
+        <VerticalSectionCard
+          icon={<ScanSearch size={20} color={theme.colors.success[400]} strokeWidth={2} />}
+          title="3. AI 분석 및 스타일 추천"
+          desc="업로드한 사진을 AI가 분석하여 최적의 콘텐츠 스타일을 추천합니다."
+          iconBg={theme.colors.success[500] + '18'}
+          accentColor={STEP_META.analyze.color}
+          stepNumber={3}
+          completed={completedSteps.has('analyze')}
+        >
+          {selectedImage && mediaType === 'photo' ? (
+            <>
+              <TouchableOpacity
+                style={styles.analyzeBtn}
+                onPress={handleAnalyzePhoto}
+                disabled={analyzing}
+                activeOpacity={0.85}
+              >
+                {analyzing ? (
+                  <Loader size={18} color="#fff" strokeWidth={2} />
+                ) : (
+                  <ScanSearch size={18} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.analyzeBtnText}>
+                  {analyzing ? 'AI 분석 중...' : 'AI 분석 시작하기'}
+                </Text>
+              </TouchableOpacity>
+
+              {analyzeError && (
+                <View style={styles.analyzeErrorBox}>
+                  <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
+                </View>
+              )}
+
+              {completedSteps.has('analyze') && aiRecommendation && (
+                <View style={styles.aiRecommendBadge}>
+                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.aiRecommendText}>
+                    AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <View style={styles.analyzeWaitingBox}>
+              <Text style={styles.analyzeWaitingText}>
+                1단계에서 사진을 먼저 선택해주세요
+              </Text>
+            </View>
+          )}
+        </VerticalSectionCard>
+        </View>
+
+        {/* STEP 4: Content & Template Editing */}
+        <View
+          ref={(ref) => { stepRefs.current[4] = ref; }}
+          collapsable={false}
+        >
         <VerticalSectionCard
           icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="3. 콘텐츠 및 템플릿 편집"
-          desc="숏폼 영상, 웹툰형 만화, 카드뉴스 템플릿으로 변환하고 자막·효과음을 수정하세요."
+          title="4. 콘텐츠 및 템플릿 편집"
+          desc="AI가 추천한 스타일로 바로 제작하거나, 원하는 스타일을 직접 선택하세요."
           iconBg={theme.colors.warning[500] + '18'}
           accentColor={STEP_META.content.color}
-          stepNumber={3}
+          stepNumber={4}
           completed={completedSteps.has('content')}
         >
+          {/* AI Recommendation badge */}
+          {aiRecommendation && (
+            <View style={styles.aiRecommendCard}>
+              <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+              <View style={styles.aiRecommendCardBody}>
+                <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
+                <Text style={styles.aiRecommendCardDesc}>
+                  이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.aiRecommendApplyBtn}
+                onPress={() => {
+                  const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
+                  if (match) setSelectedTemplate(match.key);
+                }}
+                activeOpacity={0.7}
+              >
+                <Check size={14} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Simple / Advanced mode toggle */}
+          <View style={styles.modeToggleRow}>
+            <TouchableOpacity
+              style={[styles.modeToggleBtn, simpleMode && styles.modeToggleBtnActive]}
+              onPress={() => setSimpleMode(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeToggleText, simpleMode && styles.modeToggleTextActive]}>초보자 모드</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeToggleBtn, !simpleMode && styles.modeToggleBtnActive]}
+              onPress={() => setSimpleMode(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeToggleText, !simpleMode && styles.modeToggleTextActive]}>고급 설정</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Template style selection */}
           <Text style={styles.sectionLabel}>템플릿 스타일</Text>
           <View style={styles.templateRow}>
             {TEMPLATE_STYLES.map((t) => {
               const Icon = t.icon;
               const isActive = selectedTemplate === t.key;
+              const isRecommended = aiRecommendation?.includes(t.label);
               return (
                 <TouchableOpacity
                   key={t.key}
@@ -602,40 +716,58 @@ export default function AffiliateScreen() {
                     <Text style={[styles.templateChipLabel, isActive && { color: theme.colors.warning[400] }]}>{t.label}</Text>
                     <Text style={styles.templateChipDesc}>{t.desc}</Text>
                   </View>
+                  {isRecommended && (
+                    <View style={styles.recommendBadge}>
+                      <Sparkles size={9} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.recommendBadgeText}>추천</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          {/* Content type selection */}
-          <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
-          <View style={styles.contentTypeRow}>
-            {CONTENT_TYPES.map((t) => {
-              const Icon = t.icon;
-              const isActive = contentType === t.key;
-              return (
-                <TouchableOpacity
-                  key={t.key}
-                  style={[styles.contentTypeChip, isActive && { borderColor: t.color, backgroundColor: t.color + '15' }]}
-                  onPress={() => setContentType(t.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={14} color={t.color} strokeWidth={2} />
-                  <Text style={[styles.contentTypeText, isActive && { color: t.color }]}>{t.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {/* Content type selection — hidden in simple mode */}
+          {!simpleMode && (
+            <>
+              <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
+              <View style={styles.contentTypeRow}>
+                {CONTENT_TYPES.map((t) => {
+                  const Icon = t.icon;
+                  const isActive = contentType === t.key;
+                  return (
+                    <TouchableOpacity
+                      key={t.key}
+                      style={[styles.contentTypeChip, isActive && { borderColor: t.color, backgroundColor: t.color + '15' }]}
+                      onPress={() => setContentType(t.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Icon size={14} color={t.color} strokeWidth={2} />
+                      <Text style={[styles.contentTypeText, isActive && { color: t.color }]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-          <Text style={styles.contentHint}>
-            {CONTENT_TYPES.find((t) => t.key === contentType)?.hint}
-          </Text>
+              <Text style={styles.contentHint}>
+                {CONTENT_TYPES.find((t) => t.key === contentType)?.hint}
+              </Text>
+            </>
+          )}
+
+          {simpleMode && (
+            <View style={styles.simpleModeHintBox}>
+              <Text style={styles.simpleModeHintText}>
+                초보자 모드: AI 추천 스타일로 바로 제작할 수 있습니다. 더 많은 옵션을 보려면 '고급 설정'을 선택하세요.
+              </Text>
+            </View>
+          )}
 
           <TextInput
             style={styles.contentInput}
             value={contentText}
             onChangeText={setContentText}
-            placeholder="여기에 마케팅 문구를 입력하세요..."
+            placeholder={simpleMode ? "마케팅 문구를 자유롭게 적어보세요..." : "여기에 마케팅 문구를 입력하세요..."}
             placeholderTextColor={theme.colors.dark.textFaint}
             multiline
             numberOfLines={4}
@@ -663,15 +795,20 @@ export default function AffiliateScreen() {
             </TouchableOpacity>
           </View>
         </VerticalSectionCard>
+        </View>
 
-        {/* STEP 4: Affiliate Link & Platform Upload */}
+        {/* STEP 5: Platform Upload */}
+        <View
+          ref={(ref) => { stepRefs.current[5] = ref; }}
+          collapsable={false}
+        >
         <VerticalSectionCard
           icon={<Share2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="4. 제휴 링크 연결 및 플랫폼 업로드"
-          desc="단축 제휴 링크를 삽입하고 릴스·쇼츠·틱톡·블로그에 원클릭 업로드하세요."
+          title="5. 플랫폼 업로드 및 공정위 문구 확인"
+          desc="제휴 링크가 자동으로 삽입된 콘텐츠를 릴스·쇼츠·틱톡·블로그에 업로드하세요."
           iconBg={theme.colors.success[500] + '18'}
           accentColor={STEP_META.upload.color}
-          stepNumber={4}
+          stepNumber={5}
           completed={completedSteps.has('upload')}
         >
           {/* Link summary */}
@@ -727,6 +864,7 @@ export default function AffiliateScreen() {
             </View>
           )}
         </VerticalSectionCard>
+        </View>
 
         {/* Recent revenue */}
         <Text style={styles.sectionTitle}>최근 수익 기록</Text>
@@ -1022,7 +1160,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent[500],
+    backgroundColor: theme.colors.success[500],
     marginBottom: theme.spacing.sm,
     ...theme.shadows.elevated,
   },
@@ -1179,6 +1317,130 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
+  },
+  aiRecommendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  aiRecommendText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+    lineHeight: 17,
+  },
+  analyzeWaitingBox: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md + 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+  },
+  analyzeWaitingText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  aiRecommendCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  aiRecommendCardBody: {
+    flex: 1,
+  },
+  aiRecommendCardTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  aiRecommendCardDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  aiRecommendApplyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.warning[500],
+  },
+  aiRecommendApplyBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    alignItems: 'center',
+  },
+  modeToggleBtnActive: {
+    borderColor: theme.colors.warning[400],
+    backgroundColor: theme.colors.warning[400] + '15',
+  },
+  modeToggleText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  modeToggleTextActive: {
+    color: theme.colors.warning[400],
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  simpleModeHintBox: {
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning[400] + '60',
+  },
+  simpleModeHintText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
+  },
+  recommendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.colors.warning[500],
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: theme.radius.full,
+  },
+  recommendBadgeText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   platformRow: {
     flexDirection: 'row',

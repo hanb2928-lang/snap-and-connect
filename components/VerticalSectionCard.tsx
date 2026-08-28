@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
+import { Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface VerticalSectionCardProps {
@@ -28,8 +31,31 @@ export function VerticalSectionCard({
     ? { shadowColor: accentColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 0 }
     : undefined;
 
+  const wasCompleted = useRef(false);
+  const checkScale = useSharedValue(0);
+  const checkOpacity = useSharedValue(0);
+  const cardShift = useSharedValue(0);
+
+  useEffect(() => {
+    if (completed && !wasCompleted.current) {
+      wasCompleted.current = true;
+      checkScale.value = withSpring(1, { damping: 12, stiffness: 200 });
+      checkOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+      cardShift.value = withTiming(0, { duration: 400, easing: Easing.out(Easing.ease) });
+    } else if (!completed && wasCompleted.current) {
+      wasCompleted.current = false;
+      checkScale.value = withTiming(0, { duration: 150 });
+      checkOpacity.value = withTiming(0, { duration: 150 });
+    }
+  }, [completed]);
+
+  const checkAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkScale.value }],
+    opacity: checkOpacity.value,
+  }));
+
   return (
-    <View style={[styles.section, glowStyle, style]}>
+    <Animated.View style={[styles.section, glowStyle, style]}>
       {accentColor && <View style={[styles.accentLine, { backgroundColor: accentColor }]} />}
       {completed && <View style={styles.completedOverlay} pointerEvents="none" />}
 
@@ -41,14 +67,19 @@ export function VerticalSectionCard({
               <Text style={styles.stepBadgeText}>{stepNumber}</Text>
             </View>
           )}
+          {completed && (
+            <Animated.View style={[styles.completedCheck, checkAnimStyle]}>
+              <Check size={12} color="#fff" strokeWidth={3} />
+            </Animated.View>
+          )}
         </View>
         <View style={styles.textWrap}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={[styles.title, completed && styles.titleCompleted]}>{title}</Text>
           <Text style={styles.desc}>{desc}</Text>
         </View>
       </View>
       <View style={styles.body}>{children}</View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -107,6 +138,22 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.dark.border,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  completedCheck: {
+    position: 'absolute',
+    bottom: -5,
+    right: -5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.success[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.dark.bg,
+  },
+  titleCompleted: {
+    color: theme.colors.success[400],
   },
   stepBadgeText: {
     fontSize: 9,

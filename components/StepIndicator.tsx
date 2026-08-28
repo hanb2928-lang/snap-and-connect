@@ -5,27 +5,31 @@ import { theme } from '@/lib/theme';
 const STEP_COLORS = [
   theme.colors.primary[400],
   theme.colors.accent[400],
+  theme.colors.success[400],
   theme.colors.warning[400],
   theme.colors.success[400],
 ];
 
 const STEPS = [
-  { num: '1', label: '촬영', route: '/' },
-  { num: '2', label: 'AI분석', route: '/' },
-  { num: '3', label: '편집', route: '/assets' },
-  { num: '4', label: '공유', route: '/affiliate' },
+  { num: '1', label: '사진', route: '/' },
+  { num: '2', label: '링크', route: '/' },
+  { num: '3', label: 'AI분석', route: '/' },
+  { num: '4', label: '편집', route: '/assets' },
+  { num: '5', label: '공유', route: '/affiliate' },
 ];
 
 interface StepIndicatorProps {
   activeStep?: number;
+  stepCount?: number;
 }
 
-export function StepIndicator({ activeStep = 1 }: StepIndicatorProps) {
+export function StepIndicator({ activeStep = 1, stepCount }: StepIndicatorProps) {
   const router = useRouter();
+  const steps = stepCount ? STEPS.slice(0, stepCount) : STEPS;
 
   return (
     <View style={styles.container}>
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isActive = activeStep === index + 1;
         const isDone = activeStep > index + 1;
         const color = isActive
@@ -54,7 +58,7 @@ export function StepIndicator({ activeStep = 1 }: StepIndicatorProps) {
             <Text style={[styles.label, { color }]} numberOfLines={1}>
               {step.label}
             </Text>
-            {index < STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <View style={styles.barWrap}>
                 <View
                   style={[
