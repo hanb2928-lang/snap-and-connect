@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   TextInput,
+  AppState,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -138,6 +139,7 @@ export default function ResultScreen() {
   const cardRef = useRef<View>(null);
   const mountedRef = useRef(true);
   const styleApplyCounter = useRef(0);
+  const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -195,6 +197,27 @@ export default function ResultScreen() {
     return () => clearInterval(interval);
   }, [scan]);
 
+  // Re-check TTS URL when app returns to foreground
+  useEffect(() => {
+    if (!scan || scan.tts_url) return;
+    const subscription = AppState.addEventListener('change', (nextAppState: string) => {
+      if (nextAppState === 'active' && mountedRef.current) {
+        Promise.resolve(
+          supabase
+            .from('scans')
+            .select('tts_url')
+            .eq('id', scan.id)
+            .maybeSingle()
+        ).then(({ data }) => {
+          if (data?.tts_url && mountedRef.current) {
+            setScan((prev) => (prev ? { ...prev, tts_url: data.tts_url } : prev));
+          }
+        }).catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, [scan]);
+
   // Realtime subscription for async analysis job completion
   useEffect(() => {
     if (!scan?.analysis_job_id) {
@@ -237,6 +260,7 @@ export default function ResultScreen() {
     };
 
     const sub = subscribeToJob(scan.analysis_job_id, handleJobUpdate);
+    handleJobUpdateRef.current = handleJobUpdate;
 
     // Also poll the job as a fallback (realtime can miss events)
     const pollInterval = setInterval(async () => {
@@ -259,8 +283,34 @@ export default function ResultScreen() {
     return () => {
       sub.unsubscribe();
       clearInterval(pollInterval);
+      handleJobUpdateRef.current = null;
     };
   }, [scan?.analysis_job_id]);
+
+  // Re-check job status immediately when app returns to foreground
+  // (OS suspends timers when screen is off / app is backgrounded)
+  useEffect(() => {
+    if (!scan?.analysis_job_id) return;
+    if (analysisStatus !== 'processing') return;
+
+    const subscription = AppState.addEventListener('change', (nextAppState: string) => {
+      if (nextAppState === 'active' && mountedRef.current) {
+        Promise.resolve(
+          supabase
+            .from('render_jobs')
+            .select('*')
+            .eq('id', scan.analysis_job_id!)
+            .maybeSingle()
+        ).then(({ data }) => {
+          if (data && mountedRef.current && (data.status === 'done' || data.status === 'error')) {
+            handleJobUpdateRef.current?.(data as RenderJob);
+          }
+        }).catch(() => {});
+      }
+    });
+
+    return () => subscription.remove();
+  }, [scan?.analysis_job_id, analysisStatus]);
 
   useEffect(() => {
     (async () => {
