@@ -249,7 +249,7 @@ async function analyzeWithOpenAI(
     {
       type: "text",
       text: isSingle
-        ? "Identify the single primary product in this image. Generate viral marketing copy, hashtags, and short-form template data for it. Return the detectedProducts array with one element."
+        ? "Identify the single primary product in this image. Generate viral marketing copy, hashtags, and short-form template data for it. Return the detectedProducts array with one element." + (contextHint ? "\n" + contextHint : "")
         : "Identify ALL distinct products in this image. For each product, generate viral marketing copy, hashtags, and short-form template data. Return the detectedProducts array." + (contextHint ? "\n" + contextHint : ""),
     },
     { type: "image_url", image_url: { url: imageDataUrl, detail: isSingle ? "low" : "high" } },
