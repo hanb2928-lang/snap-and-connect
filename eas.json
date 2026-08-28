@@ -11,7 +11,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug",
-        "node": "20",
         "image": "latest"
       },
       "env": {
@@ -26,7 +25,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
-        "node": "20",
         "image": "latest"
       },
       "env": {
@@ -41,7 +39,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
-        "node": "20",
         "image": "latest"
       },
       "env": {
