@@ -1224,7 +1224,7 @@ function WebUploadScreen() {
         contentContainerStyle={{ paddingTop: safeTop + theme.spacing.xl, paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
+        <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
           <View style={styles.webHeroIcon}>
             <Camera size={44} color={theme.colors.primary[400]} strokeWidth={1.5} />
           </View>
@@ -1232,6 +1232,10 @@ function WebUploadScreen() {
           <Text style={styles.webHeroSub}>
             사진을 올리면 AI가 제품을 분석하고 마케팅 소재를 만들어 드립니다
           </Text>
+        </View>
+
+        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
+          <StepIndicator activeStep={1} />
         </View>
 
         <View style={styles.webGuideSection}>
