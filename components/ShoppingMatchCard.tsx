@@ -11,7 +11,7 @@ import {
   UIManager,
   ScrollView,
 } from 'react-native';
-import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2 } from 'lucide-react-native';
+import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2, Search } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl } from '@/lib/affiliateLinkSmart';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
@@ -123,7 +123,70 @@ export function ShoppingMatchCard({
     setExpanded((e) => !e);
   };
 
-  if (matches.length === 0 && affiliateLinks.length === 0) return null;
+  const openEditor = () => {
+    setInputUrl(customLinkForProduct?.url || '');
+    setInputLabel(customLinkForProduct?.label || '');
+    setInputPlatformName(customLinkForProduct?.platform === 'Custom' ? (customLinkForProduct?.label || '') : '');
+    setError(null);
+    setEditing(true);
+  };
+
+  const closeEditor = () => {
+    setEditing(false);
+    setInputUrl('');
+    setInputLabel('');
+    setInputPlatformName('');
+    setError(null);
+  };
+
+  if (matches.length === 0 && affiliateLinks.length === 0) {
+    const searchQuery = encodeURIComponent(productName || '제품');
+    const fallbackLinks = [
+      { platform: 'Coupang' as const, label: '쿠팡에서 검색', url: `https://www.coupang.com/np/search?q=${searchQuery}` },
+      { platform: 'BrandConnect' as const, label: '네이버 쇼핑에서 검색', url: `https://search.shopping.naver.com/search/all?query=${searchQuery}` },
+      { platform: 'Toss' as const, label: '토스 쉐어링크 가입하기', url: 'https://business.toss.im/account/sign-in?client_id=ajvm9wq2t0p1ttet13y3qzb3rvjxhacn&redirect_uri=https%3A%2F%2Fsharelink.toss.im%2Fsignup-start' },
+    ];
+    return (
+      <View style={styles.container}>
+        <View style={styles.accordionHeader}>
+          <View style={styles.accordionHeaderLeft}>
+            <ShoppingBag size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.accordionTitle}>쇼핑커넥트 & 제휴 링크</Text>
+          </View>
+        </View>
+        <View style={styles.emptyStateBox}>
+          <Search size={24} color={theme.colors.primary[300]} strokeWidth={2} />
+          <Text style={styles.emptyStateTitle}>자동 매칭된 제휴 링크가 없어요</Text>
+          <Text style={styles.emptyStateDesc}>
+            AI가 정확히 일치하는 상품을 찾지 못했어요. 아래 검색 링크로 직접 상품을 찾아 수수료 링크를 발급받거나, 직접 링크를 추가해주세요.
+          </Text>
+          {fallbackLinks.map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.fallbackLinkRow}
+              onPress={() => handleOpen(item.url)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: getPlatformColor(item.platform) }]}>
+                {getPlatformIcon(item.platform)}
+              </View>
+              <Text style={styles.fallbackLinkText}>{item.label}</Text>
+              <ExternalLink size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={styles.emptyStateAddBtn}
+            onPress={openEditor}
+            activeOpacity={0.8}
+          >
+            <Plus size={16} color="#fff" strokeWidth={2.5} />
+            <Text style={styles.emptyStateAddText}>직접 링크 추가하기</Text>
+          </TouchableOpacity>
+        </View>
+        {editing && renderEditor()}
+      </View>
+    );
+  }
 
   const handleOpen = (url: string) => {
     showAffiliateToast(url);
@@ -247,7 +310,7 @@ export function ShoppingMatchCard({
         const short = await createShortLink(trimmed, scanId);
         setLocalShortUrl(short);
       } catch {
-        // short link generation failed silently
+        setError('단축 링크 생성에 실패했어요. 나중에 다시 시도해주세요.');
       } finally {
         setGeneratingShortUrl(false);
       }
@@ -264,22 +327,6 @@ export function ShoppingMatchCard({
     if (result && !result.success) {
       setError(result.error || '링크 삭제 중 오류가 발생했어요');
     }
-  };
-
-  const openEditor = () => {
-    setInputUrl(customLinkForProduct?.url || '');
-    setInputLabel(customLinkForProduct?.label || '');
-    setInputPlatformName(customLinkForProduct?.platform === 'Custom' ? (customLinkForProduct?.label || '') : '');
-    setError(null);
-    setEditing(true);
-  };
-
-  const closeEditor = () => {
-    setEditing(false);
-    setInputUrl('');
-    setInputLabel('');
-    setInputPlatformName('');
-    setError(null);
   };
 
   return (
@@ -481,110 +528,114 @@ export function ShoppingMatchCard({
             </View>
           )}
 
-          {editing && (
-            <View style={styles.editorBox}>
-              <Text style={styles.editorTitle}>수수료 링크 붙여넣기</Text>
-              <Text style={styles.editorHint}>
-                {selectedAffiliate === 'Custom'
-                  ? '이용하시는 제휴 플랫폼 이름과 링크를 직접 입력하세요. 카페24, 아임웹, 자사몰 등 어떤 플랫폼이든 등록할 수 있습니다.'
-                  : selectedMeta
-                    ? `${selectedMeta.label}에서 발급받은 링크를 붙여넣으세요. 플랫폼이 자동으로 인식되고 공정위 문구가 적용됩니다.`
-                    : '올리브영, 에이블리, 지그재그, 오늘의집, 컬리, 알리익스프레스, 마이리얼트립, 클룩, 브랜드커넥트, 쿠팡 파트너스, 또는 토스 쉐어링크에서 발급받은 링크를 붙여넣으세요.'}
-              </Text>
-              {selectedAffiliate === 'Custom' && (
-                <TextInput
-                  style={[styles.editorInput, styles.editorLabelInput]}
-                  value={inputPlatformName}
-                  onChangeText={setInputPlatformName}
-                  placeholder="플랫폼 이름 (예: 카페24, 아임웹, 자사몰)"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              )}
-              <TextInput
-                style={styles.editorInput}
-                value={inputUrl}
-                onChangeText={setInputUrl}
-                placeholder="https://... (제휴 링크 URL)"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoFocus
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType={Platform.OS === 'web' ? 'default' : 'url'}
-                multiline
-              />
-              {liveDetection && (
-                <View style={styles.detectionPreview}>
-                  <View style={styles.detectionHeader}>
-                    <Zap size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={styles.detectionPlatform}>{liveDetection.platformLabel} 자동 인식됨</Text>
-                  </View>
-                  <View style={styles.detectionBadgeRow}>
-                    <View style={[styles.detectionBadge, { backgroundColor: getPlatformColor(liveDetection.platform) }]}>
-                      <Text style={styles.detectionBadgeText}>{liveDetection.shortHint}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.detectionCopyBox}>
-                    <View style={styles.detectionCopyHeader}>
-                      <Sparkles size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-                      <Text style={styles.detectionCopyLabel}>자동 생성 마케팅 문구</Text>
-                    </View>
-                    <Text style={styles.detectionCopyText}>{liveDetection.marketingCopy}</Text>
-                  </View>
-                  <Text style={styles.detectionHint}>저장하면 이 문구가 캡션에 자동 적용됩니다</Text>
-                </View>
-              )}
-              <TextInput
-                style={[styles.editorInput, styles.editorLabelInput]}
-                value={inputLabel}
-                onChangeText={setInputLabel}
-                placeholder="링크 이름 (선택사항)"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {error && <Text style={styles.errorText}>{error}</Text>}
-              {selectedMeta && selectedAffiliate !== 'Custom' && (
-                <TouchableOpacity
-                  style={styles.brandConnectLink}
-                  onPress={() => handleOpen(selectedMeta.issueUrl)}
-                  activeOpacity={0.7}
-                >
-                  <ExternalLink size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={styles.brandConnectText}>{selectedMeta.issueLabel}</Text>
-                </TouchableOpacity>
-              )}
-              <View style={styles.editorActions}>
-                <TouchableOpacity
-                  style={styles.editorCancelBtn}
-                  onPress={closeEditor}
-                  disabled={saving}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.editorCancelText}>취소</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.editorSaveBtn, saving && styles.editorSaveBtnDisabled]}
-                  onPress={handleSaveLink}
-                  disabled={saving}
-                  activeOpacity={0.7}
-                >
-                  {saving ? (
-                    <ActivityIndicator size={16} color="#fff" />
-                  ) : (
-                    <Check size={16} color="#fff" strokeWidth={2} />
-                  )}
-                  <Text style={styles.editorSaveText}>{saving ? '저장 중...' : '저장'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          {editing && renderEditor()}
 
         </>
       )}
     </View>
   );
+
+  function renderEditor() {
+    return (
+      <View style={styles.editorBox}>
+        <Text style={styles.editorTitle}>수수료 링크 붙여넣기</Text>
+        <Text style={styles.editorHint}>
+          {selectedAffiliate === 'Custom'
+            ? '이용하시는 제휴 플랫폼 이름과 링크를 직접 입력하세요. 카페24, 아임웹, 자사몰 등 어떤 플랫폼이든 등록할 수 있습니다.'
+            : selectedMeta
+              ? `${selectedMeta.label}에서 발급받은 링크를 붙여넣으세요. 플랫폼이 자동으로 인식되고 공정위 문구가 적용됩니다.`
+              : '올리브영, 에이블리, 지그재그, 오늘의집, 컬리, 알리익스프레스, 마이리얼트립, 클룩, 브랜드커넥트, 쿠팡 파트너스, 또는 토스 쉐어링크에서 발급받은 링크를 붙여넣으세요.'}
+        </Text>
+        {selectedAffiliate === 'Custom' && (
+          <TextInput
+            style={[styles.editorInput, styles.editorLabelInput]}
+            value={inputPlatformName}
+            onChangeText={setInputPlatformName}
+            placeholder="플랫폼 이름 (예: 카페24, 아임웹, 자사몰)"
+            placeholderTextColor={theme.colors.dark.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        )}
+        <TextInput
+          style={styles.editorInput}
+          value={inputUrl}
+          onChangeText={setInputUrl}
+          placeholder="https://... (제휴 링크 URL)"
+          placeholderTextColor={theme.colors.dark.textFaint}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType={Platform.OS === 'web' ? 'default' : 'url'}
+          multiline
+        />
+        {liveDetection && (
+          <View style={styles.detectionPreview}>
+            <View style={styles.detectionHeader}>
+              <Zap size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.detectionPlatform}>{liveDetection.platformLabel} 자동 인식됨</Text>
+            </View>
+            <View style={styles.detectionBadgeRow}>
+              <View style={[styles.detectionBadge, { backgroundColor: getPlatformColor(liveDetection.platform) }]}>
+                <Text style={styles.detectionBadgeText}>{liveDetection.shortHint}</Text>
+              </View>
+            </View>
+            <View style={styles.detectionCopyBox}>
+              <View style={styles.detectionCopyHeader}>
+                <Sparkles size={12} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={styles.detectionCopyLabel}>자동 생성 마케팅 문구</Text>
+              </View>
+              <Text style={styles.detectionCopyText}>{liveDetection.marketingCopy}</Text>
+            </View>
+            <Text style={styles.detectionHint}>저장하면 이 문구가 캡션에 자동 적용됩니다</Text>
+          </View>
+        )}
+        <TextInput
+          style={[styles.editorInput, styles.editorLabelInput]}
+          value={inputLabel}
+          onChangeText={setInputLabel}
+          placeholder="링크 이름 (선택사항)"
+          placeholderTextColor={theme.colors.dark.textFaint}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        {selectedMeta && selectedAffiliate !== 'Custom' && (
+          <TouchableOpacity
+            style={styles.brandConnectLink}
+            onPress={() => handleOpen(selectedMeta.issueUrl)}
+            activeOpacity={0.7}
+          >
+            <ExternalLink size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.brandConnectText}>{selectedMeta.issueLabel}</Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.editorActions}>
+          <TouchableOpacity
+            style={styles.editorCancelBtn}
+            onPress={closeEditor}
+            disabled={saving}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.editorCancelText}>취소</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.editorSaveBtn, saving && styles.editorSaveBtnDisabled]}
+            onPress={handleSaveLink}
+            disabled={saving}
+            activeOpacity={0.7}
+          >
+            {saving ? (
+              <ActivityIndicator size={16} color="#fff" />
+            ) : (
+              <Check size={16} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.editorSaveText}>{saving ? '저장 중...' : '저장'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
@@ -1033,5 +1084,61 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     marginTop: theme.spacing.sm,
+  },
+  emptyStateBox: {
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.xl,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  emptyStateTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: theme.spacing.xs,
+  },
+  emptyStateDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  fallbackLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    gap: theme.spacing.sm,
+  },
+  fallbackLinkText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  emptyStateAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: theme.spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  emptyStateAddText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
 });

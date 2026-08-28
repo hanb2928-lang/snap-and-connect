@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Music, Volume2, VolumeX, CloudUpload, Lightbulb, Mic, Sparkles, ChevronDown, Clock } from 'lucide-react-native';
+import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Music, Volume2, VolumeX, CloudUpload, Lightbulb, Mic, Sparkles, ChevronDown, Clock, X } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
-import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
+import { uploadAssetBlobWithProgress, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
@@ -436,12 +436,16 @@ function WebClipGenerator({
   const [livePreviewPlaying, setLivePreviewPlaying] = useState(false);
   const [mascotEnabled, setMascotEnabled] = useState(true);
   const [cloudSaving, setCloudSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [renderTimedOut, setRenderTimedOut] = useState(false);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRafRef = useRef<number | null>(null);
   const previewImgRef = useRef<any>(null);
@@ -465,6 +469,7 @@ function WebClipGenerator({
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
       if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
       if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
+      if (renderTimeoutRef.current !== null) clearTimeout(renderTimeoutRef.current);
       if (bgmStopRef.current) {
         bgmStopRef.current();
         bgmStopRef.current = null;
@@ -782,6 +787,8 @@ function WebClipGenerator({
   const generateClip = useCallback(async () => {
     setState('generating');
     setProgress(0);
+    setRenderTimedOut(false);
+    cancelledRef.current = false;
     const accentColor = renderAccentColor;
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
@@ -1086,6 +1093,18 @@ function WebClipGenerator({
 
       rafRef.current = requestAnimationFrame(drawFrame);
 
+      // Overall render timeout: clipDuration + 30s buffer
+      const renderTimeoutMs = (clipDuration + 30) * 1000;
+      renderTimeoutRef.current = setTimeout(() => {
+        if (cancelledRef.current) return;
+        cancelledRef.current = true;
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+        if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+        setRenderTimedOut(true);
+        setState('error');
+        showToast('렌더링 시간이 초과되었어요. 영상 길이를 줄이거나 다시 시도해주세요.');
+      }, renderTimeoutMs);
+
       if (hasRecorder) {
         const blob = await done;
         const url = URL.createObjectURL(blob);
@@ -1101,7 +1120,10 @@ function WebClipGenerator({
       }
       setState('done');
       setProgress(100);
+      if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     } catch (err) {
+      if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
+      if (cancelledRef.current) return;
       setState('error');
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('이미지 로드') || msg.includes('CORS') || msg.includes('시간 초과') || msg.includes('SecurityError')) {
@@ -1132,20 +1154,39 @@ function WebClipGenerator({
     setProgress(0);
   }, [videoUrl, stopPreview]);
 
+  const handleCancelRender = useCallback(() => {
+    cancelledRef.current = true;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
+    if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+    setState('idle');
+    setProgress(0);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRenderTimedOut(false);
+    handleReset();
+    setTimeout(() => generateClip(), 100);
+  }, [handleReset, generateClip]);
+
   const handleSaveToCloud = useCallback(async () => {
     if (!videoUrl) return;
     setCloudSaving(true);
+    setUploadProgress(0);
     try {
       const res = await fetch(videoUrl);
       const blob = await res.blob();
       const cloudExt = videoMime.includes('png') ? 'png' : 'webm';
       const cloudFileName = fileName.replace(/\.png$|\.webm$/, '') + '-clip-' + Date.now() + '.' + cloudExt;
-      const fileUrl = await uploadAssetBlob(blob, cloudFileName, videoMime);
+      // Upload with progress via XMLHttpRequest
+      const fileUrl = await uploadAssetBlobWithProgress(blob, cloudFileName, videoMime, (pct) => setUploadProgress(pct));
       if (!fileUrl) {
         showToast('클라우드 업로드에 실패했어요');
         setCloudSaving(false);
+        setUploadProgress(0);
         return;
       }
+      setUploadProgress(100);
       await saveAssetRecord({
         scan_id: null,
         asset_type: videoMime.includes('png') ? 'image' : 'video',
@@ -1161,6 +1202,7 @@ function WebClipGenerator({
       showToast('클라우드에 저장됐어요. 내 제작물 탭에서 확인하세요');
     } catch {
       showToast('저장 중 오류가 발생했어요');
+      setUploadProgress(0);
     }
     setCloudSaving(false);
   }, [videoUrl, fileName, videoMime, title, imageUrl, platform, affiliatePlatforms, showToast]);
@@ -1477,7 +1519,17 @@ function WebClipGenerator({
       )}
 
       {state === 'generating' && (
-        <VideoProgressIndicator progress={progress} label="생성 중..." color={theme.colors.primary[400]} />
+        <View>
+          <VideoProgressIndicator progress={progress} label="생성 중..." color={theme.colors.primary[400]} />
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancelRender}
+            activeOpacity={0.7}
+          >
+            <X size={14} color={theme.colors.error[400]} strokeWidth={2} />
+            <Text style={styles.cancelButtonText}>취소</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {state === 'done' && videoUrl && (
@@ -1526,7 +1578,7 @@ function WebClipGenerator({
                 <CloudUpload size={16} color={theme.colors.primary[300]} strokeWidth={2} />
               )}
               <Text style={styles.cloudSaveButtonText}>
-                {cloudSaving ? '저장 중...' : '클라우드 저장'}
+                {cloudSaving ? (uploadProgress > 0 ? `업로드 중... ${uploadProgress}%` : '저장 중...') : '클라우드 저장'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1544,7 +1596,17 @@ function WebClipGenerator({
       {state === 'error' && (
         <View style={styles.errorBox}>
           <AlertCircle size={16} color={theme.colors.error[400]} strokeWidth={2} />
-          <Text style={styles.errorText}>생성 실패. 다시 시도해주세요.</Text>
+          <Text style={styles.errorText}>
+            {renderTimedOut ? '렌더링 시간이 초과되었어요. 영상 길이를 줄이거나 다시 시도해주세요.' : '생성 실패. 다시 시도해주세요.'}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={handleRetry}
+            activeOpacity={0.7}
+          >
+            <RefreshCw size={14} color="#fff" strokeWidth={2} />
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1999,8 +2061,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.error[500] + '15',
+    flexWrap: 'wrap',
   },
   errorText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.error[400],
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  retryButtonText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    marginTop: theme.spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.error[500] + '15',
+    alignSelf: 'center',
+  },
+  cancelButtonText: {
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],

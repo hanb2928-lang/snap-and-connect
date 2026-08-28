@@ -217,8 +217,8 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
       dailyClicks,
       dailyRevenue,
     };
-  } catch {
-    return emptyDashboard();
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : '성과 데이터를 불러오는 중 오류가 발생했어요');
   }
 }
 

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseUrl } from '@/lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { SavedAsset } from '@/types/database';
 
@@ -20,6 +20,52 @@ export async function uploadAssetBlob(
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
+}
+
+export async function uploadAssetBlobWithProgress(
+  blob: Blob,
+  fileName: string,
+  mimeType: string,
+  onProgress: (pct: number) => void,
+): Promise<string | null> {
+  if (Platform.OS !== 'web') {
+    onProgress(100);
+    return uploadAssetBlob(blob, fileName, mimeType);
+  }
+
+  const path = `${fileName}`;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token || '';
+
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/${BUCKET}/${path}`;
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', uploadUrl, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+    xhr.setRequestHeader('Content-Type', mimeType);
+    xhr.setRequestHeader('x-upsert', 'true');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+        resolve(data.publicUrl);
+      } else {
+        resolve(null);
+      }
+    };
+
+    xhr.onerror = () => resolve(null);
+    xhr.ontimeout = () => resolve(null);
+    xhr.timeout = 120000;
+    xhr.send(blob);
+  });
 }
 
 export async function uploadAssetDataUrl(
@@ -131,4 +177,3 @@ export async function deleteSavedAsset(asset: SavedAsset): Promise<boolean> {
   await supabase.storage.from(BUCKET).remove([filePath]).catch(() => {});
   return true;
 }
-
