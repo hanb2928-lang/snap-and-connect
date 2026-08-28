@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, type DimensionValue } from 'react-native';
-import { Loader as Loader2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, type DimensionValue } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -55,14 +54,25 @@ export function VideoProgressIndicator({
 }
 
 function CircularProgress({ progress, label, color, hint }: VideoProgressIndicatorProps) {
+  const progressSV = useSharedValue(0);
+  const progressWidth = useSharedValue(0);
+
+  useEffect(() => {
+    progressSV.value = withTiming(progress / 100, { duration: 300, easing: Easing.out(Easing.quad) });
+    progressWidth.value = withTiming(progress, { duration: 300, easing: Easing.out(Easing.quad) });
+  }, [progress, progressSV, progressWidth]);
+
+  const barStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value}%` as unknown as DimensionValue }));
+  const pctStyle = useAnimatedStyle(() => ({ opacity: progressSV.value > 0.02 ? 1 : 0.4 }));
+
   return (
     <View style={styles.wrap}>
-      <View style={styles.barBg}>
-        <View style={[styles.barFill, { width: `${progress}%`, backgroundColor: color }]} />
+      <View style={styles.circularBarBg}>
+        <Animated.View style={[styles.circularBarFill, { backgroundColor: color }, barStyle]} />
       </View>
-      <View style={styles.labelRow}>
-        <ActivityIndicator size="small" color={color} />
-        <Text style={styles.labelText}>{label} {progress}%</Text>
+      <View style={styles.circularLabelRow}>
+        <Animated.Text style={[styles.circularPct, { color }, pctStyle]}>{Math.round(progress)}%</Animated.Text>
+        <Text style={styles.labelText}>{label}</Text>
       </View>
       {hint && <Text style={styles.hintText}>{hint}</Text>}
     </View>
@@ -259,6 +269,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  circularBarBg: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    overflow: 'hidden',
+  },
+  circularBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  circularLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  circularPct: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    minWidth: 48,
+    textAlign: 'right',
   },
   labelText: {
     fontSize: 12,
