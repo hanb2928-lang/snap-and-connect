@@ -41,6 +41,7 @@ import {
   Palette,
   Share2,
   ShieldCheck,
+  Shirt,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -56,6 +57,8 @@ import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { UploadPreviewModal, type UploadPreviewData } from '@/components/UploadPreviewModal';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
+import { VirtualCutGallery } from '@/components/VirtualCutGallery';
+import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -148,6 +151,20 @@ export default function AffiliateScreen() {
   // Step 3: AI Analysis
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [activeAiTool, setActiveAiTool] = useState<'none' | 'cuts' | 'fitting'>('none');
+  const [aiGeneratedUrl, setAiGeneratedUrl] = useState<string | null>(null);
+
+  const imageDataUrl = useMemo(() => {
+    if (!selectedImage || mediaType !== 'photo') return '';
+    if (selectedImage.startsWith('data:')) return selectedImage;
+    return buildDataUrl(selectedImage, selectedImageMime);
+  }, [selectedImage, selectedImageMime, mediaType]);
+
+  const handleUseAiImage = useCallback((url: string) => {
+    setAiGeneratedUrl(url);
+    setSelectedImage(url.startsWith('data:') ? cleanBase64(url) : url);
+    setSelectedImageMime('image/png');
+  }, []);
 
   // Step 4: Content
   const [simpleMode, setSimpleMode] = useState(true);
@@ -762,6 +779,71 @@ export default function AffiliateScreen() {
                   <Text style={styles.aiRecommendText}>
                     AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
                   </Text>
+                </View>
+              )}
+
+              {/* AI 가상 생성 / 가상 피팅 선택 */}
+              <View style={styles.aiToolDivider} />
+              <Text style={styles.aiToolSectionLabel}>AI 이미지 생성 도구</Text>
+              <Text style={styles.aiToolSectionDesc}>
+                사진 한 장으로 다양한 각도의 상품 컷이나 모델 착용 컷을 AI로 만들어보세요. 생성된 이미지를 선택해 마케팅 소재로 사용할 수 있습니다.
+              </Text>
+
+              <View style={styles.aiToolToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.aiToolToggleBtn,
+                    activeAiTool === 'cuts' && styles.aiToolToggleBtnActive,
+                  ]}
+                  onPress={() => setActiveAiTool(activeAiTool === 'cuts' ? 'none' : 'cuts')}
+                  activeOpacity={0.7}
+                >
+                  <Camera size={14} color={activeAiTool === 'cuts' ? '#fff' : theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={[styles.aiToolToggleText, activeAiTool === 'cuts' && styles.aiToolToggleTextActive]}>
+                    AI 가상 컷 생성
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.aiToolToggleBtn,
+                    activeAiTool === 'fitting' && styles.aiToolToggleBtnActiveFitting,
+                  ]}
+                  onPress={() => setActiveAiTool(activeAiTool === 'fitting' ? 'none' : 'fitting')}
+                  activeOpacity={0.7}
+                >
+                  <Shirt size={14} color={activeAiTool === 'fitting' ? '#fff' : theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={[styles.aiToolToggleText, activeAiTool === 'fitting' && styles.aiToolToggleTextActive]}>
+                    AI 가상 피팅
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {aiGeneratedUrl && (
+                <View style={styles.aiGeneratedNotice}>
+                  <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  <Text style={styles.aiGeneratedNoticeText}>AI 생성 이미지가 적용되었습니다. 아래 4단계에서 소재를 완성하세요.</Text>
+                </View>
+              )}
+
+              {activeAiTool === 'cuts' && imageDataUrl && (
+                <View style={styles.aiToolGalleryWrap}>
+                  <VirtualCutGallery
+                    imageDataUrl={imageDataUrl}
+                    productName={productMeta?.productName}
+                    productCategory={productMeta?.platform}
+                    onUseImage={handleUseAiImage}
+                  />
+                </View>
+              )}
+
+              {activeAiTool === 'fitting' && imageDataUrl && (
+                <View style={styles.aiToolGalleryWrap}>
+                  <VirtualFittingGallery
+                    imageDataUrl={imageDataUrl}
+                    productName={productMeta?.productName}
+                    productCategory={productMeta?.platform}
+                    onUseImage={handleUseAiImage}
+                  />
                 </View>
               )}
             </>
@@ -1529,6 +1611,80 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  aiToolDivider: {
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+    marginVertical: theme.spacing.md,
+  },
+  aiToolSectionLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  aiToolSectionDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginBottom: theme.spacing.sm,
+  },
+  aiToolToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  aiToolToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  aiToolToggleBtnActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500],
+  },
+  aiToolToggleBtnActiveFitting: {
+    borderColor: theme.colors.success[400],
+    backgroundColor: theme.colors.success[500],
+  },
+  aiToolToggleText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  aiToolToggleTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  aiGeneratedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.success[500] + '12',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.success[400] + '60',
+  },
+  aiGeneratedNoticeText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 15,
+  },
+  aiToolGalleryWrap: {
+    marginTop: theme.spacing.sm,
   },
   aiRecommendCard: {
     flexDirection: 'row',
