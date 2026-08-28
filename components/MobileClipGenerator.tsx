@@ -11,10 +11,11 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown, Clock } from 'lucide-react-native';
+import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown, Clock, Eye } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { VideoUploadPreviewModal, type VideoUploadPreviewData } from '@/components/VideoUploadPreviewModal';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import { theme } from '@/lib/theme';
@@ -525,6 +526,7 @@ export function MobileClipGenerator({
   const [showPreview, setShowPreview] = useState(false);
   const [mascotEnabled, setMascotEnabled] = useState(true);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [uploadPreviewData, setUploadPreviewData] = useState<VideoUploadPreviewData | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -729,6 +731,37 @@ export function MobileClipGenerator({
     setState('idle');
     setProgress(0);
   }, [videoUri]);
+
+  const disclosureText = useMemo(
+    () => getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
+    [affiliatePlatforms, autoDisclosure],
+  );
+
+  const handleOpenUploadPreview = useCallback(() => {
+    if (!videoUri) return;
+    setUploadPreviewData({
+      videoUri,
+      videoMime,
+      format,
+      hook,
+      title,
+      hashtags,
+      affiliatePlatforms,
+      disclosureText,
+      autoDisclosure,
+      templateLabel: STYLE_PRESETS.find((s) => s.value === cardStyle)?.label ?? '',
+    });
+  }, [videoUri, videoMime, format, hook, title, hashtags, affiliatePlatforms, disclosureText, autoDisclosure, cardStyle]);
+
+  const handleConfirmUploadPreview = useCallback((_edited: {
+    hook: string;
+    title: string;
+    hashtags: string[];
+    autoDisclosure: boolean;
+  }) => {
+    setUploadPreviewData(null);
+    handleSaveToGallery();
+  }, [handleSaveToGallery]);
 
   const html = useMemo(() => buildWebViewHTML({
     imageUrl: safeImageUrl,
@@ -969,6 +1002,10 @@ export function MobileClipGenerator({
               )}
             </View>
           </View>
+          <TouchableOpacity style={styles.uploadPreviewButton} onPress={handleOpenUploadPreview} activeOpacity={0.8}>
+            <Eye size={18} color="#fff" strokeWidth={2} />
+            <Text style={styles.uploadPreviewButtonText}>업로드 미리보기</Text>
+          </TouchableOpacity>
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
               <Download size={18} color="#fff" strokeWidth={2} />
@@ -1044,6 +1081,13 @@ export function MobileClipGenerator({
           )}
         </View>
       )}
+
+      <VideoUploadPreviewModal
+        visible={!!uploadPreviewData}
+        data={uploadPreviewData}
+        onConfirm={handleConfirmUploadPreview}
+        onClose={() => setUploadPreviewData(null)}
+      />
     </View>
   );
 }
@@ -1380,6 +1424,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  uploadPreviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+    marginBottom: theme.spacing.sm,
+    ...theme.shadows.elevated,
+  },
+  uploadPreviewButtonText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   errorBox: {
     flexDirection: 'row',
