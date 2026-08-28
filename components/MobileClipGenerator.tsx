@@ -524,10 +524,11 @@ export function MobileClipGenerator({
   const [webviewKey, setWebviewKey] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [mascotEnabled, setMascotEnabled] = useState(true);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    getUserSettings().then((s) => { if (mounted && s) setMascotEnabled(s.mascot_enabled ?? true); }).catch(() => {});
+    getUserSettings().then((s) => { if (mounted && s) { setMascotEnabled(s.mascot_enabled ?? true); setAutoDisclosure(s.auto_disclosure ?? true); } }).catch(() => {});
     return () => { mounted = false; };
   }, []);
 
@@ -744,9 +745,9 @@ export function MobileClipGenerator({
     motionPreset,
     hybridMode,
     tagText: STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT',
-    disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms),
+    disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
     mascotEnabled,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode, mascotEnabled]);
+  }), [safeImageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode, mascotEnabled, autoDisclosure]);
   const isVertical = format === 'vertical';
 
   return (

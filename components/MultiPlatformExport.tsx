@@ -15,6 +15,8 @@ import { Instagram, Youtube, FileText, Download, Loader as Loader2, Check, Zap, 
 import { theme } from '@/lib/theme';
 import { uploadAssetBlob, uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
+import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
+import { getUserSettings } from '@/lib/settings';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
@@ -147,6 +149,7 @@ async function renderFormat(
     accentColor: string;
     affiliatePlatforms: string[];
     shortUrl: string;
+    autoDisclosure: boolean;
   },
 ): Promise<any> {
   const canvas = document.createElement('canvas');
@@ -202,6 +205,17 @@ async function renderFormat(
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
+
+  const disclosure = getDisclosureShortForPlatforms(opts.affiliatePlatforms, opts.autoDisclosure);
+  if (disclosure) {
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '400 18px sans-serif';
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    drawTextLines(ctx, disclosure, fmt.width / 2, fmt.height - 16, fmt.width - 80, 24);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob: Blob | null) => {
@@ -774,6 +788,7 @@ export function MultiPlatformExport({
   const [results, setResults] = useState<{ url: string; blob?: any; uri?: string; format: ExportFormat }[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [cloudSaving, setCloudSaving] = useState(false);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
   const cloudSavingRef = useRef(false);
   const cardRefs = useRef<(View | null)[]>([]);
 
@@ -795,6 +810,12 @@ export function MultiPlatformExport({
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => { if (mounted && s) setAutoDisclosure(s.auto_disclosure ?? true); }).catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   // ── Web: canvas-based generation ──────────────────────────────────────
@@ -819,6 +840,7 @@ export function MultiPlatformExport({
           accentColor,
           affiliatePlatforms,
           shortUrl,
+          autoDisclosure,
         });
         const url = URL.createObjectURL(blob);
         generated.push({ url, blob, format: fmt });
@@ -831,7 +853,7 @@ export function MultiPlatformExport({
       setState('editing');
       showToast('이미지 변환에 실패했어요. 다시 시도해주세요');
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, showToast, formats, getCrop]);
+  }, [imageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, showToast, formats, getCrop, autoDisclosure]);
 
   // ── Mobile: native view capture ───────────────────────────────────────
   const handleGenerateMobile = useCallback(async () => {

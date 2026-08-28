@@ -435,6 +435,7 @@ function WebClipGenerator({
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [livePreviewPlaying, setLivePreviewPlaying] = useState(false);
   const [mascotEnabled, setMascotEnabled] = useState(true);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [cloudSaving, setCloudSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [renderTimedOut, setRenderTimedOut] = useState(false);
@@ -453,7 +454,12 @@ function WebClipGenerator({
 
   useEffect(() => {
     let mounted = true;
-    getUserSettings().then((s) => { if (mounted && s) setMascotEnabled(s.mascot_enabled ?? true); }).catch(() => {});
+    getUserSettings().then((s) => {
+      if (mounted && s) {
+        setMascotEnabled(s.mascot_enabled ?? true);
+        setAutoDisclosure(s.auto_disclosure ?? true);
+      }
+    }).catch(() => {});
     return () => { mounted = false; };
   }, []);
 
@@ -759,7 +765,7 @@ function WebClipGenerator({
           ctx.font = '400 18px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
           drawTextLines(ctx, disclosure, L.width / 2, L.height / 2 - 20, L.width - 80, 26);
           ctx.textAlign = 'left';
           ctx.globalAlpha = 1;
@@ -776,7 +782,7 @@ function WebClipGenerator({
     } catch {
       showToast('미리보기를 시작할 수 없어요. 잠시 후 다시 시도해주세요');
     }
-  }, [imageUrl, format, musicMood, clipDuration, hybridMode, accentColor, motionPreset, hook, title, hashtags, cardStyle, shortUrl, affiliatePlatforms, livePreviewPlaying, stopLivePreview, showToast]);
+  }, [imageUrl, format, musicMood, clipDuration, hybridMode, accentColor, motionPreset, hook, title, hashtags, cardStyle, shortUrl, affiliatePlatforms, livePreviewPlaying, stopLivePreview, showToast, autoDisclosure]);
 
   useEffect(() => {
     return () => {
@@ -1074,7 +1080,7 @@ function WebClipGenerator({
           ctx.font = '400 18px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
           drawTextLines(ctx, disclosure, L.width / 2, L.height / 2 - 20, L.width - 80, 26);
           ctx.textAlign = 'left';
           ctx.globalAlpha = 1;
@@ -1132,7 +1138,7 @@ function WebClipGenerator({
         showToast('동영상 생성에 실패했어요');
       }
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime]);
+  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;

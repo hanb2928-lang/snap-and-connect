@@ -358,6 +358,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       await preloadBabyImage().catch(() => {});
       const settingsData = await getUserSettings().catch(() => null);
       const mascotEnabled = settingsData?.mascot_enabled ?? true;
+      const autoDisclosure = settingsData?.auto_disclosure ?? true;
       const { width: W, height: H } = FORMATS[format];
       const canvas = document.createElement('canvas');
       canvas.width = W;
@@ -558,7 +559,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           ctx.font = '400 20px sans-serif';
           ctx.textBaseline = 'middle';
           ctx.textAlign = 'center';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
           drawTextLines(ctx, disclosure, W / 2, H / 2 - 20, W - 80, 28, 'center');
           ctx.globalAlpha = 1;
         }

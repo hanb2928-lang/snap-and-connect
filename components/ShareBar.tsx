@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking, Modal, Pressable, Image, ScrollView } from 'react-native';
 import { Copy, Check, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink, Eye, ArrowLeft, Send } from 'lucide-react-native';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { getShareDisclosureForPlatforms } from '@/lib/disclosure';
@@ -9,6 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
+import { getUserSettings } from '@/lib/settings';
 
 interface ShareBarProps {
   cardRef: React.RefObject<View | null>;
@@ -27,10 +28,17 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   const [shareOpen, setShareOpen] = useState(false);
   const [shareModal, setShareModal] = useState<{ url: string; label: string } | null>(null);
   const [previewModal, setPreviewModal] = useState<{ uri: string | null; fullText: string; platformLabel: string; siteUrl: string } | null>(null);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
   const toastAnim = useSharedValue(0);
   const accordionHeight = useSharedValue(0);
   const accordionOpacity = useSharedValue(0);
   const chevronRot = useSharedValue(0);
+
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => { if (mounted && s) setAutoDisclosure(s.auto_disclosure ?? true); }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   const toggleShareAccordion = useCallback(() => {
     const next = !shareOpen;
@@ -139,11 +147,11 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   }, []);
 
   const buildShareText = useCallback(() => {
-    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
+    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms, autoDisclosure);
     const shareLink = shortUrl || affiliateUrl;
     const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-    return `${shareText}${linkLine}\n\n${disclosureText}`;
-  }, [shareText, affiliateUrl, shortUrl, affiliatePlatforms]);
+    return disclosureText ? `${shareText}${linkLine}\n\n${disclosureText}` : `${shareText}${linkLine}`;
+  }, [shareText, affiliateUrl, shortUrl, affiliatePlatforms, autoDisclosure]);
 
   const executeShare = useCallback(async (uri: string | null, fullText: string, siteUrl: string, label: string) => {
     let imageCopied = false;

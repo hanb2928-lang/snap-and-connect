@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Share as RNShare } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -12,12 +12,15 @@ import { Share2, Baby, ArrowRight, ExternalLink, Sparkles, Copy, Check } from 'l
 import { theme } from '@/lib/theme';
 import { BabyIcon } from '@/components/BabyIcon';
 import { useAffiliateToast } from '@/components/AffiliateToast';
+import { getShareDisclosureForPlatforms } from '@/lib/disclosure';
+import { getUserSettings } from '@/lib/settings';
 import * as Clipboard from 'expo-clipboard';
 
 interface SocialShortFormShareProps {
   shareText: string;
   affiliateUrl: string | null;
   shortUrl?: string | null;
+  affiliatePlatforms?: string[];
 }
 
 const INTRO_PHRASES = [
@@ -31,17 +34,25 @@ export function SocialShortFormShare({
   shareText,
   affiliateUrl,
   shortUrl,
+  affiliatePlatforms = [],
 }: SocialShortFormShareProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedIntro, setSelectedIntro] = useState(0);
   const [showOutro, setShowOutro] = useState(true);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
   const { showAffiliateToast } = useAffiliateToast();
 
   const expandAnim = useSharedValue(0);
   const babyBounce = useSharedValue(0);
   const sparkleRot = useSharedValue(0);
   const introOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => { if (mounted && s) setAutoDisclosure(s.auto_disclosure ?? true); }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   const toggleExpand = useCallback(() => {
     const next = !expanded;
@@ -70,7 +81,9 @@ export function SocialShortFormShare({
     const outro = showOutro ? '\n\n더 많은 혜택은 클릭!' : '';
     const link = shortUrl || affiliateUrl;
     const linkLine = link ? `\n\n${link}` : '';
-    const fullText = `${intro}\n\n${shareText}${linkLine}${outro}`;
+    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms, autoDisclosure);
+    const disclosureLine = disclosureText ? `\n\n${disclosureText}` : '';
+    const fullText = `${intro}\n\n${shareText}${linkLine}${outro}${disclosureLine}`;
 
     if (Platform.OS === 'web') {
       try {
@@ -87,7 +100,7 @@ export function SocialShortFormShare({
         // user cancelled
       }
     }
-  }, [selectedIntro, showOutro, shortUrl, affiliateUrl, shareText]);
+  }, [selectedIntro, showOutro, shortUrl, affiliateUrl, shareText, affiliatePlatforms, autoDisclosure]);
 
   const handleCopyLink = useCallback(async () => {
     const link = shortUrl || affiliateUrl;

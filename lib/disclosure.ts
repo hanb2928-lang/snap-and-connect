@@ -96,7 +96,8 @@ export function getPlatformDisclosure(platform: string): PlatformDisclosure {
   };
 }
 
-export function getDisclosureForPlatforms(platforms: string[]): string {
+export function getDisclosureForPlatforms(platforms: string[], enabled = true): string {
+  if (!enabled) return '';
   if (platforms.length === 0) return GENERIC_DISCLOSURE;
   if (platforms.length === 1) return getPlatformDisclosure(platforms[0]).full;
   return platforms
@@ -104,7 +105,8 @@ export function getDisclosureForPlatforms(platforms: string[]): string {
     .join('\n');
 }
 
-export function getDisclosureShortForPlatforms(platforms: string[]): string {
+export function getDisclosureShortForPlatforms(platforms: string[], enabled = true): string {
+  if (!enabled) return '';
   if (platforms.length === 0) return GENERIC_DISCLOSURE_SHORT;
   if (platforms.length === 1) return getPlatformDisclosure(platforms[0]).short;
   return platforms
@@ -112,7 +114,8 @@ export function getDisclosureShortForPlatforms(platforms: string[]): string {
     .join(' / ');
 }
 
-export function getShareDisclosureForPlatforms(platforms: string[]): string {
+export function getShareDisclosureForPlatforms(platforms: string[], enabled = true): string {
+  if (!enabled) return '';
   if (platforms.length === 0) return GENERIC_DISCLOSURE;
   return platforms
     .map((p) => `(${getPlatformDisclosure(p).platform}) ${getPlatformDisclosure(p).full}`)

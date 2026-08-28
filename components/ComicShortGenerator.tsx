@@ -1042,6 +1042,7 @@ export function ComicShortGenerator({
     let mounted = true;
     getUserSettings().then((s) => {
       if (mounted && s?.default_video_duration) setComicDuration(Number(s.default_video_duration) as ComicDuration);
+      if (mounted && s) setAutoDisclosure(s.auto_disclosure ?? true);
     }).catch(() => {});
     return () => { mounted = false; };
   }, []);
@@ -1064,6 +1065,7 @@ export function ComicShortGenerator({
   const [mbtiMode, setMbtiMode] = useState(true);
   const [emotionOverlay, setEmotionOverlay] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
   const tpl = useHybridTemplate(
     { category: productCategory, platform: 'shorts', productName, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
     theme.colors.accent[400],
@@ -1395,7 +1397,7 @@ export function ComicShortGenerator({
         shortUrl,
         moodTemplate: finalMood,
         panelLayout: finalPanelLayout,
-        disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms),
+        disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
         stickerPosition,
         stickerStyle,
         stickerSize,
@@ -1423,7 +1425,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure]);
 
 
 
@@ -1465,7 +1467,7 @@ export function ComicShortGenerator({
     if (!resultUri) return;
     setSharing(true);
 
-    const disclosureText = getDisclosureShortForPlatforms(affiliatePlatforms);
+    const disclosureText = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
     const linkLine = shortUrl ? `\n${shortUrl}` : '';
     const fullText = `${hook}${linkLine}\n${disclosureText}`;
 
@@ -1514,7 +1516,7 @@ export function ComicShortGenerator({
       }
     }
     setSharing(false);
-  }, [resultUri, resultBlob, resultMime, fileName, title, hook, shortUrl, affiliatePlatforms, showToast]);
+  }, [resultUri, resultBlob, resultMime, fileName, title, hook, shortUrl, affiliatePlatforms, showToast, autoDisclosure]);
 
   const handleSaveToGallery = useCallback(async () => {
     if (!resultUri) return;
@@ -1612,7 +1614,7 @@ export function ComicShortGenerator({
     shortUrl,
     moodTemplate,
     panelLayout,
-    disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms),
+    disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
     stickerPosition,
     stickerStyle,
     stickerSize,
@@ -1629,7 +1631,7 @@ export function ComicShortGenerator({
     mbtiCommentary: mbtiMode ? mbtiCommentary : [],
     emotionOverlay,
     localStoreInfo,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo]);
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 

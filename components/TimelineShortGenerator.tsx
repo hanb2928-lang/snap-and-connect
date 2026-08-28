@@ -277,6 +277,7 @@ function WebTimelineGenerator({
       await preloadBabyImage().catch(() => {});
       const settingsData = await getUserSettings().catch(() => null);
       const mascotEnabled = settingsData?.mascot_enabled ?? true;
+      const autoDisclosure = settingsData?.auto_disclosure ?? true;
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const canvas = document.createElement('canvas');
       canvas.width = CANVAS_W;
@@ -417,7 +418,7 @@ function WebTimelineGenerator({
           ctx.font = '400 16px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms);
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
           ctx.fillText(disclosure, CANVAS_W / 2, CANVAS_H - 40);
           ctx.textAlign = 'left';
           ctx.textBaseline = 'alphabetic';
