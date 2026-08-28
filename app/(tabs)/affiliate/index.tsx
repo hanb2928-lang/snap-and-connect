@@ -42,6 +42,8 @@ import {
   ChevronUp,
   Wand as Wand2,
   Loader,
+  Plus,
+  X,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -120,6 +122,10 @@ export default function AffiliateScreen() {
   // Step 2: Affiliate link
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
+  const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
+  const [showAddPlatform, setShowAddPlatform] = useState(false);
+  const [newPlatformName, setNewPlatformName] = useState('');
+  const [newPlatformUrl, setNewPlatformUrl] = useState('');
 
   // Step 3: Content
   const [contentText, setContentText] = useState('');
@@ -430,7 +436,75 @@ export default function AffiliateScreen() {
                 </TouchableOpacity>
               );
             })}
+            {customPlatforms.map((cp) => {
+              const isActive = selectedPlatform === cp.key;
+              return (
+                <TouchableOpacity
+                  key={cp.key}
+                  style={[styles.platformChip, isActive && { borderColor: theme.colors.accent[400], backgroundColor: theme.colors.accent[400] + '15' }]}
+                  onPress={() => { setSelectedPlatform(cp.key); setAffiliateUrl(cp.url); }}
+                  activeOpacity={0.7}
+                >
+                  <Link2 size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+                  <Text style={[styles.platformChipText, isActive && { color: theme.colors.accent[300] }]}>{cp.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.platformAddChip}
+              onPress={() => setShowAddPlatform(true)}
+              activeOpacity={0.7}
+            >
+              <Plus size={14} color={theme.colors.dark.textDim} strokeWidth={2.5} />
+              <Text style={styles.platformAddChipText}>직접 추가</Text>
+            </TouchableOpacity>
           </ScrollView>
+
+          {showAddPlatform && (
+            <View style={styles.addPlatformBox}>
+              <View style={styles.addPlatformHeader}>
+                <Text style={styles.addPlatformTitle}>플랫폼 수동 추가</Text>
+                <TouchableOpacity onPress={() => { setShowAddPlatform(false); setNewPlatformName(''); setNewPlatformUrl(''); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.addPlatformInput}
+                value={newPlatformName}
+                onChangeText={setNewPlatformName}
+                placeholder="플랫폼 이름 (예: 11번가)"
+                placeholderTextColor={theme.colors.dark.textFaint}
+              />
+              <TextInput
+                style={styles.addPlatformInput}
+                value={newPlatformUrl}
+                onChangeText={setNewPlatformUrl}
+                placeholder="가입 URL 또는 제휴 링크"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <TouchableOpacity
+                style={[styles.addPlatformConfirmBtn, (!newPlatformName.trim() || !newPlatformUrl.trim()) && styles.addPlatformConfirmBtnDisabled]}
+                onPress={() => {
+                  if (!newPlatformName.trim() || !newPlatformUrl.trim()) return;
+                  const key = 'custom_' + Date.now();
+                  setCustomPlatforms((prev) => [...prev, { key, label: newPlatformName.trim(), url: newPlatformUrl.trim() }]);
+                  setSelectedPlatform(key);
+                  setAffiliateUrl(newPlatformUrl.trim());
+                  setShowAddPlatform(false);
+                  setNewPlatformName('');
+                  setNewPlatformUrl('');
+                }}
+                activeOpacity={0.7}
+                disabled={!newPlatformName.trim() || !newPlatformUrl.trim()}
+              >
+                <Check size={16} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.addPlatformConfirmBtnText}>추가하기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TextInput
             style={styles.affiliateInput}
@@ -986,6 +1060,70 @@ const styles = StyleSheet.create({
   platformChipsScroll: {
     flexDirection: 'row',
     marginBottom: theme.spacing.sm,
+  },
+  platformAddChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    borderStyle: 'dashed',
+  },
+  platformAddChipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  addPlatformBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '30',
+  },
+  addPlatformHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  addPlatformTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  addPlatformInput: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.sm,
+    padding: theme.spacing.sm + 2,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    marginBottom: 8,
+  },
+  addPlatformConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+  },
+  addPlatformConfirmBtnDisabled: {
+    opacity: 0.4,
+  },
+  addPlatformConfirmBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   platformChip: {
     flexDirection: 'row',
