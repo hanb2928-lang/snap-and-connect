@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking, Modal, Pressable } from 'react-native';
-import { Copy, Check, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Platform, Linking, Modal, Pressable, Image, ScrollView } from 'react-native';
+import { Copy, Check, Clapperboard, Download, CloudUpload, Loader as Loader2, Instagram, MessageCircle, Globe, ClipboardCheck, ChevronDown, Share2, X, ExternalLink, Eye, ArrowLeft, Send } from 'lucide-react-native';
 import { useRef, useState, useCallback } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -26,6 +26,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   const [toast, setToast] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareModal, setShareModal] = useState<{ url: string; label: string } | null>(null);
+  const [previewModal, setPreviewModal] = useState<{ uri: string | null; fullText: string; platformLabel: string; siteUrl: string } | null>(null);
   const toastAnim = useSharedValue(0);
   const accordionHeight = useSharedValue(0);
   const accordionOpacity = useSharedValue(0);
@@ -137,18 +138,14 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     }
   }, []);
 
-  const handleNaverShare = useCallback(async () => {
-    setSharing(true);
-    try {
-      const uri = await captureCard();
+  const buildShareText = useCallback(() => {
+    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
+    const shareLink = shortUrl || affiliateUrl;
+    const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
+    return `${shareText}${linkLine}\n\n${disclosureText}`;
+  }, [shareText, affiliateUrl, shortUrl, affiliatePlatforms]);
 
-      const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
-      const shareLink = shortUrl || affiliateUrl;
-      const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-      const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
-
-    const siteUrl = 'https://clip.naver.com';
-
+  const executeShare = useCallback(async (uri: string | null, fullText: string, siteUrl: string, label: string) => {
     let imageCopied = false;
     let textCopied = false;
 
@@ -166,38 +163,55 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       }
 
       if (imageCopied && textCopied) {
-        showToast('홍보 문구와 이미지가 복사됐어요!\n네이버에서 붙여넣기(Ctrl+V)만 하세요');
+        showToast('홍보 문구와 이미지가 복사됐어요!\n' + label + '에서 붙여넣기(Ctrl+V)만 하세요');
       } else if (imageCopied) {
-        showToast('이미지가 복사됐어요!\n네이버에서 붙여넣기(Ctrl+V)만 하세요');
+        showToast('이미지가 복사됐어요!\n' + label + '에서 붙여넣기(Ctrl+V)만 하세요');
       } else if (textCopied) {
         showToast('홍보 문구가 복사됐어요!\n이미지는 아래 버튼으로 저장 후 업로드하세요');
       } else {
         showToast('복사 실패. 수동으로 업로드해주세요');
       }
+      setShareModal({ url: siteUrl, label });
     } else {
       if (uri) {
         try {
-          await Sharing.shareAsync(uri, {
-            mimeType: 'image/png',
-            dialogTitle: 'Share to Naver',
-          });
+          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `Share to ${label}` });
         } catch {
           await Share.share({ message: fullText });
         }
       } else {
         await Share.share({ message: fullText });
       }
-    }
-
-    if (Platform.OS === 'web') {
-      setShareModal({ url: siteUrl, label: '네이버클립' });
-    } else {
       Linking.openURL(siteUrl).catch(() => {});
     }
+  }, [copyImageToClipboard, copyTextToClipboard, showToast]);
+
+  const startPreview = useCallback(async (siteUrl: string, platformLabel: string) => {
+    setSharing(true);
+    try {
+      const uri = await captureCard();
+      const fullText = buildShareText();
+      setPreviewModal({ uri, fullText, platformLabel, siteUrl });
+    } catch {
+      showToast('이미지 캡처에 실패했어요');
+    }
+    setSharing(false);
+  }, [captureCard, buildShareText, showToast]);
+
+  const confirmPreview = useCallback(async () => {
+    if (!previewModal) return;
+    setSharing(true);
+    try {
+      await executeShare(previewModal.uri, previewModal.fullText, previewModal.siteUrl, previewModal.platformLabel);
     } finally {
       setSharing(false);
+      setPreviewModal(null);
     }
-  }, [captureCard, shareText, affiliateUrl, shortUrl, affiliatePlatforms, copyImageToClipboard, copyTextToClipboard, showToast]);
+  }, [previewModal, executeShare]);
+
+  const handleNaverShare = useCallback(() => {
+    startPreview('https://clip.naver.com', '네이버클립');
+  }, [startPreview]);
 
   const handleSaveToCloud = useCallback(async () => {
     setCloudSaving(true);
@@ -240,93 +254,17 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     setCloudSaving(false);
   }, [captureCard, fileName, affiliatePlatforms, showToast]);
 
-  const handleInstagramShare = useCallback(async () => {
-    setSharing(true);
-    const uri = await captureCard();
-    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
-    const shareLink = shortUrl || affiliateUrl;
-    const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-    const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
+  const handleInstagramShare = useCallback(() => {
+    startPreview('https://www.instagram.com', '인스타그램');
+  }, [startPreview]);
 
-    if (Platform.OS === 'web') {
-      if (uri) {
-        await copyImageToClipboard(uri);
-        await new Promise((r) => setTimeout(r, 200));
-        await copyTextToClipboard(fullText);
-      } else {
-        await copyTextToClipboard(fullText);
-      }
-      setShareModal({ url: 'https://www.instagram.com', label: '인스타그램' });
-    } else {
-      if (uri) {
-        try {
-          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share to Instagram' });
-        } catch {
-          await Share.share({ message: fullText });
-        }
-      } else {
-        await Share.share({ message: fullText });
-      }
-    }
-    setSharing(false);
-  }, [captureCard, shareText, affiliateUrl, shortUrl, affiliatePlatforms, copyImageToClipboard, copyTextToClipboard, showToast]);
+  const handleKakaoShare = useCallback(() => {
+    startPreview('https://accounts.kakao.com/weblogin/share', '카카오톡');
+  }, [startPreview]);
 
-  const handleKakaoShare = useCallback(async () => {
-    setSharing(true);
-    const uri = await captureCard();
-    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
-    const shareLink = shortUrl || affiliateUrl;
-    const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-    const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
-
-    if (Platform.OS === 'web') {
-      await copyTextToClipboard(fullText);
-      if (uri) await copyImageToClipboard(uri);
-      setShareModal({ url: 'https://accounts.kakao.com/weblogin/share', label: '카카오톡' });
-    } else {
-      if (uri) {
-        try {
-          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share to KakaoTalk' });
-        } catch {
-          await Share.share({ message: fullText });
-        }
-      } else {
-        await Share.share({ message: fullText });
-      }
-    }
-    setSharing(false);
-  }, [captureCard, shareText, affiliateUrl, shortUrl, affiliatePlatforms, copyTextToClipboard, copyImageToClipboard, showToast]);
-
-  const handleBlogShare = useCallback(async () => {
-    setSharing(true);
-    const uri = await captureCard();
-    const disclosureText = getShareDisclosureForPlatforms(affiliatePlatforms);
-    const shareLink = shortUrl || affiliateUrl;
-    const linkLine = shareLink && !shareText.includes(shareLink) ? `\n\n${shareLink}` : '';
-    const fullText = `${shareText}${linkLine}\n\n${disclosureText}`;
-
-    if (Platform.OS === 'web') {
-      if (uri) {
-        await copyImageToClipboard(uri);
-        await new Promise((r) => setTimeout(r, 200));
-        await copyTextToClipboard(fullText);
-      } else {
-        await copyTextToClipboard(fullText);
-      }
-      setShareModal({ url: 'https://blog.naver.com', label: '네이버 블로그' });
-    } else {
-      if (uri) {
-        try {
-          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share to Blog' });
-        } catch {
-          await Share.share({ message: fullText });
-        }
-      } else {
-        await Share.share({ message: fullText });
-      }
-    }
-    setSharing(false);
-  }, [captureCard, shareText, affiliateUrl, shortUrl, affiliatePlatforms, copyImageToClipboard, copyTextToClipboard, showToast]);
+  const handleBlogShare = useCallback(() => {
+    startPreview('https://blog.naver.com', '네이버 블로그');
+  }, [startPreview]);
 
   const toastStyle = useAnimatedStyle(() => ({
     opacity: toastAnim.value,
@@ -449,6 +387,75 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
           <Text style={styles.toastText}>{toast}</Text>
         </Animated.View>
       )}
+
+      <Modal visible={!!previewModal} transparent animationType="slide" onRequestClose={() => setPreviewModal(null)}>
+        <Pressable style={styles.previewBackdrop} onPress={() => setPreviewModal(null)}>
+          <Pressable style={styles.previewSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.previewHeader}>
+              <View style={styles.previewHeaderLeft}>
+                <Eye size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+                <Text style={styles.previewTitle}>공유 전 미리보기</Text>
+              </View>
+              <TouchableOpacity onPress={() => setPreviewModal(null)} hitSlop={8} activeOpacity={0.7}>
+                <X size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.previewPlatformLabel}>
+              {previewModal?.platformLabel}에 공유할 내용
+            </Text>
+
+            <ScrollView style={styles.previewScroll} showsVerticalScrollIndicator={false}>
+              {previewModal?.uri ? (
+                <View style={styles.previewImageWrap}>
+                  <Image
+                    source={{ uri: previewModal.uri }}
+                    style={styles.previewImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                <View style={styles.previewNoImage}>
+                  <Text style={styles.previewNoImageText}>이미지 없음</Text>
+                </View>
+              )}
+
+              <Text style={styles.previewTextLabel}>홍보 문구</Text>
+              <View style={styles.previewTextBox}>
+                <Text style={styles.previewTextContent}>
+                  {previewModal?.fullText}
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.previewBtnRow}>
+              <TouchableOpacity
+                style={styles.previewBackBtn}
+                onPress={() => setPreviewModal(null)}
+                activeOpacity={0.7}
+              >
+                <ArrowLeft size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.previewBackBtnText}>수정하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.previewConfirmBtn, sharing && { opacity: 0.5 }]}
+                onPress={confirmPreview}
+                disabled={sharing}
+                activeOpacity={0.8}
+              >
+                {sharing ? (
+                  <Loader2 size={16} color="#fff" strokeWidth={2} />
+                ) : (
+                  <Send size={16} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.previewConfirmBtnText}>
+                  {sharing ? '준비 중...' : '확인 후 공유'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={!!shareModal} transparent animationType="fade" onRequestClose={() => setShareModal(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setShareModal(null)}>
@@ -747,6 +754,123 @@ const styles = StyleSheet.create({
   },
   modalOpenBtnText: {
     fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  previewSheet: {
+    backgroundColor: theme.colors.dark.surface,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xxl,
+    maxHeight: '90%',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+  },
+  previewHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  previewTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  previewPlatformLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    marginBottom: theme.spacing.sm,
+  },
+  previewScroll: {
+    maxHeight: 400,
+  },
+  previewImageWrap: {
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    marginBottom: theme.spacing.md,
+  },
+  previewImage: {
+    width: '100%',
+    height: 240,
+    resizeMode: 'contain',
+  },
+  previewNoImage: {
+    height: 100,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  previewNoImageText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  previewTextLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 6,
+  },
+  previewTextBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  previewTextContent: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 20,
+  },
+  previewBtnRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  previewBackBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  previewBackBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  previewConfirmBtn: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  previewConfirmBtnText: {
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },

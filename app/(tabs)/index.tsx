@@ -37,6 +37,7 @@ import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
 import { WorkflowGuide } from '@/components/WorkflowGuide';
+import { StepIndicator } from '@/components/StepIndicator';
 import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
@@ -566,6 +567,12 @@ export default function CameraScreen() {
         <View style={styles.zoomIndicator} pointerEvents="none">
           <Text style={styles.zoomIndicatorText}>{zoomLabel}</Text>
         </View>
+        )}
+
+        {!arMode && !processing && !stylePickerVisible && !mediaPickerVisible && multiShots.length === 0 && (
+          <View style={[styles.stepIndicatorWrap, { top: safeTop + 64 }]} pointerEvents="box-none">
+            <StepIndicator activeStep={1} />
+          </View>
         )}
 
         {!arMode && (
@@ -1505,6 +1512,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: theme.radius.full,
     zIndex: 8,
+  },
+  stepIndicatorWrap: {
+    position: 'absolute',
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    zIndex: 7,
   },
   zoomIndicatorText: {
     fontSize: theme.typography.micro,
