@@ -1,6 +1,13 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
+
+const STEP_COLORS = [
+  theme.colors.primary[400],
+  theme.colors.accent[400],
+  theme.colors.warning[400],
+  theme.colors.success[400],
+];
 
 const STEPS = [
   { num: '1', label: '촬영', route: '/' },
@@ -21,10 +28,25 @@ export function StepIndicator({ activeStep = 1 }: StepIndicatorProps) {
       {STEPS.map((step, index) => {
         const isActive = activeStep === index + 1;
         const isDone = activeStep > index + 1;
-        const color = isActive ? theme.colors.primary[400] : isDone ? theme.colors.success[400] : theme.colors.dark.textFaint;
+        const color = isActive
+          ? STEP_COLORS[index]
+          : isDone
+            ? STEP_COLORS[index]
+            : theme.colors.dark.textFaint;
+        const glowStyle = isActive
+          ? { shadowColor: STEP_COLORS[index], shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 0 }
+          : undefined;
+
         return (
           <View key={step.num} style={styles.stepItem}>
-            <View style={[styles.dot, isActive && { backgroundColor: theme.colors.primary[400] }, isDone && { backgroundColor: theme.colors.success[400] }]}>
+            <View
+              style={[
+                styles.dot,
+                { borderColor: isActive || isDone ? STEP_COLORS[index] : 'rgba(255,255,255,0.12)' },
+                (isActive || isDone) && { backgroundColor: STEP_COLORS[index] },
+                glowStyle,
+              ]}
+            >
               <Text style={[styles.dotText, { color: isActive || isDone ? '#fff' : theme.colors.dark.textFaint }]}>
                 {step.num}
               </Text>
@@ -33,7 +55,14 @@ export function StepIndicator({ activeStep = 1 }: StepIndicatorProps) {
               {step.label}
             </Text>
             {index < STEPS.length - 1 && (
-              <View style={[styles.bar, isDone && { backgroundColor: theme.colors.success[400] + '60' }]} />
+              <View style={styles.barWrap}>
+                <View
+                  style={[
+                    styles.bar,
+                    isDone && { backgroundColor: STEP_COLORS[index] + '80' },
+                  ]}
+                />
+              </View>
             )}
           </View>
         );
@@ -46,12 +75,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(10, 15, 30, 0.6)',
+    backgroundColor: theme.glass.surface,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: theme.glass.border,
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(12px)' as unknown as undefined }
+      : {}),
   },
   stepItem: {
     flexDirection: 'row',
@@ -62,9 +94,10 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
   },
   dotText: {
     fontSize: 8,
@@ -73,12 +106,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.medium,
-    marginLeft: 3,
+    marginLeft: 4,
+  },
+  barWrap: {
+    flex: 1,
+    marginHorizontal: 4,
+    height: 6,
+    justifyContent: 'center',
   },
   bar: {
     flex: 1,
-    height: 1,
+    height: 2,
+    borderRadius: 1,
     backgroundColor: 'rgba(255,255,255,0.08)',
-    marginHorizontal: 4,
   },
 });

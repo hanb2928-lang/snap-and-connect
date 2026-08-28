@@ -27,7 +27,7 @@ function SubTabBar() {
   useEffect(() => {
     const activeIndex = SUBTABS.findIndex((t) => t.key === activeKey);
     if (activeIndex >= 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({ x: Math.max(0, activeIndex * 72 - 72), animated: true });
+      scrollRef.current.scrollTo({ x: Math.max(0, activeIndex * 76 - 60), animated: true });
     }
   }, [activeKey]);
 
@@ -44,7 +44,7 @@ function SubTabBar() {
           return (
             <TouchableOpacity
               key={key}
-              style={styles.tabItem}
+              style={styles.pillItem}
               onPress={() => {
                 if (key === 'index') {
                   router.push('/affiliate');
@@ -52,23 +52,26 @@ function SubTabBar() {
                   router.push(`/affiliate/${key}`);
                 }
               }}
-              activeOpacity={0.6}
+              activeOpacity={0.65}
             >
-              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                <Icon
-                  size={18}
-                  color={isActive ? theme.colors.primary[400] : theme.colors.dark.textDim}
-                  strokeWidth={isActive ? 2.5 : 2.2}
-                  fill={isActive ? theme.colors.primary[400] + '3C' : 'transparent'}
-                />
-              </View>
-              <Text
-                style={[styles.tabLabel, isActive && styles.tabLabelActive]}
-                numberOfLines={1}
+              <View
+                style={[
+                  styles.pill,
+                  isActive && styles.pillActive,
+                ]}
               >
-                {label}
-              </Text>
-              {isActive && <View style={styles.activeBar} />}
+                <Icon
+                  size={16}
+                  color={isActive ? theme.colors.primary[300] : theme.colors.dark.textDim}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                <Text
+                  style={[styles.pillLabel, isActive && styles.pillLabelActive]}
+                  numberOfLines={1}
+                >
+                  {label}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -101,50 +104,48 @@ export default function AffiliateLayout() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.dark.surface,
-    borderTopColor: theme.colors.dark.border,
+    backgroundColor: theme.glass.surface,
+    borderTopColor: theme.glass.border,
     borderTopWidth: 1,
-    paddingTop: 8,
+    paddingTop: 6,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 100,
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(16px)' as unknown as undefined }
+      : {}),
   },
   scrollContent: {
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    gap: 4,
   },
-  tabItem: {
-    width: 72,
-    alignItems: 'center',
+  pillItem: {
     paddingVertical: 4,
   },
-  iconWrap: {
-    width: 40,
-    height: 32,
-    justifyContent: 'center',
+  pill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: theme.radius.full,
+    backgroundColor: 'transparent',
   },
-  iconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '2E',
+  pillActive: {
+    backgroundColor: theme.colors.primary[500] + '24',
+    borderWidth: 1,
+    borderColor: theme.colors.primary[400] + '40',
   },
-  tabLabel: {
-    fontSize: 10,
+  pillLabel: {
+    fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textFaint,
-    marginTop: 4,
   },
-  tabLabelActive: {
-    color: theme.colors.primary[400],
+  pillLabelActive: {
+    color: theme.colors.primary[300],
     fontFamily: theme.typography.fontFamily.semiBold,
-  },
-  activeBar: {
-    width: 20,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: theme.colors.primary[400],
-    marginTop: 3,
   },
 });

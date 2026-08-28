@@ -564,6 +564,8 @@ export default function CameraScreen() {
           title="1. 사진 촬영"
           desc="제품을 카메라에 맞추고 셔터 버튼을 눌러주세요."
           iconBg={theme.colors.primary[500] + '18'}
+          accentColor={theme.colors.primary[400]}
+          stepNumber={1}
         >
           <View style={styles.cameraPreviewWrap}>
             {isActive && !arMode ? (
@@ -782,6 +784,8 @@ export default function CameraScreen() {
           title="2. 갤러리에서 불러오기"
           desc="촬영 대신 앨범에 있는 사진이나 영상을 사용할 수 있어요."
           iconBg={theme.colors.accent[500] + '18'}
+          accentColor={theme.colors.accent[400]}
+          stepNumber={2}
         >
           <View style={styles.verticalBtnRow}>
             <TouchableOpacity
@@ -809,6 +813,8 @@ export default function CameraScreen() {
           title="3. 템플릿 스타일 선택"
           desc="AI 자동 추천 또는 원하는 스타일을 직접 골라보세요."
           iconBg={theme.colors.warning[500] + '18'}
+          accentColor={theme.colors.warning[400]}
+          stepNumber={3}
         >
           <View style={styles.templateModeRow}>
             <TouchableOpacity
@@ -867,6 +873,8 @@ export default function CameraScreen() {
           title="4. 편집만 하기 (AI 분석 생략)"
           desc="분석 없이 사진만 업로드하고 직접 꾸미고 싶을 때 사용하세요."
           iconBg={theme.colors.success[500] + '18'}
+          accentColor={theme.colors.success[400]}
+          stepNumber={4}
         >
           <TouchableOpacity
             style={styles.verticalSingleBtn}
@@ -884,6 +892,8 @@ export default function CameraScreen() {
           title="5. AR 모드"
           desc="실시간 AR 효과를 적용하며 촬영할 수 있어요."
           iconBg={theme.colors.accent[500] + '18'}
+          accentColor={theme.colors.accent[400]}
+          stepNumber={5}
         >
           <TouchableOpacity
             style={styles.verticalSingleBtn}
@@ -900,6 +910,8 @@ export default function CameraScreen() {
           title="6. 플랫폼 업로드 및 공유"
           desc="완성된 콘텐츠를 SNS, 블로그 등에 바로 공유하고 제휴 링크를 관리하세요."
           iconBg={theme.colors.primary[500] + '18'}
+          accentColor={theme.colors.primary[300]}
+          stepNumber={6}
         >
           <TouchableOpacity
             style={styles.verticalSingleBtn}
