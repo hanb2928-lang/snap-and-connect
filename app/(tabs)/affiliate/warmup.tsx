@@ -47,7 +47,7 @@ import {
   type WarmupPlatform,
 } from '@/types/warmup';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -78,7 +78,7 @@ interface DaySlide {
 }
 
 export default function WarmupScreen() {
-  const tabBarHeight = useTabBarHeight();
+  const tabBarHeight = useSubTabBarHeight();
   const safeTop = useSafeTop();
   const [schedules, setSchedules] = useState<WarmupScheduleWithTasks[]>([]);
   const [loading, setLoading] = useState(true);

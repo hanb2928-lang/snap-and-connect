@@ -14,7 +14,7 @@ import { History, Trash2, Tag, ShoppingBag, WifiOff } from 'lucide-react-native'
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import type { Scan } from '@/types/database';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
@@ -26,7 +26,7 @@ const CACHE_KEY = 'scan_history';
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const tabBarHeight = useTabBarHeight();
+  const tabBarHeight = useSubTabBarHeight();
   const safeTop = useSafeTop();
   const networkStatus = useNetworkStatus();
   const [scans, setScans] = useState<ScanListItem[]>([]);

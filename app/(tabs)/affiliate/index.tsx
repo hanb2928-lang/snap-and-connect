@@ -16,7 +16,7 @@ import { theme } from '@/lib/theme';
 import { getUserSettings } from '@/lib/settings';
 import { fetchRevenueRecords } from '@/lib/revenue';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
 const PLATFORMS = [
@@ -33,7 +33,7 @@ const PLATFORMS = [
 export default function AffiliateScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
-  const tabBarHeight = useTabBarHeight();
+  const tabBarHeight = useSubTabBarHeight();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [revenue, setRevenue] = useState<RevenueRecord[]>([]);
   const [loading, setLoading] = useState(true);

@@ -16,7 +16,7 @@ import { ExternalLink, ShoppingBag, ChevronRight, Flame, Star, Globe, Lightbulb,
 import { theme } from '@/lib/theme';
 import { supabase, KEYWORD_TRENDS_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useRouter } from 'expo-router';
 
@@ -123,7 +123,7 @@ const productCache = new Map<Marketplace, { data: TrendingCategory[]; ts: number
 const PRODUCT_CACHE_TTL = 5 * 60 * 1000;
 
 export default function TrendingScreen() {
-  const tabBarHeight = useTabBarHeight();
+  const tabBarHeight = useSubTabBarHeight();
   const router = useRouter();
   const safeTop = useSafeTop();
   const [viewMode, setViewMode] = useState<ViewMode>('products');

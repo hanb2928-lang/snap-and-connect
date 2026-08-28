@@ -11,27 +11,21 @@ import type {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { theme } from '@/lib/theme';
-import { Camera, Settings, FolderOpen, ChartBar as BarChart3, Flame, History, Sprout, ShoppingBag, type LucideIcon } from 'lucide-react-native';
+import { Camera, Settings, FolderOpen, ChartBar as BarChart3, ShoppingBag, type LucideIcon } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
-  trending: Flame,
-  history: History,
-  assets: FolderOpen,
   affiliate: ShoppingBag,
+  assets: FolderOpen,
   analytics: BarChart3,
-  warmup: Sprout,
   settings: Settings,
 };
 
 const TAB_LABELS: Record<string, string> = {
   index: '카메라',
-  trending: '인기',
-  history: '기록',
-  assets: '제작물',
   affiliate: '제휴쇼핑',
+  assets: '제작물',
   analytics: '분석',
-  warmup: '육성',
   settings: '설정',
 };
 
