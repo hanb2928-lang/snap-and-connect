@@ -9,7 +9,6 @@ import {
   Linking,
   Platform,
   Image,
-  Dimensions,
 } from 'react-native';
 import {
   ShoppingBag,
@@ -30,9 +29,6 @@ import {
   Image as ImageIcon,
   Film,
   Sparkles,
-  Eye,
-  CreditCard as Edit3,
-  Upload,
   FileText,
   Hash,
   Type,
@@ -42,7 +38,6 @@ import {
   Plus,
   X,
   ScanSearch,
-  Wand as Wand2,
   Palette,
   Share2,
 } from 'lucide-react-native';
@@ -63,8 +58,6 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
 import type { UserSettings, RevenueRecord } from '@/types/database';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 const PLATFORMS = [
   { key: 'Coupang', label: '쿠팡 파트너스', icon: ShoppingBag, color: '#FF3E3E', signupUrl: 'https://partners.coupang.com/', desc: '쿠팡 상품 링크를 공유하고 수수료를 받으세요' },
@@ -134,6 +127,7 @@ export default function AffiliateScreen() {
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformUrl, setNewPlatformUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   // Step 3: Content
   const [contentText, setContentText] = useState('');
@@ -269,12 +263,14 @@ export default function AffiliateScreen() {
   const handleAnalyzePhoto = async () => {
     if (!selectedImage || mediaType !== 'photo' || analyzing) return;
     setAnalyzing(true);
+    setAnalyzeError(null);
     try {
       const imageUrl = await uploadImage(selectedImage, selectedImageMime);
       const scanId = await saveManualScan(imageUrl);
       markCompleted('analyze');
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
+      setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
       setAnalyzing(false);
     }
   };
@@ -299,7 +295,12 @@ export default function AffiliateScreen() {
         : selectedImage
     : null;
 
-  const activeStep = Math.min(completedSteps.size + 1, 4);
+  const activeStep = (() => {
+    for (let i = 0; i < STEP_ORDER.length; i++) {
+      if (!completedSteps.has(STEP_ORDER[i])) return i + 1;
+    }
+    return STEP_ORDER.length;
+  })();
 
   return (
     <View style={styles.container}>
@@ -433,6 +434,12 @@ export default function AffiliateScreen() {
                 {analyzing ? 'AI 분석 중...' : 'AI 분석 시작하기'}
               </Text>
             </TouchableOpacity>
+          )}
+
+          {analyzeError && (
+            <View style={styles.analyzeErrorBox}>
+              <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
+            </View>
           )}
 
           {/* Platform quick select */}
@@ -742,7 +749,7 @@ export default function AffiliateScreen() {
                     {r.note ? <Text style={styles.revenueNote} numberOfLines={1}>{r.note}</Text> : null}
                   </View>
                 </View>
-                <Text style={styles.revenueAmount}>{r.amount.toLocaleString('ko-KR')}원</Text>
+                <Text style={styles.revenueAmount}>{(r.amount ?? 0).toLocaleString('ko-KR')}원</Text>
               </View>
             ))}
           </View>
@@ -1023,6 +1030,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  analyzeErrorBox: {
+    backgroundColor: theme.colors.error[500] + '20',
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.error[400],
+  },
+  analyzeErrorText: {
+    color: theme.colors.error[400],
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    lineHeight: 17,
   },
   platformChipsScroll: {
     flexDirection: 'row',
