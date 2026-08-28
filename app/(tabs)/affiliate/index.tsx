@@ -54,6 +54,7 @@ import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { StepIndicator } from '@/components/StepIndicator';
 import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
+import { UploadPreviewModal, type UploadPreviewData } from '@/components/UploadPreviewModal';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -159,6 +160,7 @@ export default function AffiliateScreen() {
   // Step 4: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [previewUpload, setPreviewUpload] = useState<UploadPreviewData | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -363,9 +365,34 @@ export default function AffiliateScreen() {
     markCompleted('content');
   };
 
-  // Step 4: Upload to platform
+  // Step 4: Open preview before upload
   const handleUploadToPlatform = (platformKey: string) => {
-    setUploadPlatform(platformKey);
+    const platform = UPLOAD_PLATFORMS.find((p) => p.key === platformKey);
+    if (!platform) return;
+    const Icon = platform.icon;
+    setPreviewUpload({
+      platformKey: platform.key,
+      platformLabel: platform.label,
+      platformColor: platform.color,
+      platformIcon: <Icon size={18} color={platform.color} strokeWidth={2} />,
+      mediaUri: imagePreviewUri,
+      mediaType: mediaType,
+      caption: contentText,
+      affiliateUrl: affiliateUrl,
+      disclosureText,
+      autoDisclosure,
+      templateLabel: TEMPLATE_STYLES.find((t) => t.key === selectedTemplate)?.label ?? '',
+      productName: productMeta?.productName ?? '',
+    });
+  };
+
+  const handleConfirmUpload = (edited: { caption: string; affiliateUrl: string; autoDisclosure: boolean }) => {
+    if (!previewUpload) return;
+    setContentText(edited.caption);
+    setAffiliateUrl(edited.affiliateUrl);
+    setAutoDisclosure(edited.autoDisclosure);
+    setUploadPlatform(previewUpload.platformKey);
+    setPreviewUpload(null);
     markCompleted('upload');
   };
 
@@ -1055,6 +1082,14 @@ export default function AffiliateScreen() {
           onRetake={handlePreviewRetake}
         />
       )}
+
+      {/* Upload preview modal */}
+      <UploadPreviewModal
+        visible={!!previewUpload}
+        data={previewUpload}
+        onConfirm={handleConfirmUpload}
+        onClose={() => setPreviewUpload(null)}
+      />
     </View>
   );
 }
