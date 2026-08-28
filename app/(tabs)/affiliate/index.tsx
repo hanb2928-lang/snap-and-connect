@@ -743,7 +743,7 @@ export default function AffiliateScreen() {
         <VerticalSectionCard
           icon={<ScanSearch size={20} color={theme.colors.success[400]} strokeWidth={2} />}
           title="3. AI 분석 및 스타일 추천"
-          desc="업로드한 사진을 AI가 분석하여 최적의 콘텐츠 스타일을 추천합니다."
+          desc="원본 사진으로 AI 분석을 진행하거나, 먼저 다양한 각도·착용 컷을 만들어 가장 좋은 이미지를 선택한 뒤 분석할 수 있습니다."
           iconBg={theme.colors.success[500] + '18'}
           accentColor={STEP_META.analyze.color}
           stepNumber={3}
@@ -751,42 +751,10 @@ export default function AffiliateScreen() {
         >
           {selectedImage && mediaType === 'photo' ? (
             <>
-              <TouchableOpacity
-                style={styles.analyzeBtn}
-                onPress={handleAnalyzePhoto}
-                disabled={analyzing}
-                activeOpacity={0.85}
-              >
-                {analyzing ? (
-                  <Loader size={18} color="#fff" strokeWidth={2} />
-                ) : (
-                  <ScanSearch size={18} color="#fff" strokeWidth={2} />
-                )}
-                <Text style={styles.analyzeBtnText}>
-                  {analyzing ? 'AI 분석 중...' : 'AI 분석 시작하기'}
-                </Text>
-              </TouchableOpacity>
-
-              {analyzeError && (
-                <View style={styles.analyzeErrorBox}>
-                  <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
-                </View>
-              )}
-
-              {completedSteps.has('analyze') && aiRecommendation && (
-                <View style={styles.aiRecommendBadge}>
-                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.aiRecommendText}>
-                    AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
-                  </Text>
-                </View>
-              )}
-
-              {/* AI 가상 생성 / 가상 피팅 선택 */}
-              <View style={styles.aiToolDivider} />
-              <Text style={styles.aiToolSectionLabel}>AI 이미지 생성 도구</Text>
+              {/* 3a: AI 이미지 생성 도구 (선택) — 먼저 다양한 컷을 만들어볼 수 있습니다 */}
+              <Text style={styles.aiToolSectionLabel}>AI 이미지 생성 도구 (선택)</Text>
               <Text style={styles.aiToolSectionDesc}>
-                사진 한 장으로 다양한 각도의 상품 컷이나 모델 착용 컷을 AI로 만들어보세요. 생성된 이미지를 선택해 마케팅 소재로 사용할 수 있습니다.
+                사진 한 장으로 다양한 각도의 상품 컷이나 모델 착용 컷을 AI로 만들어보세요. 마음에 드는 이미지를 선택하면 그 이미지로 AI 분석이 진행됩니다. 건너뛰고 바로 분석해도 됩니다.
               </Text>
 
               <View style={styles.aiToolToggleRow}>
@@ -821,7 +789,7 @@ export default function AffiliateScreen() {
               {aiGeneratedUrl && (
                 <View style={styles.aiGeneratedNotice}>
                   <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  <Text style={styles.aiGeneratedNoticeText}>AI 생성 이미지가 적용되었습니다. 아래 4단계에서 소재를 완성하세요.</Text>
+                  <Text style={styles.aiGeneratedNoticeText}>AI 생성 이미지가 적용되었습니다. 아래에서 AI 분석을 시작하면 이 이미지로 분석합니다.</Text>
                 </View>
               )}
 
@@ -844,6 +812,44 @@ export default function AffiliateScreen() {
                     productCategory={productMeta?.platform}
                     onUseImage={handleUseAiImage}
                   />
+                </View>
+              )}
+
+              {/* 3b: AI 분석 시작 */}
+              <View style={styles.aiToolDivider} />
+
+              <TouchableOpacity
+                style={styles.analyzeBtn}
+                onPress={handleAnalyzePhoto}
+                disabled={analyzing}
+                activeOpacity={0.85}
+              >
+                {analyzing ? (
+                  <Loader size={18} color="#fff" strokeWidth={2} />
+                ) : (
+                  <ScanSearch size={18} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.analyzeBtnText}>
+                  {analyzing
+                    ? 'AI 분석 중...'
+                    : aiGeneratedUrl
+                      ? '선택한 이미지로 AI 분석 시작'
+                      : 'AI 분석 시작하기'}
+                </Text>
+              </TouchableOpacity>
+
+              {analyzeError && (
+                <View style={styles.analyzeErrorBox}>
+                  <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
+                </View>
+              )}
+
+              {completedSteps.has('analyze') && aiRecommendation && (
+                <View style={styles.aiRecommendBadge}>
+                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.aiRecommendText}>
+                    AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
+                  </Text>
                 </View>
               )}
             </>

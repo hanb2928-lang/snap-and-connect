@@ -1399,6 +1399,10 @@ export default function ResultScreen() {
 
         {captureImageUrl ? (
           <View style={styles.section}>
+            <Text style={styles.aiToolExtraLabel}>추가 AI 이미지 생성</Text>
+            <Text style={styles.aiToolExtraDesc}>
+              제휴쇼핑 탭 3단계에서 만든 이미지 외에, 여기서 추가로 다양한 각도·착용 컷을 더 만들 수 있습니다.
+            </Text>
             <VirtualCutGallery
               imageDataUrl={captureImageUrl}
               productName={activeProductName}
@@ -1906,6 +1910,19 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
+  },
+  aiToolExtraLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  aiToolExtraDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginBottom: theme.spacing.sm,
   },
   captureErrorBanner: {
     flexDirection: 'row',
