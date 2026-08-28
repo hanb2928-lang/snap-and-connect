@@ -121,3 +121,13 @@ export function getShareDisclosureForPlatforms(platforms: string[], enabled = tr
     .map((p) => `(${getPlatformDisclosure(p).platform}) ${getPlatformDisclosure(p).full}`)
     .join('\n');
 }
+
+export function buildCaptionWithDisclosure(
+  caption: string,
+  platforms: string[],
+  enabled = true,
+): string {
+  const disclosure = getDisclosureForPlatforms(platforms, enabled);
+  if (!disclosure) return caption;
+  return `${disclosure}\n\n${caption}`;
+}

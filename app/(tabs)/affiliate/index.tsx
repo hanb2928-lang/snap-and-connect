@@ -40,6 +40,7 @@ import {
   ScanSearch,
   Palette,
   Share2,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -58,6 +59,7 @@ import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
+import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
 const PLATFORMS = [
@@ -156,6 +158,7 @@ export default function AffiliateScreen() {
 
   // Step 4: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
+  const [autoDisclosure, setAutoDisclosure] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -164,6 +167,7 @@ export default function AffiliateScreen() {
       const [s, r] = await Promise.all([getUserSettings(), fetchRevenueRecords(10)]);
       setSettings(s);
       setRevenue(r);
+      if (s?.auto_disclosure != null) setAutoDisclosure(s.auto_disclosure);
     } catch (err) {
       setLoadError(friendlyError(err, '제휴 마케팅 데이터를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'));
     } finally {
@@ -382,6 +386,11 @@ export default function AffiliateScreen() {
     }
     return STEP_ORDER.length;
   }, [completedSteps]);
+
+  const disclosureText = useMemo(() => {
+    const platforms = selectedPlatform ? [selectedPlatform] : [];
+    return getDisclosureForPlatforms(platforms, autoDisclosure);
+  }, [selectedPlatform, autoDisclosure]);
 
   return (
     <View style={styles.container}>
@@ -923,6 +932,41 @@ export default function AffiliateScreen() {
           <Text style={styles.uploadHint}>
             업로드할 플랫폼을 선택하세요. 각 플랫폼에 맞는 형식으로 자동 변환됩니다.
           </Text>
+
+          {/* Auto-disclosure toggle */}
+          <TouchableOpacity
+            style={styles.disclosureToggleRow}
+            onPress={() => setAutoDisclosure(!autoDisclosure)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.disclosureToggleInfo}>
+              <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
+              <View style={styles.disclosureToggleTextWrap}>
+                <Text style={styles.disclosureToggleTitle}>공정위 문구 캡션 자동 추가</Text>
+                <Text style={styles.disclosureToggleDesc}>
+                  업로드 시 캡션 최상단에 제휴 문구가 자동으로 들어갑니다. 이미지 내부에는 표시되지 않습니다.
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.toggleSwitch, autoDisclosure && styles.toggleSwitchActive]}>
+              <View style={[styles.toggleKnob, autoDisclosure && styles.toggleKnobActive]} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Caption preview with disclosure */}
+          {autoDisclosure && disclosureText && (contentText || affiliateUrl).trim() && (
+            <View style={styles.captionPreviewBox}>
+              <Text style={styles.captionPreviewLabel}>업로드 시 캡션 미리보기</Text>
+              <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
+              <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
+              <Text style={styles.captionPreviewContent}>
+                {contentText || '마케팅 문구를 입력하면 여기에 표시됩니다.'}
+              </Text>
+              {affiliateUrl.trim() && (
+                <Text style={styles.captionPreviewLink}>{affiliateUrl.trim()}</Text>
+              )}
+            </View>
+          )}
 
           <View style={styles.uploadGrid}>
             {UPLOAD_PLATFORMS.map((p) => {
@@ -1882,6 +1926,97 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.success[400],
     lineHeight: 17,
+  },
+  disclosureToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  disclosureToggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    flex: 1,
+  },
+  disclosureToggleTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  disclosureToggleTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  disclosureToggleDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  toggleSwitch: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleSwitchActive: {
+    backgroundColor: theme.colors.success[500],
+  },
+  toggleKnob: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#fff',
+    alignSelf: 'flex-start',
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
+  },
+  captionPreviewBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    gap: 6,
+  },
+  captionPreviewLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 2,
+  },
+  captionPreviewDisclosure: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.success[400],
+    lineHeight: 16,
+  },
+  captionPreviewDivider: {
+    fontSize: 10,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 14,
+  },
+  captionPreviewContent: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 18,
+  },
+  captionPreviewLink: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[400],
+    marginTop: 2,
   },
   sectionTitle: {
     fontSize: 16,

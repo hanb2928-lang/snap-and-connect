@@ -15,7 +15,6 @@ import { Instagram, Youtube, FileText, Download, Loader as Loader2, Check, Zap, 
 import { theme } from '@/lib/theme';
 import { uploadAssetBlob, uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
-import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { getUserSettings } from '@/lib/settings';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
@@ -206,16 +205,8 @@ async function renderFormat(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  const disclosure = getDisclosureShortForPlatforms(opts.affiliatePlatforms, opts.autoDisclosure);
-  if (disclosure) {
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '400 18px sans-serif';
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'center';
-    drawTextLines(ctx, disclosure, fmt.width / 2, fmt.height - 16, fmt.width - 80, 24);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  }
+  // Disclosure text is NOT drawn on the image — it is prepended to the caption
+  // when uploading to platforms, to keep the visual template clean.
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob: Blob | null) => {
