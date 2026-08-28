@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, ShoppingBag, History } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -1441,6 +1441,19 @@ export default function SettingsScreen() {
           />
           <Divider />
           <UsageGuide
+            icon={<Film size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+            title="타임라인 숏폼 (연작 에피소드) 만들기"
+            steps={[
+              '결과 화면에서 "만화 숏폼" 버튼을 탭합니다',
+              '고급 설정에서 "연작 에피소드 모드"를 켭니다',
+              '1일차-3일차-7일차 등 시간 흐름 스토리로 만화 숏폼이 자동 제작됩니다',
+              '각 일차별 시나리오와 대사를 직접 수정할 수 있습니다',
+              '무드 템플릿과 내레이션 더빙을 함께 적용할 수 있습니다',
+              '완성된 타임라인 숏폼을 저장하거나 틱톡/인스타/쇼츠로 공유합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
             icon={<PenLine size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
             title="카피라이팅 (글 자동 생성)"
             steps={[
@@ -1664,6 +1677,48 @@ export default function SettingsScreen() {
             title="내 가게 정보 & 오프라인 연계"
             desc="매장 정보를 등록하면 숏폼 카드와 공유 콘텐츠에 자동으로 포함됩니다"
           />
+          <Divider />
+          <FeatureRow
+            icon={<Clapperboard size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="AR 촬영 모드"
+            desc="실시간 AR 효과를 적용하며 상품을 촬영할 수 있습니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<ShoppingBag size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="제휴쇼핑 콘텐츠 제작 워크플로우"
+            desc="사진 불러오기 → 제휴 링크 연결 → AI 분석 → 템플릿 편집 → 플랫폼 업로드까지 5단계 가이드"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Link2 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="링크 관리 (단축 URL & QR코드)"
+            desc="제휴 링크를 북마크로 관리하고 단축 URL과 QR코드를 자동 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<LayoutTemplate size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="마케팅 소재 보관함"
+            desc="마케팅 문구, 해시태그, 후킹 문장을 저장하고 재사용할 수 있습니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Flame size={20} color={theme.colors.error[400]} strokeWidth={2} />}
+            title="인기 상품 & 소재 아이디어 봇"
+            desc="실시간 인기 상품과 트렌드 키워드를 기반으로 콘텐츠 아이디어를 자동 생성합니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<Film size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+            title="타임라인 숏폼 제작"
+            desc="1일차-3일차-7일차 등 시간 흐름 스토리로 숏폼 영상을 만듭니다"
+          />
+          <Divider />
+          <FeatureRow
+            icon={<BarChart3 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="제휴 성과 분석 대시보드"
+            desc="월별 수익 추이, 플랫폼별 수익, 클릭수 TOP 링크를 한눈에 확인합니다"
+          />
         </View>
       </View>
 
@@ -1678,9 +1733,36 @@ export default function SettingsScreen() {
             title="실물 촬영 & 제품 분석"
             steps={[
               '카메라 탭에서 제품을 촬영하거나 갤러리에서 사진을 선택합니다',
+              '단품 모드(사진 1장) 또는 다각도 모드(최대 4장)를 선택할 수 있습니다',
+              '다각도 모드에서는 정면·측면·후면·디테일을 순서대로 촬영하면 AI 정밀도가 극대화됩니다',
               'AI가 자동으로 제품명, 카테고리, 가격대를 식별합니다',
               '네이버 쇼핑에서 동일 상품을 검색하고 매칭 결과를 보여줍니다',
               '원하는 상품을 선택하면 제휴 링크가 자동 생성됩니다',
+              '템플릿 스타일을 수동 선택하거나 AI 자동 추천으로 받을 수 있습니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Clapperboard size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+            title="AR 촬영 모드"
+            steps={[
+              '카메라 탭에서 "AR 촬영 시작" 버튼을 탭합니다',
+              '실시간 AR 효과가 적용된 상태로 상품을 촬영할 수 있습니다',
+              '촬영한 이미지는 AI 분석을 거쳐 결과 화면으로 이동합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<ShoppingBag size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+            title="제휴쇼핑 콘텐츠 제작 워크플로우"
+            steps={[
+              '제휴 마케팅 탭 → 제휴 하위 탭에서 5단계 워크플로우를 따라갑니다',
+              '1단계: 사진 또는 영상을 불러옵니다',
+              '2단계: 제휴 플랫폼을 선택하고 링크 URL을 입력합니다 (쿠팡, 토스, 네이버 브랜드커넥트, 올리브영 등)',
+              '3단계: AI 분석 시작 버튼으로 상품을 분석하고 스타일을 추천받습니다',
+              '4단계: 템플릿 스타일(숏폼 영상, 웹툰형 만화, 카드뉴스)을 선택하고 마케팅 문구를 편집합니다',
+              '5단계: 공정위 문구 자동 추가 토글을 켜고 플랫폼에 업로드합니다',
+              '상단 수익 요약 카드에서 총 수익과 건수를 확인할 수 있습니다',
             ]}
           />
           <Divider />
@@ -1763,11 +1845,15 @@ export default function SettingsScreen() {
           <Divider />
           <UsageGuide
             icon={<Flame size={20} color={theme.colors.error[400]} strokeWidth={2} />}
-            title="인기 상품 탭"
+            title="인기 상품 & 소재 아이디어 봇"
             steps={[
-              '인기 상품 탭에서 현재 트렌드인 키워드를 확인합니다',
-              '네이버 쇼핑 인기 검색어와 실시간 트렌드를 볼 수 있습니다',
-              '트렌드 키워드를 탭하면 관련 상품을 바로 검색합니다',
+              '제휴 마케팅 탭 → 인기 하위 탭에서 실시간 인기 상품을 확인합니다',
+              '쿠팡, 네이버, 토스 등 플랫폼을 선택하고 카테고리별 인기 상품을 봅니다',
+              '상품 카드의 "콘텐츠" 버튼을 탭하면 해당 상품으로 바로 분석을 시작합니다',
+              '"보기" 버튼으로 상품 페이지를 직접 열어볼 수 있습니다',
+              '상단 토글을 "소재 아이디어 봇"으로 전환하면 트렌드 키워드를 확인합니다',
+              '키워드를 탭하면 5개의 콘텐츠 소재 아이디어가 자동 생성됩니다',
+              '각 아이디어의 복사 버튼으로 제목, 후킹, 형식, 각도를 클립보드에 복사합니다',
             ]}
           />
           <Divider />
@@ -1775,9 +1861,12 @@ export default function SettingsScreen() {
             icon={<FolderOpen size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
             title="내 제작물 관리"
             steps={[
-              '내 제작물 탭에서 저장한 모든 카드와 캐러셀을 확인합니다',
-              '제작물을 탭하면 원본 결과 페이지로 이동합니다',
-              '불필요한 제작물은 스와이프 또는 삭제 버튼으로 제거할 수 있습니다',
+              '하단 탭에서 "제작물" 탭을 선택합니다',
+              '클라우드에 저장한 모든 카드와 숏폼 영상이 그리드로 표시됩니다',
+              '제작물을 탭하면 전체 화면 미리보기가 열립니다',
+              '다운로드 버튼으로 기기 갤러리에 저장하거나, 삭제 버튼으로 제거할 수 있습니다',
+              '영상 제작물은 "영상" 배지로 구분되어 표시됩니다',
+              '당겨서 새로고침으로 최신 목록을 불러올 수 있습니다',
             ]}
           />
           <Divider />
@@ -1785,11 +1874,63 @@ export default function SettingsScreen() {
             icon={<BarChart3 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
             title="통합 분석 대시보드"
             steps={[
-              '분석 탭에서 제품 분석부터 수익까지 전체 성과를 한눈에 봅니다',
-              '성과 퍼널에서 각 단계별 전환율과 이탈률을 확인합니다',
-              '일별 클릭 추이 차트로 트래픽 패턴을 파악합니다',
+              '하단 탭에서 "분석" 탭을 선택합니다',
+              '상단 요약 카드에서 분석 수, 콘텐츠 수, 클릭 수, 수익을 한눈에 확인합니다',
+              '성과 퍼널에서 제품 분석 → 콘텐츠 제작 → 링크 클릭 → 수익 발생 단계별 전환율을 봅니다',
+              '일별 클릭 추이 차트(14일)로 트래픽 패턴을 파악합니다',
               '플랫폼별 수익과 클릭수를 비교합니다',
               '성과가 높은 콘텐츠를 탭하면 해당 결과 페이지로 이동합니다',
+              '오프라인 상태에서는 캐시 데이터로 대체 표시됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<History size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="스캔 히스토리"
+            steps={[
+              '제휴 마케팅 탭 → 기록 하위 탭에서 과거 분석 기록을 확인합니다',
+              '각 카드에 상품 이미지, 이름, 한줄평, 가격, 태그, 날짜가 표시됩니다',
+              '카드를 탭하면 원본 결과 페이지로 이동합니다',
+              '삭제 버튼으로 불필요한 기록을 제거할 수 있습니다',
+              '당겨서 새로고침으로 최신 기록을 불러옵니다',
+              '오프라인에서는 저장된 캐시 데이터로 목록이 표시됩니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<Link2 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="링크 관리 (단축 URL & QR코드)"
+            steps={[
+              '제휴 마케팅 탭 → 링크 하위 탭을 엽니다',
+              '"새 링크 추가" 버튼으로 제휴 링크를 등록합니다 (라벨, URL, 플랫폼 선택)',
+              '저장된 링크는 단축 URL로 자동 변환되고 클릭수가 추적됩니다',
+              '"복사" 버튼으로 단축 URL을 클립보드에 복사합니다',
+              '"QR" 버튼으로 QR코드를 생성하고 저장할 수 있습니다',
+              '"열기" 버튼으로 링크를 브라우저에서 직접 엽니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<LayoutTemplate size={20} color={theme.colors.accent[300]} strokeWidth={2} />}
+            title="마케팅 소재 보관함"
+            steps={[
+              '제휴 마케팅 탭 → 소재 하위 탭을 엽니다',
+              '상단 소재 템플릿에서 카드뉴스, 상세페이지, 숏폼 스크립트 템플릿을 확인합니다',
+              '"추가" 버튼으로 마케팅 문구, 해시태그, 후킹 문장을 저장합니다',
+              '저장한 문구는 타입별 배지로 구분되어 표시됩니다',
+              '복사 버튼으로 원하는 문구를 클립보드에 복사해서 재사용합니다',
+            ]}
+          />
+          <Divider />
+          <UsageGuide
+            icon={<BarChart3 size={20} color={theme.colors.success[500]} strokeWidth={2} />}
+            title="제휴 성과 분석"
+            steps={[
+              '제휴 마케팅 탭 → 분석 하위 탭을 엽니다',
+              '총 수익, 총 클릭, 단축 링크 수, 북마크 수를 상단 카드에서 확인합니다',
+              '월별 수익 추이 바 차트로 월간 성과를 비교합니다',
+              '플랫폼별 수익 바 차트로 어느 플랫폼이 가장 수익이 좋은지 파악합니다',
+              '클릭수 TOP 링크 순위로 가장 성과가 좋은 링크를 확인합니다',
             ]}
           />
           <Divider />
@@ -1797,9 +1938,10 @@ export default function SettingsScreen() {
             icon={<CalendarDays size={20} color={theme.colors.success[400]} strokeWidth={2} />}
             title="계정 육성 (웜업)"
             steps={[
-              '육성 탭에서 "웜업 스케줄 만들기" 버튼을 탭합니다',
-              '플랫폼(인스타/틱톡/트위터/블로그)과 계정 이름, 웜업 기간(7~30일)을 선택합니다',
+              '제휴 마케팅 탭 → 육성 하위 탭에서 "웜업 스케줄 만들기" 버튼을 탭합니다',
+              '플랫폼(인스타/틱톡/트위터·스레드/블로그/핀터레스트)과 계정 이름, 웜업 기간(7~30일)을 선택합니다',
               '스케줄을 생성하면 일자별 체크리스트가 자동으로 만들어집니다',
+              '좌우 스와이프로 각 일차별 활동을 확인하고 완료 체크합니다',
               '1~3일차는 게시물 없이 좋아요와 댓글로 활동을 알립니다 (안정화 단계)',
               '4~7일차는 게시물 업로드를 시작하고 관련 계정과 소통합니다 (기초 체력 단계)',
               '8일차 이후부터 본격적으로 게시물에 제휴 링크를 포함합니다 (본격 활동 단계)',
