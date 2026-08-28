@@ -43,6 +43,7 @@ import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
+import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -84,6 +85,7 @@ export default function CameraScreen() {
   const [videoImportVisible, setVideoImportVisible] = useState(false);
   const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
   const [workflowGuideVisible, setWorkflowGuideVisible] = useState(false);
+  const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
@@ -219,11 +221,8 @@ export default function CameraScreen() {
       }
 
       setError(null);
-      setProgressStep(0);
-      setProgressText('사진 촬영 중...');
-      progressWidth.value = withTiming(0.15, { duration: 300 });
-      fadeAnim.value = 0;
-      await processImage(compressedB64, photo.uri, compressedMime);
+      setProcessing(false);
+      setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
     } catch (err) {
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -316,15 +315,11 @@ export default function CameraScreen() {
 
         setProcessing(true);
         setError(null);
-        setProgressStep(0);
-        setProgressText('사진 선택 중...');
-        progressWidth.value = withTiming(0.1, { duration: 200 });
-        fadeAnim.value = 0;
-
         const img = images[0];
         const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
         const compressedMime = getMimeTypeFromDataUrl(compressed);
-        await processImage(cleanBase64(compressed), img.uri, compressedMime);
+        setProcessing(false);
+        setPreviewCapture({ base64: cleanBase64(compressed), mimeType: compressedMime });
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
         setProcessing(false);
@@ -359,10 +354,6 @@ export default function CameraScreen() {
 
       setProcessing(true);
       setError(null);
-      setProgressStep(0);
-      setProgressText('사진 선택 중...');
-      progressWidth.value = withTiming(0.1, { duration: 200 });
-      fadeAnim.value = 0;
 
       const asset = result.assets[0];
       if (!asset.uri) {
@@ -370,7 +361,8 @@ export default function CameraScreen() {
         return;
       }
       const { base64: compressedB64, mimeType: compressedMime } = await compressImageToBase64(asset.uri, 1280, 0.7);
-      await processImage(compressedB64, asset.uri, compressedMime);
+      setProcessing(false);
+      setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
     } catch (err) {
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -479,6 +471,21 @@ export default function CameraScreen() {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handlePreviewConfirm = async (base64: string, mimeType: string) => {
+    setPreviewCapture(null);
+    setProcessing(true);
+    setError(null);
+    setProgressStep(0);
+    setProgressText('AI 분석 준비 중...');
+    progressWidth.value = withTiming(0.1, { duration: 200 });
+    fadeAnim.value = 0;
+    await processImage(base64, '', mimeType);
+  };
+
+  const handlePreviewRetake = () => {
+    setPreviewCapture(null);
   };
 
   if (isWebPlatform()) {
@@ -760,7 +767,7 @@ export default function CameraScreen() {
               ? multiShots.length === 0
                 ? '앞 · 옆 · 뒤 · 디테일 순서로 촬영하세요 (최대 4장)'
                 : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`
-              : '가운데 버튼을 눌러 사진을 찍으면 AI가 자동 분석합니다'}
+              : '사진을 찍으면 미리보기에서 확인하고 편집한 뒤 AI 분석을 시작합니다'}
           </Text>
 
           {error && (
@@ -913,6 +920,16 @@ export default function CameraScreen() {
           <Text style={styles.guideBtnText}>작업 순서 가이드 보기</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {previewCapture && (
+        <CapturePreviewModal
+          visible={!!previewCapture}
+          imageBase64={previewCapture.base64}
+          mimeType={previewCapture.mimeType}
+          onConfirm={handlePreviewConfirm}
+          onRetake={handlePreviewRetake}
+        />
+      )}
 
       <OnboardingModal
         visible={showOnboardingModal}
