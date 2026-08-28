@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, FileImage, Upload } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -42,6 +42,7 @@ import { AnalysisLoadingOverlay } from '@/components/AnalysisLoadingOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
+import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -513,311 +514,6 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.cameraWrapper}>
-        {isActive && !arMode && (
-          <GestureDetector gesture={pinchGesture}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing={facing}
-              flash={flash}
-              zoom={zoom}
-              onCameraReady={() => setCameraReady(true)}
-            />
-          </GestureDetector>
-        )}
-        {!arMode && (
-        <View style={styles.overlay} pointerEvents="none">
-          <View style={styles.frameCornerTL} />
-          <View style={styles.frameCornerTR} />
-          <View style={styles.frameCornerBL} />
-          <View style={styles.frameCornerBR} />
-          {gridVisible && (
-            <View style={styles.gridOverlay}>
-              <View style={styles.gridLineVerticalLeft} />
-              <View style={styles.gridLineVerticalRight} />
-              <View style={styles.gridLineHorizontalTop} />
-              <View style={styles.gridLineHorizontalBottom} />
-            </View>
-          )}
-        </View>
-        )}
-
-        {focusIndicator.visible && !arMode && (
-          <RNAnimated.View
-            pointerEvents="none"
-            style={[
-              styles.focusIndicator,
-              {
-                left: focusIndicator.x - 30,
-                top: focusIndicator.y - 30,
-                width: focusBoxSize,
-                height: focusBoxSize,
-                opacity: focusOpacity,
-              },
-            ]}
-          />
-        )}
-
-        {!arMode && (
-        <View style={styles.touchLayer} {...cameraPanResponder.panHandlers} pointerEvents={processing || stylePickerVisible ? 'none' : 'auto'} />
-        )}
-
-        {!arMode && (
-        <View style={styles.zoomIndicator} pointerEvents="none">
-          <Text style={styles.zoomIndicatorText}>{zoomLabel}</Text>
-        </View>
-        )}
-
-        {!arMode && !processing && !stylePickerVisible && !mediaPickerVisible && multiShots.length === 0 && (
-          <View style={[styles.stepIndicatorWrap, { top: safeTop + 64 }]} pointerEvents="box-none">
-            <StepIndicator activeStep={1} />
-          </View>
-        )}
-
-        {!arMode && (
-        <View style={[styles.topBar, { top: safeTop + 8 }]}>
-          <View style={styles.topBarLeft}>
-            <TouchableOpacity
-              style={[styles.topButton, gridVisible && styles.topButtonActive]}
-              onPress={() => setGridVisible((g) => !g)}
-              disabled={processing}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              <Grid3x3 size={20} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2.2} />
-              {gridVisible && <View style={styles.topBadgeDot} />}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.topButton}
-              onPress={() => setWorkflowGuideVisible(true)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              <LayoutTemplate size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.topBarRight}>
-            <TouchableOpacity
-              style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
-              onPress={() =>
-                setFlash((f) =>
-                  f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off',
-                )
-              }
-              disabled={processing}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              {flash === 'on' ? (
-                <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
-              ) : flash === 'auto' ? (
-                <View style={styles.flashAutoWrap}>
-                  <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
-                  <Text style={styles.flashAutoLabel}>A</Text>
-                </View>
-              ) : (
-                <ZapOff size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
-              )}
-              {flash !== 'off' && <View style={styles.topBadgeDot} />}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.topButton}
-              onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
-              disabled={processing}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            >
-              <RotateCcw size={20} color={theme.colors.dark.text} strokeWidth={2.2} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        )}
-
-      </View>
-
-      {!arMode && (
-      <View style={styles.bottomControls}>
-        <View style={styles.zoomBar}>
-          {ZOOM_LEVELS.map((level) => (
-            <TouchableOpacity
-              key={level.label}
-              style={[
-                styles.zoomButton,
-                zoom >= level.value - 0.01 && zoom <= level.value + 0.01 && styles.zoomButtonActive,
-              ]}
-              onPress={() => updateZoom(level.value)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.zoomButtonText,
-                  zoom >= level.value - 0.01 && zoom <= level.value + 0.01 && styles.zoomButtonTextActive,
-                ]}
-              >
-                {level.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.modeToggleContainer}>
-          <TouchableOpacity
-            style={[styles.modeButton, recognitionMode === 'single' && styles.modeButtonActive]}
-            onPress={() => {
-              setRecognitionMode('single');
-              setMultiShots([]);
-            }}
-            activeOpacity={0.7}
-          >
-            <ScanLine
-              size={14}
-              color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim}
-              strokeWidth={2.2}
-            />
-            <Text
-              style={[
-                styles.modeButtonText,
-                recognitionMode === 'single' && styles.modeButtonTextActive,
-              ]}
-            >
-              단품
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeButton, recognitionMode === 'multi' && styles.modeButtonActive]}
-            onPress={() => {
-              setRecognitionMode('multi');
-              setMultiShots([]);
-            }}
-            activeOpacity={0.7}
-          >
-            <Layers
-              size={14}
-              color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim}
-              strokeWidth={2.2}
-            />
-            <Text
-              style={[
-                styles.modeButtonText,
-                recognitionMode === 'multi' && styles.modeButtonTextActive,
-              ]}
-            >
-              다각도 (1~4장)
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.extraButtonsRow}>
-          <TouchableOpacity
-            style={[styles.pillButton, mediaPickerVisible && styles.pillButtonActive]}
-            onPress={() => { setMediaPickerVisible((v) => !v); setStylePickerVisible(false); }}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <ImageIcon size={12} color={mediaPickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
-            <Text style={[styles.pillButtonText, mediaPickerVisible && styles.pillButtonTextActive]}>갤러리</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.pillButton}
-            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
-            activeOpacity={0.8}
-          >
-            <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.pillButtonText}>AR</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.pillButton, stylePickerVisible && styles.pillButtonActive]}
-            onPress={() => { setStylePickerVisible((v) => !v); setMediaPickerVisible(false); }}
-            activeOpacity={0.7}
-          >
-            <Palette size={12} color={stylePickerVisible ? theme.colors.accent[400] : theme.colors.dark.text} strokeWidth={2} />
-            <Text style={[styles.pillButtonText, stylePickerVisible && styles.pillButtonTextActive]}>
-              {templateMode === 'auto' ? '자동' : STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.pillButton}
-            onPress={() => { handleTemplateOnly(); setMediaPickerVisible(false); setStylePickerVisible(false); }}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <Wand2 size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.pillButtonText}>편집</Text>
-          </TouchableOpacity>
-        </View>
-
-        {stylePickerVisible && (
-          <View style={styles.stylePickerPanel}>
-            <View style={styles.templateModeRow}>
-              <TouchableOpacity
-                style={[styles.templateModePill, templateMode === 'manual' && styles.templateModePillActive]}
-                onPress={() => handleTemplateModeChange('manual')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.templateModePillText, templateMode === 'manual' && styles.templateModePillTextActive]}>
-                  수동 선택
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.templateModePill, templateMode === 'auto' && styles.templateModePillActive]}
-                onPress={() => handleTemplateModeChange('auto')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.templateModePillText, templateMode === 'auto' && styles.templateModePillTextActive]}>
-                  자동 추천
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {templateMode === 'manual' ? (
-              <ScrollView style={styles.styleOptionScroll}>
-                {STYLE_PRESETS.map((preset) => (
-                  <TouchableOpacity
-                    key={preset.key}
-                    style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
-                    onPress={() => {
-                      handleStyleChange(preset.key);
-                      setStylePickerVisible(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.styleOptionTextWrap}>
-                      <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
-                        {preset.label}
-                      </Text>
-                      <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
-                    </View>
-                    {preferredStyle === preset.key && (
-                      <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.autoTemplateInfo}>
-                <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={1.5} />
-                <Text style={styles.autoTemplateTitle}>AI 자동 추천</Text>
-                <Text style={styles.autoTemplateDesc}>
-                  촬영 후 AI가 사진을 분석하여 가장 어울리는 템플릿 스타일을 자동으로 선택합니다.
-                </Text>
-                <TouchableOpacity
-                  style={styles.autoTemplateConfirmBtn}
-                  onPress={() => setStylePickerVisible(false)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.autoTemplateConfirmText}>확인</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
-      )}
-
       {arMode && (
         <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
           <ARComicCamera
@@ -828,14 +524,6 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {videoImportVisible && Platform.OS === 'web' && (
-        <VideoImportGenerator
-          affiliatePlatforms={[]}
-          shortUrl={''}
-          onClose={() => setVideoImportVisible(false)}
-        />
-      )}
-
       {videoImportVisible && Platform.OS !== 'web' && (
         <MobileVideoImport
           affiliatePlatforms={[]}
@@ -844,45 +532,216 @@ export default function CameraScreen() {
         />
       )}
 
-      {!arMode && error && (
-        <View style={styles.errorBannerInline} pointerEvents="none">
-          <Text style={styles.errorText}>{error}</Text>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[
+          styles.verticalScroll,
+          { paddingTop: safeTop + theme.spacing.sm, paddingBottom: theme.spacing.xxl + insets.bottom },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!arMode}
+      >
+        <View style={styles.verticalHeader}>
+          <Text style={styles.verticalTitle}>제품 촬영부터 공유까지</Text>
+          <Text style={styles.verticalSubtitle}>
+            아래 순서대로 따라 하시면 됩니다. 각 단계를 탭하여 진행하세요.
+          </Text>
         </View>
-      )}
 
-      {!arMode && recognitionMode === 'multi' && multiShots.length > 0 && (
-        <View style={styles.multiShotStripInline} pointerEvents="auto">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
-            {multiShots.map((shot, i) => (
-              <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
-                <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
-                <Text style={styles.multiShotBadge}>{i + 1}</Text>
+        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
+          <StepIndicator activeStep={1} />
+        </View>
+
+        <VerticalSectionCard
+          icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+          title="1. 사진 촬영"
+          desc="제품을 카메라에 맞추고 셔터 버튼을 눌러주세요."
+          iconBg={theme.colors.primary[500] + '18'}
+        >
+          <View style={styles.cameraPreviewWrap}>
+            {isActive && !arMode ? (
+              <GestureDetector gesture={pinchGesture}>
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.cameraPreview}
+                  facing={facing}
+                  flash={flash}
+                  zoom={zoom}
+                  onCameraReady={() => setCameraReady(true)}
+                />
+              </GestureDetector>
+            ) : (
+              <View style={[styles.cameraPreview, styles.cameraPlaceholder]}>
+                <Camera size={36} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+              </View>
+            )}
+
+            {!arMode && (
+              <View style={styles.cameraOverlay} pointerEvents="none">
+                <View style={styles.frameCornerTL} />
+                <View style={styles.frameCornerTR} />
+                <View style={styles.frameCornerBL} />
+                <View style={styles.frameCornerBR} />
+                {gridVisible && (
+                  <View style={styles.gridOverlaySmall}>
+                    <View style={styles.gridLineVerticalLeft} />
+                    <View style={styles.gridLineVerticalRight} />
+                    <View style={styles.gridLineHorizontalTop} />
+                    <View style={styles.gridLineHorizontalBottom} />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {focusIndicator.visible && !arMode && (
+              <RNAnimated.View
+                pointerEvents="none"
+                style={[
+                  styles.focusIndicator,
+                  {
+                    left: focusIndicator.x - 30,
+                    top: focusIndicator.y - 30,
+                    width: focusBoxSize,
+                    height: focusBoxSize,
+                    opacity: focusOpacity,
+                  },
+                ]}
+              />
+            )}
+
+            {!arMode && (
+              <View
+                style={styles.cameraTouchLayer}
+                {...cameraPanResponder.panHandlers}
+                pointerEvents={processing ? 'none' : 'auto'}
+              />
+            )}
+
+            {!arMode && (
+              <View style={styles.cameraTopControls}>
                 <TouchableOpacity
-                  style={styles.multiShotRemove}
-                  onPress={() => handleRemoveShot(i)}
+                  style={[styles.topButton, gridVisible && styles.topButtonActive]}
+                  onPress={() => setGridVisible((g) => !g)}
+                  disabled={processing}
                   activeOpacity={0.7}
                 >
-                  <X size={12} color="#fff" strokeWidth={3} />
+                  <Grid3x3 size={18} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2.2} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
+                  onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
+                  disabled={processing}
+                  activeOpacity={0.7}
+                >
+                  {flash === 'on' ? (
+                    <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                  ) : flash === 'auto' ? (
+                    <View style={styles.flashAutoWrap}>
+                      <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                      <Text style={styles.flashAutoLabel}>A</Text>
+                    </View>
+                  ) : (
+                    <ZapOff size={18} color={theme.colors.dark.text} strokeWidth={2.2} />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.topButton}
+                  onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+                  disabled={processing}
+                  activeOpacity={0.7}
+                >
+                  <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2.2} />
                 </TouchableOpacity>
               </View>
-            ))}
-          </ScrollView>
-          <TouchableOpacity
-            style={styles.analyzeMultiBtn}
-            onPress={handleAnalyzeMultiShot}
-            disabled={processing}
-            activeOpacity={0.8}
-          >
-            <Play size={16} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.analyzeMultiText}>
-              {multiShots.length}장 분석 시작
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            )}
 
-      {!arMode && (
-        <View style={[styles.bottomControlsWrap, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+            {!arMode && (
+              <View style={styles.cameraZoomBadge} pointerEvents="none">
+                <Text style={styles.zoomIndicatorText}>{zoomLabel}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.zoomBar}>
+            {ZOOM_LEVELS.map((level) => (
+              <TouchableOpacity
+                key={level.label}
+                style={[
+                  styles.zoomButton,
+                  zoom >= level.value - 0.01 && zoom <= level.value + 0.01 && styles.zoomButtonActive,
+                ]}
+                onPress={() => updateZoom(level.value)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.zoomButtonText,
+                    zoom >= level.value - 0.01 && zoom <= level.value + 0.01 && styles.zoomButtonTextActive,
+                  ]}
+                >
+                  {level.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.modeToggleContainer}>
+            <TouchableOpacity
+              style={[styles.modeButton, recognitionMode === 'single' && styles.modeButtonActive]}
+              onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
+              activeOpacity={0.7}
+            >
+              <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+              <Text style={[styles.modeButtonText, recognitionMode === 'single' && styles.modeButtonTextActive]}>단품</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, recognitionMode === 'multi' && styles.modeButtonActive]}
+              onPress={() => { setRecognitionMode('multi'); setMultiShots([]); }}
+              activeOpacity={0.7}
+            >
+              <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+              <Text style={[styles.modeButtonText, recognitionMode === 'multi' && styles.modeButtonTextActive]}>다각도 (1~4장)</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
+            <View style={styles.angleGuideInline}>
+              {[
+                { num: '1', label: '정면' },
+                { num: '2', label: '측면' },
+                { num: '3', label: '후면' },
+                { num: '4', label: '디테일' },
+              ].map((item) => (
+                <View key={item.num} style={styles.angleGuideItemInline}>
+                  <View style={styles.angleGuideCircleInline}>
+                    <Text style={styles.angleGuideNumInline}>{item.num}</Text>
+                  </View>
+                  <Text style={styles.angleGuideLabelInline}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {recognitionMode === 'multi' && multiShots.length > 0 && (
+            <View style={styles.multiShotStripInline}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiShotScroll}>
+                {multiShots.map((shot, i) => (
+                  <View key={`${shot.slice(0, 16)}-${i}`} style={styles.multiShotThumb}>
+                    <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
+                    <Text style={styles.multiShotBadge}>{i + 1}</Text>
+                    <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
+                      <X size={12} color="#fff" strokeWidth={3} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={styles.analyzeMultiBtn} onPress={handleAnalyzeMultiShot} disabled={processing} activeOpacity={0.8}>
+                <Play size={16} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.analyzeMultiText}>{multiShots.length}장 분석 시작</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.captureButton}
             onPress={handleCapture}
@@ -896,79 +755,164 @@ export default function CameraScreen() {
             </View>
           </TouchableOpacity>
 
-          {mediaPickerVisible && (
-            <View style={styles.mediaPickerPanel}>
-              <TouchableOpacity
-                style={styles.mediaPickerOption}
-                onPress={() => {
-                  setMediaPickerVisible(false);
-                  handlePickImage();
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.mediaPickerIcon, { backgroundColor: theme.colors.primary[500] + '20' }]}>
-                  <ImageIcon size={20} color={theme.colors.primary[400]} strokeWidth={2} />
-                </View>
-                <Text style={styles.mediaPickerLabel}>사진 선택</Text>
-                <Text style={styles.mediaPickerDesc}>갤러리에서 사진을 불러와 AI 분석</Text>
-              </TouchableOpacity>
+          <Text style={styles.captureHint}>
+            {recognitionMode === 'multi'
+              ? multiShots.length === 0
+                ? '앞 · 옆 · 뒤 · 디테일 순서로 촬영하세요 (최대 4장)'
+                : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`
+              : '가운데 버튼을 눌러 사진을 찍으면 AI가 자동 분석합니다'}
+          </Text>
 
-              <TouchableOpacity
-                style={styles.mediaPickerOption}
-                onPress={() => {
-                  setMediaPickerVisible(false);
-                  setVideoImportVisible(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.mediaPickerIcon, { backgroundColor: theme.colors.warning[500] + '20' }]}>
-                  <Film size={20} color={theme.colors.warning[400]} strokeWidth={2} />
-                </View>
-                <Text style={styles.mediaPickerLabel}>동영상 선택</Text>
-                <Text style={styles.mediaPickerDesc}>영상에서 숏폼 클립 생성</Text>
-              </TouchableOpacity>
+          {error && (
+            <View style={styles.errorBannerInline} pointerEvents="none">
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
+        </VerticalSectionCard>
 
-          <Text style={styles.hintText}>
-            {processing
-              ? progressText
-              : recognitionMode === 'single'
-                ? templateMode === 'auto'
-                  ? '단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: AI 자동 추천 — 촬영 후 가장 어울리는 스타일이 자동 적용됩니다'
-                  : `단품 모드: 한 개의 제품을 정밀하게 분석합니다\n템플릿: ${STYLE_PRESETS.find((s) => s.key === preferredStyle)?.label || '볼드'} — 촬영 후 이 스타일이 적용됩니다`
-                : multiShots.length === 0
-                  ? '다각도 모드: 앞·옆·뒤·디테일을 순서대로 촬영하세요 (최대 4장)'
-                  : `${multiShots.length}장 촬영 완료 — 더 찍거나 분석을 시작하세요`}
-          </Text>
-        </View>
-      )}
+        <VerticalSectionCard
+          icon={<ImageIcon size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          title="2. 갤러리에서 불러오기"
+          desc="촬영 대신 앨범에 있는 사진이나 영상을 사용할 수 있어요."
+          iconBg={theme.colors.accent[500] + '18'}
+        >
+          <View style={styles.verticalBtnRow}>
+            <TouchableOpacity
+              style={styles.verticalBtn}
+              onPress={handlePickImage}
+              disabled={processing}
+              activeOpacity={0.7}
+            >
+              <ImageIcon size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.verticalBtnText}>사진 선택</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.verticalBtn}
+              onPress={() => setVideoImportVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Film size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.verticalBtnText}>동영상 선택</Text>
+            </TouchableOpacity>
+          </View>
+        </VerticalSectionCard>
 
-      {!arMode && recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
-        <View style={styles.nativeAngleGuide} pointerEvents="none">
-          <View style={styles.nativeAngleTooltip}>
-            <Text style={styles.nativeAngleTooltipText}>
-              앞 · 옆 · 뒤 · 디테일 순서로 촬영하세요
-            </Text>
-            <View style={styles.nativeAngleTooltipArrow} />
+        <VerticalSectionCard
+          icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+          title="3. 템플릿 스타일 선택"
+          desc="AI 자동 추천 또는 원하는 스타일을 직접 골라보세요."
+          iconBg={theme.colors.warning[500] + '18'}
+        >
+          <View style={styles.templateModeRow}>
+            <TouchableOpacity
+              style={[styles.templateModePill, templateMode === 'manual' && styles.templateModePillActive]}
+              onPress={() => handleTemplateModeChange('manual')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.templateModePillText, templateMode === 'manual' && styles.templateModePillTextActive]}>
+                수동 선택
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.templateModePill, templateMode === 'auto' && styles.templateModePillActive]}
+              onPress={() => handleTemplateModeChange('auto')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.templateModePillText, templateMode === 'auto' && styles.templateModePillTextActive]}>
+                자동 추천
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.nativeAngleGuideRow}>
-            {[
-              { num: '1', label: '정면' },
-              { num: '2', label: '측면' },
-              { num: '3', label: '후면' },
-              { num: '4', label: '디테일' },
-            ].map((item) => (
-              <View key={item.num} style={styles.nativeAngleGuideItem}>
-                <View style={styles.nativeAngleGuideCircle}>
-                  <Text style={styles.nativeAngleGuideNum}>{item.num}</Text>
-                </View>
-                <Text style={styles.nativeAngleGuideLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+
+          {templateMode === 'manual' ? (
+            <View style={styles.styleListInline}>
+              {STYLE_PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
+                  onPress={() => handleStyleChange(preset.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.styleOptionTextWrap}>
+                    <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
+                      {preset.label}
+                    </Text>
+                    <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
+                  </View>
+                  {preferredStyle === preset.key && (
+                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.autoTemplateInfo}>
+              <Sparkles size={24} color={theme.colors.accent[400]} strokeWidth={1.5} />
+              <Text style={styles.autoTemplateDescSmall}>
+                AI가 사진을 분석하여 가장 어울리는 스타일을 자동으로 선택합니다.
+              </Text>
+            </View>
+          )}
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Wand2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
+          title="4. 편집만 하기 (AI 분석 생략)"
+          desc="분석 없이 사진만 업로드하고 직접 꾸미고 싶을 때 사용하세요."
+          iconBg={theme.colors.success[500] + '18'}
+        >
+          <TouchableOpacity
+            style={styles.verticalSingleBtn}
+            onPress={handleTemplateOnly}
+            disabled={processing}
+            activeOpacity={0.7}
+          >
+            <Wand2 size={18} color={theme.colors.success[400]} strokeWidth={2} />
+            <Text style={styles.verticalSingleBtnText}>템플릿만 만들기</Text>
+          </TouchableOpacity>
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Sparkles size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          title="5. AR 모드"
+          desc="실시간 AR 효과를 적용하며 촬영할 수 있어요."
+          iconBg={theme.colors.accent[500] + '18'}
+        >
+          <TouchableOpacity
+            style={styles.verticalSingleBtn}
+            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
+            activeOpacity={0.8}
+          >
+            <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.verticalSingleBtnText}>AR 촬영 시작</Text>
+          </TouchableOpacity>
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Share2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+          title="6. 플랫폼 업로드 및 공유"
+          desc="완성된 콘텐츠를 SNS, 블로그 등에 바로 공유하고 제휴 링크를 관리하세요."
+          iconBg={theme.colors.primary[500] + '18'}
+        >
+          <TouchableOpacity
+            style={styles.verticalSingleBtn}
+            onPress={() => router.push('/affiliate' as never)}
+            activeOpacity={0.7}
+          >
+            <Share2 size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.verticalSingleBtnText}>제휴 마케팅 / 공유하기</Text>
+          </TouchableOpacity>
+        </VerticalSectionCard>
+
+        <TouchableOpacity
+          style={styles.guideBtnInline}
+          onPress={() => setWorkflowGuideVisible(true)}
+          activeOpacity={0.7}
+        >
+          <LayoutTemplate size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          <Text style={styles.guideBtnText}>작업 순서 가이드 보기</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <OnboardingModal
         visible={showOnboardingModal}
@@ -977,8 +921,6 @@ export default function CameraScreen() {
           setShowOnboardingCapture(true);
         }}
       />
-
-
 
       <OnboardingTooltip
         visible={showOnboardingCapture}
@@ -2335,5 +2277,190 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  verticalScroll: {
+    paddingHorizontal: theme.spacing.lg,
+    gap: 0,
+  },
+  verticalHeader: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    gap: 4,
+  },
+  verticalTitle: {
+    fontSize: 22,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  verticalSubtitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: theme.spacing.md,
+  },
+  cameraPreviewWrap: {
+    width: '100%',
+    aspectRatio: 0.75,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative',
+    marginBottom: theme.spacing.sm,
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  cameraPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.dark.surface,
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraTouchLayer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
+  cameraTopControls: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  cameraZoomBadge: {
+    position: 'absolute',
+    bottom: 8,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(10, 15, 30, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: theme.radius.full,
+    zIndex: 8,
+  },
+  gridOverlaySmall: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  captureHint: {
+    textAlign: 'center',
+    color: theme.colors.dark.textDim,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.xs,
+    lineHeight: 17,
+  },
+  verticalBtnRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  verticalBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  verticalBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  verticalSingleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  verticalSingleBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  styleListInline: {
+    gap: 6,
+  },
+  autoTemplateDescSmall: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  angleGuideInline: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.sm,
+  },
+  angleGuideItemInline: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  angleGuideCircleInline: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.full,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '80',
+    backgroundColor: theme.colors.primary[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  angleGuideNumInline: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[300],
+  },
+  angleGuideLabelInline: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  guideBtnInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  guideBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
 });
