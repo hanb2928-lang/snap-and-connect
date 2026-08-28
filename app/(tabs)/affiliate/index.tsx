@@ -55,6 +55,7 @@ import { StepIndicator } from '@/components/StepIndicator';
 import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { UploadPreviewModal, type UploadPreviewData } from '@/components/UploadPreviewModal';
+import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -954,6 +955,10 @@ export default function AffiliateScreen() {
             <View style={styles.linkEmptyBox}>
               <Text style={styles.linkEmptyText}>2단계에서 제휴 링크를 먼저 입력해주세요</Text>
             </View>
+          )}
+
+          {affiliateUrl.trim() && (
+            <ShortLinkCopyBar url={affiliateUrl.trim()} label="제휴 단축 링크" />
           )}
 
           <Text style={styles.uploadHint}>

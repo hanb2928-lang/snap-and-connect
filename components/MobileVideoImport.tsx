@@ -29,6 +29,7 @@ import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from '@/lib/errors';
 import { COPY_FUNCTION_URL, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
+import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 
 interface MobileVideoImportProps {
   affiliatePlatforms?: string[];
@@ -472,6 +473,11 @@ export function MobileVideoImport({
                 ? '이미지가 서버에 저장되었습니다. 숏폼 가공(자막, 훅 문구, 공정위 문구 추가)은 웹 버전에서 지원됩니다.'
                 : '영상이 서버에 저장되었습니다. 숏폼 가공(자막, 훅 문구, 공정위 문구 추가)은 웹 버전에서 지원됩니다.'}
             </Text>
+            {shortUrl ? (
+              <View style={styles.shortLinkWrap}>
+                <ShortLinkCopyBar url={shortUrl} label="제휴 단축 링크" />
+              </View>
+            ) : null}
             {videoUri && (
               <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.8}>
                 <Play size={16} color="#fff" strokeWidth={2} />
@@ -852,6 +858,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: theme.spacing.md,
+  },
+  shortLinkWrap: {
+    width: '100%',
+    marginTop: theme.spacing.sm,
   },
   shareButton: {
     flexDirection: 'row',
