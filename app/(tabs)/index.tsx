@@ -1515,8 +1515,7 @@ const styles = StyleSheet.create({
   },
   stepIndicatorWrap: {
     position: 'absolute',
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
+    alignSelf: 'center',
     zIndex: 7,
   },
   zoomIndicatorText: {
