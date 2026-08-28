@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Camera,
   Palette,
@@ -14,6 +15,7 @@ interface WorkflowStep {
   desc: string;
   icon: React.ReactNode;
   color: string;
+  route: string;
 }
 
 const STEPS: WorkflowStep[] = [
@@ -23,6 +25,7 @@ const STEPS: WorkflowStep[] = [
     desc: '제품의 단품 또는 다각도(앞·옆·뒤) 사진을 촬영하거나 앨범에서 불러옵니다.',
     icon: <Camera size={22} color={theme.colors.primary[400]} strokeWidth={2} />,
     color: theme.colors.primary[500],
+    route: '/',
   },
   {
     num: '2',
@@ -30,6 +33,7 @@ const STEPS: WorkflowStep[] = [
     desc: '업로드한 사진을 AI가 자동으로 분석하고, 원하시는 마케팅 템플릿 스타일을 적용하거나 변경합니다.',
     icon: <Palette size={22} color={theme.colors.accent[400]} strokeWidth={2} />,
     color: theme.colors.accent[500],
+    route: '/',
   },
   {
     num: '3',
@@ -37,6 +41,7 @@ const STEPS: WorkflowStep[] = [
     desc: '추천된 템플릿을 바탕으로 문구, 상세페이지, 카드뉴스 디자인을 직접 수정하고 꾸밉니다.',
     icon: <LayoutTemplate size={22} color={theme.colors.warning[400]} strokeWidth={2} />,
     color: theme.colors.warning[500],
+    route: '/assets',
   },
   {
     num: '4',
@@ -44,6 +49,7 @@ const STEPS: WorkflowStep[] = [
     desc: '제휴 마케팅 링크를 삽입하고, 완성된 콘텐츠를 블로그나 SNS에 바로 내보내거나 관리합니다.',
     icon: <Share2 size={22} color={theme.colors.success[400]} strokeWidth={2} />,
     color: theme.colors.success[500],
+    route: '/affiliate',
   },
 ];
 
@@ -53,6 +59,16 @@ interface WorkflowGuideProps {
 }
 
 export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) {
+  const router = useRouter();
+
+  const handleStepPress = (index: number, route: string) => {
+    if (onStepPress) {
+      onStepPress(index + 1);
+    } else {
+      router.push(route as never);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>작업 순서 가이드</Text>
@@ -71,9 +87,8 @@ export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) 
               isActive && styles.stepCardActive,
               isDone && styles.stepCardDone,
             ]}
-            onPress={() => onStepPress?.(index + 1)}
+            onPress={() => handleStepPress(index, step.route)}
             activeOpacity={0.7}
-            disabled={!onStepPress}
           >
             <View style={styles.stepLeft}>
               <View
@@ -107,13 +122,11 @@ export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) 
               <Text style={styles.stepDesc}>{step.desc}</Text>
             </View>
 
-            {onStepPress && (
-              <ChevronRight
-                size={18}
-                color={theme.colors.dark.textDim}
-                strokeWidth={2}
-              />
-            )}
+            <ChevronRight
+              size={18}
+              color={theme.colors.dark.textDim}
+              strokeWidth={2}
+            />
           </TouchableOpacity>
         );
       })}

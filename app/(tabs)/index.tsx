@@ -1217,7 +1217,7 @@ function WebUploadScreen() {
         contentContainerStyle={{ paddingTop: safeTop + theme.spacing.xl, paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
+        <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
           <View style={styles.webHeroIcon}>
             <Camera size={44} color={theme.colors.primary[400]} strokeWidth={1.5} />
           </View>
@@ -1227,7 +1227,13 @@ function WebUploadScreen() {
           </Text>
         </View>
 
-        <WorkflowGuide />
+        <View style={styles.webGuideSection}>
+          <Text style={styles.webGuideHeading}>이렇게 진행하세요</Text>
+          <Text style={styles.webGuideSubheading}>
+            1번부터 4번까지 순서대로 따라 하시면 됩니다. 각 단계를 탭하면 해당 화면으로 이동합니다.
+          </Text>
+          <WorkflowGuide />
+        </View>
 
         <View style={styles.webModeRow}>
           <TouchableOpacity
@@ -2031,6 +2037,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: theme.spacing.lg,
+  },
+  webGuideSection: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  webGuideHeading: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  webGuideSubheading: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
   },
   webModeRow: {
     flexDirection: 'row',
