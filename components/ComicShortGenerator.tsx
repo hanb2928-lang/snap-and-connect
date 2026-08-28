@@ -1038,6 +1038,13 @@ export function ComicShortGenerator({
   const [moodTemplate, setMoodTemplate] = useState<MoodTemplate>('energetic-popart');
   const [panelLayout, setPanelLayout] = useState<PanelLayout>('single');
   const [comicDuration, setComicDuration] = useState<ComicDuration>(15000);
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => {
+      if (mounted && s?.default_video_duration) setComicDuration(Number(s.default_video_duration) as ComicDuration);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [resultUri, setResultUri] = useState<string | null>(null);
   const [resultMime, setResultMime] = useState<string>('video/webm');
   const [resultSize, setResultSize] = useState<number>(0);
@@ -1703,20 +1710,11 @@ export function ComicShortGenerator({
 
           {showAdvanced && (
             <View>
-              <Text style={styles.optionLabel}>영상 길이</Text>
-              <View style={styles.durationGroup}>
-                {[10000, 15000, 20000, 30000].map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.durationPill, comicDuration === d && styles.durationPillActive]}
-                    onPress={() => setComicDuration(d as ComicDuration)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationPillText, comicDuration === d && styles.durationPillTextActive]}>
-                      {d / 1000}초
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.durationInfoBox}>
+                <Clock size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.durationInfoText}>
+                  영상 길이: {comicDuration / 1000}초 (설정에서 변경)
+                </Text>
               </View>
 
               <Text style={styles.optionLabel}>무드 템플릿</Text>
@@ -2110,31 +2108,20 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
   },
-  durationGroup: {
+  durationInfoBox: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: 3,
-    gap: 2,
-    marginBottom: theme.spacing.md,
-  },
-  durationPill: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: theme.radius.sm,
     alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
   },
-  durationPillActive: {
-    backgroundColor: theme.colors.accent[500],
-  },
-  durationPillText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
+  durationInfoText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
-  },
-  durationPillTextActive: {
-    color: '#fff',
   },
   styleScroll: {
     flexDirection: 'row',

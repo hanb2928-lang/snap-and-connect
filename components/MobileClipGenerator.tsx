@@ -11,7 +11,7 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
+import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown, Clock } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
@@ -23,7 +23,7 @@ import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { getUserSettings } from '@/lib/settings';
-import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
+import { DEFAULT_DURATION, getRecommendedDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 
@@ -493,6 +493,13 @@ export function MobileClipGenerator({
   const [progress, setProgress] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const [duration, setDuration] = useState(DEFAULT_DURATION);
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => {
+      if (mounted && s?.default_video_duration) setDuration(Number(s.default_video_duration));
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
   const [format, setFormat] = useState<VideoFormat>(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
   const [cardStyle, setCardStyle] = useState<CardStyleKey>(PLATFORM_STYLE_MAP[platform] || 'bold');
   const [musicMood, setMusicMood] = useState<MusicMood>('none');
@@ -874,56 +881,11 @@ export function MobileClipGenerator({
                 </View>
               </View>
 
-              <View style={styles.durationSection}>
-                <View style={styles.durationHeaderRow}>
-                  <Text style={styles.optionLabel}>영상 길이</Text>
-                  <View style={styles.durationTierBadge}>
-                    <Text style={[styles.durationTierText, { color: tierColor(getTierForDuration(duration)) }]}>
-                      {tierLabel(getTierForDuration(duration))}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.durationPillGroup}>
-                  {(() => {
-                    const recDur = getRecommendedDuration(_category);
-                    return DURATION_PRESETS.map((preset) => {
-                    const active = duration === preset.value;
-                    const isRec = recDur.duration === preset.value;
-                    return (
-                      <TouchableOpacity
-                        key={preset.value}
-                        style={[
-                          styles.durationPill,
-                          active && styles.durationPillActive,
-                        ]}
-                        onPress={() => setDuration(preset.value)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.durationPillLabel,
-                            active && styles.durationPillLabelActive,
-                          ]}
-                        >
-                          {preset.label}
-                        </Text>
-                        {isRec && (
-                          <View style={styles.recDot} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                    });
-                  })()}
-                </View>
-                <Text style={styles.durationHint}>
-                  {DURATION_PRESETS.find((p) => p.value === duration)?.desc}
+              <View style={styles.durationInfoBox}>
+                <Clock size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.durationInfoText}>
+                  영상 길이: {duration / 1000}초 (설정에서 변경)
                 </Text>
-                <View style={styles.durationRecBox}>
-                  <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.durationRecText}>
-                    {(() => { const r = getRecommendedDuration(_category); return `이 카테고리 추천: ${r.duration / 1000}초 · ${r.reason}`; })()}
-                  </Text>
-                </View>
               </View>
 
               <View style={styles.optionRow}>
@@ -1159,82 +1121,20 @@ const styles = StyleSheet.create({
   togglePillSubActive: {
     color: 'rgba(255,255,255,0.7)',
   },
-  durationSection: {
-    marginBottom: theme.spacing.md,
-  },
-  durationHeaderRow: {
+  durationInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  durationTierBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  durationTierText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.bold,
-  },
-  durationPillGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: 3,
-    gap: 2,
-  },
-  durationPill: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.sm,
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  durationPillActive: {
-    backgroundColor: theme.colors.warning[500],
-  },
-  durationPillLabel: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  durationPillLabelActive: {
-    color: '#fff',
-  },
-  recDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: theme.colors.warning[400],
-  },
-  durationHint: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    marginTop: 6,
-    marginBottom: 8,
-  },
-  durationRecBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 6,
-    backgroundColor: theme.colors.warning[500] + '0D',
-    borderRadius: theme.radius.sm,
+    marginBottom: theme.spacing.md,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.warning[400] + '20',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
   },
-  durationRecText: {
-    flex: 1,
+  durationInfoText: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
-    lineHeight: 16,
   },
   styleScroll: {
     flexDirection: 'row',
