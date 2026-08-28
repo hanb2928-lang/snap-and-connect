@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, FileImage, Upload } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, FileImage, Upload, Lightbulb, Sun, Aperture } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -726,6 +726,28 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Pro Tip: shooting conditions */}
+          <View style={styles.proTipCard}>
+            <View style={styles.proTipHeader}>
+              <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.proTipTitle}>촬영 꿀팁 — AI 정밀도 UP</Text>
+            </View>
+            <View style={styles.proTipItems}>
+              <View style={styles.proTipItem}>
+                <Sun size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.proTipText}>밝고 부드러운 조명 아래에서 촬영</Text>
+              </View>
+              <View style={styles.proTipItem}>
+                <Aperture size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.proTipText}>단색(흰/베이지) 배경 사용 — 그림자 최소화</Text>
+              </View>
+              <View style={styles.proTipItem}>
+                <Camera size={12} color={theme.colors.primary[400]} strokeWidth={2} />
+                <Text style={styles.proTipText}>카메라를 제품에 수직으로 정면 대면 — 왜곡 방지</Text>
+              </View>
+            </View>
+          </View>
+
           {recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
             <View style={styles.angleGuideInline}>
               {[
@@ -741,6 +763,25 @@ export default function CameraScreen() {
                   <Text style={styles.angleGuideLabelInline}>{item.label}</Text>
                 </View>
               ))}
+            </View>
+          )}
+
+          {recognitionMode === 'multi' && multiShots.length > 0 && (
+            <View style={styles.multiAngleProgressInline}>
+              <View style={styles.multiAngleProgressBar}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.multiAngleProgressDot,
+                      i < multiShots.length && styles.multiAngleProgressDotFilled,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.multiAngleProgressText}>
+                {multiShots.length}/4 컷 완료 — 입체적 질감과 형태를 AI가 더 정밀하게 학습합니다
+              </Text>
             </View>
           )}
 
@@ -1266,6 +1307,28 @@ function WebUploadScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Pro Tip: shooting conditions (web) */}
+        <View style={styles.proTipCardWeb}>
+          <View style={styles.proTipHeader}>
+            <Lightbulb size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.proTipTitle}>촬영 꿀팁 — AI 정밀도 UP</Text>
+          </View>
+          <View style={styles.proTipItems}>
+            <View style={styles.proTipItem}>
+              <Sun size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.proTipText}>밝고 부드러운 조명 아래에서 촬영하세요</Text>
+            </View>
+            <View style={styles.proTipItem}>
+              <Aperture size={13} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.proTipText}>단색(흰/베이지) 배경에서 그림자 없이 찍으세요</Text>
+            </View>
+            <View style={styles.proTipItem}>
+              <Camera size={13} color={theme.colors.primary[400]} strokeWidth={2} />
+              <Text style={styles.proTipText}>카메라를 제품에 수직으로 대면 왜곡을 방지하세요</Text>
+            </View>
+          </View>
+        </View>
+
         {recognitionMode === 'multi' && multiShots.length === 0 && (
           <View style={styles.angleGuideBox}>
             <Text style={styles.angleGuideTitle}>촬영 가이드</Text>
@@ -1297,6 +1360,25 @@ function WebUploadScreen() {
             </View>
             <Text style={styles.angleGuideDesc}>
               같은 제품을 앞·옆·뒤에서 2~4장 촬영하면 더 정확하게 분석합니다.
+            </Text>
+          </View>
+        )}
+
+        {recognitionMode === 'multi' && multiShots.length > 0 && (
+          <View style={styles.multiAngleProgressWeb}>
+            <View style={styles.multiAngleProgressBar}>
+              {[0, 1, 2, 3].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.multiAngleProgressDot,
+                    i < multiShots.length && styles.multiAngleProgressDotFilled,
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={styles.multiAngleProgressText}>
+              {multiShots.length}/4 컷 완료 — 입체적 질감과 형태를 AI가 더 정밀하게 학습합니다
             </Text>
           </View>
         )}
@@ -2409,6 +2491,87 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     marginTop: theme.spacing.xs,
     lineHeight: 17,
+  },
+  proTipCard: {
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  proTipCardWeb: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  proTipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  proTipTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  proTipItems: {
+    gap: 6,
+  },
+  proTipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  proTipText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
+  },
+  multiAngleProgressInline: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 2,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+  },
+  multiAngleProgressWeb: {
+    width: '100%',
+    maxWidth: 440,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 2,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+  },
+  multiAngleProgressBar: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+  },
+  multiAngleProgressDot: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.dark.border,
+  },
+  multiAngleProgressDotFilled: {
+    backgroundColor: theme.colors.primary[400],
+  },
+  multiAngleProgressText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[300],
+    lineHeight: 16,
   },
   verticalBtnRow: {
     flexDirection: 'row',
