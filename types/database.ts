@@ -125,6 +125,25 @@ export interface UserSettings {
   brand_persona: string | null;
 }
 
+export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';
+
+export interface TemplateRegistryEntry {
+  id: string;
+  category: string;
+  platform: string;
+  hook_duration_sec: number;
+  pacing_seconds: number;
+  card_style: CardStyleKey;
+  accent_color: string;
+  bgm_mood: string;
+  sfx_triggers: string[];
+  caption_preset: string;
+  hook_template: string | null;
+  hashtag_templates: string[];
+  transition_type: string;
+  is_default: boolean;
+}
+
 export interface SavedAsset {
   id: string;
   scan_id: string | null;

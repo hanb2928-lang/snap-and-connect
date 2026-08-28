@@ -15,6 +15,8 @@ import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loa
 import { VideoPreview } from '@/components/VideoPreview';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
@@ -496,6 +498,13 @@ export function MobileClipGenerator({
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const lastAppliedKey = useRef<string | null>(null);
+  const tpl = useHybridTemplate(
+    { category: _category, platform: platform as string, productName: title, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: accentColor, fallbackCardStyle: PLATFORM_STYLE_MAP[platform] || 'bold' },
+    accentColor,
+    PLATFORM_STYLE_MAP[platform] || 'bold',
+    'none',
+  );
+  const renderAccentColor = tpl.effectiveAccentColor;
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const [videoSize, setVideoSize] = useState<number>(0);
   const [cloudSaving, setCloudSaving] = useState(false);
@@ -528,6 +537,13 @@ export function MobileClipGenerator({
     setFormat(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
     lastAppliedKey.current = null;
   }, [platform]);
+
+  useEffect(() => {
+    if (!tpl.result || !tpl.result.matched) return;
+    if (lastAppliedKey.current) return;
+    setCardStyle(tpl.effectiveCardStyle as CardStyleKey);
+    setMusicMood(tpl.effectiveBgmMood as MusicMood);
+  }, [tpl.result]);
 
   useEffect(() => {
     if (!recommendedStyle || !styleAppliedKey) return;
@@ -701,7 +717,7 @@ export function MobileClipGenerator({
     hook,
     title,
     hashtags,
-    accentColor,
+    accentColor: renderAccentColor,
     affiliatePlatforms,
     shortUrl,
     duration,
@@ -737,6 +753,7 @@ export function MobileClipGenerator({
 
       {state === 'idle' && (
         <View>
+          <TemplateBadge label={tpl.badgeLabel} />
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>

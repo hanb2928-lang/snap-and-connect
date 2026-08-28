@@ -6,6 +6,8 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 
 interface VideoImportGeneratorProps {
   affiliatePlatforms?: string[];
@@ -107,6 +109,12 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tpl = useHybridTemplate(
+    { category: null, platform: 'shorts', fallbackHook: '', fallbackHashtags: [], fallbackAccentColor: theme.colors.primary[400], fallbackCardStyle: 'bold' },
+    theme.colors.primary[400],
+    'bold',
+    'upbeat',
+  );
 
   const urlsRef = useRef({ videoUrl, originalVideoUrl, outputUrl });
   urlsRef.current = { videoUrl, originalVideoUrl, outputUrl };
@@ -651,6 +659,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
         {state === 'idle' && (
           <View style={styles.idleWrap}>
+            <TemplateBadge label={tpl.badgeLabel} />
             <View style={styles.typeSelectorRow}>
               <TouchableOpacity
                 style={[styles.typePill, importType === 'video' && styles.typePillActive]}

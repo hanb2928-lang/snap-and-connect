@@ -27,6 +27,8 @@ import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import type { PunchMarker } from '@/hooks/useSoundPunch';
 import { safeFetch } from '@/lib/apiClient';
 import type { PlatformKey, LocalStoreInfo } from '@/types/database';
@@ -1055,6 +1057,12 @@ export function ComicShortGenerator({
   const [mbtiMode, setMbtiMode] = useState(true);
   const [emotionOverlay, setEmotionOverlay] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const tpl = useHybridTemplate(
+    { category: productCategory, platform: 'shorts', productName, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
+    theme.colors.accent[400],
+    'bold',
+    'upbeat',
+  );
   const [mbtiCommentary, setMbtiCommentary] = useState<MbtiCommentary[]>([]);
   const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
@@ -1671,6 +1679,7 @@ export function ComicShortGenerator({
 
       {state === 'idle' && (
         <View>
+          <TemplateBadge label={tpl.badgeLabel} />
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>

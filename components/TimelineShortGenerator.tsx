@@ -20,6 +20,8 @@ import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { friendlyError } from '@/lib/errors';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import type { PlatformKey } from '@/types/database';
 
 interface TimelineShortGeneratorProps {
@@ -295,6 +297,12 @@ function WebTimelineGenerator({
   const [cloudSaving, setCloudSaving] = useState(false);
   const [videoMime, setVideoMime] = useState('video/webm');
   const rafRef = useRef<number | null>(null);
+  const tpl = useHybridTemplate(
+    { category: null, platform: platform as string, productName: title, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: accentColor, fallbackCardStyle: 'bold' },
+    accentColor,
+    'bold',
+    'upbeat',
+  );
 
   const duration = mode === '30s' ? 30000 : 60000;
   const phases = mode === '30s' ? TIMELINE_30S : TIMELINE_60S;
@@ -607,6 +615,7 @@ function WebTimelineGenerator({
 
       {state === 'idle' && (
         <View>
+          <TemplateBadge label={tpl.badgeLabel} />
           {/* Mode selector */}
           <View style={styles.modeSelector}>
             {(Object.keys(modeConfig) as TimelineMode[]).map((key) => {

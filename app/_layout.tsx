@@ -14,6 +14,7 @@ import {
 import { activateKeepAwakeAsync } from 'expo-keep-awake';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { initStorage } from '@/lib/storage';
+import { preloadTemplates } from '@/lib/templateRegistry';
 import { theme } from '@/lib/theme';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -54,6 +55,7 @@ export default function RootLayout() {
     (async () => {
       try {
         await initStorage();
+        preloadTemplates().catch(() => {});
         if (fontError && !fontsLoaded) {
           setReady('error');
         } else {

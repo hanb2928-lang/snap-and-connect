@@ -16,6 +16,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { TemplateCard } from '@/components/TemplateCard';
 import type { StickerPosition } from '@/components/TemplateCard';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import type { DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -71,6 +73,12 @@ export function CarouselGenerator({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoUrlRef = useRef<string | null>(null);
   videoUrlRef.current = videoUrl;
+  const tpl = useHybridTemplate(
+    { category: detectedProducts[0]?.productCategory, platform: platform as string, productName: detectedProducts[0]?.productName, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
+    theme.colors.accent[400],
+    'bold',
+    'upbeat',
+  );
 
   useEffect(() => {
     return () => {
@@ -387,7 +395,9 @@ export function CarouselGenerator({
       </View>
 
       {exportState === 'idle' && (
-        <TouchableOpacity
+        <View>
+          <TemplateBadge label={tpl.badgeLabel} />
+          <TouchableOpacity
           style={styles.generateButton}
           onPress={handleGenerateVideo}
           activeOpacity={0.8}
@@ -395,6 +405,7 @@ export function CarouselGenerator({
           <Film size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.generateButtonText}>20초 동영상 만들기</Text>
         </TouchableOpacity>
+        </View>
       )}
 
       {(exportState === 'capturing' || exportState === 'generating') && (

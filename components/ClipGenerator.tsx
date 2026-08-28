@@ -9,6 +9,8 @@ import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
+import { TemplateBadge } from '@/components/TemplateBadge';
+import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
@@ -414,6 +416,13 @@ function WebClipGenerator({
   const [motionPreset, setMotionPreset] = useState<MotionPreset>('kenburns');
   const [hybridMode, setHybridMode] = useState<HybridMode>('off');
   const lastAppliedKey = useRef<string | null>(null);
+  const tpl = useHybridTemplate(
+    { category, platform: platform as string, productName: title, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: accentColor, fallbackCardStyle: PLATFORM_STYLE_MAP[platform] || 'bold' },
+    accentColor,
+    PLATFORM_STYLE_MAP[platform] || 'bold',
+    'upbeat',
+  );
+  const renderAccentColor = tpl.effectiveAccentColor;
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [livePreviewPlaying, setLivePreviewPlaying] = useState(false);
@@ -453,6 +462,13 @@ function WebClipGenerator({
     setFormat(PLATFORM_FORMAT_DEFAULT[platform] || 'vertical');
     lastAppliedKey.current = null;
   }, [platform]);
+
+  useEffect(() => {
+    if (!tpl.result || !tpl.result.matched) return;
+    if (lastAppliedKey.current) return;
+    setCardStyle(tpl.effectiveCardStyle as CardStyleKey);
+    setMusicMood(tpl.effectiveBgmMood as MusicMood);
+  }, [tpl.result]);
 
   useEffect(() => {
     if (!recommendedStyle || !styleAppliedKey) return;
@@ -751,6 +767,7 @@ function WebClipGenerator({
   const generateClip = useCallback(async () => {
     setState('generating');
     setProgress(0);
+    const accentColor = renderAccentColor;
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
       setVideoUrl(null);
@@ -1173,6 +1190,7 @@ function WebClipGenerator({
 
       {state === 'idle' && (
         <View>
+          <TemplateBadge label={tpl.badgeLabel} />
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>
