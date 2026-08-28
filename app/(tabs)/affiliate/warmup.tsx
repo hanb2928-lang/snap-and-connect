@@ -316,7 +316,7 @@ export default function WarmupScreen() {
               onPress={() => setShowCreateModal(true)}
               activeOpacity={0.7}
             >
-              <Plus size={14} color={theme.colors.primary[400]} strokeWidth={2.5} />
+              <Plus size={14} color={theme.colors.primary[400]} strokeWidth={2} />
               <Text style={styles.addChipText}>추가</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -439,11 +439,11 @@ export default function WarmupScreen() {
                         >
                           {isDone ? (
                             <View style={[styles.taskCheckCircle, { backgroundColor: theme.colors.success[400] }]}>
-                              <Check size={12} color="#fff" strokeWidth={3} />
+                              <Check size={12} color="#fff" strokeWidth={2} />
                             </View>
                           ) : isSkipped ? (
                             <View style={[styles.taskCheckCircle, { backgroundColor: theme.colors.dark.border }]}>
-                              <X size={10} color={theme.colors.dark.textFaint} strokeWidth={3} />
+                              <X size={10} color={theme.colors.dark.textFaint} strokeWidth={2} />
                             </View>
                           ) : (
                             <Circle size={20} color={theme.colors.dark.border} strokeWidth={2} />
@@ -509,7 +509,7 @@ export default function WarmupScreen() {
               onPress={() => setShowCreateModal(true)}
               activeOpacity={0.8}
             >
-              <Plus size={18} color="#fff" strokeWidth={2.5} />
+              <Plus size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.createButtonText}>웜업 스케줄 만들기</Text>
             </TouchableOpacity>
           </View>

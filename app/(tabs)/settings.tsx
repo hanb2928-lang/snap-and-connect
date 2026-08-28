@@ -278,7 +278,7 @@ export default function SettingsScreen() {
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>
                 <View style={[styles.planRadio, isSelected && { borderColor: plan.accentColor, backgroundColor: plan.accentColor }]}>
-                  {isSelected && <Check size={14} color="#fff" strokeWidth={3} />}
+                  {isSelected && <Check size={14} color="#fff" strokeWidth={2} />}
                 </View>
               </View>
               <View style={styles.planPriceRow}>
@@ -289,7 +289,7 @@ export default function SettingsScreen() {
               <View style={styles.planFeatureList}>
                 {plan.features.map((feat, i) => (
                   <View key={i} style={styles.planFeatureRow}>
-                    <Check size={14} color={plan.accentColor} strokeWidth={2.5} />
+                    <Check size={14} color={plan.accentColor} strokeWidth={2} />
                     <Text style={styles.planFeatureText}>{feat}</Text>
                   </View>
                 ))}
@@ -466,7 +466,7 @@ export default function SettingsScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : savedIds ? (
             <>
-              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Check size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.saveIdButtonText}>저장됨</Text>
             </>
           ) : (
@@ -536,7 +536,7 @@ export default function SettingsScreen() {
           onPress={() => setRevModalVisible(true)}
           activeOpacity={0.8}
         >
-          <Plus size={18} color="#fff" strokeWidth={2.5} />
+          <Plus size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.addRevenueButtonText}>수익 추가 기록</Text>
         </TouchableOpacity>
 
@@ -774,7 +774,7 @@ export default function SettingsScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : savedDefaults ? (
             <>
-              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Check size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.saveIdButtonText}>저장됨</Text>
             </>
           ) : (
@@ -925,7 +925,7 @@ export default function SettingsScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : savedPersona ? (
             <>
-              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Check size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.saveIdButtonText}>저장됨</Text>
             </>
           ) : (
@@ -1010,7 +1010,7 @@ export default function SettingsScreen() {
             <ActivityIndicator size="small" color="#fff" />
           ) : savedKey ? (
             <>
-              <Check size={18} color="#fff" strokeWidth={2.5} />
+              <Check size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.saveIdButtonText}>저장됨</Text>
             </>
           ) : (

@@ -14,7 +14,7 @@ import {
   Crop as CropIcon,
   RotateCcw,
   Eye,
-  Sparkles,
+  ScanSearch,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { buildDataUrl } from '@/lib/base64';
@@ -104,7 +104,7 @@ export function CapturePreviewModal({
           </View>
 
           <TouchableOpacity style={styles.primaryBtn} onPress={handleConfirm} activeOpacity={0.85}>
-            <Sparkles size={20} color="#fff" strokeWidth={2} />
+            <ScanSearch size={20} color="#fff" strokeWidth={2} />
             <Text style={styles.primaryBtnText}>AI 분석 시작하기</Text>
           </TouchableOpacity>
         </View>

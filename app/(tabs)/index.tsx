@@ -647,7 +647,7 @@ export default function CameraScreen() {
                   disabled={processing}
                   activeOpacity={0.7}
                 >
-                  <Grid3x3 size={18} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2.2} />
+                  <Grid3x3 size={18} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
@@ -656,14 +656,14 @@ export default function CameraScreen() {
                   activeOpacity={0.7}
                 >
                   {flash === 'on' ? (
-                    <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                    <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
                   ) : flash === 'auto' ? (
                     <View style={styles.flashAutoWrap}>
-                      <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                      <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2} />
                       <Text style={styles.flashAutoLabel}>A</Text>
                     </View>
                   ) : (
-                    <ZapOff size={18} color={theme.colors.dark.text} strokeWidth={2.2} />
+                    <ZapOff size={18} color={theme.colors.dark.text} strokeWidth={2} />
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -672,7 +672,7 @@ export default function CameraScreen() {
                   disabled={processing}
                   activeOpacity={0.7}
                 >
-                  <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2.2} />
+                  <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
             )}
@@ -713,7 +713,7 @@ export default function CameraScreen() {
               onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
               activeOpacity={0.7}
             >
-              <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+              <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeButtonText, recognitionMode === 'single' && styles.modeButtonTextActive]}>단품</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -721,7 +721,7 @@ export default function CameraScreen() {
               onPress={() => { setRecognitionMode('multi'); setMultiShots([]); }}
               activeOpacity={0.7}
             >
-              <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+              <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeButtonText, recognitionMode === 'multi' && styles.modeButtonTextActive]}>다각도 (1~4장)</Text>
             </TouchableOpacity>
           </View>
@@ -752,13 +752,13 @@ export default function CameraScreen() {
                     <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
                     <Text style={styles.multiShotBadge}>{i + 1}</Text>
                     <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
-                      <X size={12} color="#fff" strokeWidth={3} />
+                      <X size={12} color="#fff" strokeWidth={2.5} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
               <TouchableOpacity style={styles.analyzeMultiBtn} onPress={handleAnalyzeMultiShot} disabled={processing} activeOpacity={0.8}>
-                <Play size={16} color="#fff" strokeWidth={2.5} />
+                <Play size={16} color="#fff" strokeWidth={2} />
                 <Text style={styles.analyzeMultiText}>{multiShots.length}장 분석 시작</Text>
               </TouchableOpacity>
             </View>
@@ -772,7 +772,7 @@ export default function CameraScreen() {
           >
             <View style={styles.captureButtonRing}>
               <View style={styles.captureButtonInner}>
-                <Camera size={32} color="#fff" strokeWidth={2.5} />
+                <Camera size={32} color="#fff" strokeWidth={2} />
               </View>
             </View>
           </TouchableOpacity>
@@ -866,14 +866,14 @@ export default function CameraScreen() {
                     <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
                   </View>
                   {preferredStyle === preset.key && (
-                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2} />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
             <View style={styles.autoTemplateInfo}>
-              <Sparkles size={24} color={theme.colors.accent[400]} strokeWidth={1.5} />
+              <Sparkles size={24} color={theme.colors.accent[400]} strokeWidth={2} />
               <Text style={styles.autoTemplateDescSmall}>
                 AI가 사진을 분석하여 가장 어울리는 스타일을 자동으로 선택합니다.
               </Text>
@@ -1309,13 +1309,13 @@ function WebUploadScreen() {
                   <Image source={{ uri: `data:image/jpeg;base64,${shot}` }} style={styles.multiShotImage} />
                   <Text style={styles.multiShotBadge}>{i + 1}</Text>
                   <TouchableOpacity style={styles.multiShotRemove} onPress={() => handleRemoveShot(i)} activeOpacity={0.7}>
-                    <X size={12} color="#fff" strokeWidth={3} />
+                    <X size={12} color="#fff" strokeWidth={2.5} />
                   </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>
             <TouchableOpacity style={styles.analyzeMultiBtn} onPress={handleAnalyzeMultiShot} disabled={processing} activeOpacity={0.8}>
-              <Play size={16} color="#fff" strokeWidth={2.5} />
+              <Play size={16} color="#fff" strokeWidth={2} />
               <Text style={styles.analyzeMultiText}>{multiShots.length}장 분석 시작</Text>
             </TouchableOpacity>
           </View>
@@ -1574,6 +1574,7 @@ const styles = StyleSheet.create({
   modeButtonActive: {
     backgroundColor: theme.colors.primary[600],
     borderColor: theme.colors.primary[600],
+    ...theme.shadows.glowPrimary,
   },
   modeButtonText: {
     fontSize: theme.typography.caption,
@@ -1766,6 +1767,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
     justifyContent: 'center',
     alignItems: 'center',
+    ...theme.shadows.glowPrimary,
   },
   captureButtonRing: {
     width: 76,

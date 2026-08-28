@@ -153,7 +153,7 @@ export default function LinksScreen() {
           onPress={() => setShowAdd(true)}
           activeOpacity={0.7}
         >
-          <Plus size={18} color={theme.colors.primary[400]} strokeWidth={2.5} />
+          <Plus size={18} color={theme.colors.primary[400]} strokeWidth={2} />
           <Text style={styles.addButtonText}>새 링크 추가</Text>
         </TouchableOpacity>
 

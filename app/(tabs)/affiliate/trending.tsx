@@ -337,9 +337,9 @@ export default function TrendingScreen() {
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
         <View style={[styles.headerIconWrap, { backgroundColor: viewMode === 'products' ? productPmColor : theme.colors.accent[500] }]}>
           {viewMode === 'products' ? (
-            <productPm.icon size={22} color="#fff" strokeWidth={2.5} />
+            <productPm.icon size={22} color="#fff" strokeWidth={2} />
           ) : (
-            <Lightbulb size={22} color="#fff" strokeWidth={2.5} />
+            <Lightbulb size={22} color="#fff" strokeWidth={2} />
           )}
         </View>
         <View style={styles.headerText}>
@@ -400,7 +400,7 @@ export default function TrendingScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.productPlatformIconWrap, isActive && { backgroundColor: pm.color }]}>
-                    <Icon size={12} color={isActive ? '#fff' : pm.color} strokeWidth={2.5} />
+                    <Icon size={12} color={isActive ? '#fff' : pm.color} strokeWidth={2} />
                   </View>
                   <Text
                     style={[
@@ -591,7 +591,7 @@ export default function TrendingScreen() {
                       activeOpacity={0.7}
                     >
                       <View style={[styles.keywordPlatformIconWrap, isActive && { backgroundColor: color }]}>
-                        <Icon size={12} color={isActive ? '#fff' : color} strokeWidth={2.5} />
+                        <Icon size={12} color={isActive ? '#fff' : color} strokeWidth={2} />
                       </View>
                       <Text
                         style={[
@@ -650,7 +650,7 @@ export default function TrendingScreen() {
                             <Text style={styles.keywordCategoryText}>{item.category}</Text>
                           </View>
                           <View style={styles.trendRow}>
-                            <TrendIcon size={12} color={trendInfo.color} strokeWidth={2.5} />
+                            <TrendIcon size={12} color={trendInfo.color} strokeWidth={2} />
                             {item.changeRate && (
                               <Text style={[styles.trendText, { color: trendInfo.color }]}>{item.changeRate}</Text>
                             )}
@@ -741,7 +741,7 @@ export default function TrendingScreen() {
                         activeOpacity={0.7}
                       >
                         {isCopied ? (
-                          <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+                          <Check size={13} color={theme.colors.success[400]} strokeWidth={2} />
                         ) : (
                           <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
                         )}
@@ -816,6 +816,7 @@ const styles = StyleSheet.create({
   viewModeToggleActive: {
     backgroundColor: theme.colors.accent[500],
     borderColor: theme.colors.accent[500],
+    ...theme.shadows.glowAccent,
   },
   viewModeToggleText: {
     fontSize: theme.typography.caption,

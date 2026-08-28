@@ -407,7 +407,7 @@ export default function AffiliateScreen() {
                 >
                   <Icon size={14} color={p.color} strokeWidth={2} />
                   <Text style={[styles.platformChipText, isActive && { color: p.color }]}>{p.label.split(' ')[0]}</Text>
-                  {configured && <Check size={10} color={theme.colors.success[400]} strokeWidth={3} />}
+                  {configured && <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />}
                 </TouchableOpacity>
               );
             })}
@@ -430,7 +430,7 @@ export default function AffiliateScreen() {
               onPress={() => setShowAddPlatform(true)}
               activeOpacity={0.7}
             >
-              <Plus size={14} color={theme.colors.dark.textDim} strokeWidth={2.5} />
+              <Plus size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={styles.platformAddChipText}>직접 추가</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -475,7 +475,7 @@ export default function AffiliateScreen() {
                 activeOpacity={0.7}
                 disabled={!newPlatformName.trim() || !newPlatformUrl.trim()}
               >
-                <Check size={16} color="#fff" strokeWidth={2.5} />
+                <Check size={16} color="#fff" strokeWidth={2} />
                 <Text style={styles.addPlatformConfirmBtnText}>추가하기</Text>
               </TouchableOpacity>
             </View>
@@ -500,7 +500,7 @@ export default function AffiliateScreen() {
               activeOpacity={0.7}
               disabled={!affiliateUrl.trim()}
             >
-              <Check size={16} color="#fff" strokeWidth={2.5} />
+              <Check size={16} color="#fff" strokeWidth={2} />
               <Text style={styles.affiliateSaveBtnText}>링크 저장</Text>
             </TouchableOpacity>
 
@@ -574,7 +574,7 @@ export default function AffiliateScreen() {
               activeOpacity={0.7}
               disabled={!contentText.trim()}
             >
-              <Check size={16} color="#fff" strokeWidth={2.5} />
+              <Check size={16} color="#fff" strokeWidth={2} />
               <Text style={styles.contentSaveBtnText}>소재 저장</Text>
             </TouchableOpacity>
 
@@ -675,7 +675,7 @@ export default function AffiliateScreen() {
                   <Text style={styles.uploadLabel}>{p.label}</Text>
                   {isUploaded ? (
                     <View style={styles.uploadDoneBadge}>
-                      <Check size={10} color="#fff" strokeWidth={3} />
+                      <Check size={10} color="#fff" strokeWidth={2.5} />
                       <Text style={styles.uploadDoneText}>완료</Text>
                     </View>
                   ) : (
@@ -688,7 +688,7 @@ export default function AffiliateScreen() {
 
           {uploadPlatform && (
             <View style={styles.uploadSuccessBox}>
-              <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Check size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <Text style={styles.uploadSuccessText}>
                 {UPLOAD_PLATFORMS.find((p) => p.key === uploadPlatform)?.label}에 업로드가 완료되었습니다. 제휴 링크를 통해 수익이 발생하면 '분석' 탭에서 확인할 수 있습니다.
               </Text>
@@ -788,7 +788,7 @@ export default function AffiliateScreen() {
                 onPress={handleConfirmPreview}
                 activeOpacity={0.85}
               >
-                <Check size={18} color="#fff" strokeWidth={2.5} />
+                <Check size={18} color="#fff" strokeWidth={2} />
                 <Text style={styles.modalConfirmBtnText}>확인 완료</Text>
               </TouchableOpacity>
             </View>
@@ -830,7 +830,7 @@ function PlatformListSection({
                 <Text style={styles.platformLabel}>{p.label}</Text>
                 {configured ? (
                   <View style={styles.configuredBadge}>
-                    <Check size={10} color="#fff" strokeWidth={3} />
+                    <Check size={10} color="#fff" strokeWidth={2.5} />
                     <Text style={styles.configuredBadgeText}>설정됨</Text>
                   </View>
                 ) : (

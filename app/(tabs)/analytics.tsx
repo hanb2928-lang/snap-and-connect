@@ -131,28 +131,28 @@ export default function AnalyticsScreen() {
       <View style={styles.heroRow}>
         <View style={styles.heroCard}>
           <View style={[styles.heroIconWrap, { backgroundColor: theme.colors.primary[400] + '20' }]}>
-            <Target size={16} color={theme.colors.primary[400]} strokeWidth={2.5} />
+            <Target size={16} color={theme.colors.primary[400]} strokeWidth={2} />
           </View>
           <Text style={styles.heroLabel}>분석</Text>
           <Text style={styles.heroValue}>{d.totalScans.toLocaleString()}</Text>
         </View>
         <View style={styles.heroCard}>
           <View style={[styles.heroIconWrap, { backgroundColor: theme.colors.accent[400] + '20' }]}>
-            <ImageIcon size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+            <ImageIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />
           </View>
           <Text style={styles.heroLabel}>콘텐츠</Text>
           <Text style={styles.heroValue}>{d.totalAssets.toLocaleString()}</Text>
         </View>
         <View style={styles.heroCard}>
           <View style={[styles.heroIconWrap, { backgroundColor: theme.colors.warning[400] + '20' }]}>
-            <MousePointerClick size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
+            <MousePointerClick size={16} color={theme.colors.warning[400]} strokeWidth={2} />
           </View>
           <Text style={styles.heroLabel}>클릭</Text>
           <Text style={styles.heroValue}>{d.totalClicks.toLocaleString()}</Text>
         </View>
         <View style={styles.heroCard}>
           <View style={[styles.heroIconWrap, { backgroundColor: theme.colors.success[400] + '20' }]}>
-            <DollarSign size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <DollarSign size={16} color={theme.colors.success[400]} strokeWidth={2} />
           </View>
           <Text style={styles.heroLabel}>수익</Text>
           <Text style={styles.heroValueSm}>{d.totalRevenue > 0 ? formatKRW(d.totalRevenue) : '—'}</Text>
@@ -194,7 +194,7 @@ export default function AnalyticsScreen() {
                   <View key={stage.key} style={styles.funnelRow}>
                     <View style={styles.funnelLeft}>
                       <View style={[styles.funnelIcon, { backgroundColor: stage.color + '20' }]}>
-                        <Icon size={14} color={stage.color} strokeWidth={2.5} />
+                        <Icon size={14} color={stage.color} strokeWidth={2} />
                       </View>
                       <View style={styles.funnelInfo}>
                         <Text style={styles.funnelLabel}>{stage.label}</Text>
@@ -208,7 +208,7 @@ export default function AnalyticsScreen() {
                       <Text style={styles.funnelPct}>{pct.toFixed(0)}%</Text>
                       {i > 0 && dropOff > 0 && (
                         <View style={styles.funnelDropOff}>
-                          <TrendingDown size={9} color={theme.colors.error[400]} strokeWidth={2.5} />
+                          <TrendingDown size={9} color={theme.colors.error[400]} strokeWidth={2} />
                           <Text style={styles.funnelDropText}>{dropOff.toFixed(0)}% 이탈</Text>
                         </View>
                       )}
@@ -457,6 +457,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
+    ...theme.shadows.glowPrimary,
   },
   heroLabel: {
     fontSize: 10,
