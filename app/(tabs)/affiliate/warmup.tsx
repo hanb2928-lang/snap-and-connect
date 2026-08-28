@@ -47,6 +47,8 @@ import {
   type WarmupPlatform,
 } from '@/types/warmup';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
+import { friendlyError } from '@/lib/errors';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 
@@ -82,6 +84,7 @@ export default function WarmupScreen() {
   const safeTop = useSafeTop();
   const [schedules, setSchedules] = useState<WarmupScheduleWithTasks[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
@@ -105,6 +108,8 @@ export default function WarmupScreen() {
   selectedScheduleIdRef.current = selectedScheduleId;
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchActiveSchedules();
       setSchedules(data);
@@ -115,8 +120,9 @@ export default function WarmupScreen() {
       } else if (data.length === 0) {
         setSelectedScheduleId(null);
       }
-    } catch {
+    } catch (err) {
       setSchedules([]);
+      setLoadError(friendlyError(err, '육성 스케줄을 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -250,6 +256,22 @@ export default function WarmupScreen() {
 
   if (loading) {
     return <LoadingScreen message="육성 스케줄을 불러오는 중..." />;
+  }
+
+  if (loadError && schedules.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
+          <Text style={styles.headerTitle}>계정 육성</Text>
+          <Text style={styles.headerSubtext}>
+            주기적인 업로드와 자연스러운 반응으로 계정 기초 체력을 키웁니다
+          </Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <ErrorRetryBanner message={loadError} onRetry={loadData} />
+        </View>
+      </View>
+    );
   }
 
   return (

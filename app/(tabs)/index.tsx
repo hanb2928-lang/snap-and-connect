@@ -59,6 +59,7 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
+  const isMountedRef = useRef(true);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [flash, setFlash] = useState<'on' | 'off' | 'auto'>('off');
@@ -116,8 +117,10 @@ export default function CameraScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      isMountedRef.current = true;
       setIsActive(true);
       return () => {
+        isMountedRef.current = false;
         setIsActive(false);
         setCameraReady(false);
       };
@@ -206,6 +209,7 @@ export default function CameraScreen() {
       }
       const cleanB64 = cleanBase64(photo.base64);
       const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1280, 0.7);
+      if (!isMountedRef.current) return;
       const compressedB64 = cleanBase64(compressedDataUrl);
       const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
 
@@ -224,6 +228,7 @@ export default function CameraScreen() {
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
     }
@@ -285,9 +290,10 @@ export default function CameraScreen() {
       setMultiShots([]);
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(friendlyError(err, '다각도 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
-      setProcessing(false);
+      if (isMountedRef.current) setProcessing(false);
     }
   };
 
@@ -336,6 +342,8 @@ export default function CameraScreen() {
         selectionLimit: 4,
       });
 
+      if (!isMountedRef.current) return;
+
       if (result.canceled || !result.assets?.[0]?.uri) {
         return;
       }
@@ -345,6 +353,7 @@ export default function CameraScreen() {
         for (const a of result.assets) {
           if (!a.uri) continue;
           const { base64 } = await compressImageToBase64(a.uri, 1280, 0.7);
+          if (!isMountedRef.current) return;
           newShots.push(base64);
           if (newShots.length >= 4 - multiShots.length) break;
         }
@@ -361,9 +370,11 @@ export default function CameraScreen() {
         return;
       }
       const { base64: compressedB64, mimeType: compressedMime } = await compressImageToBase64(asset.uri, 1280, 0.7);
+      if (!isMountedRef.current) return;
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
     }
@@ -420,9 +431,10 @@ export default function CameraScreen() {
 
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(friendlyError(err, '이미지를 불러오지 못했습니다. 다시 시도해주세요.'));
     } finally {
-      setProcessing(false);
+      if (isMountedRef.current) setProcessing(false);
     }
   };
 
@@ -467,9 +479,10 @@ export default function CameraScreen() {
 
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
+      if (!isMountedRef.current) return;
       setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
-      setProcessing(false);
+      if (isMountedRef.current) setProcessing(false);
     }
   };
 

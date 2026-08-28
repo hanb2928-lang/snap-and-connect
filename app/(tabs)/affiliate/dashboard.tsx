@@ -11,20 +11,26 @@ import { theme } from '@/lib/theme';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { fetchDashboardSummary, type DashboardSummary } from '@/lib/affiliateDashboard';
+import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
+import { friendlyError } from '@/lib/errors';
 
 export default function DashboardScreen() {
   const tabBarHeight = useSubTabBarHeight();
   const safeTop = useSafeTop();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchDashboardSummary();
       setSummary(data);
-    } catch {
+    } catch (err) {
       setSummary(null);
+      setLoadError(friendlyError(err, '성과 데이터를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -69,6 +75,8 @@ export default function DashboardScreen() {
             <BarChart3 size={48} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
             <Text style={styles.loadingText}>데이터를 불러오는 중...</Text>
           </View>
+        ) : loadError ? (
+          <ErrorRetryBanner message={loadError} onRetry={load} />
         ) : !summary ? (
           <View style={styles.loadingState}>
             <BarChart3 size={48} color={theme.colors.dark.textFaint} strokeWidth={1.5} />

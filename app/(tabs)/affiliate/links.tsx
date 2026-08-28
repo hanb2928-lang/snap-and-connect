@@ -29,6 +29,8 @@ import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { fetchLinkBookmarks, addLinkBookmark, deleteLinkBookmark } from '@/lib/linkBookmarks';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
+import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
+import { friendlyError } from '@/lib/errors';
 import type { LinkBookmark } from '@/types/database';
 
 const PLATFORM_OPTIONS = [
@@ -43,6 +45,7 @@ export default function LinksScreen() {
   const safeTop = useSafeTop();
   const [bookmarks, setBookmarks] = useState<LinkBookmark[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showQR, setShowQR] = useState<LinkBookmark | null>(null);
@@ -54,10 +57,13 @@ export default function LinksScreen() {
   const [platform, setPlatform] = useState<string>('Coupang');
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchLinkBookmarks();
       setBookmarks(data);
-    } catch {
+    } catch (err) {
+      setLoadError(friendlyError(err, '링크 목록을 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'));
       setBookmarks([]);
     } finally {
       setLoading(false);
@@ -139,6 +145,9 @@ export default function LinksScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary[400]} />
         }
       >
+        {loadError && (
+          <ErrorRetryBanner message={loadError} onRetry={load} retrying={loading} />
+        )}
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowAdd(true)}

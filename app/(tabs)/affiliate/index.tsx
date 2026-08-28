@@ -12,39 +12,7 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import {
-  ShoppingBag,
-  Send,
-  Globe,
-  ShoppingBasket,
-  Hop as Home,
-  Ticket,
-  TreePalm as Palmtree,
-  Store,
-  ExternalLink,
-  Settings as SettingsIcon,
-  ChevronRight,
-  TrendingUp,
-  Link2,
-  Copy,
-  Check,
-  Camera,
-  Image as ImageIcon,
-  Film,
-  Sparkles,
-  Eye,
-  Edit3,
-  Upload,
-  FileText,
-  Hash,
-  Type,
-  ChevronDown,
-  ChevronUp,
-  Wand as Wand2,
-  Loader,
-  Plus,
-  X,
-} from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, ChevronRight, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, Eye, CreditCard as Edit3, Upload, FileText, Hash, Type, ChevronDown, ChevronUp, Wand as Wand2, Loader, Plus, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -53,6 +21,7 @@ import { fetchRevenueRecords } from '@/lib/revenue';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
+import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { StepIndicator } from '@/components/StepIndicator';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
@@ -107,6 +76,7 @@ export default function AffiliateScreen() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [revenue, setRevenue] = useState<RevenueRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
   // Step state
@@ -138,12 +108,14 @@ export default function AffiliateScreen() {
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const [s, r] = await Promise.all([getUserSettings(), fetchRevenueRecords(10)]);
       setSettings(s);
       setRevenue(r);
-    } catch {
-      // ignore
+    } catch (err) {
+      setLoadError(friendlyError(err, '제휴 마케팅 데이터를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.'));
     } finally {
       setLoading(false);
     }
@@ -325,6 +297,9 @@ export default function AffiliateScreen() {
         contentContainerStyle={{ paddingBottom: tabBarHeight + 40 }}
         showsVerticalScrollIndicator={false}
       >
+        {loadError && (
+          <ErrorRetryBanner message={loadError} onRetry={loadData} retrying={loading} />
+        )}
         {/* Revenue summary */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryLeft}>

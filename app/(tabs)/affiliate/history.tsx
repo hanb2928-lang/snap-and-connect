@@ -19,6 +19,7 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
 import { SkeletonList } from '@/components/Skeleton';
+import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 
 type ScanListItem = Pick<Scan, 'id' | 'image_url' | 'title' | 'summary' | 'product_name' | 'product_category' | 'price_estimate' | 'one_liner' | 'tags' | 'created_at'>;
 
@@ -136,9 +137,11 @@ export default function HistoryScreen() {
       </View>
 
       {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+        <ErrorRetryBanner
+          message={error}
+          onRetry={() => { setError(null); fetchScans(true); }}
+          retrying={refreshing}
+        />
       )}
 
       {usingCache && !error && (
