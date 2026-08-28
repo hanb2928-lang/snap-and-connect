@@ -11,7 +11,7 @@ import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
-import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
+import { drawRoamingBabyWithLink, preloadBabyImage } from '@/lib/canvasOverlay';
 import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
@@ -777,6 +777,7 @@ function WebClipGenerator({
       if (!imageUrl) {
         throw new Error('이미지가 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요');
       }
+      await preloadBabyImage().catch(() => {});
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const L = getLayout(format);
       const canvas = document.createElement('canvas');

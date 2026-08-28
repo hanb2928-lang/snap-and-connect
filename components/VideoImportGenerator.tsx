@@ -4,7 +4,7 @@ import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as Aler
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
-import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
+import { drawRoamingBabyWithLink, preloadBabyImage } from '@/lib/canvasOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
@@ -354,6 +354,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     }
 
     try {
+      await preloadBabyImage().catch(() => {});
       const { width: W, height: H } = FORMATS[format];
       const canvas = document.createElement('canvas');
       canvas.width = W;

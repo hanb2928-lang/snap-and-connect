@@ -2,10 +2,40 @@
  * Canvas overlay utilities for drawing baby character and link sticker
  * directly into video frames during canvas recording.
  *
- * These functions are used by the web canvas-based video generators to
- * ensure the baby character and purchase link are permanently composited
- * into the output video file (not just DOM overlays).
+ * The baby character is now rendered from a realistic 3D image asset
+ * instead of vector drawing.
  */
+
+const BABY_IMAGE_SRC = '/baby-crawl.webp';
+
+let babyImageCache: HTMLImageElement | null = null;
+let babyLoadPromise: Promise<HTMLImageElement> | null = null;
+
+export function getBabyImageUrl(): string {
+  return BABY_IMAGE_SRC;
+}
+
+export async function preloadBabyImage(): Promise<HTMLImageElement> {
+  if (babyImageCache && babyImageCache.complete) return babyImageCache;
+  if (babyLoadPromise) return babyLoadPromise;
+
+  babyLoadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      babyImageCache = img;
+      resolve(img);
+    };
+    img.onerror = () => reject(new Error('baby image load failed'));
+    img.src = BABY_IMAGE_SRC;
+  });
+
+  return babyLoadPromise;
+}
+
+export function getBabyImageSync(): HTMLImageElement | null {
+  return babyImageCache && babyImageCache.complete ? babyImageCache : null;
+}
 
 export interface BabyOverlayState {
   x: number;
@@ -25,10 +55,6 @@ export interface LinkStickerStyle {
   paddingV: number;
 }
 
-/**
- * Compute roaming baby position based on time progression.
- * The baby moves in a smooth pseudo-random path across the frame.
- */
 export function computeBabyPosition(
   elapsed: number,
   canvasW: number,
@@ -54,145 +80,37 @@ export function computeBabyPosition(
   return { x, y: y + bob, scale, crawlPhase, alpha: 1 };
 }
 
+const BABY_NATIVE_SIZE = 128;
+
 /**
- * Draw a crawling baby character at the given position on a 2D canvas context.
- * Matches the visual style of the CrawlingBaby React component.
+ * Draw the baby image at the given position on a 2D canvas context.
+ * Falls back to a simple circle if the image hasn't loaded yet.
  */
 export function drawBabyOnCanvas(
   ctx: any,
   cx: number,
   cy: number,
   scale: number,
-  crawlPhase: number,
-  color: string,
+  _crawlPhase: number,
+  _color: string,
 ) {
+  const img = getBabyImageSync();
+  const size = BABY_NATIVE_SIZE * scale * 0.5;
+
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const bob = Math.sin(crawlPhase * Math.PI * 2) * 1.5;
-  const armL = Math.sin(crawlPhase * Math.PI * 2) * 4;
-  const armR = -armL;
-  const legL = -armL;
-  const legR = armL;
-  const headBob = Math.sin(crawlPhase * Math.PI * 2 + 0.3) * 0.8;
-
-  const skinLight = '#FFE4D0';
-  const skinBase = '#F4C4A8';
-  const skinShadow = '#E0A884';
-  const cheekColor = '#FF9999';
-  const hairColor = '#8B5E3C';
-  const hairHighlight = '#B07A4F';
-
-  // Head shadow on body
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(24, 26 + bob, 7, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Body — filled onesie with gradient
-  const bodyGrad = ctx.createRadialGradient(24, 28 + bob, 2, 24, 32 + bob, 14);
-  bodyGrad.addColorStop(0, '#FFFFFF');
-  bodyGrad.addColorStop(0.5, color);
-  bodyGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.ellipse(24, 30 + bob, 13, 6.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Arms — filled with skin tone
-  ctx.strokeStyle = skinBase;
-  ctx.lineWidth = 3.2;
-  ctx.beginPath();
-  ctx.moveTo(14, 28 + bob);
-  ctx.quadraticCurveTo(10 + armL, 23 - armL, 12 + armL, 18 - armL);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(34, 28 + bob);
-  ctx.quadraticCurveTo(38 + armR, 23 - armR, 36 + armR, 18 - armR);
-  ctx.stroke();
-
-  // Tiny hands
-  ctx.fillStyle = skinBase;
-  ctx.beginPath(); ctx.arc(12 + armL, 18 - armL, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(36 + armR, 18 - armR, 2, 0, Math.PI * 2); ctx.fill();
-
-  // Legs — filled skin tone
-  ctx.strokeStyle = skinBase;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(20, 35 + bob);
-  ctx.quadraticCurveTo(17 + legL, 40 + legL, 15 + legL, 44 + legL);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(28, 35 + bob);
-  ctx.quadraticCurveTo(31 + legR, 40 + legR, 33 + legR, 44 + legR);
-  ctx.stroke();
-
-  // Tiny feet
-  ctx.fillStyle = skinShadow;
-  ctx.beginPath(); ctx.ellipse(15 + legL, 44 + legL, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(33 + legR, 44 + legR, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-
-  // Head — 3D sphere with radial gradient
-  const headGrad = ctx.createRadialGradient(21, 11 + headBob, 1, 24, 14 + headBob, 8);
-  headGrad.addColorStop(0, skinLight);
-  headGrad.addColorStop(0.6, skinBase);
-  headGrad.addColorStop(1, skinShadow);
-  ctx.fillStyle = headGrad;
-  ctx.beginPath();
-  ctx.arc(24, 14 + headBob, 7.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = skinShadow;
-  ctx.lineWidth = 0.6;
-  ctx.stroke();
-
-  // Hair — soft tuft
-  const hairGrad = ctx.createLinearGradient(16, 6, 32, 12);
-  hairGrad.addColorStop(0, hairHighlight);
-  hairGrad.addColorStop(1, hairColor);
-  ctx.fillStyle = hairGrad;
-  ctx.beginPath();
-  ctx.moveTo(16, 11 + headBob);
-  ctx.quadraticCurveTo(18, 5 + headBob, 24, 5.5 + headBob);
-  ctx.quadraticCurveTo(30, 5 + headBob, 32, 11 + headBob);
-  ctx.quadraticCurveTo(28, 8 + headBob, 24, 8.5 + headBob);
-  ctx.quadraticCurveTo(20, 8 + headBob, 16, 11 + headBob);
-  ctx.closePath();
-  ctx.fill();
-
-  // Cheeks — soft blush
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = cheekColor;
-  ctx.beginPath(); ctx.arc(19, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(29, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Eyes — dark dots with highlight
-  ctx.fillStyle = '#2D2D2D';
-  ctx.beginPath(); ctx.arc(21, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(27, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath(); ctx.arc(21.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(27.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
-
-  // Smile
-  ctx.strokeStyle = '#C47070';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(21, 16 + headBob);
-  ctx.quadraticCurveTo(24, 18.5 + headBob, 27, 16 + headBob);
-  ctx.stroke();
-
+  if (img) {
+    ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+  } else {
+    ctx.fillStyle = '#F4C4A8';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
 /**
- * Draw a baby badge: white circle with baby inside, matching RoamingBabyOverlay style.
+ * Draw a baby badge: white circle with baby image inside.
  */
 export function drawBabyBadge(
   ctx: any,
@@ -211,13 +129,13 @@ export function drawBabyBadge(
   ctx.lineWidth = 2 * scale;
   ctx.stroke();
 
-  drawBabyOnCanvas(ctx, cx - 24 * scale, cy - 24 * scale, scale * 0.7, crawlPhase, color);
+  const badgeSize = 36 * scale;
+  drawBabyOnCanvas(ctx, cx - badgeSize / 2, cy - badgeSize / 2 - 4 * scale, scale * 0.55, crawlPhase, color);
   ctx.restore();
 }
 
 /**
- * Draw a link sticker pill: baby circle + "구매하기" label + arrow,
- * matching the RoamingBabyOverlay DOM component visual style.
+ * Draw a link sticker pill: baby image + "구매하기" label + arrow.
  */
 export function drawLinkSticker(
   ctx: any,
@@ -232,7 +150,6 @@ export function drawLinkSticker(
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // Shadow
   ctx.shadowColor = 'rgba(0,0,0,0.18)';
   ctx.shadowBlur = 8;
   ctx.shadowOffsetY = 2;
@@ -251,7 +168,6 @@ export function drawLinkSticker(
   const stickerW = padH + iconR * 2 + gap + textW + gap + arrowW + padH;
   const stickerH = padV * 2 + Math.max(iconR * 2, labelFS);
 
-  // Pill background (with fallback for browsers without roundRect)
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.beginPath();
   if (typeof ctx.roundRect === 'function') {
@@ -270,7 +186,6 @@ export function drawLinkSticker(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  // Baby circle inside
   const circleCx = x + padH + iconR;
   const circleCy = y + stickerH / 2;
   ctx.fillStyle = 'rgba(47,157,255,0.08)';
@@ -278,22 +193,20 @@ export function drawLinkSticker(
   ctx.arc(circleCx, circleCy, iconR, 0, Math.PI * 2);
   ctx.fill();
 
-  drawBabyOnCanvas(ctx, circleCx - 12 * scale, circleCy - 12 * scale, scale * 0.38, crawlPhase, color);
+  const babySize = iconR * 1.5;
+  drawBabyOnCanvas(ctx, circleCx - babySize / 2, circleCy - babySize / 2, scale * 0.38, crawlPhase, color);
 
-  // Label text
   const textX = x + padH + iconR * 2 + gap;
   ctx.fillStyle = '#1267e8';
   ctx.font = `600 ${labelFS}px sans-serif`;
   ctx.textBaseline = 'middle';
   ctx.fillText(label, textX, y + stickerH / 2);
 
-  // Arrow
   ctx.fillStyle = '#1267e8';
   ctx.font = `700 ${arrowFS}px sans-serif`;
   ctx.fillText('\u2192', textX + textW + gap, y + stickerH / 2);
   ctx.textBaseline = 'alphabetic';
 
-  // Pulse dot
   const pulseScale = 1 + Math.sin(pulseT * Math.PI * 2) * 0.3;
   const pulseAlpha = 0.4 + Math.sin(pulseT * Math.PI * 2) * 0.4;
   ctx.globalAlpha = alpha * Math.max(0.2, pulseAlpha);
@@ -309,9 +222,6 @@ export function drawLinkSticker(
   ctx.restore();
 }
 
-/**
- * Draw the short URL text below the link sticker.
- */
 export function drawShortUrlText(
   ctx: any,
   x: number,
@@ -330,10 +240,6 @@ export function drawShortUrlText(
   ctx.restore();
 }
 
-/**
- * Full roaming baby + link sticker overlay for a video frame.
- * Call this at the end of each frame draw, just before the recorder captures.
- */
 export function drawRoamingBabyWithLink(
   ctx: any,
   elapsed: number,
@@ -347,20 +253,25 @@ export function drawRoamingBabyWithLink(
   const baby = computeBabyPosition(elapsed, canvasW, canvasH, canvasW, canvasH);
   const pulseT = (elapsed / 1000) * 0.7;
 
-  // Draw link sticker
   drawLinkSticker(ctx, baby.x, baby.y, baby.scale, baby.crawlPhase, color, baby.alpha, pulseT);
-
-  // Draw short URL text below
   drawShortUrlText(ctx, baby.x, baby.y + 50 * baby.scale, shortUrl, baby.alpha);
 }
 
 /**
- * Returns a JS string body that can be embedded in a WebView <script> to draw
- * the roaming baby + link overlay. This avoids duplicating the drawing logic
- * for the WebView-based mobile generators.
+ * Returns a JS string body for WebView-based generators.
+ * The baby image is loaded from the provided URL (babyImgUrl).
  */
-export function getWebViewOverlayScript(): string {
+export function getWebViewOverlayScript(babyImgUrl: string = '/baby-crawl.webp'): string {
   return `
+  var __babyImg = null;
+  (function() {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() { __babyImg = img; };
+    img.onerror = function() { __babyImg = null; };
+    img.src = '${babyImgUrl}';
+  })();
+
   function __computeBabyPosition(elapsed, W, H) {
     var t = elapsed / 1000;
     var padding = 40;
@@ -376,86 +287,16 @@ export function getWebViewOverlayScript(): string {
     return { x: x, y: y + bob, scale: scale, crawlPhase: crawlPhase, alpha: 1 };
   }
 
-  function __drawBabyOnCanvas(ctx, cx, cy, scale, crawlPhase, color) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(scale, scale);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    var bob = Math.sin(crawlPhase * Math.PI * 2) * 1.5;
-    var armL = Math.sin(crawlPhase * Math.PI * 2) * 4;
-    var armR = -armL;
-    var legL = -armL;
-    var legR = armL;
-    var headBob = Math.sin(crawlPhase * Math.PI * 2 + 0.3) * 0.8;
-    var skinLight = '#FFE4D0';
-    var skinBase = '#F4C4A8';
-    var skinShadow = '#E0A884';
-    var cheekColor = '#FF9999';
-    var hairColor = '#8B5E3C';
-    var hairHighlight = '#B07A4F';
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(24, 26 + bob, 7, 2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-    var bodyGrad = ctx.createRadialGradient(24, 28 + bob, 2, 24, 32 + bob, 14);
-    bodyGrad.addColorStop(0, '#FFFFFF');
-    bodyGrad.addColorStop(0.5, color);
-    bodyGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath(); ctx.ellipse(24, 30 + bob, 13, 6.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = skinBase;
-    ctx.lineWidth = 3.2;
-    ctx.beginPath(); ctx.moveTo(14, 28 + bob);
-    ctx.quadraticCurveTo(10 + armL, 23 - armL, 12 + armL, 18 - armL); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(34, 28 + bob);
-    ctx.quadraticCurveTo(38 + armR, 23 - armR, 36 + armR, 18 - armR); ctx.stroke();
-    ctx.fillStyle = skinBase;
-    ctx.beginPath(); ctx.arc(12 + armL, 18 - armL, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(36 + armR, 18 - armR, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = skinBase;
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(20, 35 + bob);
-    ctx.quadraticCurveTo(17 + legL, 40 + legL, 15 + legL, 44 + legL); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(28, 35 + bob);
-    ctx.quadraticCurveTo(31 + legR, 40 + legR, 33 + legR, 44 + legR); ctx.stroke();
-    ctx.fillStyle = skinShadow;
-    ctx.beginPath(); ctx.ellipse(15 + legL, 44 + legL, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(33 + legR, 44 + legR, 2.2, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-    var headGrad = ctx.createRadialGradient(21, 11 + headBob, 1, 24, 14 + headBob, 8);
-    headGrad.addColorStop(0, skinLight);
-    headGrad.addColorStop(0.6, skinBase);
-    headGrad.addColorStop(1, skinShadow);
-    ctx.fillStyle = headGrad;
-    ctx.beginPath(); ctx.arc(24, 14 + headBob, 7.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = skinShadow;
-    ctx.lineWidth = 0.6; ctx.stroke();
-    var hairGrad = ctx.createLinearGradient(16, 6, 32, 12);
-    hairGrad.addColorStop(0, hairHighlight);
-    hairGrad.addColorStop(1, hairColor);
-    ctx.fillStyle = hairGrad;
-    ctx.beginPath(); ctx.moveTo(16, 11 + headBob);
-    ctx.quadraticCurveTo(18, 5 + headBob, 24, 5.5 + headBob);
-    ctx.quadraticCurveTo(30, 5 + headBob, 32, 11 + headBob);
-    ctx.quadraticCurveTo(28, 8 + headBob, 24, 8.5 + headBob);
-    ctx.quadraticCurveTo(20, 8 + headBob, 16, 11 + headBob);
-    ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = cheekColor;
-    ctx.beginPath(); ctx.arc(19, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(29, 16 + headBob, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#2D2D2D';
-    ctx.beginPath(); ctx.arc(21, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(27, 13.5 + headBob, 1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.arc(21.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(27.3, 13.2 + headBob, 0.35, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#C47070';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(21, 16 + headBob);
-    ctx.quadraticCurveTo(24, 18.5 + headBob, 27, 16 + headBob); ctx.stroke();
-    ctx.restore();
+  function __drawBabyOnCanvas(ctx, cx, cy, scale) {
+    if (__babyImg && __babyImg.complete) {
+      var size = 64 * scale;
+      ctx.drawImage(__babyImg, cx - size / 2, cy - size / 2, size, size);
+    } else {
+      ctx.fillStyle = '#F4C4A8';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 12 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function __drawLinkSticker(ctx, x, y, scale, crawlPhase, color, alpha, pulseT) {
@@ -494,7 +335,8 @@ export function getWebViewOverlayScript(): string {
     var circleCy = y + stickerH / 2;
     ctx.fillStyle = 'rgba(47,157,255,0.08)';
     ctx.beginPath(); ctx.arc(circleCx, circleCy, iconR, 0, Math.PI * 2); ctx.fill();
-    __drawBabyOnCanvas(ctx, circleCx - 12 * scale, circleCy - 12 * scale, scale * 0.38, crawlPhase, color);
+    var babySize = iconR * 1.5;
+    __drawBabyOnCanvas(ctx, circleCx, circleCy, scale * 0.38);
     var textX = x + padH + iconR * 2 + gap;
     ctx.fillStyle = '#1267e8';
     ctx.font = '600 ' + labelFS + 'px sans-serif';

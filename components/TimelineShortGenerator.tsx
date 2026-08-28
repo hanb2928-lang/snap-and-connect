@@ -16,7 +16,7 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
-import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
+import { drawRoamingBabyWithLink, preloadBabyImage, getBabyImageSync } from '@/lib/canvasOverlay';
 import { friendlyError } from '@/lib/errors';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
@@ -123,83 +123,20 @@ function drawBabyOnCanvas(
   cx: number,
   cy: number,
   scale: number,
-  crawlPhase: number,
-  color: string,
+  _crawlPhase: number,
+  _color: string,
 ) {
+  const img = getBabyImageSync();
+  const size = 48 * scale;
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  const bob = Math.sin(crawlPhase * Math.PI * 2) * 1.5;
-  const armL = Math.sin(crawlPhase * Math.PI * 2) * 4;
-  const armR = -armL;
-  const legL = -armL;
-  const legR = armL;
-  const headBob = Math.sin(crawlPhase * Math.PI * 2 + 0.3) * 0.8;
-
-  // Head
-  ctx.beginPath();
-  ctx.arc(24, 14 + headBob, 7, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Eyes
-  ctx.beginPath();
-  ctx.arc(21.5, 13 + headBob, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(26.5, 13 + headBob, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cheeks
-  ctx.globalAlpha = 0.3;
-  ctx.beginPath();
-  ctx.arc(19, 16 + headBob, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(29, 16 + headBob, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Smile
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(21, 15.5 + headBob);
-  ctx.quadraticCurveTo(24, 18 + headBob, 27, 15.5 + headBob);
-  ctx.stroke();
-  ctx.lineWidth = 2;
-
-  // Body
-  ctx.beginPath();
-  ctx.ellipse(24, 30 + bob, 12, 5, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Arms
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(14, 28 + bob);
-  ctx.quadraticCurveTo(10 + armL, 23 - armL, 12 + armL, 18 - armL);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(34, 28 + bob);
-  ctx.quadraticCurveTo(38 + armR, 23 - armR, 36 + armR, 18 - armR);
-  ctx.stroke();
-
-  // Legs
-  ctx.beginPath();
-  ctx.moveTo(20, 35 + bob);
-  ctx.quadraticCurveTo(17 + legL, 40 + legL, 15 + legL, 44 + legL);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(28, 35 + bob);
-  ctx.quadraticCurveTo(31 + legR, 40 + legR, 33 + legR, 44 + legR);
-  ctx.stroke();
-  ctx.lineWidth = 2;
-
+  if (img) {
+    ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+  } else {
+    ctx.fillStyle = '#F4C4A8';
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -213,7 +150,6 @@ function drawBabyBadge(
   label: string,
 ) {
   ctx.save();
-  // White circle background
   ctx.fillStyle = 'rgba(255,255,255,0.95)';
   ctx.beginPath();
   ctx.arc(cx, cy, 28 * scale, 0, Math.PI * 2);
@@ -222,10 +158,9 @@ function drawBabyBadge(
   ctx.lineWidth = 2 * scale;
   ctx.stroke();
 
-  // Baby inside
-  drawBabyOnCanvas(ctx, cx - 24 * scale, cy - 24 * scale, scale * 0.7, crawlPhase, color);
+  const badgeSize = 36 * scale;
+  drawBabyOnCanvas(ctx, cx, cy - 4 * scale, scale * 0.55, crawlPhase, color);
 
-  // Label below
   ctx.fillStyle = color;
   ctx.font = `700 ${14 * scale}px sans-serif`;
   ctx.textAlign = 'center';
@@ -338,6 +273,7 @@ function WebTimelineGenerator({
 
     try {
       if (!imageUrl) throw new Error('이미지가 준비되지 않았어요');
+      await preloadBabyImage().catch(() => {});
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const canvas = document.createElement('canvas');
       canvas.width = CANVAS_W;
