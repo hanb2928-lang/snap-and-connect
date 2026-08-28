@@ -8,6 +8,7 @@ import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { MobileClipGenerator } from '@/components/MobileClipGenerator';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
@@ -1485,15 +1486,7 @@ function WebClipGenerator({
       )}
 
       {state === 'generating' && (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-          </View>
-          <View style={styles.progressLabelRow}>
-            <Loader2 size={14} color={theme.colors.primary[400]} strokeWidth={2.5} />
-            <Text style={styles.progressText}>생성 중... {progress}%</Text>
-          </View>
-        </View>
+        <VideoProgressIndicator progress={progress} label="생성 중..." color={theme.colors.primary[400]} />
       )}
 
       {state === 'done' && videoUrl && (

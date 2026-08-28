@@ -19,6 +19,7 @@ import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
 import { friendlyError } from '@/lib/errors';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import type { PlatformKey } from '@/types/database';
 
 interface TimelineShortGeneratorProps {
@@ -679,18 +680,12 @@ function WebTimelineGenerator({
       )}
 
       {state === 'generating' && (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-          </View>
-          <View style={styles.progressLabelRow}>
-            <Loader2 size={14} color={theme.colors.primary[400]} strokeWidth={2.5} />
-            <Text style={styles.progressText}>생성 중... {progress}%</Text>
-          </View>
-          <Text style={styles.progressHint}>
-            {mode === '30s' ? '아기 캐릭터가 훅 → 본론 → 클로징 순서로 움직이며 영상을 만들고 있어요' : '아기 캐릭터가 문제 제기 → 시연 → 결과 순서로 가이드하며 영상을 만들고 있어요'}
-          </Text>
-        </View>
+        <VideoProgressIndicator
+          progress={progress}
+          label="생성 중..."
+          color={theme.colors.primary[400]}
+          hint={mode === '30s' ? '아기 캐릭터가 훅 → 본론 → 클로징 순서로 움직이며 영상을 만들고 있어요' : '아기 캐릭터가 문제 제기 → 시연 → 결과 순서로 가이드하며 영상을 만들고 있어요'}
+        />
       )}
 
       {state === 'done' && videoUrl && (

@@ -26,6 +26,7 @@ import { getOpenAiVoiceParams } from '@/lib/ttsVoices';
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import type { PunchMarker } from '@/hooks/useSoundPunch';
 import { safeFetch } from '@/lib/apiClient';
 import type { PlatformKey, LocalStoreInfo } from '@/types/database';
@@ -1831,17 +1832,7 @@ export function ComicShortGenerator({
       )}
 
       {state === 'generating' && (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-          </View>
-          <View style={styles.progressLabelRow}>
-            <ActivityIndicator size="small" color={theme.colors.accent[400]} />
-            <Text style={styles.progressText}>
-              {ttsEnabled ? 'AI 내레이션 만화 변환 중... ' : '만화 변환 중... '}{progress}%
-            </Text>
-          </View>
-        </View>
+        <VideoProgressIndicator progress={progress} label={ttsEnabled ? 'AI 내레이션 만화 변환 중...' : '만화 변환 중...'} color={theme.colors.accent[400]} />
       )}
 
       {state === 'done' && resultUri && (

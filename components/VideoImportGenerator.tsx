@@ -5,6 +5,7 @@ import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { drawRoamingBabyWithLink } from '@/lib/canvasOverlay';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 
 interface VideoImportGeneratorProps {
   affiliatePlatforms?: string[];
@@ -918,15 +919,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         )}
 
         {state === 'generating' && (
-          <View style={styles.progressWrap}>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-            </View>
-            <View style={styles.progressLabelRow}>
-              <Loader2 size={14} color={theme.colors.primary[400]} strokeWidth={2.5} />
-              <Text style={styles.progressText}>가공 중... {progress}%</Text>
-            </View>
-          </View>
+          <VideoProgressIndicator progress={progress} label="가공 중..." color={theme.colors.primary[400]} />
         )}
 
         {state === 'done' && outputUrl && (

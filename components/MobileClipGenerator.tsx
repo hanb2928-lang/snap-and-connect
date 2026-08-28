@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Film, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, Play, Sparkles, ChevronDown } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
@@ -950,15 +951,7 @@ export function MobileClipGenerator({
       )}
 
       {state === 'generating' && (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-          </View>
-          <View style={styles.progressLabelRow}>
-            <ActivityIndicator size="small" color={theme.colors.primary[400]} />
-            <Text style={styles.progressText}>생성 중... {progress}%</Text>
-          </View>
-        </View>
+        <VideoProgressIndicator progress={progress} label="생성 중..." color={theme.colors.primary[400]} />
       )}
 
       {state === 'done' && videoUri && (

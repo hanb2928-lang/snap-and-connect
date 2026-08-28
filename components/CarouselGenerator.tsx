@@ -15,6 +15,7 @@ import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import { TemplateCard } from '@/components/TemplateCard';
 import type { StickerPosition } from '@/components/TemplateCard';
+import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import type { DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -397,22 +398,11 @@ export function CarouselGenerator({
       )}
 
       {(exportState === 'capturing' || exportState === 'generating') && (
-        <View style={styles.progressWrap}>
-          <View style={styles.progressBarBg}>
-            <View style={[styles.progressBarFill, { width: `${exportProgress}%` }]} />
-          </View>
-          <View style={styles.progressLabelRow}>
-            {exportState === 'capturing' ? (
-              <Loader2 size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
-            ) : (
-              <ActivityIndicator size="small" color={theme.colors.accent[400]} />
-            )}
-            <Text style={styles.progressText}>
-              {exportState === 'capturing' ? '슬라이드 캡처 중... ' : '동영상 생성 중... '}
-              {exportProgress}%
-            </Text>
-          </View>
-        </View>
+        <VideoProgressIndicator
+          progress={exportProgress}
+          label={exportState === 'capturing' ? '슬라이드 캡처 중...' : '동영상 생성 중...'}
+          color={theme.colors.accent[400]}
+        />
       )}
 
       {exportState === 'done' && videoUrl && (
