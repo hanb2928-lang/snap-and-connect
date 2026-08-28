@@ -14,13 +14,14 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
 import { uploadAssetBlob } from '@/lib/savedAssets';
 import { clearLogoCache } from '@/lib/logoWatermark';
 import { TTS_VOICES, DEFAULT_TTS_VOICE } from '@/lib/ttsVoices';
+import { SUBSCRIPTION_PLANS, TOKEN_PACKS, formatKRW as formatPlanKRW } from '@/lib/subscriptionPlans';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -65,6 +66,8 @@ export default function SettingsScreen() {
   const [brandPersona, setBrandPersona] = useState('');
   const [savingPersona, setSavingPersona] = useState(false);
   const [savedPersona, setSavedPersona] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'business'>('pro');
+  const [showTokenPacks, setShowTokenPacks] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -233,6 +236,107 @@ export default function SettingsScreen() {
         <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>ShortConnect</Text>
         <Text style={styles.appTagline}>사진 한 장으로 끝내는 숏폼 마케팅</Text>
         <Text style={styles.appVersion}>Version 1.0.0</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>구독 플랜 및 결제</Text>
+        <Text style={styles.sectionDesc}>
+          월 구독 플랜을 선택하면 매월 정해진 횟수만큼 AI 콘텐츠를 제작할 수 있습니다. 기본 쿼터를 모두 소진하면 충전 팩으로 추가할 수 있어요.
+        </Text>
+
+        {SUBSCRIPTION_PLANS.map((plan) => {
+          const isPro = plan.id === 'pro';
+          const isSelected = selectedPlan === plan.id;
+          const PlanIcon = plan.id === 'basic' ? Rocket : plan.id === 'pro' ? Crown : Building2;
+          return (
+            <TouchableOpacity
+              key={plan.id}
+              style={[styles.planCard, isSelected && { borderColor: plan.accentColor, backgroundColor: plan.accentColor + '0D' }]}
+              onPress={() => setSelectedPlan(plan.id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.planHeader}>
+                <View style={[styles.planIconWrap, { backgroundColor: plan.accentColor + '20' }]}>
+                  <PlanIcon size={20} color={plan.accentColor} strokeWidth={2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.planNameRow}>
+                    <Text style={styles.planName}>{plan.name} 플랜</Text>
+                    {plan.badge && (
+                      <View style={[styles.planBadge, { backgroundColor: plan.accentColor }]}>
+                        <Text style={styles.planBadgeText}>{plan.badge}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.planTagline}>{plan.tagline}</Text>
+                </View>
+                <View style={[styles.planRadio, isSelected && { borderColor: plan.accentColor, backgroundColor: plan.accentColor }]}>
+                  {isSelected && <Check size={14} color="#fff" strokeWidth={3} />}
+                </View>
+              </View>
+              <View style={styles.planPriceRow}>
+                <Text style={[styles.planPrice, { color: plan.accentColor }]}>{formatPlanKRW(plan.monthlyPrice)}</Text>
+                <Text style={styles.planPriceUnit}>/ 월</Text>
+              </View>
+              <Text style={styles.planQuota}>월간 AI 콘텐츠 {plan.quota.toLocaleString()}회 제공</Text>
+              <View style={styles.planFeatureList}>
+                {plan.features.map((feat, i) => (
+                  <View key={i} style={styles.planFeatureRow}>
+                    <Check size={14} color={plan.accentColor} strokeWidth={2.5} />
+                    <Text style={styles.planFeatureText}>{feat}</Text>
+                  </View>
+                ))}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+
+        <TouchableOpacity
+          style={styles.subscribeBtn}
+          onPress={() => Alert.alert('결제 안내', `${SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.name ?? ''} 플랜(${formatPlanKRW(SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.monthlyPrice ?? 0)}/월) 구독을 시작하시겠어요?\n\n결제 시스템 연동 후 실제 결제가 진행됩니다.`, [
+            { text: '취소', style: 'cancel' },
+            { text: '구독하기', onPress: () => Alert.alert('준비 중', '결제 시스템 연동 후 이용할 수 있어요. 곧 지원될 예정입니다.') },
+          ])}
+          activeOpacity={0.8}
+        >
+          <Crown size={18} color="#fff" strokeWidth={2} />
+          <Text style={styles.subscribeBtnText}>{SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.name ?? ''} 플랜 구독하기</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tokenPackToggle}
+          onPress={() => setShowTokenPacks(!showTokenPacks)}
+          activeOpacity={0.7}
+        >
+          <Coins size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+          <Text style={styles.tokenPackToggleText}>토큰 추가 충전 팩 (Pay-as-you-go)</Text>
+          {showTokenPacks ? <ChevronDown size={18} color={theme.colors.dark.textDim} strokeWidth={2} /> : <ChevronRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />}
+        </TouchableOpacity>
+
+        {showTokenPacks && (
+          <View style={styles.tokenPackContainer}>
+            <Text style={styles.tokenPackHint}>기본 월간 쿼터를 모두 소진한 경우 추가 충전할 수 있어요. 구독 해지나 상위 플랜 업그레이드 없이 유연하게 이용 가능합니다.</Text>
+            {TOKEN_PACKS.map((pack) => (
+              <View key={pack.id} style={styles.tokenPackCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tokenPackName}>{pack.name}</Text>
+                  <Text style={styles.tokenPackQuota}>AI 콘텐츠 {pack.quota}회 추가</Text>
+                </View>
+                <Text style={styles.tokenPackPrice}>{formatPlanKRW(pack.price)}</Text>
+                <TouchableOpacity
+                  style={styles.tokenPackBuyBtn}
+                  onPress={() => Alert.alert('충전 안내', `${pack.name}(${formatPlanKRW(pack.price)})을 충전하시겠어요?`, [
+                    { text: '취소', style: 'cancel' },
+                    { text: '충전하기', onPress: () => Alert.alert('준비 중', '결제 시스템 연동 후 이용할 수 있어요.') },
+                  ])}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.tokenPackBuyBtnText}>충전</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -2456,5 +2560,177 @@ const styles = StyleSheet.create({
   toggleKnobActive: {
     backgroundColor: '#fff',
     marginLeft: 22,
+  },
+  planCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md + 4,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.dark.border,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  planIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  planName: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  planBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.full,
+  },
+  planBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  planTagline: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  planRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.dark.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginBottom: 4,
+  },
+  planPrice: {
+    fontSize: 24,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  planPriceUnit: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  planQuota: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 10,
+  },
+  planFeatureList: {
+    gap: 8,
+  },
+  planFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  planFeatureText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
+  },
+  subscribeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+    marginBottom: 12,
+  },
+  subscribeBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  tokenPackToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  tokenPackToggleText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  tokenPackContainer: {
+    marginTop: 10,
+    gap: 10,
+  },
+  tokenPackHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 16,
+  },
+  tokenPackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  tokenPackName: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  tokenPackQuota: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  tokenPackPrice: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  tokenPackBuyBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.warning[400] + '20',
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400],
+  },
+  tokenPackBuyBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
   },
 });
