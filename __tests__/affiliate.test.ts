@@ -37,6 +37,8 @@ const fullSettings: UserSettings = {
   logo_url: null,
   default_video_duration: null,
   default_tts_voice: null,
+  tts_speed: null,
+  tts_pitch: null,
   auto_disclosure: null,
   brand_persona: null,
 };

@@ -57,6 +57,8 @@ export default function SettingsScreen() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [defaultVideoDuration, setDefaultVideoDuration] = useState('15s');
   const [defaultTtsVoice, setDefaultTtsVoice] = useState(DEFAULT_TTS_VOICE);
+  const [ttsSpeed, setTtsSpeed] = useState(1.0);
+  const [ttsPitch, setTtsPitch] = useState(0);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
@@ -76,6 +78,8 @@ export default function SettingsScreen() {
       setOpenaiKey(data?.openai_api_key || '');
       setDefaultVideoDuration(data?.default_video_duration || '15s');
       setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
+      setTtsSpeed(data?.tts_speed ?? 1.0);
+      setTtsPitch(data?.tts_pitch ?? 0);
       setAutoDisclosure(data?.auto_disclosure ?? true);
       setBrandPersona(data?.brand_persona || '');
     } catch {
@@ -531,6 +535,52 @@ export default function SettingsScreen() {
             ))}
           </View>
           <Divider />
+          <Text style={styles.idInputLabel}>내레이션 속도</Text>
+          <Text style={styles.sliderValueText}>{ttsSpeed.toFixed(1)}x{ttsSpeed === 1.0 ? ' (기본)' : ttsSpeed < 1.0 ? ' (느림)' : ' (빠름)'}</Text>
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>0.5x</Text>
+            <View style={styles.sliderTrack}>
+              <View style={[styles.sliderFill, { width: `${((ttsSpeed - 0.5) / 1.5) * 100}%` }]} />
+              <View style={[styles.sliderThumb, { left: `${((ttsSpeed - 0.5) / 1.5) * 100}%` }]} />
+            </View>
+            <Text style={styles.sliderLabel}>2.0x</Text>
+          </View>
+          <View style={styles.sliderChipsRow}>
+            {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((s) => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.sliderChip, ttsSpeed === s && styles.sliderChipActive]}
+                onPress={() => setTtsSpeed(s)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.sliderChipText, ttsSpeed === s && styles.sliderChipTextActive]}>{s.toFixed(2).replace(/\.?0+$/, '')}x</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Divider />
+          <Text style={styles.idInputLabel}>내레이션 피치 (음조)</Text>
+          <Text style={styles.sliderValueText}>{ttsPitch > 0 ? `+${ttsPitch}` : ttsPitch}{ttsPitch === 0 ? ' (기본)' : ttsPitch > 0 ? ' (높음)' : ' (낮음)'}</Text>
+          <View style={styles.sliderRow}>
+            <Text style={styles.sliderLabel}>-12</Text>
+            <View style={styles.sliderTrack}>
+              <View style={[styles.sliderFill, { width: `${((ttsPitch + 12) / 24) * 100}%` }]} />
+              <View style={[styles.sliderThumb, { left: `${((ttsPitch + 12) / 24) * 100}%` }]} />
+            </View>
+            <Text style={styles.sliderLabel}>+12</Text>
+          </View>
+          <View style={styles.sliderChipsRow}>
+            {[-12, -6, -3, 0, 3, 6, 12].map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[styles.sliderChip, ttsPitch === p && styles.sliderChipActive]}
+                onPress={() => setTtsPitch(p)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.sliderChipText, ttsPitch === p && styles.sliderChipTextActive]}>{p > 0 ? `+${p}` : p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Divider />
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.featureTitle}>제휴 공시문 자동 포함</Text>
@@ -556,6 +606,8 @@ export default function SettingsScreen() {
               await updateUserSettings({
                 default_video_duration: defaultVideoDuration,
                 default_tts_voice: defaultTtsVoice,
+                tts_speed: ttsSpeed,
+                tts_pitch: ttsPitch,
                 auto_disclosure: autoDisclosure,
               });
               setSavedDefaults(true);
@@ -2261,6 +2313,76 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginTop: 10,
     marginBottom: 6,
+  },
+  sliderValueText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+    marginBottom: 8,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  sliderLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  sliderTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    position: 'relative',
+  },
+  sliderFill: {
+    position: 'absolute',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.accent[500],
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginLeft: -8,
+    marginTop: -5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sliderChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  sliderChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  sliderChipActive: {
+    backgroundColor: theme.colors.accent[500],
+    borderColor: theme.colors.accent[500],
+  },
+  sliderChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  sliderChipTextActive: {
+    color: '#fff',
   },
   platformChip: {
     paddingHorizontal: theme.spacing.md,

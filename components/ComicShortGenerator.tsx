@@ -1049,6 +1049,8 @@ export function ComicShortGenerator({
   const [ttsLoading, setTtsLoading] = useState(false);
   const [narrationAudioDataUrl, setNarrationAudioDataUrl] = useState<string | null>(null);
   const [ttsVoice, setTtsVoice] = useState<string | null>(null);
+  const [ttsSpeed, setTtsSpeed] = useState<number | null>(null);
+  const [ttsPitch, setTtsPitch] = useState<number | null>(null);
   const [mbtiMode, setMbtiMode] = useState(true);
   const [emotionOverlay, setEmotionOverlay] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -1309,16 +1311,22 @@ export function ComicShortGenerator({
       setTtsLoading(true);
       try {
         let resolvedVoiceKey = ttsVoice;
+        let resolvedSpeed: number | null = ttsSpeed;
+        let resolvedPitch: number | null = ttsPitch;
         if (!resolvedVoiceKey) {
           try {
             const userSettings = await getUserSettings();
             resolvedVoiceKey = userSettings?.default_tts_voice || null;
+            resolvedSpeed = userSettings?.tts_speed ?? null;
+            resolvedPitch = userSettings?.tts_pitch ?? null;
             setTtsVoice(resolvedVoiceKey);
+            setTtsSpeed(resolvedSpeed);
+            setTtsPitch(resolvedPitch);
           } catch {
             // use default
           }
         }
-        const voiceParams = getOpenAiVoiceParams(resolvedVoiceKey || '');
+        const voiceParams = getOpenAiVoiceParams(resolvedVoiceKey || '', resolvedSpeed);
         const ttsResponse = await safeFetch(TTS_FUNCTION_URL, {
           method: 'POST',
           headers: {
@@ -1329,6 +1337,7 @@ export function ComicShortGenerator({
             text: narrationText,
             voice: voiceParams.voice,
             speed: voiceParams.speed,
+            pitch: resolvedPitch ?? 0,
           }),
           timeoutMs: 15000,
         });
@@ -1398,7 +1407,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
 
 
 

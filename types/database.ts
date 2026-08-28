@@ -118,6 +118,8 @@ export interface UserSettings {
   logo_url: string | null;
   default_video_duration: string | null;
   default_tts_voice: string | null;
+  tts_speed: number | null;
+  tts_pitch: number | null;
   auto_disclosure: boolean | null;
   brand_persona: string | null;
 }

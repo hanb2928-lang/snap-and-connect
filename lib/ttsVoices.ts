@@ -41,7 +41,9 @@ export function getTtsVoiceByKey(key: string): TtsVoice | undefined {
   return TTS_VOICES.find((v) => v.key === key);
 }
 
-export function getOpenAiVoiceParams(key: string): { voice: string; speed: number } {
+export function getOpenAiVoiceParams(key: string, speedOverride?: number | null): { voice: string; speed: number } {
   const v = getTtsVoiceByKey(key);
-  return { voice: v?.openaiVoice ?? 'alloy', speed: v?.speed ?? 1.0 };
+  const baseSpeed = v?.speed ?? 1.0;
+  const speed = speedOverride != null ? Math.min(Math.max(speedOverride, 0.5), 2.0) : baseSpeed;
+  return { voice: v?.openaiVoice ?? 'alloy', speed };
 }
