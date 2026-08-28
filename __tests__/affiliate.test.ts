@@ -44,6 +44,9 @@ const fullSettings: UserSettings = {
   brand_persona: null,
   mascot_enabled: null,
   mascot_style: null,
+  capture_guide_mode: null,
+  ui_performance: null,
+  theme_mode: null,
 };
 
 describe('isCoupangUrl', () => {

@@ -33,6 +33,7 @@ import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64'
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
+import { getUserSettings } from '@/lib/settings';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
@@ -67,6 +68,7 @@ export default function CameraScreen() {
   const [zoomLabel, setZoomLabel] = useState('1x');
   const [recognitionMode, setRecognitionMode] = useState<'single' | 'multi'>('single');
   const [multiShots, setMultiShots] = useState<string[]>([]);
+  const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progressText, setProgressText] = useState('');
@@ -145,6 +147,12 @@ export default function CameraScreen() {
         setShowOnboardingModal(true);
         setItem('onboarding_seen', 'true');
       }
+      try {
+        const s = await getUserSettings();
+        const mode = (s?.capture_guide_mode as 'beginner' | 'pro') || 'beginner';
+        setCaptureGuideMode(mode);
+        if (mode === 'pro') setRecognitionMode('multi');
+      } catch {}
     })();
   }, []);
 
@@ -1059,6 +1067,7 @@ function WebUploadScreen() {
   const safeTop = useSafeTop();
   const [recognitionMode, setRecognitionMode] = useState<'single' | 'multi'>('single');
   const [multiShots, setMultiShots] = useState<string[]>([]);
+  const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progressText, setProgressText] = useState('');
@@ -1073,6 +1082,17 @@ function WebUploadScreen() {
   }, [fadeAnim]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await getUserSettings();
+        const mode = (s?.capture_guide_mode as 'beginner' | 'pro') || 'beginner';
+        setCaptureGuideMode(mode);
+        if (mode === 'pro') setRecognitionMode('multi');
+      } catch {}
+    })();
+  }, []);
 
   const processImage = async (base64: string, mimeType: string) => {
     const dataUrl = buildDataUrl(base64, mimeType);

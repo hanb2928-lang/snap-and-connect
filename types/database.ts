@@ -125,6 +125,9 @@ export interface UserSettings {
   brand_persona: string | null;
   mascot_enabled: boolean | null;
   mascot_style: string | null;
+  capture_guide_mode: string | null;
+  ui_performance: string | null;
+  theme_mode: string | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

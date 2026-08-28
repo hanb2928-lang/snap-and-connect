@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Send, Zap, ChevronDown, ChevronRight, ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays, MessageSquare, Bug, Wallet, Plus, Trash2, TrendingUp, Film, LayoutTemplate, BookOpen, PenLine, Image as ImageIcon, Scissors, Type, Stamp, Upload, Share2, Lightbulb, Smartphone, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, Wand as Wand2, Target, Users, Layers, Store, Video, Palette, Shuffle, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -67,6 +67,11 @@ export default function SettingsScreen() {
   const [ttsPitch, setTtsPitch] = useState(0);
   const [progressStyle, setProgressStyle] = useState<'circular' | 'baby-run' | 'status-bar'>('circular');
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
+  const [uiPerformance, setUiPerformance] = useState<'high' | 'lite'>('high');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [savedPrefs, setSavedPrefs] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
   const [brandPersona, setBrandPersona] = useState('');
@@ -91,6 +96,9 @@ export default function SettingsScreen() {
       setTtsPitch(data?.tts_pitch ?? 0);
       setProgressStyle((data?.progress_style as 'circular' | 'baby-run' | 'status-bar') || 'circular');
       setAutoDisclosure(data?.auto_disclosure ?? true);
+      setCaptureGuideMode((data?.capture_guide_mode as 'beginner' | 'pro') || 'beginner');
+      setUiPerformance((data?.ui_performance as 'high' | 'lite') || 'high');
+      setThemeMode((data?.theme_mode as 'dark' | 'light') || 'dark');
       setBrandPersona(data?.brand_persona || '');
     } catch {
       setSettings(null);
@@ -876,6 +884,149 @@ export default function SettingsScreen() {
         {savedMascot && (
           <Text style={styles.mascotSavedHint}>마스코트 설정이 저장되었습니다</Text>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>앱 환경 설정</Text>
+        <Text style={styles.sectionDesc}>
+          촬영 가이드 모드, 화면 효과, 테마를 기기 사양과 선호에 맞게 조절하세요
+        </Text>
+        <View style={styles.card}>
+          {/* Capture Guide Mode */}
+          <Text style={styles.idInputLabel}>AI 정밀도 및 촬영 가이드 모드</Text>
+          <View style={styles.progressStyleRow}>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, captureGuideMode === 'beginner' && styles.progressStyleCardActive]}
+              onPress={() => setCaptureGuideMode('beginner')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, captureGuideMode === 'beginner' && styles.progressStyleIconActive]}>
+                <Camera size={22} color={captureGuideMode === 'beginner' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, captureGuideMode === 'beginner' && styles.progressStyleNameActive]}>초보자용 간편</Text>
+              <Text style={styles.progressStyleDesc}>사진 한 장으로 시작</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, captureGuideMode === 'pro' && styles.progressStyleCardActive]}
+              onPress={() => setCaptureGuideMode('pro')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, captureGuideMode === 'pro' && styles.progressStyleIconActive]}>
+                <Layers size={22} color={captureGuideMode === 'pro' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, captureGuideMode === 'pro' && styles.progressStyleNameActive]}>프로 다각도</Text>
+              <Text style={styles.progressStyleDesc}>정면·측면·디테일</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.ttsCategoryLabel}>
+            {captureGuideMode === 'beginner'
+              ? '간편 모드: 기본 촬영 팁만 표시되고, 사진 한 장으로 빠르게 AI 분석을 시작합니다'
+              : '프로 모드: 다각도 촬영 가이드(정면·측면·후면·디테일)가 표시되고, 여러 각도 사진으로 AI 정밀도가 극대화됩니다'}
+          </Text>
+
+          <Divider />
+
+          {/* UI Performance */}
+          <Text style={styles.idInputLabel}>UI 성능 (글래스모피즘 & 블러)</Text>
+          <View style={styles.progressStyleRow}>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, uiPerformance === 'high' && styles.progressStyleCardActive]}
+              onPress={() => setUiPerformance('high')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, uiPerformance === 'high' && styles.progressStyleIconActive]}>
+                <Sparkles size={22} color={uiPerformance === 'high' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, uiPerformance === 'high' && styles.progressStyleNameActive]}>고화질 블러</Text>
+              <Text style={styles.progressStyleDesc}>반투명 유리 효과</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, uiPerformance === 'lite' && styles.progressStyleCardActive]}
+              onPress={() => setUiPerformance('lite')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, uiPerformance === 'lite' && styles.progressStyleIconActive]}>
+                <Smartphone size={22} color={uiPerformance === 'lite' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, uiPerformance === 'lite' && styles.progressStyleNameActive]}>저사양 최적화</Text>
+              <Text style={styles.progressStyleDesc}>단색 배경 대체</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.ttsCategoryLabel}>
+            {uiPerformance === 'high'
+              ? '고화질: 반투명 유리 질감(글래스모피즘)과 블러 효과가 적용되어 프리미엄 느낌을 줍니다'
+              : '최적화: 블러 효과 대신 단색 배경을 사용하여 구형 기기에서도 부드럽게 작동합니다'}
+          </Text>
+
+          <Divider />
+
+          {/* Theme Mode */}
+          <Text style={styles.idInputLabel}>테마 및 디스플레이 모드</Text>
+          <View style={styles.progressStyleRow}>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, themeMode === 'dark' && styles.progressStyleCardActive]}
+              onPress={() => setThemeMode('dark')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, themeMode === 'dark' && styles.progressStyleIconActive]}>
+                <Palette size={22} color={themeMode === 'dark' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, themeMode === 'dark' && styles.progressStyleNameActive]}>다크 크리에이터</Text>
+              <Text style={styles.progressStyleDesc}>딥 다크 그라데이션</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, themeMode === 'light' && styles.progressStyleCardActive]}
+              onPress={() => setThemeMode('light')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, themeMode === 'light' && styles.progressStyleIconActive]}>
+                <Sun size={22} color={themeMode === 'light' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, themeMode === 'light' && styles.progressStyleNameActive]}>라이트 클린</Text>
+              <Text style={styles.progressStyleDesc}>밝고 화사한 모드</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.ttsCategoryLabel}>
+            {themeMode === 'dark'
+              ? '다크 모드: 딥 다크 그라데이션의 세련된 감성을 유지합니다. 야외나 밝은 곳에서는 라이트 모드를 추천합니다'
+              : '라이트 모드: 밝고 화사한 분위기로, 야외 촬영이나 밝은 환경에서 가시성이 좋습니다 (현재 다크 테마가 기본 적용 중이며, 라이트 테마는 순차적으로 적용됩니다)'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.saveIdButton, savedPrefs && styles.saveIdButtonDone]}
+          onPress={async () => {
+            setSavingPrefs(true);
+            setSavedPrefs(false);
+            try {
+              await updateUserSettings({
+                capture_guide_mode: captureGuideMode,
+                ui_performance: uiPerformance,
+                theme_mode: themeMode,
+              });
+              setSavedPrefs(true);
+              setTimeout(() => setSavedPrefs(false), 2500);
+            } catch (err) {
+              Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
+            }
+            setSavingPrefs(false);
+          }}
+          disabled={savingPrefs}
+          activeOpacity={0.8}
+        >
+          {savingPrefs ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : savedPrefs ? (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>저장됨</Text>
+            </>
+          ) : (
+            <>
+              <Check size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.saveIdButtonText}>환경 설정 저장</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
