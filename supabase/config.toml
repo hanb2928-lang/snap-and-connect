@@ -1,3 +1,6 @@
+[functions.extract-product-meta]
+verify_jwt = false
+
 [functions.analyze-photo]
 verify_jwt = false
 

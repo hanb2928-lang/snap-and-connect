@@ -56,7 +56,7 @@ import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { saveManualScan, uploadImage } from '@/lib/analysis';
+import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -130,6 +130,16 @@ export default function AffiliateScreen() {
   const [showAddPlatform, setShowAddPlatform] = useState(false);
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformUrl, setNewPlatformUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [productMeta, setProductMeta] = useState<{
+    productName: string;
+    description: string;
+    price: string;
+    image: string;
+    platform: string;
+    brand: string;
+  } | null>(null);
 
   // Step 3: AI Analysis
   const [analyzing, setAnalyzing] = useState(false);
@@ -283,10 +293,28 @@ export default function AffiliateScreen() {
     setPreviewCapture(null);
   };
 
-  // Step 2: Save affiliate link
-  const handleSaveAffiliate = () => {
+  // Step 2: Save affiliate link and extract product metadata
+  const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
-    markCompleted('affiliate');
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      const meta = await extractProductMeta(affiliateUrl.trim());
+      setProductMeta({
+        productName: meta.productName || '',
+        description: meta.description || '',
+        price: meta.price || '',
+        image: meta.image || '',
+        platform: meta.platform || '',
+        brand: meta.brand || '',
+      });
+    } catch {
+      setProductMeta(null);
+      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. AI 분석은 계속 진행할 수 있습니다.');
+    } finally {
+      setExtracting(false);
+      markCompleted('affiliate');
+    }
   };
 
   const handleAnalyzePhoto = async () => {
@@ -296,6 +324,26 @@ export default function AffiliateScreen() {
     try {
       const imageUrl = await uploadImage(selectedImage, selectedImageMime);
       const scanId = await saveManualScan(imageUrl);
+      if (productMeta) {
+        try {
+          const dataUrl = selectedImage.startsWith('data:') ? selectedImage : buildDataUrl(selectedImage, selectedImageMime);
+          await analyzeImageWithProductContext(
+            dataUrl,
+            'scan.jpg',
+            selectedImageMime || 'image/jpeg',
+            'single',
+            {
+              productName: productMeta.productName,
+              description: productMeta.description,
+              price: productMeta.price,
+              brand: productMeta.brand,
+              platform: productMeta.platform,
+            },
+          );
+        } catch {
+          // analysis enhancement is best-effort; scan already saved
+        }
+      }
       markCompleted('analyze');
       setAiRecommendation('웹툰형 만화');
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
@@ -567,10 +615,16 @@ export default function AffiliateScreen() {
               style={styles.affiliateSaveBtn}
               onPress={handleSaveAffiliate}
               activeOpacity={0.7}
-              disabled={!affiliateUrl.trim()}
+              disabled={!affiliateUrl.trim() || extracting}
             >
-              <Check size={16} color="#fff" strokeWidth={2} />
-              <Text style={styles.affiliateSaveBtnText}>링크 저장</Text>
+              {extracting ? (
+                <Loader size={16} color="#fff" strokeWidth={2} />
+              ) : (
+                <Check size={16} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.affiliateSaveBtnText}>
+                {extracting ? '상품 정보 추출 중...' : '링크 저장'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -591,6 +645,39 @@ export default function AffiliateScreen() {
             onOpenUrl={handleOpenUrl}
             onCopySignup={handleCopySignup}
           />
+
+          {/* Product metadata preview */}
+          {extractError && (
+            <View style={styles.extractErrorBox}>
+              <Text style={styles.extractErrorText}>{extractError}</Text>
+            </View>
+          )}
+
+          {productMeta && (productMeta.productName || productMeta.price) && (
+            <View style={styles.productMetaCard}>
+              {productMeta.image ? (
+                <Image
+                  source={{ uri: productMeta.image }}
+                  style={styles.productMetaImage}
+                  resizeMode="cover"
+                />
+              ) : null}
+              <View style={styles.productMetaInfo}>
+                {productMeta.productName ? (
+                  <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
+                ) : null}
+                {productMeta.price ? (
+                  <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
+                ) : null}
+                {productMeta.brand ? (
+                  <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
+                ) : null}
+                {productMeta.description ? (
+                  <Text style={styles.productMetaDesc} numberOfLines={3}>{productMeta.description}</Text>
+                ) : null}
+              </View>
+            </View>
+          )}
         </VerticalSectionCard>
         </View>
 
@@ -1453,6 +1540,63 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  extractErrorBox: {
+    backgroundColor: theme.colors.error[500] + '12',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.error[400] + '60',
+  },
+  extractErrorText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    lineHeight: 17,
+  },
+  productMetaCard: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  productMetaImage: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  productMetaInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  productMetaName: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    lineHeight: 18,
+  },
+  productMetaPrice: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[400],
+  },
+  productMetaBrand: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  productMetaDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginTop: 2,
   },
   platformRow: {
     flexDirection: 'row',

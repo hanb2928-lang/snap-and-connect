@@ -1,5 +1,5 @@
 import type { AnalysisResult } from '@/types/database';
-import { supabase, ANALYSIS_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { supabase, ANALYSIS_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { safeFetch } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
@@ -234,6 +234,67 @@ export async function saveManualScan(
 export async function deleteScan(id: string): Promise<void> {
   const { error } = await supabase.from('scans').delete().eq('id', id);
   if (error) throw new Error(`Failed to delete: ${error.message}`);
+}
+
+export async function analyzeImageWithProductContext(
+  imageDataUrl: string,
+  fileName: string,
+  mimeType: string,
+  mode: 'single' | 'multi' = 'multi',
+  productContext?: { productName?: string; description?: string; price?: string; brand?: string; platform?: string },
+): Promise<AnalysisResult> {
+  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode, productContext }),
+    timeoutMs: 60000,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`AI 분석 실패 (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+
+  return normalizeAnalysis(data);
+}
+
+export async function extractProductMeta(
+  url: string,
+): Promise<{
+  productName: string;
+  description: string;
+  price: string;
+  currency: string;
+  image: string;
+  platform: string;
+  brand: string;
+  availability: string;
+}> {
+  const extractUrl = `${supabaseUrl}/functions/v1/extract-product-meta`;
+  const response = await safeFetch(extractUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ url }),
+    timeoutMs: 15000,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`상품 정보 추출 실패 (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.productMeta;
 }
 
 export async function analyzeImageQueued(

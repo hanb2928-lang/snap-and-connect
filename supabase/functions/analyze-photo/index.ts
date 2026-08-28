@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { imageDataUrl, images, fileName, mimeType, mode, preferredStyle } = body;
+    const { imageDataUrl, images, fileName, mimeType, mode, preferredStyle, productContext } = body;
 
     if (!imageDataUrl && !images) {
       return new Response(
@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
         );
       }
       if (openaiKey) {
-        result = await analyzeMultiShotWithOpenAI(sanitizedImages, openaiKey);
+        result = await analyzeMultiShotWithOpenAI(sanitizedImages, openaiKey, productContext);
       } else {
         result = generateContextualAnalysis(fileName || "snapshot");
       }
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
       const sanitizedDataUrl = ensureDataUrl(imageDataUrl, cleanMime);
       const recognitionMode = mode === "single" ? "single" : "multi";
       if (openaiKey) {
-        result = await analyzeWithOpenAI(sanitizedDataUrl, cleanMime, openaiKey, recognitionMode, preferredStyle);
+        result = await analyzeWithOpenAI(sanitizedDataUrl, cleanMime, openaiKey, recognitionMode, preferredStyle, productContext);
       } else {
         result = generateContextualAnalysis(fileName || "snapshot");
       }
@@ -176,12 +176,22 @@ async function resolveOpenAIKey(): Promise<string | null> {
   return null;
 }
 
+interface ProductContext {
+  productName?: string;
+  description?: string;
+  price?: string;
+  brand?: string;
+  platform?: string;
+  url?: string;
+}
+
 async function analyzeWithOpenAI(
   imageDataUrl: string,
   mimeType: string,
   apiKey: string,
   mode: "single" | "multi",
   preferredStyle?: string,
+  productContext?: ProductContext,
 ): Promise<AnalysisResult> {
   const isSingle = mode === "single";
 
@@ -231,12 +241,16 @@ async function analyzeWithOpenAI(
     "Return ONLY valid JSON, no markdown." +
     styleHint;
 
+  const contextHint = productContext?.productName || productContext?.description
+    ? `\n\n사용자가 제공한 제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "알 수 없음"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "알 수 없음"}\n- 브랜드: ${productContext.brand || ""}\n- 플랫폼: ${productContext.platform || ""}\n이 정보를 사진 분석과 마케팅 문구 생성에 적극 활용해. 사진의 상품과 링크 정보가 일치하면 정확한 상품명과 가격을 반영하고, 링크의 핵심 셀링 포인트를 후킹과 caption에 자연스럽게 녹여내.`
+    : "";
+
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
     {
       type: "text",
       text: isSingle
         ? "Identify the single primary product in this image. Generate viral marketing copy, hashtags, and short-form template data for it. Return the detectedProducts array with one element."
-        : "Identify ALL distinct products in this image. For each product, generate viral marketing copy, hashtags, and short-form template data. Return the detectedProducts array.",
+        : "Identify ALL distinct products in this image. For each product, generate viral marketing copy, hashtags, and short-form template data. Return the detectedProducts array." + (contextHint ? "\n" + contextHint : ""),
     },
     { type: "image_url", image_url: { url: imageDataUrl, detail: isSingle ? "low" : "high" } },
   ];
@@ -247,6 +261,7 @@ async function analyzeWithOpenAI(
 async function analyzeMultiShotWithOpenAI(
   imageDataUrls: string[],
   apiKey: string,
+  productContext?: ProductContext,
 ): Promise<AnalysisResult> {
   const systemPrompt =
     "You are a viral short-form marketing copywriter and product identification assistant. " +
@@ -287,7 +302,7 @@ async function analyzeMultiShotWithOpenAI(
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
     {
       type: "text",
-      text: `These ${imageDataUrls.length} photos show the SAME product from different angles. Analyze all of them together to identify the product comprehensively, then generate viral marketing copy, hashtags, and short-form template data for this single product.`,
+      text: `These ${imageDataUrls.length} photos show the SAME product from different angles. Analyze all of them together to identify the product comprehensively, then generate viral marketing copy, hashtags, and short-form template data for this single product.` + (productContext?.productName || productContext?.description ? `\n\n제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "알 수 없음"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "알 수 없음"}\n이 정보를 마케팅 문구에 적극 반영해.` : ""),
     },
     ...imageDataUrls.map((url) => ({
       type: "image_url",

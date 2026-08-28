@@ -31,6 +31,13 @@ interface ComicScenarioRequest {
   mbtiMode?: boolean;
   multiverseMode?: boolean;
   brandPersona?: string | null;
+  productContext?: {
+    productName?: string;
+    description?: string;
+    price?: string;
+    brand?: string;
+    platform?: string;
+  };
 }
 
 type MoodTemplate = 'cute-webtoon' | 'noir' | 'sale-popup' | 'retro' | 'premium-minimal' | 'energetic-popart';
@@ -221,6 +228,9 @@ async function generateWithOpenAI(
     `한 줄 소개: ${data.oneLiner || ""}\n` +
     `장점: ${(data.productAdvantages || []).join(', ')}\n` +
     `후킹 문구: ${data.hook || ""}\n` +
+    (data.productContext?.productName || data.productContext?.description
+      ? `\n제휴 링크에서 추출된 실제 상품 정보:\n- 상품명: ${data.productContext.productName || ""}\n- 설명: ${data.productContext.description || ""}\n- 가격: ${data.productContext.price || ""}\n- 브랜드: ${data.productContext.brand || ""}\n- 플랫폼: ${data.productContext.platform || ""}\n이 실제 상품 정보를 만화 대사에 자연스럽게 반영해. 상품명과 핵심 특징을 대사와 자막에 녹여내.\n`
+      : "") +
     `패널 수: ${panelCount}\n` +
     `${trendingGuidance}` +
     `\n${panelCount}컷 만화 시나리오를 만들어줘.`;
