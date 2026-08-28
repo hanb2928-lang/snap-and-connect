@@ -29,6 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { uploadImage, analyzeImageQueued, analyzeMultiShotQueued, saveScan, saveManualScan } from '@/lib/analysis';
+import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
@@ -264,32 +265,18 @@ export default function CameraScreen() {
         );
       }, 3000);
 
-      let imageUrl: string, analysis: AnalysisResult;
-      try {
-        [imageUrl, analysis] = await Promise.all([
-          uploadImage(firstB64, 'image/jpeg'),
-          analyzeMultiShotQueued(multiShots, `scan-${Date.now()}`),
-        ]);
-      } finally {
-        clearInterval(progressTimer);
-      }
-
-      const additionalUrls: string[] = [];
-      if (multiShots.length > 1) {
-        for (let i = 1; i < multiShots.length; i++) {
-          try {
-            const url = await uploadImage(multiShots[i], 'image/jpeg');
-            additionalUrls.push(url);
-          } catch {
-            // individual angle upload failure shouldn't block the whole scan
-          }
-        }
-      }
+      clearInterval(progressTimer);
 
       setProgressStep(2);
-      setProgressText('결과 저장 중...');
-      progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, additionalUrls, 'multi');
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
+
+      const { scanId } = await startAsyncAnalysis(
+        firstB64,
+        'image/jpeg',
+        'multi',
+        multiShots.slice(1),
+      );
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -466,20 +453,19 @@ export default function CameraScreen() {
         );
       }, 3000);
 
-      let imageUrl: string, analysis: AnalysisResult;
-      try {
-        [imageUrl, analysis] = await Promise.all([
-          uploadImage(base64, mimeType),
-          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode, templateMode === 'auto' ? undefined : preferredStyle),
-        ]);
-      } finally {
-        clearInterval(progressTimer);
-      }
+      clearInterval(progressTimer);
 
       setProgressStep(2);
-      setProgressText('결과 저장 중...');
-      progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, [], 'single');
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
+
+      const { scanId } = await startAsyncAnalysis(
+        base64,
+        mimeType,
+        recognitionMode,
+        [],
+        templateMode === 'auto' ? undefined : preferredStyle,
+      );
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1110,20 +1096,17 @@ function WebUploadScreen() {
         );
       }, 3000);
 
-      let imageUrl: string, analysis: AnalysisResult;
-      try {
-        [imageUrl, analysis] = await Promise.all([
-          uploadImage(base64, mimeType),
-          analyzeImageQueued(dataUrl, fileName, mimeType, recognitionMode),
-        ]);
-      } finally {
-        clearInterval(progressTimer);
-      }
+      clearInterval(progressTimer);
 
       setProgressStep(2);
-      setProgressText('결과 저장 중...');
-      progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, [], 'single');
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
+
+      const { scanId } = await startAsyncAnalysis(
+        base64,
+        mimeType,
+        recognitionMode,
+      );
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1187,33 +1170,18 @@ function WebUploadScreen() {
         );
       }, 3000);
 
-      let imageUrl: string, analysis: AnalysisResult;
-      try {
-        [imageUrl, analysis] = await Promise.all([
-          uploadImage(multiShots[0], 'image/jpeg'),
-          analyzeMultiShotQueued(multiShots, `scan-${Date.now()}`),
-        ]);
-      } finally {
-        clearInterval(progressTimer);
-      }
-
-      const additionalUrls: string[] = [];
-      if (multiShots.length > 1) {
-        for (let i = 1; i < multiShots.length; i++) {
-          try {
-            const url = await uploadImage(multiShots[i], 'image/jpeg');
-            additionalUrls.push(url);
-            await new Promise((r) => setTimeout(r, 100));
-          } catch {
-            // individual angle upload failure shouldn't block the whole scan
-          }
-        }
-      }
+      clearInterval(progressTimer);
 
       setProgressStep(2);
-      setProgressText('결과 저장 중...');
-      progressWidth.value = withTiming(0.85, { duration: 300 });
-      const scanId = await saveScan(imageUrl, analysis, additionalUrls, 'multi');
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
+
+      const { scanId } = await startAsyncAnalysis(
+        multiShots[0],
+        'image/jpeg',
+        'multi',
+        multiShots.slice(1),
+      );
 
       setProgressStep(3);
       setProgressText('완료!');

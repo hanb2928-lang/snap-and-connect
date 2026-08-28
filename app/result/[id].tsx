@@ -91,6 +91,9 @@ import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
 import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
+import { subscribeToJob } from '@/lib/jobQueue';
+import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
+import type { RenderJob } from '@/lib/jobQueue';
 import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock } from 'lucide-react-native';
 
 export default function ResultScreen() {
@@ -127,6 +130,8 @@ export default function ResultScreen() {
   const [localStoreInfo, setLocalStoreInfo] = useState<LocalStoreInfo | null>(null);
   const [recommendedStyle, setRecommendedStyle] = useState<StyleRecommendation | null>(null);
   const [styleAppliedKey, setStyleAppliedKey] = useState<string | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
@@ -189,6 +194,73 @@ export default function ResultScreen() {
     }, 5000);
     return () => clearInterval(interval);
   }, [scan]);
+
+  // Realtime subscription for async analysis job completion
+  useEffect(() => {
+    if (!scan?.analysis_job_id) {
+      setAnalysisStatus('idle');
+      return;
+    }
+
+    setAnalysisStatus('processing');
+    setAnalysisError(null);
+    let finalizing = false;
+
+    const handleJobUpdate = (job: RenderJob) => {
+      if (!mountedRef.current) return;
+      if (job.status === 'done' && !finalizing) {
+        finalizing = true;
+        setAnalysisStatus('done');
+        // Finalize: write analysis data to scan row, cache result, trigger TTS
+        (async () => {
+          try {
+            await finalizeAnalysisFromJob(scan.id, job.id, job.result ?? {});
+            // Refresh the scan to get the updated data
+            const { data: refreshed } = await supabase
+              .from('scans')
+              .select('*')
+              .eq('id', scan.id)
+              .maybeSingle();
+            if (mountedRef.current && refreshed) {
+              setScan(refreshed as Scan);
+            }
+          } catch (err) {
+            if (mountedRef.current) {
+              setAnalysisError(err instanceof Error ? err.message : '분석 결과 저장에 실패했습니다.');
+            }
+          }
+        })();
+      } else if (job.status === 'error') {
+        setAnalysisStatus('error');
+        setAnalysisError(job.error_message || 'AI 분석 중 오류가 발생했습니다.');
+      }
+    };
+
+    const sub = subscribeToJob(scan.analysis_job_id, handleJobUpdate);
+
+    // Also poll the job as a fallback (realtime can miss events)
+    const pollInterval = setInterval(async () => {
+      if (!mountedRef.current) return;
+      try {
+        const { data: jobRow } = await supabase
+          .from('render_jobs')
+          .select('*')
+          .eq('id', scan.analysis_job_id)
+          .maybeSingle();
+        if (jobRow && (jobRow.status === 'done' || jobRow.status === 'error')) {
+          clearInterval(pollInterval);
+          handleJobUpdate(jobRow as RenderJob);
+        }
+      } catch {
+        // network error — keep polling
+      }
+    }, 3000);
+
+    return () => {
+      sub.unsubscribe();
+      clearInterval(pollInterval);
+    };
+  }, [scan?.analysis_job_id]);
 
   useEffect(() => {
     (async () => {
@@ -1164,6 +1236,40 @@ export default function ResultScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom + 72 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {analysisStatus === 'processing' && (
+          <View style={styles.analysisPendingCard}>
+            <View style={styles.analysisPendingHeader}>
+              <ActivityIndicator size="small" color={theme.colors.primary[400]} />
+              <Text style={styles.analysisPendingTitle}>AI 분석 진행 중</Text>
+            </View>
+            <Text style={styles.analysisPendingDesc}>
+              사진을 분석하고 마케팅 소스를 생성하고 있습니다. 잠시만 기다려주시면 결과가 자동으로 표시됩니다.
+            </Text>
+            <Text style={styles.analysisPendingHint}>
+              대기 중에 다른 탭(제휴 링크, 성과 분석 등)을 자유롭게 이용할 수 있어요.
+            </Text>
+          </View>
+        )}
+        {analysisStatus === 'error' && (
+          <View style={styles.analysisErrorCard}>
+            <CircleAlert size={18} color={theme.colors.error[400]} strokeWidth={2} />
+            <Text style={styles.analysisErrorTitle}>AI 분석 실패</Text>
+            <Text style={styles.analysisErrorDesc}>
+              {analysisError || '분석 중 오류가 발생했습니다. 다시 시도해주세요.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.analysisRetryBtn}
+              onPress={() => {
+                if (scan?.analysis_job_id) {
+                  setAnalysisStatus('processing');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.analysisRetryText}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.heroWrap}>
           <Image
             source={{ uri: scan.edited_image_url || scan.image_url }}
@@ -1768,6 +1874,75 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.warning[400],
     lineHeight: 20,
+  },
+  analysisPendingCard: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.primary[400] + '25',
+    gap: theme.spacing.sm,
+  },
+  analysisPendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  analysisPendingTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  analysisPendingDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 20,
+  },
+  analysisPendingHint: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  analysisErrorCard: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.error[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '30',
+    alignItems: 'center',
+    gap: 8,
+  },
+  analysisErrorTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.error[400],
+  },
+  analysisErrorDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  analysisRetryBtn: {
+    marginTop: theme.spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  analysisRetryText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   sectionHeader: {
     flexDirection: 'row',

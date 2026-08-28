@@ -84,6 +84,8 @@ export interface Scan {
   local_store_info?: LocalStoreInfo | null;
   scan_source?: 'single' | 'multi' | 'template' | null;
   tts_url?: string | null;
+  analysis_job_id?: string | null;
+  image_hash?: string | null;
 }
 
 export interface DetectedProduct {
