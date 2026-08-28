@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
+import { isLowEndDevice } from '@/lib/devicePerformance';
 
 const _isWeb = Platform.OS === 'web';
+const _isLowEnd = isLowEndDevice();
+const _noGlow = { shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 };
 
 export const theme = {
   colors: {
@@ -127,28 +130,28 @@ export const theme = {
       shadowRadius: 24,
       elevation: 8,
     },
-    glowPrimary: {
+    glowPrimary: _isLowEnd ? _noGlow : {
       shadowColor: '#59bdff',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.35,
       shadowRadius: 12,
       elevation: 0,
     },
-    glowAccent: {
+    glowAccent: _isLowEnd ? _noGlow : {
       shadowColor: '#22ccec',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.3,
       shadowRadius: 10,
       elevation: 0,
     },
-    glowSuccess: {
+    glowSuccess: _isLowEnd ? _noGlow : {
       shadowColor: '#34d399',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.3,
       shadowRadius: 10,
       elevation: 0,
     },
-    glowWarning: {
+    glowWarning: _isLowEnd ? _noGlow : {
       shadowColor: '#fbbf24',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.3,
@@ -156,36 +159,52 @@ export const theme = {
       elevation: 0,
     },
   },
-  glass: _isWeb
+  glass: _isLowEnd
     ? {
-        surface: 'rgba(19, 26, 46, 0.72)',
-        surfaceLight: 'rgba(30, 39, 64, 0.6)',
-        border: 'rgba(255, 255, 255, 0.08)',
-        borderActive: 'rgba(89, 189, 255, 0.25)',
-        highlight: 'rgba(255, 255, 255, 0.04)',
-      }
-    : {
         surface: '#131a2e',
         surfaceLight: '#1e2740',
         border: '#2a3454',
         borderActive: '#2a4a6b',
         highlight: '#1e2740',
-      },
-  glassLight: _isWeb
-    ? {
-        surface: 'rgba(255, 255, 255, 0.82)',
-        surfaceLight: 'rgba(238, 243, 251, 0.7)',
-        border: 'rgba(15, 23, 42, 0.08)',
-        borderActive: 'rgba(47, 157, 255, 0.25)',
-        highlight: 'rgba(15, 23, 42, 0.03)',
       }
-    : {
+    : _isWeb
+      ? {
+          surface: 'rgba(19, 26, 46, 0.72)',
+          surfaceLight: 'rgba(30, 39, 64, 0.6)',
+          border: 'rgba(255, 255, 255, 0.08)',
+          borderActive: 'rgba(89, 189, 255, 0.25)',
+          highlight: 'rgba(255, 255, 255, 0.04)',
+        }
+      : {
+          surface: '#131a2e',
+          surfaceLight: '#1e2740',
+          border: '#2a3454',
+          borderActive: '#2a4a6b',
+          highlight: '#1e2740',
+        },
+  glassLight: _isLowEnd
+    ? {
         surface: '#ffffff',
         surfaceLight: '#eef3fb',
         border: '#d6e0ee',
         borderActive: '#a8c8e8',
         highlight: '#eef3fb',
-      },
+      }
+    : _isWeb
+      ? {
+          surface: 'rgba(255, 255, 255, 0.82)',
+          surfaceLight: 'rgba(238, 243, 251, 0.7)',
+          border: 'rgba(15, 23, 42, 0.08)',
+          borderActive: 'rgba(47, 157, 255, 0.25)',
+          highlight: 'rgba(15, 23, 42, 0.03)',
+        }
+      : {
+          surface: '#ffffff',
+          surfaceLight: '#eef3fb',
+          border: '#d6e0ee',
+          borderActive: '#a8c8e8',
+          highlight: '#eef3fb',
+        },
 } as const;
 
 export type ColorPalette = {

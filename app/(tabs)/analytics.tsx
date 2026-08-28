@@ -27,6 +27,8 @@ import {
   Flame,
   DollarSign,
   Sparkles,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -39,6 +41,8 @@ import {
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { getStaleCached, setCached } from '@/lib/offlineCache';
 
 const PLATFORM_META: Record<string, { label: string; icon: typeof ShoppingBag; color: string }> = {
   Coupang: { label: '쿠팡', icon: ShoppingBag, color: '#FF3E3E' },
@@ -66,14 +70,27 @@ export default function AnalyticsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [usingCache, setUsingCache] = useState(false);
+  const networkStatus = useNetworkStatus();
 
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
       const d = await fetchDashboardSummary();
       setData(d);
+      setLastUpdated(Date.now());
+      setUsingCache(false);
+      await setCached('dashboard_summary', d);
     } catch {
-      setLoadError('성과 데이터를 불러오는 중 오류가 발생했어요');
+      const stale = await getStaleCached<DashboardSummary>('dashboard_summary');
+      if (stale) {
+        setData(stale);
+        setUsingCache(true);
+        setLoadError(null);
+      } else {
+        setLoadError('성과 데이터를 불러오는 중 오류가 발생했어요');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,6 +104,18 @@ export default function AnalyticsScreen() {
   const handleRefresh = () => {
     setRefreshing(true);
     loadData();
+  };
+
+  const formatLastUpdated = (ts: number | null) => {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return '방금 전';
+    if (min < 60) return `${min}분 전`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}시간 전`;
+    const day = Math.floor(hr / 24);
+    return `${day}일 전`;
   };
 
   const maxDailyClicks = useMemo(() => {
@@ -121,10 +150,38 @@ export default function AnalyticsScreen() {
       contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 24 }]}
     >
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>통합 성과 대시보드</Text>
-        <Text style={styles.headerSubtext}>
-          제품 분석부터 콘텐츠 제작, 클릭, 수익까지 한눈에 추적합니다
-        </Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>통합 성과 대시보드</Text>
+            <Text style={styles.headerSubtext}>
+              제품 분석부터 콘텐츠 제작, 클릭, 수익까지 한눈에 추적합니다
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.manualRefreshBtn}
+            onPress={handleRefresh}
+            disabled={refreshing}
+            activeOpacity={0.7}
+          >
+            <RefreshCw size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+        {(lastUpdated || usingCache) && (
+          <View style={styles.updateInfoRow}>
+            {usingCache ? (
+              <>
+                <WifiOff size={11} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.updateInfoTextWarn}>오프라인 · 캐시 데이터 표시 중</Text>
+              </>
+            ) : (
+              <>
+                <Clock size={11} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                <Text style={styles.updateInfoText}>마지막 업데이트 {formatLastUpdated(lastUpdated)}</Text>
+              </>
+            )}
+            {refreshing && <ActivityIndicator size={11} color={theme.colors.primary[400]} />}
+          </View>
+        )}
       </View>
 
       {/* Hero summary row */}
@@ -877,6 +934,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.lg,
     paddingHorizontal: theme.spacing.xl,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
+  manualRefreshBtn: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    marginTop: 2,
+  },
+  updateInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+  },
+  updateInfoText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  updateInfoTextWarn: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.warning[400],
   },
   errorText: {
     fontSize: theme.typography.body,
