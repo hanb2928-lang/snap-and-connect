@@ -265,18 +265,18 @@ export default function CameraScreen() {
         );
       }, 3000);
 
-      clearInterval(progressTimer);
-
-      setProgressStep(2);
-      setProgressText('결과 페이지로 이동 중...');
-      progressWidth.value = withTiming(0.9, { duration: 300 });
-
       const { scanId } = await startAsyncAnalysis(
         firstB64,
         'image/jpeg',
         'multi',
         multiShots.slice(1),
       );
+
+      clearInterval(progressTimer);
+
+      setProgressStep(2);
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -438,9 +438,6 @@ export default function CameraScreen() {
     _uri: string,
     mimeType: string,
   ) => {
-    const dataUrl = buildDataUrl(base64, mimeType);
-    const fileName = `scan-${Date.now()}`;
-
     try {
       setProgressStep(1);
       setProgressText('AI 분석 중...');
@@ -453,12 +450,6 @@ export default function CameraScreen() {
         );
       }, 3000);
 
-      clearInterval(progressTimer);
-
-      setProgressStep(2);
-      setProgressText('결과 페이지로 이동 중...');
-      progressWidth.value = withTiming(0.9, { duration: 300 });
-
       const { scanId } = await startAsyncAnalysis(
         base64,
         mimeType,
@@ -466,6 +457,12 @@ export default function CameraScreen() {
         [],
         templateMode === 'auto' ? undefined : preferredStyle,
       );
+
+      clearInterval(progressTimer);
+
+      setProgressStep(2);
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1081,9 +1078,6 @@ function WebUploadScreen() {
   }, []);
 
   const processImage = async (base64: string, mimeType: string) => {
-    const dataUrl = buildDataUrl(base64, mimeType);
-    const fileName = `scan-${Date.now()}`;
-
     try {
       setProgressStep(1);
       setProgressText('AI 분석 중...');
@@ -1096,17 +1090,17 @@ function WebUploadScreen() {
         );
       }, 3000);
 
-      clearInterval(progressTimer);
-
-      setProgressStep(2);
-      setProgressText('결과 페이지로 이동 중...');
-      progressWidth.value = withTiming(0.9, { duration: 300 });
-
       const { scanId } = await startAsyncAnalysis(
         base64,
         mimeType,
         recognitionMode,
       );
+
+      clearInterval(progressTimer);
+
+      setProgressStep(2);
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
 
       setProgressStep(3);
       setProgressText('완료!');
@@ -1170,18 +1164,18 @@ function WebUploadScreen() {
         );
       }, 3000);
 
-      clearInterval(progressTimer);
-
-      setProgressStep(2);
-      setProgressText('결과 페이지로 이동 중...');
-      progressWidth.value = withTiming(0.9, { duration: 300 });
-
       const { scanId } = await startAsyncAnalysis(
         multiShots[0],
         'image/jpeg',
         'multi',
         multiShots.slice(1),
       );
+
+      clearInterval(progressTimer);
+
+      setProgressStep(2);
+      setProgressText('결과 페이지로 이동 중...');
+      progressWidth.value = withTiming(0.9, { duration: 300 });
 
       setProgressStep(3);
       setProgressText('완료!');
