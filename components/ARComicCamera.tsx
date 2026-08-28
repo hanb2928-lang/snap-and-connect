@@ -923,7 +923,7 @@ export function ARComicCamera({
       )}
 
       {recognitionMode === 'multi' && multiShots.length > 0 && (
-        <View style={styles.multiShotStripInline} pointerEvents="auto">
+        <View style={styles.multiShotStripFloating} pointerEvents="auto">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1506,13 +1506,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     zIndex: 15,
   },
-  multiShotStripInline: {
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+  multiShotStripFloating: {
+    position: 'absolute',
+    bottom: 180,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.md,
+    zIndex: 15,
   },
   multiShotScroll: {
     gap: 8,
