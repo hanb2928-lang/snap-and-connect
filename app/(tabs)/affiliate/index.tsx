@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -51,6 +51,7 @@ import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { StepIndicator } from '@/components/StepIndicator';
+import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
@@ -164,7 +165,7 @@ export default function AffiliateScreen() {
     loadData();
   }, [loadData]);
 
-  const totalRevenue = revenue.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const totalRevenue = useMemo(() => revenue.reduce((sum, r) => sum + (r.amount || 0), 0), [revenue]);
 
   const markCompleted = (key: StepKey) => {
     setCompletedSteps((prev) => {
@@ -208,13 +209,13 @@ export default function AffiliateScreen() {
     }
   };
 
-  const isConfigured = (key: string): boolean => {
+  const isConfigured = useCallback((key: string): boolean => {
     if (!settings) return false;
     if (key === 'Coupang') return !!settings.coupang_partners_id;
     if (key === 'Toss') return !!settings.toss_share_id;
     if (key === 'BrandConnect') return !!settings.naver_shopping_id;
     return false;
-  };
+  }, [settings]);
 
   // Step 1: Pick photo — goes through CapturePreviewModal
   const handlePickPhoto = async () => {
@@ -316,20 +317,23 @@ export default function AffiliateScreen() {
     markCompleted('upload');
   };
 
-  const imagePreviewUri = selectedImage
-    ? mediaType === 'photo' && selectedImage.startsWith('data:')
-      ? selectedImage
-      : mediaType === 'photo'
-        ? buildDataUrl(selectedImage, selectedImageMime)
-        : selectedImage
-    : null;
+  const imagePreviewUri = useMemo(
+    () => selectedImage
+      ? mediaType === 'photo' && selectedImage.startsWith('data:')
+        ? selectedImage
+        : mediaType === 'photo'
+          ? buildDataUrl(selectedImage, selectedImageMime)
+          : selectedImage
+      : null,
+    [selectedImage, mediaType, selectedImageMime],
+  );
 
-  const activeStep = (() => {
+  const activeStep = useMemo(() => {
     for (let i = 0; i < STEP_ORDER.length; i++) {
       if (!completedSteps.has(STEP_ORDER[i])) return i + 1;
     }
     return STEP_ORDER.length;
-  })();
+  }, [completedSteps]);
 
   return (
     <View style={styles.container}>
@@ -343,6 +347,12 @@ export default function AffiliateScreen() {
           <ErrorRetryBanner message={loadError} onRetry={loadData} retrying={loading} />
         )}
 
+        {loading && !loadError && (
+          <SkeletonList count={4} />
+        )}
+
+        {!loading && (
+          <>
         {/* Header */}
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
@@ -900,6 +910,8 @@ export default function AffiliateScreen() {
             팁: 카메라 탭에서 촬영 후 결과 화면의 '쇼핑커넥트'에서도 제휴 링크를 바로 추가할 수 있습니다. 정기적으로 콘텐츠를 올리면 노출이 늘어납니다.
           </Text>
         </View>
+        </>
+        )}
       </ScrollView>
 
       {/* CapturePreviewModal — same as camera tab */}

@@ -133,6 +133,7 @@ export default function ResultScreen() {
   const [styleAppliedKey, setStyleAppliedKey] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [ttsUrl, setTtsUrl] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
@@ -181,7 +182,7 @@ export default function ResultScreen() {
   }, [fetchScan]);
 
   useEffect(() => {
-    if (!scan || scan.tts_url) return;
+    if (!scan || scan.tts_url || ttsUrl) return;
     const interval = setInterval(() => {
       supabase
         .from('scans')
@@ -190,16 +191,16 @@ export default function ResultScreen() {
         .maybeSingle()
         .then(({ data }) => {
           if (data?.tts_url && mountedRef.current) {
-            setScan((prev) => (prev ? { ...prev, tts_url: data.tts_url } : prev));
+            setTtsUrl(data.tts_url);
           }
         });
     }, 5000);
     return () => clearInterval(interval);
-  }, [scan]);
+  }, [scan, ttsUrl]);
 
   // Re-check TTS URL when app returns to foreground
   useEffect(() => {
-    if (!scan || scan.tts_url) return;
+    if (!scan || scan.tts_url || ttsUrl) return;
     const subscription = AppState.addEventListener('change', (nextAppState: string) => {
       if (nextAppState === 'active' && mountedRef.current) {
         Promise.resolve(
@@ -210,13 +211,13 @@ export default function ResultScreen() {
             .maybeSingle()
         ).then(({ data }) => {
           if (data?.tts_url && mountedRef.current) {
-            setScan((prev) => (prev ? { ...prev, tts_url: data.tts_url } : prev));
+            setTtsUrl(data.tts_url);
           }
         }).catch(() => {});
       }
     });
     return () => subscription.remove();
-  }, [scan]);
+  }, [scan, ttsUrl]);
 
   // Realtime subscription for async analysis job completion
   useEffect(() => {
@@ -359,7 +360,7 @@ export default function ResultScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [scan]);
+  }, [scan?.edited_image_url, scan?.image_url]);
 
   const handleUseGeneratedImage = useCallback((url: string) => {
     setCaptureImageUrl(url);
@@ -462,13 +463,13 @@ export default function ResultScreen() {
     }
   };
 
-  const detectedProducts: DetectedProduct[] = scan?.detected_products ?? [];
-  const selectedProduct = detectedProducts[selectedProductIndex] ?? null;
-  const activeProductName = selectedProduct?.productName || scan?.product_name || '';
-  const activePriceEstimate = selectedProduct?.priceEstimate || scan?.price_estimate || '';
-  const activeShoppingMatches = selectedProduct?.shoppingMatches ?? scan?.shopping_matches ?? [];
-  const activeTemplateData = selectedProduct?.templateData ?? scan?.template_data;
-  const activeOneLiner = selectedProduct?.oneLiner || scan?.one_liner || '';
+  const detectedProducts: DetectedProduct[] = useMemo(() => scan?.detected_products ?? [], [scan?.detected_products]);
+  const selectedProduct = useMemo(() => detectedProducts[selectedProductIndex] ?? null, [detectedProducts, selectedProductIndex]);
+  const activeProductName = useMemo(() => selectedProduct?.productName || scan?.product_name || '', [selectedProduct, scan?.product_name]);
+  const activePriceEstimate = useMemo(() => selectedProduct?.priceEstimate || scan?.price_estimate || '', [selectedProduct, scan?.price_estimate]);
+  const activeShoppingMatches = useMemo(() => selectedProduct?.shoppingMatches ?? scan?.shopping_matches ?? [], [selectedProduct, scan?.shopping_matches]);
+  const activeTemplateData = useMemo(() => selectedProduct?.templateData ?? scan?.template_data, [selectedProduct, scan?.template_data]);
+  const activeOneLiner = useMemo(() => selectedProduct?.oneLiner || scan?.one_liner || '', [selectedProduct, scan?.one_liner]);
 
   const currentAffiliateLinks: AffiliateLink[] = useMemo(() => {
     if (!scan) return [];
@@ -1146,7 +1147,7 @@ export default function ResultScreen() {
               productCategory={selectedProduct?.productCategory || scan.product_category || ''}
               narrationText={activeHook || activeOneLiner}
               affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
-              preloadedKoreanTtsUrl={scan.tts_url}
+              preloadedKoreanTtsUrl={ttsUrl || scan.tts_url}
             />
           ),
         },

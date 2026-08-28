@@ -1,12 +1,22 @@
 import { supabaseAnonKey } from '@/lib/supabase';
+import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
 
 interface SafeFetchOptions extends RequestInit {
   timeoutMs?: number;
   retries?: number;
+  cacheKey?: string;
+  cacheTtlMs?: number;
 }
 
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 800;
+
+const inflightGets = new Map<string, Promise<Response>>();
+
+function isCacheableGet(options: SafeFetchOptions): boolean {
+  const method = (options.method || 'GET').toUpperCase();
+  return method === 'GET' && !options.body;
+}
 
 function isRetryableError(err: unknown): boolean {
   if (err instanceof ApiError) {
@@ -36,7 +46,34 @@ export async function safeFetch(
   url: string,
   options: SafeFetchOptions = {},
 ): Promise<Response> {
+  const { timeoutMs = 60000, retries = MAX_RETRIES, cacheKey, cacheTtlMs, ...fetchOptions } = options;
+
+  if (isCacheableGet(options)) {
+    const key = cacheKey || url;
+    if (inflightGets.has(key)) {
+      return inflightGets.get(key)!;
+    }
+    const promise = doFetch(url, { timeoutMs, retries, ...fetchOptions }, cacheKey, cacheTtlMs)
+      .finally(() => inflightGets.delete(key));
+    inflightGets.set(key, promise);
+    return promise;
+  }
+
+  return doFetch(url, { timeoutMs, retries, ...fetchOptions }, cacheKey, cacheTtlMs);
+}
+
+async function doFetch(
+  url: string,
+  options: SafeFetchOptions,
+  cacheKey?: string,
+  cacheTtlMs?: number,
+): Promise<Response> {
   const { timeoutMs = 60000, retries = MAX_RETRIES, ...fetchOptions } = options;
+
+  if (cacheKey) {
+    const cached = await getCached<Response>(cacheKey);
+    if (cached) return cached;
+  }
 
   let lastError: unknown = null;
 
@@ -80,9 +117,20 @@ export async function safeFetch(
         throw new ApiError('서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.', response.status);
       }
 
+      if (cacheKey && response.ok) {
+        const cloned = response.clone();
+        cloned.json().then((data) => setCached(cacheKey, data)).catch(() => {});
+      }
+
       return response;
     } catch (err) {
       clearTimeout(timeoutId);
+
+      if (cacheKey && err instanceof Error && /failed to fetch|network|abort/i.test(err.message)) {
+        const stale = await getStaleCached<Response>(cacheKey);
+        if (stale) return stale;
+      }
+
       if (err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))) {
         lastError = new ApiError('요청 시간이 초과되었습니다. 네트워크 환경을 확인 후 다시 시도해주세요.', 408);
       } else if (err instanceof ApiError) {

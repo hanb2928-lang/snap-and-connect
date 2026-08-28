@@ -1,5 +1,5 @@
+import { memo } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 
 const STEP_COLORS = [
@@ -23,8 +23,7 @@ interface StepIndicatorProps {
   stepCount?: number;
 }
 
-export function StepIndicator({ activeStep = 1, stepCount }: StepIndicatorProps) {
-  const router = useRouter();
+function StepIndicatorInner({ activeStep = 1, stepCount }: StepIndicatorProps) {
   const steps = stepCount ? STEPS.slice(0, stepCount) : STEPS;
 
   return (
@@ -74,6 +73,8 @@ export function StepIndicator({ activeStep = 1, stepCount }: StepIndicatorProps)
     </View>
   );
 }
+
+export const StepIndicator = memo(StepIndicatorInner);
 
 const styles = StyleSheet.create({
   container: {

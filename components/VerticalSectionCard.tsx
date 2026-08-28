@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Platform } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
 import { Check } from 'lucide-react-native';
@@ -16,7 +16,7 @@ interface VerticalSectionCardProps {
   completed?: boolean;
 }
 
-export function VerticalSectionCard({
+function VerticalSectionCardInner({
   icon,
   title,
   desc,
@@ -27,9 +27,12 @@ export function VerticalSectionCard({
   stepNumber,
   completed,
 }: VerticalSectionCardProps) {
-  const glowStyle = accentColor && Platform.OS === 'web'
-    ? { shadowColor: accentColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 0 }
-    : undefined;
+  const glowStyle = useMemo(
+    () => accentColor && Platform.OS === 'web'
+      ? { shadowColor: accentColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 0 }
+      : undefined,
+    [accentColor],
+  );
 
   const wasCompleted = useRef(false);
   const checkScale = useSharedValue(0);
@@ -82,6 +85,8 @@ export function VerticalSectionCard({
     </Animated.View>
   );
 }
+
+export const VerticalSectionCard = memo(VerticalSectionCardInner);
 
 const styles = StyleSheet.create({
   section: {
