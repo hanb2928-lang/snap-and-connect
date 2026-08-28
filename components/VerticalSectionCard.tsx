@@ -24,7 +24,7 @@ export function VerticalSectionCard({
   stepNumber,
   completed,
 }: VerticalSectionCardProps) {
-  const glowStyle = accentColor
+  const glowStyle = accentColor && Platform.OS === 'web'
     ? { shadowColor: accentColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 0 }
     : undefined;
 

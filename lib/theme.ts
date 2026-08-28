@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+
+const _isWeb = Platform.OS === 'web';
+
 export const theme = {
   colors: {
     primary: {
@@ -143,11 +147,19 @@ export const theme = {
       elevation: 0,
     },
   },
-  glass: {
-    surface: 'rgba(19, 26, 46, 0.72)',
-    surfaceLight: 'rgba(30, 39, 64, 0.6)',
-    border: 'rgba(255, 255, 255, 0.08)',
-    borderActive: 'rgba(89, 189, 255, 0.25)',
-    highlight: 'rgba(255, 255, 255, 0.04)',
-  },
+  glass: _isWeb
+    ? {
+        surface: 'rgba(19, 26, 46, 0.72)',
+        surfaceLight: 'rgba(30, 39, 64, 0.6)',
+        border: 'rgba(255, 255, 255, 0.08)',
+        borderActive: 'rgba(89, 189, 255, 0.25)',
+        highlight: 'rgba(255, 255, 255, 0.04)',
+      }
+    : {
+        surface: '#131a2e',
+        surfaceLight: '#1e2740',
+        border: '#2a3454',
+        borderActive: '#2a4a6b',
+        highlight: '#1e2740',
+      },
 } as const;

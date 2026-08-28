@@ -33,7 +33,7 @@ export function StepIndicator({ activeStep = 1 }: StepIndicatorProps) {
           : isDone
             ? STEP_COLORS[index]
             : theme.colors.dark.textFaint;
-        const glowStyle = isActive
+        const glowStyle = isActive && Platform.OS === 'web'
           ? { shadowColor: STEP_COLORS[index], shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 0 }
           : undefined;
 
