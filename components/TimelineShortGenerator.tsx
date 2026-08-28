@@ -17,6 +17,7 @@ import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getLogoUrl, drawLogoWatermark } from '@/lib/logoWatermark';
 import { drawRoamingBabyWithLink, preloadBabyImage, getBabyImageSync } from '@/lib/canvasOverlay';
+import { getUserSettings } from '@/lib/settings';
 import { friendlyError } from '@/lib/errors';
 import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
@@ -274,6 +275,8 @@ function WebTimelineGenerator({
     try {
       if (!imageUrl) throw new Error('이미지가 준비되지 않았어요');
       await preloadBabyImage().catch(() => {});
+      const settingsData = await getUserSettings().catch(() => null);
+      const mascotEnabled = settingsData?.mascot_enabled ?? true;
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const canvas = document.createElement('canvas');
       canvas.width = CANVAS_W;
@@ -423,7 +426,7 @@ function WebTimelineGenerator({
 
         // Draw roaming baby + link sticker overlay into the video frame
         if (shortUrl) {
-          drawRoamingBabyWithLink(ctx, elapsed * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor);
+          drawRoamingBabyWithLink(ctx, elapsed * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor, mascotEnabled);
         }
 
         if (t < 1) {

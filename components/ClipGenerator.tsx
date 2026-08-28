@@ -12,6 +12,7 @@ import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
 import { drawRoamingBabyWithLink, preloadBabyImage } from '@/lib/canvasOverlay';
+import { getUserSettings } from '@/lib/settings';
 import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
@@ -426,6 +427,7 @@ function WebClipGenerator({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [livePreviewPlaying, setLivePreviewPlaying] = useState(false);
+  const [mascotEnabled, setMascotEnabled] = useState(true);
   const [cloudSaving, setCloudSaving] = useState(false);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
@@ -437,6 +439,12 @@ function WebClipGenerator({
   const previewRafRef = useRef<number | null>(null);
   const previewImgRef = useRef<any>(null);
   const previewStartTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => { if (mounted && s) setMascotEnabled(s.mascot_enabled ?? true); }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -727,7 +735,7 @@ function WebClipGenerator({
         }
 
         if (shortUrl && t < 0.667) {
-          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor);
+          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor, mascotEnabled);
         }
 
         if (t >= 0.667) {
@@ -778,6 +786,8 @@ function WebClipGenerator({
         throw new Error('이미지가 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요');
       }
       await preloadBabyImage().catch(() => {});
+      const settingsData = await getUserSettings().catch(() => null);
+      const mascotEnabled = settingsData?.mascot_enabled ?? true;
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const L = getLayout(format);
       const canvas = document.createElement('canvas');
@@ -1037,7 +1047,7 @@ function WebClipGenerator({
 
         // Baby + link sticker composited into the video frame
         if (shortUrl && t < 0.667) {
-          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor);
+          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor, mascotEnabled);
         }
 
         // Disclosure text (last ~2 seconds)

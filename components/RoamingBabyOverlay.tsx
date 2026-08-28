@@ -12,6 +12,7 @@ import Animated, {
 import { ExternalLink } from 'lucide-react-native';
 import { CrawlingBaby } from '@/components/CrawlingBaby';
 import { theme } from '@/lib/theme';
+import { useMascotSettings, shouldShowMascot } from '@/hooks/useMascotSettings';
 
 interface RoamingBabyOverlayProps {
   linkUrl?: string;
@@ -30,6 +31,7 @@ export function RoamingBabyOverlay({
   babySize = 44,
   color = theme.colors.primary[300],
 }: RoamingBabyOverlayProps) {
+  const mascot = useMascotSettings();
   const posX = useSharedValue(0);
   const posY = useSharedValue(0);
   const dotScale = useSharedValue(1);
@@ -113,6 +115,8 @@ export function RoamingBabyOverlay({
       Linking.openURL(linkUrl).catch(() => {});
     }
   };
+
+  if (!shouldShowMascot(mascot)) return null;
 
   return (
     <View style={styles.overlayContainer} pointerEvents="box-none">

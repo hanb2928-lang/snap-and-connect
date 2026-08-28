@@ -22,6 +22,7 @@ import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
+import { getUserSettings } from '@/lib/settings';
 import { DURATION_PRESETS, DEFAULT_DURATION, getRecommendedDuration, tierLabel, tierColor, getTierForDuration } from '@/lib/durationPresets';
 import type { PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
@@ -129,8 +130,9 @@ function buildWebViewHTML(params: {
   hybridMode: HybridMode;
   tagText: string;
   disclosureText: string;
+  mascotEnabled: boolean;
 }): string {
-  const { imageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode, tagText, disclosureText } = params;
+  const { imageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode, tagText, disclosureText, mascotEnabled } = params;
   const { width: W, height: H } = FORMATS[format];
   const hashtagStr = hashtags.slice(0, 8).map((h) => `#${h}`).join(' ');
   const hasHashtags = hashtags.length > 0 ? 'true' : 'false';
@@ -158,6 +160,7 @@ function buildWebViewHTML(params: {
   var motionPreset=${JSON.stringify(motionPreset)};
   var hybridMode=${JSON.stringify(hybridMode)};
   var cardStyle=${JSON.stringify(cardStyle)};
+  var mascotEnabled=${mascotEnabled ? 'true' : 'false'};
   var FPS=${FPS};
   var imageUrl=${JSON.stringify(imageUrl)};
 
@@ -424,7 +427,7 @@ function buildWebViewHTML(params: {
         ctx.textAlign='left';ctx.globalAlpha=1;}
 
       // Baby + link sticker composited into the video frame
-      if(shortUrl&&t<0.667){
+      if(shortUrl&&t<0.667&&mascotEnabled){
         __drawRoamingBabyWithLink(ctx,elapsed,W,H,shortUrl,accentColor);
       }
 
@@ -513,6 +516,13 @@ export function MobileClipGenerator({
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [webviewKey, setWebviewKey] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
+  const [mascotEnabled, setMascotEnabled] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    getUserSettings().then((s) => { if (mounted && s) setMascotEnabled(s.mascot_enabled ?? true); }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -728,7 +738,8 @@ export function MobileClipGenerator({
     hybridMode,
     tagText: STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT',
     disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms),
-  }), [safeImageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode]);
+    mascotEnabled,
+  }), [safeImageUrl, hook, title, hashtags, accentColor, affiliatePlatforms, shortUrl, duration, format, cardStyle, musicMood, motionPreset, hybridMode, mascotEnabled]);
   const isVertical = format === 'vertical';
 
   return (

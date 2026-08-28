@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Sparkles, Camera, Scan, Film, Trophy, ShoppingBag } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { useMascotSettings, shouldShowMascot } from '@/hooks/useMascotSettings';
 
 type ProgressStep = 0 | 1 | 2 | 3;
 
@@ -39,6 +40,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 export function ProgressBarBabyRun({ progressSV, step, text }: ProgressBarBabyRunProps) {
+  const mascot = useMascotSettings();
   const babyX = useSharedValue(0);
   const bodyBob = useSharedValue(0);
   const armLeft = useSharedValue(0);
@@ -131,6 +133,39 @@ export function ProgressBarBabyRun({ progressSV, step, text }: ProgressBarBabyRu
   const sparkleStyle = useAnimatedStyle(() => ({ opacity: sparkleOpacity.value }));
 
   const sw = 2;
+
+  if (!shouldShowMascot(mascot)) {
+    const progressPct = isComplete ? 100 : Math.round(Math.max(0, Math.min(progressSV.value, 1)) * 100);
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>{isComplete ? '완료!' : '제작 중...'}</Text>
+        <View style={styles.minimalTrackWrap}>
+          <View style={styles.minimalTrackBg}>
+            <Animated.View style={[styles.minimalTrackFill, { width: `${progressPct}%` }]} />
+          </View>
+          {MILESTONES.map((m, i) => {
+            const pos = (i / (MILESTONES.length - 1)) * 100;
+            const reached = step >= i + 1 || isComplete;
+            const MIcon = m.icon;
+            return (
+              <View key={i} style={[styles.minimalMilestone, { left: `${pos}%` }]}>
+                <View style={[styles.milestoneDot, reached && styles.milestoneDotReached]}>
+                  <MIcon size={12} color={reached ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2.5} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        <Text style={styles.subtext}>{text}</Text>
+        {isComplete && (
+          <View style={styles.trophyRow}>
+            <Trophy size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.trophyText}>콘텐츠 완성</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -266,6 +301,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 4,
     top: 8,
+  },
+  minimalTrackWrap: {
+    width: TRACK_WIDTH,
+    height: 44,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  minimalTrackBg: {
+    width: '100%',
+    height: 4,
+    backgroundColor: theme.colors.dark.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  minimalTrackFill: {
+    height: 4,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: 2,
+  },
+  minimalMilestone: {
+    position: 'absolute',
+    top: -2,
+    transform: [{ translateX: -12 }],
   },
   shoppingBagWrap: {
     position: 'absolute',

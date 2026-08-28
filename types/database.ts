@@ -123,6 +123,8 @@ export interface UserSettings {
   progress_style: string | null;
   auto_disclosure: boolean | null;
   brand_persona: string | null;
+  mascot_enabled: boolean | null;
+  mascot_style: string | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

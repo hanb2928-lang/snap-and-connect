@@ -28,6 +28,8 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
 import { formatKRW } from '@/lib/dashboard';
 import { OnboardingModal } from '@/components/OnboardingModal';
+import { useMascotSettings, shouldShowMascot, type MascotStyle } from '@/hooks/useMascotSettings';
+import { invalidateSettingsCache, updateUserSettings as persistUserSettings } from '@/lib/settings';
 
 export default function SettingsScreen() {
   const tabBarHeight = useTabBarHeight();
@@ -56,6 +58,9 @@ export default function SettingsScreen() {
   const [savedKey, setSavedKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const mascot = useMascotSettings();
+  const [savingMascot, setSavingMascot] = useState(false);
+  const [savedMascot, setSavedMascot] = useState(false);
   const [defaultVideoDuration, setDefaultVideoDuration] = useState('15s');
   const [defaultTtsVoice, setDefaultTtsVoice] = useState(DEFAULT_TTS_VOICE);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
@@ -779,6 +784,98 @@ export default function SettingsScreen() {
             </>
           )}
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>마스코트 캐릭터 설정</Text>
+        <Text style={styles.sectionDesc}>
+          영상과 화면에 표시되는 아기 캐릭터 마스코트를 켜거나 끌 수 있습니다. 비즈니스 계정이나 전문적인 톤이 필요하다면 마스코트를 끄거나 심플한 스타일로 변경하세요.
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.featureTitle}>마스코트 표시</Text>
+              <Text style={styles.featureDesc}>아기 캐릭터를 영상 오버레이, 진행 바, 화면 UI에 표시합니다</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                const next = !mascot.enabled;
+                mascot.updateEnabled(next);
+                setSavingMascot(true);
+                persistUserSettings({ mascot_enabled: next }).then(() => {
+                  invalidateSettingsCache();
+                  setSavingMascot(false);
+                  setSavedMascot(true);
+                  setTimeout(() => setSavedMascot(false), 2000);
+                }).catch(() => setSavingMascot(false));
+              }}
+              activeOpacity={0.7}
+              hitSlop={12}
+            >
+              <View style={[styles.toggleSwitch, mascot.enabled && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, mascot.enabled && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {mascot.enabled && (
+            <>
+              <Divider />
+              <Text style={styles.idInputLabel}>마스코트 스타일</Text>
+              <Text style={styles.ttsCategoryLabel}>표시할 캐릭터 스타일을 선택하세요</Text>
+              <View style={styles.progressStyleRow}>
+                <TouchableOpacity
+                  style={[styles.progressStyleCard, mascot.style === 'cute-crawler' && styles.progressStyleCardActive]}
+                  onPress={() => {
+                    mascot.updateStyle('cute-crawler');
+                    persistUserSettings({ mascot_style: 'cute-crawler' }).then(() => invalidateSettingsCache()).catch(() => {});
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.progressStyleIcon, mascot.style === 'cute-crawler' && styles.progressStyleIconActive]}>
+                    <Baby size={22} color={mascot.style === 'cute-crawler' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.progressStyleName, mascot.style === 'cute-crawler' && styles.progressStyleNameActive]}>아기 크롤러</Text>
+                  <Text style={styles.progressStyleDesc}>귀여운 3D 아기</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.progressStyleCard, mascot.style === 'minimal-dot' && styles.progressStyleCardActive]}
+                  onPress={() => {
+                    mascot.updateStyle('minimal-dot');
+                    persistUserSettings({ mascot_style: 'minimal-dot' }).then(() => invalidateSettingsCache()).catch(() => {});
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.progressStyleIcon, mascot.style === 'minimal-dot' && styles.progressStyleIconActive]}>
+                    <CircleDot size={22} color={mascot.style === 'minimal-dot' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.progressStyleName, mascot.style === 'minimal-dot' && styles.progressStyleNameActive]}>심플 닷</Text>
+                  <Text style={styles.progressStyleDesc}>미니멀 인디케이터</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.progressStyleCard, mascot.style === 'none' && styles.progressStyleCardActive]}
+                  onPress={() => {
+                    mascot.updateStyle('none');
+                    persistUserSettings({ mascot_style: 'none' }).then(() => invalidateSettingsCache()).catch(() => {});
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.progressStyleIcon, mascot.style === 'none' && styles.progressStyleIconActive]}>
+                    <Activity size={22} color={mascot.style === 'none' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.progressStyleName, mascot.style === 'none' && styles.progressStyleNameActive]}>표시 안 함</Text>
+                  <Text style={styles.progressStyleDesc}>마스코트 없음</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+        {savingMascot && (
+          <Text style={styles.mascotSavingHint}>저장 중...</Text>
+        )}
+        {savedMascot && (
+          <Text style={styles.mascotSavedHint}>마스코트 설정이 저장되었습니다</Text>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -2822,5 +2919,19 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     textAlign: 'center',
+  },
+  mascotSavingHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  mascotSavedHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

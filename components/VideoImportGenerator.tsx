@@ -5,6 +5,7 @@ import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { drawRoamingBabyWithLink, preloadBabyImage } from '@/lib/canvasOverlay';
+import { getUserSettings } from '@/lib/settings';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
@@ -355,6 +356,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
     try {
       await preloadBabyImage().catch(() => {});
+      const settingsData = await getUserSettings().catch(() => null);
+      const mascotEnabled = settingsData?.mascot_enabled ?? true;
       const { width: W, height: H } = FORMATS[format];
       const canvas = document.createElement('canvas');
       canvas.width = W;
@@ -561,7 +564,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         }
 
         if (shortUrl) {
-          drawRoamingBabyWithLink(ctx, elapsed * 1000, W, H, shortUrl, theme.colors.primary[500]);
+          drawRoamingBabyWithLink(ctx, elapsed * 1000, W, H, shortUrl, theme.colors.primary[500], mascotEnabled);
         }
 
         if (elapsed < totalDuration) {

@@ -247,8 +247,9 @@ export function drawRoamingBabyWithLink(
   canvasH: number,
   shortUrl: string,
   color: string,
+  enabled: boolean = true,
 ): void {
-  if (!shortUrl) return;
+  if (!shortUrl || !enabled) return;
 
   const baby = computeBabyPosition(elapsed, canvasW, canvasH, canvasW, canvasH);
   const pulseT = (elapsed / 1000) * 0.7;
