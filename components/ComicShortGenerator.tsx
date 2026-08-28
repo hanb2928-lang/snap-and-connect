@@ -22,6 +22,8 @@ import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { getOpenAiVoiceParams } from '@/lib/ttsVoices';
+import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
 import type { PunchMarker } from '@/hooks/useSoundPunch';
@@ -1046,6 +1048,7 @@ export function ComicShortGenerator({
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [narrationAudioDataUrl, setNarrationAudioDataUrl] = useState<string | null>(null);
+  const [ttsVoice, setTtsVoice] = useState<string | null>(null);
   const [mbtiMode, setMbtiMode] = useState(true);
   const [emotionOverlay, setEmotionOverlay] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -1305,6 +1308,17 @@ export function ComicShortGenerator({
     if (ttsEnabled && narrationText) {
       setTtsLoading(true);
       try {
+        let resolvedVoiceKey = ttsVoice;
+        if (!resolvedVoiceKey) {
+          try {
+            const userSettings = await getUserSettings();
+            resolvedVoiceKey = userSettings?.default_tts_voice || null;
+            setTtsVoice(resolvedVoiceKey);
+          } catch {
+            // use default
+          }
+        }
+        const voiceParams = getOpenAiVoiceParams(resolvedVoiceKey || '');
         const ttsResponse = await safeFetch(TTS_FUNCTION_URL, {
           method: 'POST',
           headers: {
@@ -1313,8 +1327,8 @@ export function ComicShortGenerator({
           },
           body: JSON.stringify({
             text: narrationText,
-            voice: 'alloy',
-            speed: 1.0,
+            voice: voiceParams.voice,
+            speed: voiceParams.speed,
           }),
           timeoutMs: 15000,
         });
@@ -1384,7 +1398,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl]);
 
 
 

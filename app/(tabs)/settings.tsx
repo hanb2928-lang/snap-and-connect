@@ -20,6 +20,7 @@ import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
 import { uploadAssetBlob } from '@/lib/savedAssets';
 import { clearLogoCache } from '@/lib/logoWatermark';
+import { TTS_VOICES, DEFAULT_TTS_VOICE } from '@/lib/ttsVoices';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -55,7 +56,7 @@ export default function SettingsScreen() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [defaultVideoDuration, setDefaultVideoDuration] = useState('15s');
-  const [defaultTtsVoice, setDefaultTtsVoice] = useState('alloy');
+  const [defaultTtsVoice, setDefaultTtsVoice] = useState(DEFAULT_TTS_VOICE);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
@@ -74,7 +75,7 @@ export default function SettingsScreen() {
       setLogoUrl(data?.logo_url || null);
       setOpenaiKey(data?.openai_api_key || '');
       setDefaultVideoDuration(data?.default_video_duration || '15s');
-      setDefaultTtsVoice(data?.default_tts_voice || 'alloy');
+      setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
       setAutoDisclosure(data?.auto_disclosure ?? true);
       setBrandPersona(data?.brand_persona || '');
     } catch {
@@ -469,14 +470,54 @@ export default function SettingsScreen() {
           </View>
           <Divider />
           <Text style={styles.idInputLabel}>기본 TTS 음성</Text>
+          <Text style={styles.ttsCategoryLabel}>남성 - 쇼핑호스트</Text>
           <View style={styles.platformPickerRow}>
-            {[
-              { key: 'alloy', label: '알로이' },
-              { key: 'echo', label: '에코' },
-              { key: 'verse', label: '버스' },
-              { key: 'onyx', label: '오닉스' },
-              { key: 'shimmer', label: '시머' },
-            ].map((v) => (
+            {TTS_VOICES.filter((v) => v.gender === 'male' && v.style === 'shopping').map((v) => (
+              <TouchableOpacity
+                key={v.key}
+                style={[styles.platformChip, defaultTtsVoice === v.key && styles.platformChipActive]}
+                onPress={() => setDefaultTtsVoice(v.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.platformChipText, defaultTtsVoice === v.key && styles.platformChipTextActive]}>
+                  {v.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.ttsCategoryLabel}>남성 - 아나운서</Text>
+          <View style={styles.platformPickerRow}>
+            {TTS_VOICES.filter((v) => v.gender === 'male' && v.style === 'announcer').map((v) => (
+              <TouchableOpacity
+                key={v.key}
+                style={[styles.platformChip, defaultTtsVoice === v.key && styles.platformChipActive]}
+                onPress={() => setDefaultTtsVoice(v.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.platformChipText, defaultTtsVoice === v.key && styles.platformChipTextActive]}>
+                  {v.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.ttsCategoryLabel}>여성 - 쇼핑호스트</Text>
+          <View style={styles.platformPickerRow}>
+            {TTS_VOICES.filter((v) => v.gender === 'female' && v.style === 'shopping').map((v) => (
+              <TouchableOpacity
+                key={v.key}
+                style={[styles.platformChip, defaultTtsVoice === v.key && styles.platformChipActive]}
+                onPress={() => setDefaultTtsVoice(v.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.platformChipText, defaultTtsVoice === v.key && styles.platformChipTextActive]}>
+                  {v.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.ttsCategoryLabel}>여성 - 아나운서</Text>
+          <View style={styles.platformPickerRow}>
+            {TTS_VOICES.filter((v) => v.gender === 'female' && v.style === 'announcer').map((v) => (
               <TouchableOpacity
                 key={v.key}
                 style={[styles.platformChip, defaultTtsVoice === v.key && styles.platformChipActive]}
@@ -2213,6 +2254,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  ttsCategoryLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    marginTop: 10,
+    marginBottom: 6,
   },
   platformChip: {
     paddingHorizontal: theme.spacing.md,

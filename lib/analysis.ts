@@ -150,6 +150,19 @@ export async function saveScan(
 }
 
 async function generateAndUploadTTS(scanId: string, text: string): Promise<void> {
+  let voice = 'alloy';
+  let speed = 1.0;
+  try {
+    const settings = await getUserSettings();
+    if (settings?.default_tts_voice) {
+      const { getOpenAiVoiceParams } = await import('@/lib/ttsVoices');
+      const params = getOpenAiVoiceParams(settings.default_tts_voice);
+      voice = params.voice;
+      speed = params.speed;
+    }
+  } catch {
+    // use defaults
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   const response = await fetch(TTS_FUNCTION_URL, {
@@ -158,7 +171,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ text, voice: 'ko-KR', speed: 1.0 }),
+    body: JSON.stringify({ text, voice, speed }),
     signal: controller.signal,
   });
   clearTimeout(timeoutId);
