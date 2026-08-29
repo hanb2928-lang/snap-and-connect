@@ -681,7 +681,7 @@ export function MobileClipGenerator({
     generateTimeoutRef.current = setTimeout(() => {
       setState((prev) => {
         if (prev === 'generating') {
-          showToast('생 시간이 초과됐어요. 다시 시도해주세요');
+          showToast('생성 시간이 초과됐어요. 다시 시도해주세요');
           return 'error';
         }
         return prev;

@@ -10,6 +10,7 @@ import Animated, {
   withDelay,
   Easing,
   useDerivedValue,
+  cancelAnimation,
   type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Circle, Path, Ellipse, Defs, RadialGradient, Stop, LinearGradient } from 'react-native-svg';
@@ -112,7 +113,11 @@ function CircularProgress({ progress, label, color, hint }: VideoProgressIndicat
   }, [progress, progressSV, progressWidth]);
 
   useEffect(() => {
-    if (progress >= 100) return;
+    if (progress >= 100) {
+      cancelAnimation(shimmerX);
+      cancelAnimation(glowOpacity);
+      return;
+    }
     shimmerX.value = withRepeat(
       withTiming(200, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
       -1, false,
@@ -124,6 +129,10 @@ function CircularProgress({ progress, label, color, hint }: VideoProgressIndicat
       ),
       -1, false,
     );
+    return () => {
+      cancelAnimation(shimmerX);
+      cancelAnimation(glowOpacity);
+    };
   }, [progress, shimmerX, glowOpacity]);
 
   const barStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value}%` as unknown as DimensionValue }));
@@ -181,7 +190,15 @@ function BabyRunProgress({ progress, label, color, hint }: VideoProgressIndicato
   }, [progress, progressSV]);
 
   useEffect(() => {
-    if (isComplete) return;
+    if (isComplete) {
+      cancelAnimation(bodyBob);
+      cancelAnimation(armLeft);
+      cancelAnimation(armRight);
+      cancelAnimation(legLeft);
+      cancelAnimation(legRight);
+      cancelAnimation(headBob);
+      return;
+    }
     const hc = 600;
     bodyBob.value = withRepeat(withSequence(withTiming(-1.2, { duration: hc, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: hc, easing: Easing.inOut(Easing.sin) })), -1, false);
     armLeft.value = withRepeat(withSequence(withTiming(1, { duration: hc, easing: Easing.inOut(Easing.sin) }), withTiming(-1, { duration: hc, easing: Easing.inOut(Easing.sin) })), -1, false);
@@ -189,6 +206,14 @@ function BabyRunProgress({ progress, label, color, hint }: VideoProgressIndicato
     legLeft.value = withRepeat(withSequence(withTiming(1, { duration: hc, easing: Easing.inOut(Easing.sin) }), withTiming(-1, { duration: hc, easing: Easing.inOut(Easing.sin) })), -1, false);
     legRight.value = withRepeat(withSequence(withTiming(-1, { duration: hc, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: hc, easing: Easing.inOut(Easing.sin) })), -1, false);
     headBob.value = withRepeat(withSequence(withTiming(-0.6, { duration: hc, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: hc, easing: Easing.inOut(Easing.sin) })), -1, false);
+    return () => {
+      cancelAnimation(bodyBob);
+      cancelAnimation(armLeft);
+      cancelAnimation(armRight);
+      cancelAnimation(legLeft);
+      cancelAnimation(legRight);
+      cancelAnimation(headBob);
+    };
   }, [isComplete, bodyBob, armLeft, armRight, legLeft, legRight, headBob]);
 
   const maxRange = TRACK_W - BABY_SIZE - 4;
@@ -286,14 +311,23 @@ function StatusBarProgress({ progress, label, color, hint }: VideoProgressIndica
     if (isComplete) {
       mouthOpen.value = withRepeat(withSequence(withTiming(2.5, { duration: 200 }), withTiming(0, { duration: 300 })), -1, false);
     }
+    return () => {
+      cancelAnimation(bodyBob);
+      cancelAnimation(eyeScale);
+      cancelAnimation(mouthOpen);
+    };
   }, [bodyBob, eyeScale, mouthOpen, isComplete]);
 
   useEffect(() => {
-    if (isComplete) return;
+    if (isComplete) {
+      cancelAnimation(shimmerX);
+      return;
+    }
     shimmerX.value = withRepeat(
       withTiming(200, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
       -1, false,
     );
+    return () => { cancelAnimation(shimmerX); };
   }, [isComplete, shimmerX]);
 
   const headProps = useAnimatedProps(() => ({ cy: 14 + bodyBob.value }));

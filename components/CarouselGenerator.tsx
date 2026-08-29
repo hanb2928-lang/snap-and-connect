@@ -70,9 +70,11 @@ export function CarouselGenerator({
   const lastScrollUpdate = useRef(0);
   const rafRef = useRef<number | null>(null);
   const recorderRef = useRef<any>(null);
+  const canvasStreamRef = useRef<any>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoUrlRef = useRef<string | null>(null);
   videoUrlRef.current = videoUrl;
+  const mountedRef = useRef(true);
   const tpl = useHybridTemplate(
     { category: detectedProducts[0]?.productCategory, platform: platform as string, productName: detectedProducts[0]?.productName, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
     theme.colors.accent[400],
@@ -82,9 +84,13 @@ export function CarouselGenerator({
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (recorderRef.current && recorderRef.current.state !== 'inactive') {
         try { recorderRef.current.stop(); } catch { /* ignore */ }
+      }
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
       }
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
@@ -176,6 +182,7 @@ export function CarouselGenerator({
       }
 
       const canvasStream = (canvas as any).captureStream(FPS);
+      canvasStreamRef.current = canvasStream;
       const mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
@@ -285,14 +292,21 @@ export function CarouselGenerator({
 
       const blob = await done;
       recorderRef.current = null;
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
-      setExportState('done');
-      setExportProgress(100);
+      if (mountedRef.current) { setExportState('done'); setExportProgress(100); }
       showToast('20초 동영상이 생성됐어요');
     } catch {
       recorderRef.current = null;
-      setExportState('error');
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
+      if (mountedRef.current) setExportState('error');
       showToast('동영상 생성에 실패했어요');
     }
   }, [slides, showToast]);

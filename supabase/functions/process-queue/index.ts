@@ -43,13 +43,19 @@ Deno.serve(async (req: Request) => {
   try {
     const processed: Array<{ id: string; status: string; error?: string }> = [];
 
+    await recoverStaleJobs();
+
     for (let i = 0; i < MAX_JOBS_PER_RUN; i++) {
       const job = await dequeueJob();
       if (!job) break;
 
       try {
         const result = await processJob(job);
-        await markJobDone(job.id, result);
+        try {
+          await markJobDone(job.id, result);
+        } catch (markErr) {
+          console.error('markJobDone failed for job', job.id, markErr);
+        }
         processed.push({ id: job.id, status: "done" });
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
@@ -157,7 +163,7 @@ async function markJobDone(jobId: string, result: Record<string, unknown>): Prom
 }
 
 async function markJobError(jobId: string, attempts: number, errorMsg: string): Promise<void> {
-  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
+  const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
       apikey: serviceRoleKey,
@@ -171,10 +177,13 @@ async function markJobError(jobId: string, attempts: number, errorMsg: string): 
       completed_at: new Date().toISOString(),
     }),
   });
+  if (!resp.ok) {
+    console.error(`markJobError failed for job ${jobId}: ${resp.status}`);
+  }
 }
 
 async function requeueJob(jobId: string, attempts: number, errorMsg: string): Promise<void> {
-  await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
+  const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
       apikey: serviceRoleKey,
@@ -187,6 +196,32 @@ async function requeueJob(jobId: string, attempts: number, errorMsg: string): Pr
       error_message: errorMsg,
     }),
   });
+  if (!resp.ok) {
+    console.error(`requeueJob failed for job ${jobId}: ${resp.status}`);
+  }
+}
+
+async function recoverStaleJobs(): Promise<void> {
+  const staleThreshold = new Date(Date.now() - JOB_TIMEOUT_MS).toISOString();
+  try {
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/render_jobs?status=eq.processing&started_at=lt.${staleThreshold}`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "queued" }),
+      },
+    );
+    if (!resp.ok) {
+      console.warn(`recoverStaleJobs PATCH failed: ${resp.status}`);
+    }
+  } catch (err) {
+    console.warn('recoverStaleJobs error', err instanceof Error ? err.message : String(err));
+  }
 }
 
 async function processJob(job: RenderJob): Promise<Record<string, unknown>> {

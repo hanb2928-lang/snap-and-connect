@@ -48,22 +48,35 @@ Deno.serve(async (req: Request) => {
 
     const enhancedPrompt = enhancePrompt(body.prompt);
 
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: enhancedPrompt,
-        n: 1,
-        size,
-        quality,
-        style,
-        response_format: "b64_json",
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let response: Response;
+    try {
+      response = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "dall-e-3",
+          prompt: enhancedPrompt,
+          n: 1,
+          size,
+          quality,
+          style,
+          response_format: "b64_json",
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      return new Response(
+        JSON.stringify({ error: "이미지 생성 요청 시간이 초과되었습니다." }),
+        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errText = await response.text();

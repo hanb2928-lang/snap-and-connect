@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -48,12 +48,25 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    };
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setStep('processing');
     setError(null);
     setResultImage(null);
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
       const response = await fetch(`${supabaseUrl}/functions/v1/generate-image`, {
@@ -69,7 +82,9 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
           quality: 'standard',
           n: 1,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: '이미지 생성에 실패했습니다.' }));
@@ -82,6 +97,7 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
         throw new Error('이미지를 생성하지 못했습니다.');
       }
 
+      if (!mountedRef.current) return;
       setResultImage(data.image);
       setRevisedPrompt(data.revisedPrompt ?? null);
       setStep('done');
@@ -90,8 +106,16 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
         onResult(data.image, data.mimeType ?? 'image/png');
       }
     } catch (err) {
+      clearTimeout(timeoutId);
+      if (controller.signal.aborted) {
+        if (mountedRef.current) { setError('이미지 생성 시간이 초과되었습니다.'); setStep('error'); }
+        return;
+      }
+      if (!mountedRef.current) return;
       setError(friendlyError(err, '이미지 생성에 실패했습니다. 다시 시도해주세요.'));
       setStep('error');
+    } finally {
+      abortRef.current = null;
     }
   }, [prompt, size, stylePreset, onResult]);
 

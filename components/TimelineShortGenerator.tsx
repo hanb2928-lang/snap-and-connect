@@ -233,6 +233,12 @@ function WebTimelineGenerator({
   const [cloudSaving, setCloudSaving] = useState(false);
   const [videoMime, setVideoMime] = useState('video/webm');
   const rafRef = useRef<number | null>(null);
+  const recorderRef = useRef<any>(null);
+  const canvasStreamRef = useRef<any>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const cancelledRef = useRef(false);
   const tpl = useHybridTemplate(
     { category: null, platform: platform as string, productName: title, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: accentColor, fallbackCardStyle: 'bold' },
     accentColor,
@@ -246,12 +252,23 @@ function WebTimelineGenerator({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
+      cancelledRef.current = true;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (recorderTimerRef.current) clearTimeout(recorderTimerRef.current);
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+      }
     };
   }, []);
 
@@ -265,6 +282,7 @@ function WebTimelineGenerator({
   }, []);
 
   const generateClip = useCallback(async () => {
+    cancelledRef.current = false;
     setState('generating');
     setProgress(0);
     if (videoUrl) {
@@ -303,6 +321,7 @@ function WebTimelineGenerator({
 
       if (hasRecorder) {
         const canvasStream = (canvas as any).captureStream(FPS);
+        canvasStreamRef.current = canvasStream;
         mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
           ? 'video/webm;codecs=vp9'
           : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
@@ -312,6 +331,7 @@ function WebTimelineGenerator({
           mimeType,
           videoBitsPerSecond: 6000000,
         });
+        recorderRef.current = recorder;
         const chunks: any[] = [];
         recorder.ondataavailable = (e: any) => {
           if (e.data.size > 0) chunks.push(e.data);
@@ -433,7 +453,7 @@ function WebTimelineGenerator({
         if (t < 1) {
           rafRef.current = requestAnimationFrame(drawFrame);
         } else {
-          setTimeout(() => {
+          recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') recorder.stop();
           }, 150);
         }
@@ -443,21 +463,37 @@ function WebTimelineGenerator({
 
       if (hasRecorder) {
         const blob = await done;
+        if (cancelledRef.current) return;
+        if (canvasStreamRef.current) {
+          try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+          canvasStreamRef.current = null;
+        }
+        recorderRef.current = null;
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
         setVideoMime(mimeType);
       } else {
         await new Promise<void>((resolve) => setTimeout(resolve, duration + 200));
+        if (cancelledRef.current) return;
         const dataUrl = canvas.toDataURL('image/png');
         const blob = await (await fetch(dataUrl)).blob();
+        if (cancelledRef.current) return;
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
         setVideoMime('image/png');
       }
-      setState('done');
-      setProgress(100);
+      if (mountedRef.current) { setState('done'); setProgress(100); }
     } catch (err) {
-      setState('error');
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      recorderRef.current = null;
+      if (cancelledRef.current) return;
+      if (mountedRef.current) setState('error');
       showToast(friendlyError(err, '생성에 실패했어요. 다시 시도해주세요.'));
     }
   }, [imageUrl, hook, title, hashtags, accentColor, fileName, affiliatePlatforms, shortUrl, productAdvantages, oneLiner, duration, mode, phasesKey, videoUrl, showToast]);

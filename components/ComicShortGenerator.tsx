@@ -1165,6 +1165,7 @@ export function ComicShortGenerator({
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webGenCleanupRef = useRef<(() => void) | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
   const [webviewKey, setWebviewKey] = useState(0);
 
@@ -1207,6 +1208,7 @@ export function ComicShortGenerator({
   useEffect(() => {
     return () => {
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (webGenCleanupRef.current) {
         webGenCleanupRef.current();
         webGenCleanupRef.current = null;
@@ -1222,7 +1224,8 @@ export function ComicShortGenerator({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   const stateRef = useRef(state);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,11 @@ export function AICutGenerator({ sourceImage, onResult }: AICutGeneratorProps) {
   const [beatSync, setBeatSync] = useState<string>('micro');
   const [segments, setSegments] = useState<CutSegment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const handlePickSource = useCallback(async () => {
     setError(null);
@@ -112,11 +117,13 @@ export function AICutGenerator({ sourceImage, onResult }: AICutGeneratorProps) {
       }
 
       setSegments(generated);
+      if (!mountedRef.current) return;
       setStep('done');
       if (onResult) {
         onResult(generated);
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(friendlyError(err, '컷 분할 생성에 실패했습니다.'));
       setStep('error');
     }
