@@ -67,7 +67,8 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
-import { getDeepLink, getCaptionTemplate, buildPlatformCaption, getCaptionStyleDescription, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
+import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
+import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -427,6 +428,19 @@ export default function AffiliateScreen() {
     });
   };
 
+  const handleCopyText = async (text: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const { default: Clipboard } = await import('expo-clipboard');
+        await Clipboard.setStringAsync(text);
+      }
+    } catch {
+      // clipboard failed
+    }
+  };
+
   const handleOneTapCopyAndOpen = async (key: string) => {
     const built = buildPlatformCaption(
       key as UploadPlatformKey,
@@ -475,18 +489,6 @@ export default function AffiliateScreen() {
     setUploadPlatform(key);
     markCompleted('upload');
   };
-
-  const platformCaptionData = useMemo(() => {
-    if (!uploadPlatform) return null;
-    return buildPlatformCaption(
-      uploadPlatform as UploadPlatformKey,
-      contentText,
-      affiliateUrl,
-      selectedPlatform ? [selectedPlatform] : [],
-      autoDisclosure,
-      disclosurePlacement,
-    );
-  }, [uploadPlatform, contentText, affiliateUrl, selectedPlatform, autoDisclosure, disclosurePlacement]);
 
   const imagePreviewUri = useMemo(
     () => selectedImage
@@ -1313,30 +1315,26 @@ export default function AffiliateScreen() {
             })}
           </View>
 
-          {/* Platform-specific caption preview for the selected platform */}
-          {platformCaptionData && uploadPlatform && (
-            <View style={styles.platformCaptionPreviewBox}>
-              <Text style={styles.platformCaptionPreviewLabel}>
-                {UPLOAD_PLATFORMS.find((p) => p.key === uploadPlatform)?.label} 맞춤 캡션
-              </Text>
-              <Text style={styles.platformCaptionStyleHint}>
-                {getCaptionStyleDescription(uploadPlatform as UploadPlatformKey)}
-              </Text>
-              <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
-              <Text style={styles.platformCaptionText}>
-                {platformCaptionData.fullText}
-              </Text>
-              {platformCaptionData.commentText && (
-                <>
-                  <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
-                  <Text style={styles.platformCaptionPreviewLabel}>댓글용 공정위 문구</Text>
-                  <Text style={styles.platformCaptionText}>
-                    {platformCaptionData.commentText}
-                  </Text>
-                </>
-              )}
-            </View>
-          )}
+          {/* Per-platform algorithm-aware caption optimizer */}
+          <Text style={styles.optimizerSectionTitle}>플랫폼별 알고리즘 최적화 캡션</Text>
+          <Text style={styles.optimizerSectionDesc}>
+            각 플랫폼의 추천 알고리즘과 UX에 맞춰 제목, 본문, 해시태그, 공정위 문구 배치를 자동 최적화합니다. 섹션별로 복사할 수 있습니다.
+          </Text>
+          {UPLOAD_PLATFORMS.map((p) => (
+            <PlatformCaptionOptimizer
+              key={p.key}
+              platformKey={p.key as UploadPlatformKey}
+              platformLabel={p.label}
+              platformColor={p.color}
+              contentText={contentText}
+              affiliateUrl={affiliateUrl}
+              disclosurePlatforms={selectedPlatform ? [selectedPlatform] : []}
+              autoDisclosure={autoDisclosure}
+              disclosurePlacement={disclosurePlacement}
+              isActive={uploadPlatform === p.key}
+              onCopy={handleCopyText}
+            />
+          ))}
 
           {/* Upload checklist */}
           {uploadedPlatforms.size > 0 && (
@@ -2764,6 +2762,20 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     lineHeight: 16,
+  },
+  optimizerSectionTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginTop: theme.spacing.md,
+    marginBottom: 2,
+  },
+  optimizerSectionDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginBottom: theme.spacing.sm,
   },
   uploadChecklistBox: {
     backgroundColor: theme.colors.dark.surfaceLight,
