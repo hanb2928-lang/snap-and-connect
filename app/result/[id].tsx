@@ -66,6 +66,8 @@ import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
 import { VariantGenerator, type Variant } from '@/components/VariantGenerator';
+import { SmartScheduler } from '@/components/SmartScheduler';
+import { BellRing } from 'lucide-react-native';
 import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
@@ -1211,6 +1213,23 @@ export default function ResultScreen() {
               affiliateUrl={primaryAffiliateUrl}
               shortUrl={shortUrl}
               affiliatePlatforms={affiliatePlatforms}
+            />
+          ),
+        },
+        {
+          key: 'smartScheduler',
+          label: '스마트 업로드 알림',
+          description: '골든타임 예약 푸시 알림과 원클릭 캡션 복사',
+          category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <BellRing size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <SmartScheduler
+              scanId={scan.id}
+              caption={baseCaption}
+              hashtags={allDisplayHashtags}
+              affiliateUrl={shortUrl || primaryAffiliateUrl || undefined}
+              platform={activePlatform}
             />
           ),
         },
