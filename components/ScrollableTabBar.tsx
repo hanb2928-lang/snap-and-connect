@@ -79,9 +79,11 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
     <>
       <View style={[styles.container, { paddingBottom: 8 + bottomPadding, minHeight: 62 + bottomPadding }]}>
         <View style={styles.tabRow}>
-          {state.routes.map((route, index) => {
-            const isFocused = state.index === index;
-            const Icon = TAB_ICONS[route.name] || Settings;
+          {state.routes
+            .filter((route) => TAB_ICONS[route.name] !== undefined)
+            .map((route) => {
+            const isFocused = state.index === state.routes.findIndex((r) => r.name === route.name);
+            const Icon = TAB_ICONS[route.name];
             const label = t(TAB_KEYS[route.name] || '', route.name);
             const hasBadge = badges?.[route.name] === true;
 
