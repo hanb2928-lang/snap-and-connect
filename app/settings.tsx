@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -242,6 +242,38 @@ export default function SettingsScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingTop: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {/* API Health Check Badges */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>API 연동 상태</Text>
+        <View style={styles.healthCheckRow}>
+          {[
+            { label: '쿠팡', value: coupangId, color: '#FF3E3E', icon: 'C' },
+            { label: '네이버', value: naverId, color: '#03C75A', icon: 'N' },
+            { label: '토스', value: tossId, color: '#0064FF', icon: 'T' },
+            { label: 'OpenAI', value: openaiKey, color: theme.colors.primary[400], icon: 'AI' },
+          ].map((item, i) => {
+            const isSet = item.value && item.value.trim().length > 0;
+            return (
+              <View key={i} style={[styles.healthBadge, isSet ? styles.healthBadgeOk : styles.healthBadgeErr]}>
+                <View style={[styles.healthBadgeIcon, { backgroundColor: isSet ? item.color + '20' : theme.colors.dark.surfaceLight }]}>
+                  {isSet ? (
+                    <Check size={12} color={item.color} strokeWidth={2.5} />
+                  ) : (
+                    <XCircle size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  )}
+                </View>
+                <Text style={[styles.healthBadgeLabel, isSet ? { color: theme.colors.dark.text } : { color: theme.colors.dark.textDim }]}>
+                  {item.label}
+                </Text>
+                <Text style={[styles.healthBadgeStatus, isSet ? styles.healthBadgeStatusOk : styles.healthBadgeStatusErr]}>
+                  {isSet ? '연결됨' : '미설정'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>구독 플랜 및 결제</Text>
         <Text style={styles.sectionDesc}>
@@ -2149,5 +2181,48 @@ const styles = StyleSheet.create({
     color: theme.colors.success[400],
     textAlign: 'center',
     marginTop: 8,
+  },
+  healthCheckRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  healthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+  },
+  healthBadgeOk: {
+    backgroundColor: theme.colors.success[500] + '0D',
+    borderColor: theme.colors.success[500] + '40',
+  },
+  healthBadgeErr: {
+    backgroundColor: theme.colors.error[500] + '08',
+    borderColor: theme.colors.error[500] + '30',
+  },
+  healthBadgeIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  healthBadgeLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  healthBadgeStatus: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.medium,
+  },
+  healthBadgeStatusOk: {
+    color: theme.colors.success[400],
+  },
+  healthBadgeStatusErr: {
+    color: theme.colors.error[400],
   },
 });
