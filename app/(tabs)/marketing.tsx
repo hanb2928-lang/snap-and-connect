@@ -24,6 +24,9 @@ import {
   Film,
   Sparkles,
   X,
+  Store,
+  Tag,
+  TrendingUp,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -77,7 +80,16 @@ export default function MarketingScreen() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const lastActionRef = useRef(0);
+
+  const STORE_HOOK_CHIPS = [
+    { key: 'new_menu', label: '오늘 우리 동네 신메뉴 특가!', icon: Store, color: theme.colors.warning[400] },
+    { key: 'limited', label: '재료 소진 전 마지막 기회', icon: Flame, color: theme.colors.error[400] },
+    { key: 'best_seller', label: '이 동네 1위 베스트셀러', icon: TrendingUp, color: theme.colors.primary[400] },
+    { key: 'seasonal', label: '계절 한정! 이맘때만 맛볼 수 있어요', icon: Tag, color: theme.colors.accent[400] },
+    { key: 'combo', label: '꿀조합 발견! 같이 시키면 최고', icon: Sparkles, color: theme.colors.success[400] },
+  ] as const;
 
   useEffect(() => {
     (async () => {
@@ -167,7 +179,10 @@ export default function MarketingScreen() {
           await setItem('marketing_affiliate_priority', 'false');
         }
       } catch {}
-      router.push('/affiliate' as never);
+      if (selectedHook) {
+        await setItem('marketing_selected_hook', selectedHook);
+      }
+      router.push('/' as never);
     } catch {
       // navigation failure — reset so user can retry
     } finally {
@@ -287,6 +302,32 @@ export default function MarketingScreen() {
               </View>
             </View>
           )}
+        </View>
+
+        {/* AI Store Promo Hook Chips */}
+        <View style={styles.hookSection}>
+          <View style={styles.hookHeader}>
+            <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.hookTitle}>AI 매장 홍보 훅 문구</Text>
+          </View>
+          <Text style={styles.hookDesc}>사장님 매장에 맞는 오프닝 문구를 선택하세요</Text>
+          <View style={styles.hookChipRow}>
+            {STORE_HOOK_CHIPS.map((chip) => {
+              const Icon = chip.icon;
+              const selected = selectedHook === chip.key;
+              return (
+                <TouchableOpacity
+                  key={chip.key}
+                  style={[styles.hookChip, selected && { borderColor: chip.color, backgroundColor: chip.color + '15' }]}
+                  onPress={() => setSelectedHook(selected ? null : chip.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={13} color={selected ? chip.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.hookChipText, selected && { color: chip.color }]} numberOfLines={1}>{chip.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Selected product summary */}
@@ -635,6 +676,50 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.success[500] + '20',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  hookSection: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: 8,
+  },
+  hookHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hookTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  hookDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  hookChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hookChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    maxWidth: '100%',
+  },
+  hookChipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    flexShrink: 1,
   },
   selectedSummary: {
     flexDirection: 'row',

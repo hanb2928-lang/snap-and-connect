@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash } from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
@@ -633,6 +633,14 @@ export default function AssetsScreen() {
                     <Repeat2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
                     <Text style={styles.modalRemixText}>리믹스</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalKarrotBtn} onPress={() => { Linking.openURL('https://www.daangn.com/').catch(() => {}); }} activeOpacity={0.8}>
+                    <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.modalKarrotText}>당근배포</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalQrBtn} onPress={() => { if (Platform.OS === 'web' && previewAsset.share_url) { const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(previewAsset.share_url)}`; const a = document.createElement('a'); a.href = qrUrl; a.download = `qr-${previewAsset.file_name}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); } }} activeOpacity={0.8} disabled={!previewAsset.share_url}>
+                    <QrCode size={16} color={theme.colors.success[400]} strokeWidth={2} />
+                    <Text style={styles.modalQrText}>QR 다운</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.modalDownloadBtn} onPress={() => handleDownload(previewAsset)} activeOpacity={0.8}>
                     <Download size={16} color="#fff" strokeWidth={2} />
                     <Text style={styles.modalDownloadText}>다운로드</Text>
@@ -1005,6 +1013,10 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' },
   modalRemixBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.accent[500] + '15' },
   modalRemixText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.accent[400] },
+  modalKarrotBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.warning[500] + '15' },
+  modalKarrotText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.warning[400] },
+  modalQrBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.success[500] + '15' },
+  modalQrText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.success[400] },
   modalDownloadBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.primary[500] },
   modalDownloadText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
   modalDeleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.error[500] + '15' },
