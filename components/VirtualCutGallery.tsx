@@ -54,6 +54,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
   const [shared, setShared] = useState<number | null>(null);
   const [progressMessage, setProgressMessage] = useState(PROGRESS_MESSAGES[0]);
   const [queueStatus, setQueueStatus] = useState<JobStatus | 'idle'>('idle');
+  const [backgroundPreset, setBackgroundPreset] = useState<string>('studio');
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressStepRef = useRef(0);
   const isGeneratingRef = useRef(false);
@@ -115,7 +116,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       setQueueStatus('processing');
       const jobResult = await enqueueAndWait<Record<string, unknown>>(
         'virtual-cuts',
-        { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory },
+        { imageDataUrl: preparedImage, mimeType: 'image/png', productName, productCategory, backgroundPreset },
         { timeoutMs: 300000 },
       );
       if (targetImage !== imageRef.current) return;
@@ -148,7 +149,7 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
       setLoading(false);
       isGeneratingRef.current = false;
     }
-  }, [imageDataUrl, productName, productCategory, startProgressCycle, stopProgressCycle]);
+  }, [imageDataUrl, productName, productCategory, backgroundPreset, startProgressCycle, stopProgressCycle]);
 
   const handleUseCut = useCallback(
     (cut: VirtualCut) => {
@@ -318,6 +319,29 @@ export function VirtualCutGallery({ imageDataUrl, productName, productCategory, 
           </View>
         )}
       </TouchableOpacity>
+
+      <View style={styles.optionSection}>
+        <Text style={styles.optionLabel}>배경 분위기 프리셋</Text>
+        <View style={styles.chipRow}>
+          {[
+            { key: 'studio', label: '스튜디오' },
+            { key: 'cafe', label: '모던 카페' },
+            { key: 'home', label: '감성 자취방' },
+            { key: 'street', label: '야외 스트릿' },
+            { key: 'department', label: '백화점' },
+            { key: 'outdoor', label: '아웃도어' },
+          ].map(opt => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.chip, backgroundPreset === opt.key && styles.chipActive]}
+              onPress={() => setBackgroundPreset(opt.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chipText, backgroundPreset === opt.key && styles.chipTextActive]}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       {error && (
         <View style={styles.errorBanner}>
@@ -647,6 +671,42 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.micro,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],
+  },
+  optionSection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    gap: 4,
+  },
+  optionLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  chipActive: {
+    backgroundColor: theme.colors.accent[500] + '25',
+    borderColor: theme.colors.accent[400],
+  },
+  chipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  chipTextActive: {
+    color: theme.colors.accent[400],
   },
   gallerySection: {
     paddingBottom: theme.spacing.md,

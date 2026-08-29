@@ -12,7 +12,17 @@ interface CutRequest {
   mimeType?: string;
   productName?: string;
   productCategory?: string;
+  backgroundPreset?: string;
 }
+
+const BG_PRESETS: Record<string, string> = {
+  studio: 'clean studio background',
+  cafe: 'modern cafe interior with warm ambient lighting',
+  home: 'cozy minimalist apartment with natural light',
+  street: 'urban street scene with natural daylight',
+  department: 'luxury department store display floor',
+  outdoor: 'outdoor park setting with soft natural lighting',
+};
 
 type CutAngle = 'front' | 'side' | 'detail' | 'full';
 
@@ -33,6 +43,7 @@ Deno.serve(async (req: Request) => {
     const mimeType = String(raw?.mimeType ?? 'image/jpeg');
     const productName = String(raw?.productName ?? '');
     const productCategory = String(raw?.productCategory ?? '');
+    const backgroundPreset = String(raw?.backgroundPreset ?? 'studio');
 
     if (!imageDataUrl) {
       return new Response(
@@ -53,7 +64,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { cuts, failedCount, totalRequested } = await generateVirtualCuts(
-      sanitizedDataUrl, openaiKey, productName || "", productCategory || "",
+      sanitizedDataUrl, openaiKey, productName || "", productCategory || "", backgroundPreset,
     );
 
     return new Response(
@@ -190,16 +201,20 @@ async function generateVirtualCuts(
   apiKey: string,
   productName: string,
   productCategory: string,
+  backgroundPreset: string,
 ): Promise<{ cuts: VirtualCut[]; failedCount: number; totalRequested: number }> {
   const contextHint = productName || productCategory
     ? ` This is a ${productCategory || 'product'}${productName ? ` called "${productName}"` : ''}.`
+    : '';
+  const bgHint = backgroundPreset && backgroundPreset !== 'studio'
+    ? ` Scene setting: ${BG_PRESETS[backgroundPreset] || BG_PRESETS.studio}.`
     : '';
 
   const errors: string[] = [];
   const results = await Promise.all(
     CUT_PROMPTS.map(async (cut) => {
       try {
-        const b64 = await editWithOpenAI(imageDataUrl, apiKey, cut.prompt + contextHint);
+        const b64 = await editWithOpenAI(imageDataUrl, apiKey, cut.prompt + contextHint + bgHint);
         const imageUrl = await uploadToStorage(b64, 'image/png');
         return {
           angle: cut.angle,

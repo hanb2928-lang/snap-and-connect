@@ -12,7 +12,38 @@ interface FittingRequest {
   mimeType?: string;
   productName?: string;
   productCategory?: string;
+  bodyType?: string;
+  ageGroup?: string;
+  backgroundPreset?: string;
 }
+
+type BodyType = 'female' | 'male' | 'unisex';
+type AgeGroup = '20s' | '30s' | '40s' | 'all';
+
+interface BodyPreset {
+  bodyType: BodyType;
+  ageGroup: AgeGroup;
+  label: string;
+  prompt: string;
+}
+
+const BODY_PRESETS: BodyPreset[] = [
+  { bodyType: 'female', ageGroup: '20s', label: '여성 20대', prompt: 'A young Asian woman in her early 20s' },
+  { bodyType: 'female', ageGroup: '30s', label: '여성 30대', prompt: 'An Asian woman in her 30s' },
+  { bodyType: 'female', ageGroup: '40s', label: '여성 40대', prompt: 'An Asian woman in her 40s' },
+  { bodyType: 'male', ageGroup: '20s', label: '남성 20대', prompt: 'A young Asian man in his early 20s' },
+  { bodyType: 'male', ageGroup: '30s', label: '남성 30대', prompt: 'An Asian man in his 30s' },
+  { bodyType: 'male', ageGroup: '40s', label: '남성 40대', prompt: 'An Asian man in his 40s' },
+];
+
+const BG_PRESETS: Record<string, string> = {
+  studio: 'clean studio background',
+  cafe: 'modern cafe interior with warm ambient lighting',
+  home: 'cozy minimalist apartment with natural light',
+  street: 'urban street scene with natural daylight',
+  department: 'luxury department store display floor',
+  outdoor: 'outdoor park setting with soft natural lighting',
+};
 
 type ModelType = 'asian-female-young' | 'asian-male-young' | 'western-female' | 'western-male' | 'asian-female-30s' | 'asian-male-30s';
 
@@ -33,6 +64,9 @@ Deno.serve(async (req: Request) => {
     const mimeType = String(raw?.mimeType ?? 'image/jpeg');
     const productName = String(raw?.productName ?? '');
     const productCategory = String(raw?.productCategory ?? '');
+    const bodyType = String(raw?.bodyType ?? 'all');
+    const ageGroup = String(raw?.ageGroup ?? 'all');
+    const backgroundPreset = String(raw?.backgroundPreset ?? 'studio');
 
     if (!imageDataUrl) {
       return new Response(
@@ -57,6 +91,9 @@ Deno.serve(async (req: Request) => {
       openaiKey,
       productName || "",
       productCategory || "",
+      bodyType,
+      ageGroup,
+      backgroundPreset,
     );
 
     return new Response(
@@ -164,53 +201,48 @@ async function resolveOpenAIKey(): Promise<string | null> {
   return Deno.env.get("OPENAI_API_KEY") ?? null;
 }
 
-const MODEL_PRESETS: { type: ModelType; label: string; prompt: string }[] = [
-  {
-    type: 'asian-female-young',
-    label: '아시아 여성 20대',
-    prompt: 'A young Asian woman in her early 20s wearing this product, professional fashion photography, natural lighting, clean studio background, full body shot, fashion catalog style',
-  },
-  {
-    type: 'asian-male-young',
-    label: '아시아 남성 20대',
-    prompt: 'A young Asian man in his early 20s wearing this product, professional fashion photography, natural lighting, clean studio background, full body shot, fashion catalog style',
-  },
-  {
-    type: 'western-female',
-    label: '서양 여성',
-    prompt: 'A Caucasian woman in her 20s wearing this product, professional fashion photography, soft natural lighting, clean studio background, full body shot, fashion catalog style',
-  },
-  {
-    type: 'asian-female-30s',
-    label: '아시아 여성 30대',
-    prompt: 'An Asian woman in her 30s wearing this product, professional fashion photography, warm natural lighting, clean studio background, full body shot, elegant fashion catalog style',
-  },
-];
+function resolvePresets(bodyType: string, ageGroup: string): BodyPreset[] {
+  if (bodyType === 'all' && ageGroup === 'all') return BODY_PRESETS;
+  return BODY_PRESETS.filter(p =>
+    (bodyType === 'all' || p.bodyType === bodyType) &&
+    (ageGroup === 'all' || p.ageGroup === ageGroup)
+  );
+}
+
+function buildFittingPrompt(preset: BodyPreset, backgroundPreset: string): string {
+  const bg = BG_PRESETS[backgroundPreset] || BG_PRESETS.studio;
+  return `${preset.prompt} wearing this product, professional fashion photography, natural lighting, ${bg}, full body shot, fashion catalog style`;
+}
 
 async function generateFittingImages(
   imageDataUrl: string,
   apiKey: string,
   productName: string,
   productCategory: string,
+  bodyType: string,
+  ageGroup: string,
+  backgroundPreset: string,
 ): Promise<{ results: FittingResult[]; failedCount: number; totalRequested: number }> {
   const contextHint = productName || productCategory
     ? ` This is a ${productCategory || 'fashion/beauty product'}${productName ? ` called "${productName}"` : ''}.`
     : ' This is a fashion or beauty product.';
 
+  const presets = resolvePresets(bodyType, ageGroup);
   const errors: string[] = [];
   const results = await Promise.all(
-    MODEL_PRESETS.map(async (preset) => {
+    presets.map(async (preset) => {
       try {
-        const b64 = await editWithOpenAI(imageDataUrl, apiKey, preset.prompt + contextHint);
+        const prompt = buildFittingPrompt(preset, backgroundPreset);
+        const b64 = await editWithOpenAI(imageDataUrl, apiKey, prompt + contextHint);
         const imageUrl = await uploadToStorage(b64, 'image/png');
         return {
-          modelType: preset.type,
+          modelType: preset.bodyType === 'female' ? 'asian-female-young' : 'asian-male-young',
           label: preset.label,
           imageUrl,
         } satisfies FittingResult;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`Fitting ${preset.type} failed:`, msg);
+        console.error(`Fitting ${preset.label} failed:`, msg);
         errors.push(`${preset.label}: ${msg}`);
         return null;
       }
