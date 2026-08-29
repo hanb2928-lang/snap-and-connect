@@ -16,7 +16,7 @@ export default function TabLayout() {
           s.tasks.some((t) => t.status === 'pending')
         );
         if (!cancelled) {
-          setBadges({ affiliate: hasPending });
+          setBadges({ marketing: hasPending });
         }
       } catch {
         if (!cancelled) setBadges({});
@@ -53,7 +53,6 @@ export default function TabLayout() {
       screenOptions={screenOptions}
     >
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="affiliate" />
       <Tabs.Screen name="marketing" />
       <Tabs.Screen name="assets" />
       <Tabs.Screen name="analytics" />

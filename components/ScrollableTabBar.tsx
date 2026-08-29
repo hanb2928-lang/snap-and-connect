@@ -29,7 +29,6 @@ import {
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
-  affiliate: ShoppingBag,
   marketing: Megaphone,
   assets: FolderOpen,
   analytics: BarChart3,
@@ -37,7 +36,6 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 
 const TAB_KEYS: Record<string, string> = {
   index: 'tab.camera',
-  affiliate: 'tab.affiliate',
   marketing: 'tab.marketing',
   assets: 'tab.assets',
   analytics: 'tab.analytics',

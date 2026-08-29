@@ -6,8 +6,9 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  TextInput,
   Linking,
-  Dimensions,
+  Platform,
   Image,
 } from 'react-native';
 import {
@@ -15,29 +16,20 @@ import {
   TrendingUp,
   Zap,
   Link2,
-  Calendar,
-  Globe,
-  Type,
-  Hash,
-  Sparkles,
-  Film,
-  Palette,
-  Volume2,
-  Users,
-  Rocket,
-  ArrowRight,
   Flame,
   Check,
   Lightbulb,
   Timer,
   QrCode,
   Shuffle,
-  Copy,
   ShoppingBag,
-  Scissors,
-  Music,
-  Play,
+  Users,
+  Sparkles,
+  ArrowRight,
+  Film,
   Dna,
+  Tag,
+  Globe,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -51,13 +43,9 @@ import { ViralProductFeed } from '@/components/ViralProductFeed';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { LinkInBioCard } from '@/components/LinkInBioCard';
-import { VariantGenerator } from '@/components/VariantGenerator';
-import { CopyWriter } from '@/components/CopyWriter';
-import { HashtagCopyBar } from '@/components/HashtagCopyBar';
-import { AICutGenerator } from '@/components/AICutGenerator';
-import type { PlatformKey } from '@/types/database';
-
-const { width: screenWidth } = Dimensions.get('window');
+import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
+import { validateAffiliateUrl } from '@/lib/affiliate';
+import { extractProductMeta } from '@/lib/analysis';
 
 const HOOK_TYPES = [
   { key: 'curiosity', label: '호기심 유발', desc: '이거 모르면 손해? 3초 멈춤 보장', icon: Lightbulb, color: theme.colors.warning[400] },
@@ -86,25 +74,16 @@ const TRENDING_KEYWORDS = [
   { tag: '#스트랩', category: '악세', heat: 70 },
 ];
 
-interface MarketingTool {
-  key: string;
-  label: string;
-  desc: string;
-  icon: typeof Megaphone;
-  color: string;
-  route?: string;
-}
-
-const MARKETING_TOOLS: MarketingTool[] = [
-  { key: 'copywriter', label: '마케팅 문구 생성', desc: 'AI가 제품에 맞춘 바이럴 카피를 자동 작성', icon: Type, color: theme.colors.primary[400], route: '/affiliate' },
-  { key: 'hashtag', label: '해시태그 추천', desc: '트렌드 기반 최적 해시태그 자동 생성', icon: Hash, color: theme.colors.accent[400], route: '/affiliate' },
-  { key: 'hook', label: '역발상 훅 생성기', desc: '3초 후킹 오프닝 3가지 타입으로 즉시 생성', icon: Zap, color: theme.colors.warning[400], route: '/affiliate' },
-  { key: 'shortlink', label: '단축 링크 관리', desc: '제휴 링크를 단축하고 클릭 추적', icon: Link2, color: theme.colors.success[400], route: '/affiliate/links' },
-  { key: 'scheduler', label: '스마트 예약', desc: '최적 업로드 시간대 자동 추천 및 예약', icon: Calendar, color: theme.colors.primary[300], route: '/affiliate/warmup' },
-  { key: 'localizer', label: '글로벌 현지화', desc: '다국어 번역 및 현지 해시태그 자동 적용', icon: Globe, color: theme.colors.accent[300], route: '/affiliate' },
-  { key: 'tts', label: '감정 곡선 TTS', desc: '3단계 감정 변화로 자연스러운 AI 성우 음성', icon: Volume2, color: theme.colors.success[400], route: '/affiliate' },
-  { key: 'persona', label: '크리에이터 페르소나', desc: '상위 1% 마케터 페르소나 시뮬레이션', icon: Users, color: theme.colors.warning[400], route: '/affiliate' },
+const QUICK_NAV_ITEMS = [
+  { key: 'viral', label: '떡상 꿀템', icon: Flame, color: theme.colors.warning[400] },
+  { key: 'url', label: 'URL 입력', icon: Link2, color: theme.colors.accent[400] },
+  { key: 'category', label: '카테고리', icon: Tag, color: theme.colors.primary[300] },
+  { key: 'hook', label: '3초 훅', icon: Zap, color: theme.colors.warning[400] },
+  { key: 'ab', label: 'A/B 테스트', icon: Dna, color: theme.colors.accent[400] },
+  { key: 'render', label: '영상 만들기', icon: Film, color: theme.colors.primary[400] },
 ];
+
+type PipelineStep = 1 | 2 | 3;
 
 export default function MarketingScreen() {
   const router = useRouter();
@@ -122,7 +101,22 @@ export default function MarketingScreen() {
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(3600);
   const [qrValue, setQrValue] = useState('https://example.com/your-link');
-  const linkInBioRef = useRef<View>(null);
+  const [activeStep, setActiveStep] = useState<PipelineStep>(1);
+
+  // Step 1: Product input state
+  const [affiliateUrl, setAffiliateUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [productMeta, setProductMeta] = useState<{
+    productName: string;
+    description: string;
+    price: string;
+    image: string;
+    platform: string;
+    brand: string;
+  } | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+
   const scrollRef = useRef<ScrollView>(null);
   const sectionRefs = useRef<Record<string, View | null>>({});
 
@@ -185,9 +179,7 @@ export default function MarketingScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -195,19 +187,9 @@ export default function MarketingScreen() {
     shuffleTags();
   };
 
-  const handleToolPress = (tool: MarketingTool) => {
-    if (tool.route) {
-      router.push(tool.route as never);
-    }
-  };
-
   const handleCopyTag = (tag: string) => {
     setCopiedTag(tag);
     setTimeout(() => setCopiedTag(null), 2000);
-  };
-
-  const handleStartGeneration = () => {
-    router.push('/affiliate' as never);
   };
 
   const formatCountdown = (seconds: number) => {
@@ -215,6 +197,57 @@ export default function MarketingScreen() {
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleSaveAffiliate = async () => {
+    if (!affiliateUrl.trim()) return;
+    const validation = validateAffiliateUrl(affiliateUrl);
+    if (!validation.valid) {
+      setExtractError(validation.error);
+      return;
+    }
+    setAffiliateUrl(validation.normalizedUrl);
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      const meta = await extractProductMeta(affiliateUrl.trim());
+      setProductMeta({
+        productName: meta.productName || '',
+        description: meta.description || '',
+        price: meta.price || '',
+        image: meta.image || '',
+        platform: meta.platform || '',
+        brand: meta.brand || '',
+      });
+      setSelectedProduct(meta.productName || '선택된 상품');
+      setActiveStep(2);
+      scrollToSection('hook');
+    } catch {
+      setProductMeta(null);
+      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 직접 입력하거나 다른 링크를 시도해주세요.');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleQuickProductSelect = (productName: string) => {
+    setSelectedProduct(productName);
+    setActiveStep(2);
+    scrollToSection('hook');
+  };
+
+  const handleHookSelect = (hookKey: string) => {
+    setSelectedHook(hookKey);
+    setActiveStep(3);
+    scrollToSection('render');
+  };
+
+  const handleStartGeneration = () => {
+    if (productMeta?.productName || selectedProduct) {
+      router.push('/affiliate' as never);
+    } else {
+      router.push('/affiliate' as never);
+    }
   };
 
   const totalRevenue = summary?.totalRevenue ?? 0;
@@ -229,18 +262,38 @@ export default function MarketingScreen() {
             <Megaphone size={22} color={theme.colors.primary[300]} strokeWidth={2.5} />
           </View>
           <View style={styles.headerTextBox}>
-            <Text style={styles.headerTitle}>마케팅</Text>
+            <Text style={styles.headerTitle}>마케팅 &amp; 제휴쇼핑</Text>
             <Text style={styles.headerSubtext}>
-              오늘 어떤 마케팅 전략으로 매출을 올리시겠습니까?
+              상품 선택 → 훅/전략 → 영상 생성, 한 화면에서 끝내세요
             </Text>
           </View>
         </View>
       </View>
 
+      {/* Quick Nav Bar */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickNav} contentContainerStyle={styles.quickNavContent}>
+        {QUICK_NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.quickNavItem}
+              onPress={() => scrollToSection(item.key)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.quickNavIcon, { backgroundColor: item.color + '18' }]}>
+                <Icon size={16} color={item.color} strokeWidth={2} />
+              </View>
+              <Text style={styles.quickNavLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary[400]} />
@@ -250,76 +303,19 @@ export default function MarketingScreen() {
           <ErrorRetryBanner message={loadError} onRetry={load} />
         ) : (
           <>
-            {/* 3 Strategy Track Cards */}
-            <View style={styles.trackGrid}>
-              <TouchableOpacity
-                style={styles.trackCard}
-                onPress={() => scrollToSection('hook')}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
-                  <Zap size={44} color={theme.colors.warning[400]} strokeWidth={2} />
-                </View>
-                <Text style={styles.trackTitle}>3초 훅 스튜디오</Text>
-                <Text style={styles.trackDesc}>오프닝 3초 반전 문구, 결핍 자극 자막, 팝업 연출</Text>
-                <View style={styles.trackTagRow}>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                    <Flame size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>이탈 방지</Text>
+            {/* Pipeline Step Indicator */}
+            <View style={styles.pipelineIndicator}>
+              {([1, 2, 3] as PipelineStep[]).map((step, idx) => (
+                <View key={step} style={styles.pipelineStepWrap}>
+                  <View style={[styles.pipelineDot, activeStep >= step && styles.pipelineDotActive]}>
+                    <Text style={[styles.pipelineDotText, activeStep >= step && styles.pipelineDotTextActive]}>{step}</Text>
                   </View>
-                  <Text style={styles.trackArrow}>→</Text>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                    <Lightbulb size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>3초 후킹</Text>
-                  </View>
+                  <Text style={[styles.pipelineLabel, activeStep >= step && styles.pipelineLabelActive]}>
+                    {step === 1 ? '상품 수집' : step === 2 ? '전략 가공' : '영상 렌더링'}
+                  </Text>
+                  {idx < 2 && <View style={[styles.pipelineConnector, activeStep > step && styles.pipelineConnectorActive]} />}
                 </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.trackCard}
-                onPress={() => scrollToSection('ab')}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
-                  <Dna size={44} color={theme.colors.accent[400]} strokeWidth={2} />
-                </View>
-                <Text style={styles.trackTitle}>A/B 테스트 3종 생성</Text>
-                <Text style={styles.trackDesc}>Z세대 감성 / 3040 실용 / 팩트 리뷰 1클릭 동시 렌더링</Text>
-                <View style={styles.trackTagRow}>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                    <Users size={10} color={theme.colors.accent[300]} strokeWidth={2} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>3가지 톤</Text>
-                  </View>
-                  <Text style={styles.trackArrow}>→</Text>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                    <Check size={10} color={theme.colors.accent[300]} strokeWidth={2.5} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>동시 생성</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.trackCard}
-                onPress={() => scrollToSection('trending')}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
-                  <Flame size={44} color={theme.colors.primary[300]} strokeWidth={2} />
-                </View>
-                <Text style={styles.trackTitle}>떡상 키워드 & 스마트 CTA</Text>
-                <Text style={styles.trackDesc}>SNS 인기 해시태그 믹스 및 QR/카운트다운 랜딩 CTA</Text>
-                <View style={styles.trackTagRow}>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                    <TrendingUp size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.primary[300] }]}>알고리즘</Text>
-                  </View>
-                  <Text style={styles.trackArrow}>→</Text>
-                  <View style={[styles.trackTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                    <QrCode size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                    <Text style={[styles.trackTagText, { color: theme.colors.primary[300] }]}>스마트 CTA</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              ))}
             </View>
 
             {/* Handoff Hero */}
@@ -330,7 +326,7 @@ export default function MarketingScreen() {
                 </View>
                 <Text style={styles.handoffHeroTitle}>소재가 준비되었습니다!</Text>
                 <Text style={styles.handoffHeroDesc}>
-                  훅을 선택하고 마케팅 숏폼을 완성하세요
+                  아래에서 상품을 선택하고 훅을 고르면 영상이 완성됩니다
                 </Text>
                 {handoffImage && (
                   <Image
@@ -355,257 +351,451 @@ export default function MarketingScreen() {
                 <Text style={styles.statPillLabel}>클릭</Text>
               </View>
               <View style={styles.statPill}>
-                <Rocket size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <ShoppingBag size={14} color={theme.colors.accent[400]} strokeWidth={2} />
                 <Text style={styles.statPillValue}>{totalLinks}</Text>
                 <Text style={styles.statPillLabel}>링크</Text>
               </View>
             </View>
 
-            {/* Hook Studio */}
+            {/* ========== STEP 1: Product Input Track ========== */}
+            <View
+              ref={(ref) => { sectionRefs.current['viral'] = ref; }}
+              collapsable={false}
+            >
+              <View style={styles.phaseBanner}>
+                <View style={[styles.phaseNum, { backgroundColor: theme.colors.warning[500] }]}>
+                  <Text style={styles.phaseNumText}>1</Text>
+                </View>
+                <View style={styles.phaseHeaderText}>
+                  <Text style={styles.phaseTitle}>상품 소재 수집</Text>
+                  <Text style={styles.phaseDesc}>마케팅할 상품을 선택하세요 — 3가지 방법 중 하나</Text>
+                </View>
+              </View>
+
+              {/* Track 1a: Viral Products */}
+              <View style={styles.trackCard}>
+                <View style={styles.trackCardHeader}>
+                  <View style={[styles.trackIconSmall, { backgroundColor: theme.colors.warning[500] + '22' }]}>
+                    <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2} />
+                  </View>
+                  <View style={styles.trackCardInfo}>
+                    <Text style={styles.trackCardTitle}>실시간 떡상 꿀템 TOP 20</Text>
+                    <Text style={styles.trackCardDesc}>쿠팡·아마존·알리 클릭 급상승 상품</Text>
+                  </View>
+                  <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                    <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>추천 트랙</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.viralFeedWrap}>
+                <ViralProductFeed />
+              </View>
+
+              {/* Track 1b: URL Input */}
+              <View
+                ref={(ref) => { sectionRefs.current['url'] = ref; }}
+                collapsable={false}
+              >
+                <View style={styles.trackCard}>
+                  <View style={styles.trackCardHeader}>
+                    <View style={[styles.trackIconSmall, { backgroundColor: theme.colors.accent[500] + '22' }]}>
+                      <Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
+                    </View>
+                    <View style={styles.trackCardInfo}>
+                      <Text style={styles.trackCardTitle}>제휴 URL 직접 입력</Text>
+                      <Text style={styles.trackCardDesc}>클립보드 자동 인식 &amp; 상품 정보 추출</Text>
+                    </View>
+                    <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>직접 트랙</Text>
+                    </View>
+                  </View>
+
+                  <ClipboardAffiliateBanner
+                    onInsert={(url) => setAffiliateUrl(url)}
+                    currentUrl={affiliateUrl}
+                  />
+
+                  <TextInput
+                    style={styles.urlInput}
+                    value={affiliateUrl}
+                    onChangeText={setAffiliateUrl}
+                    placeholder="제휴 링크 URL을 여기에 붙여넣으세요"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    multiline
+                  />
+
+                  <TouchableOpacity
+                    style={[styles.urlSubmitBtn, (!affiliateUrl.trim() || extracting) && styles.urlSubmitBtnDisabled]}
+                    onPress={handleSaveAffiliate}
+                    disabled={!affiliateUrl.trim() || extracting}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.urlSubmitBtnText}>
+                      {extracting ? '상품 정보 추출 중...' : '링크에서 상품 정보 추출 →'}
+                    </Text>
+                    <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
+                  </TouchableOpacity>
+
+                  {extractError && (
+                    <View style={styles.extractErrorBox}>
+                      <Text style={styles.extractErrorText}>{extractError}</Text>
+                    </View>
+                  )}
+
+                  {productMeta && (productMeta.productName || productMeta.price) && (
+                    <View style={styles.productMetaCard}>
+                      {productMeta.image ? (
+                        <Image
+                          source={{ uri: productMeta.image }}
+                          style={styles.productMetaImage}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+                      <View style={styles.productMetaInfo}>
+                        {productMeta.productName ? (
+                          <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
+                        ) : null}
+                        {productMeta.price ? (
+                          <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
+                        ) : null}
+                        {productMeta.brand ? (
+                          <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.productMetaCheck}>
+                        <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Track 1c: Category Catalog */}
+              <View
+                ref={(ref) => { sectionRefs.current['category'] = ref; }}
+                collapsable={false}
+              >
+                <View style={styles.trackCard}>
+                  <View style={styles.trackCardHeader}>
+                    <View style={[styles.trackIconSmall, { backgroundColor: theme.colors.primary[500] + '22' }]}>
+                      <Tag size={20} color={theme.colors.primary[300]} strokeWidth={2} />
+                    </View>
+                    <View style={styles.trackCardInfo}>
+                      <Text style={styles.trackCardTitle}>카테고리별 카탈로그</Text>
+                      <Text style={styles.trackCardDesc}>패션·뷰티·자취·IT 기기 묶음 상품</Text>
+                    </View>
+                    <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>탐색 트랙</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.categoryExploreBtn}
+                    onPress={() => router.push('/affiliate/trending' as never)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.categoryExploreText}>카테고리별 꿀조합 보기 →</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.trendMatchWrap}>
+                  <TrendMatchCard productCategory="라이프스타일" />
+                </View>
+              </View>
+            </View>
+
+            {/* ========== STEP 2: Marketing Strategy Track ========== */}
             <View
               ref={(ref) => { sectionRefs.current['hook'] = ref; }}
               collapsable={false}
             >
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                <Text style={styles.sectionTitleText}>마케팅 훅 스튜디오</Text>
+              <View style={styles.phaseBanner}>
+                <View style={[styles.phaseNum, { backgroundColor: theme.colors.accent[500] }]}>
+                  <Text style={styles.phaseNumText}>2</Text>
+                </View>
+                <View style={styles.phaseHeaderText}>
+                  <Text style={styles.phaseTitle}>마케팅 전환율 전략 가공</Text>
+                  <Text style={styles.phaseDesc}>
+                    {selectedProduct ? `선택 상품: ${selectedProduct}` : '1단계에서 상품을 먼저 선택하세요'}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.sectionDesc}>3초 후킹 오프닝 — 시청자가 스크롤을 멈추게 만드는 첫 문장</Text>
-            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-              <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>사진 선택 → 3초 훅 문구 → 영상 생성</Text>
-            </View>
-            <View style={styles.selectGrid}>
-              {HOOK_TYPES.map((hook) => {
-                const Icon = hook.icon;
-                const selected = selectedHook === hook.key;
-                return (
-                  <TouchableOpacity
-                    key={hook.key}
-                    style={[styles.selectCard, selected && styles.selectCardActive]}
-                    onPress={() => setSelectedHook(hook.key)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.selectIcon, { backgroundColor: hook.color + '20' }]}>
-                      <Icon size={18} color={hook.color} strokeWidth={2.2} />
-                    </View>
-                    <View style={styles.selectInfo}>
-                      <Text style={styles.selectLabel}>{hook.label}</Text>
-                      <Text style={styles.selectDesc} numberOfLines={2}>{hook.desc}</Text>
-                    </View>
-                    {selected && (
-                      <View style={styles.selectCheck}>
-                        <Check size={14} color="#fff" strokeWidth={2.5} />
+
+              {/* 2a: Hook Studio */}
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                  <Text style={styles.sectionTitleText}>3초 오프닝 훅 스튜디오</Text>
+                </View>
+              </View>
+              <Text style={styles.sectionDesc}>시청자가 스크롤을 멈추게 만드는 첫 문장을 선택하세요</Text>
+              <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>사진 선택 → 3초 훅 문구 → 영상 생성</Text>
+              </View>
+              <View style={styles.selectGrid}>
+                {HOOK_TYPES.map((hook) => {
+                  const Icon = hook.icon;
+                  const selected = selectedHook === hook.key;
+                  return (
+                    <TouchableOpacity
+                      key={hook.key}
+                      style={[styles.selectCard, selected && styles.selectCardActive]}
+                      onPress={() => handleHookSelect(hook.key)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.selectIcon, { backgroundColor: hook.color + '20' }]}>
+                        <Icon size={18} color={hook.color} strokeWidth={2.2} />
                       </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.startBtn, !selectedHook && styles.startBtnDisabled]}
-              onPress={handleStartGeneration}
-              disabled={!selectedHook}
-              activeOpacity={0.85}
-            >
-              <Sparkles size={28} color={selectedHook ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2.5} />
-              <Text style={[styles.startBtnText, !selectedHook && styles.startBtnTextDisabled]}>
-                {selectedHook ? '훅으로 콘텐츠 생성 시작' : '훅을 선택해주세요'}
-              </Text>
-              {selectedHook && <ArrowRight size={20} color="#fff" strokeWidth={2.5} />}
-            </TouchableOpacity>
-
-            {/* AI Cut Generation */}
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <Scissors size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
-                <Text style={styles.sectionTitleText}>AI 컷 생성</Text>
+                      <View style={styles.selectInfo}>
+                        <Text style={styles.selectLabel}>{hook.label}</Text>
+                        <Text style={styles.selectDesc} numberOfLines={2}>{hook.desc}</Text>
+                      </View>
+                      {selected && (
+                        <View style={styles.selectCheck}>
+                          <Check size={14} color="#fff" strokeWidth={2.5} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            </View>
-            <Text style={styles.sectionDesc}>0.8초 템포 컷 분할 · 마이크로 비트 동기화 · 하이라이트 자동 추출</Text>
-            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-              <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>영상 올리기 → AI 자동 컷 편집</Text>
-            </View>
-            <AICutGenerator />
 
-            {/* A/B Variant Personas */}
-            <View
-              ref={(ref) => { sectionRefs.current['ab'] = ref; }}
-              collapsable={false}
-            >
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <Users size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                <Text style={styles.sectionTitleText}>A/B 테스트 3종 페르소나</Text>
+              {/* 2b: A/B Persona Tones */}
+              <View
+                ref={(ref) => { sectionRefs.current['ab'] = ref; }}
+                collapsable={false}
+              >
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <Users size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                    <Text style={styles.sectionTitleText}>A/B 테스트 3종 페르소나</Text>
+                  </View>
+                </View>
+                <Text style={styles.sectionDesc}>Z세대 / 3040 실용 / 내돈내산 — 1클릭 동시 적용</Text>
+                <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                  <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>1클릭 → 3가지 톤 영상 동시 생성</Text>
+                </View>
+                <View style={styles.personaGrid}>
+                  {PERSONA_TONES.map((tone) => (
+                    <TouchableOpacity
+                      key={tone.key}
+                      style={[styles.personaCard, { borderColor: tone.color + '40' }]}
+                      onPress={handleStartGeneration}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.personaEmoji}>{tone.emoji}</Text>
+                      <Text style={styles.personaLabel}>{tone.label}</Text>
+                      <Text style={styles.personaDesc} numberOfLines={2}>{tone.desc}</Text>
+                      <View style={[styles.personaGenBtn, { backgroundColor: tone.color + '18' }]}>
+                        <Sparkles size={12} color={tone.color} strokeWidth={2} />
+                        <Text style={[styles.personaGenText, { color: tone.color }]}>생성</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
-            <Text style={styles.sectionDesc}>Z세대 / 3040 실용 / 내돈내산 — 3가지 톤으로 1클릭 동시 생성</Text>
-            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-              <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>1클릭 → 3가지 톤 영상 동시 생성</Text>
-            </View>
-            <View style={styles.personaGrid}>
-              {PERSONA_TONES.map((tone) => (
+
+              {/* 2c: Trending Keywords & CTA */}
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <TrendingUp size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
+                  <Text style={styles.sectionTitleText}>실시간 떡상 키워드 &amp; 스마트 CTA</Text>
+                </View>
+                <TouchableOpacity onPress={shuffleTags} activeOpacity={0.7} style={styles.shuffleBtn}>
+                  <Shuffle size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={styles.shuffleBtnText}>셔플</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.sectionDesc}>SNS 인기 해시태그 무작위 믹스 — 복사해서 바로 사용</Text>
+              <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>인기 해시태그 → 1탭 복사 → 영상에 붙여넣기</Text>
+              </View>
+              <View style={styles.tagCloud}>
+                {(shuffledTags.length > 0 ? shuffledTags : TRENDING_KEYWORDS.slice(0, 8).map((k) => k.tag)).map((tag, i) => {
+                  const keyword = TRENDING_KEYWORDS.find((k) => k.tag === tag);
+                  const heat = keyword?.heat ?? 70;
+                  return (
+                    <TouchableOpacity
+                      key={`${tag}-${i}`}
+                      style={[styles.tagChip, copiedTag === tag && styles.tagChipCopied]}
+                      onPress={() => handleCopyTag(tag)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.tagChipText}>{tag}</Text>
+                      <View style={styles.tagHeatBadge}>
+                        <Flame size={8} color={heat >= 90 ? theme.colors.warning[400] : theme.colors.dark.textFaint} strokeWidth={2} />
+                        <Text style={[styles.tagHeatText, heat >= 90 && styles.tagHeatTextHot]}>{heat}</Text>
+                      </View>
+                      {copiedTag === tag && (
+                        <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Smart CTA: Countdown + QR */}
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  <Text style={styles.sectionTitleText}>스마트 CTA &amp; Link-in-Bio</Text>
+                </View>
+              </View>
+              <Text style={styles.sectionDesc}>카운트다운 타이머 &amp; QR/자막 워터마크로 전환율 극대화</Text>
+              <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.success[500] + '18' }]}>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.success[400] }]}>QR 코드 → 영상에 삽입 → 스캔 시 구매</Text>
+              </View>
+
+              <View style={styles.countdownCard}>
+                <View style={styles.countdownHeader}>
+                  <Timer size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                  <Text style={styles.countdownTitle}>긴급 카운트다운</Text>
+                </View>
+                <Text style={styles.countdownTimer}>{formatCountdown(countdownSeconds)}</Text>
+                <Text style={styles.countdownDesc}>
+                  제한 시간 느낌으로 구매 긴장감 조성 — CTA 클릭률 평균 23% 상승
+                </Text>
                 <TouchableOpacity
-                  key={tone.key}
-                  style={[styles.personaCard, { borderColor: tone.color + '40' }]}
-                  onPress={handleStartGeneration}
+                  style={styles.countdownResetBtn}
+                  onPress={() => setCountdownSeconds(3600)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.personaEmoji}>{tone.emoji}</Text>
-                  <Text style={styles.personaLabel}>{tone.label}</Text>
-                  <Text style={styles.personaDesc} numberOfLines={2}>{tone.desc}</Text>
-                  <View style={[styles.personaGenBtn, { backgroundColor: tone.color + '18' }]}>
-                    <Sparkles size={12} color={tone.color} strokeWidth={2} />
-                    <Text style={[styles.personaGenText, { color: tone.color }]}>생성</Text>
-                  </View>
+                  <Text style={styles.countdownResetText}>1시간으로 리셋</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
+
+              <View style={styles.qrCard}>
+                <View style={styles.qrHeader}>
+                  <QrCode size={18} color={theme.colors.primary[400]} strokeWidth={2.2} />
+                  <Text style={styles.qrTitle}>QR 워터마크</Text>
+                </View>
+                <View style={styles.qrDisplayWrap}>
+                  <QRCodeDisplay value={qrValue} size={140} />
+                </View>
+                <Text style={styles.qrDesc}>
+                  영상에 QR을 워터마크로 삽입 — 시청자가 스캔하면 바로 구매
+                </Text>
+                <TouchableOpacity
+                  style={styles.qrEditBtn}
+                  onPress={() => router.push('/affiliate/links' as never)}
+                  activeOpacity={0.7}
+                >
+                  <Link2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={styles.qrEditText}>단축 링크 관리에서 QR 연결</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.linkInBioWrap}>
+                <LinkInBioCard scanId="" scanTitle="마케팅 허브" />
+              </View>
             </View>
 
-            {/* Trending Keyword Feed */}
+            {/* ========== STEP 3: AI Video Rendering CTA ========== */}
             <View
-              ref={(ref) => { sectionRefs.current['trending'] = ref; }}
+              ref={(ref) => { sectionRefs.current['render'] = ref; }}
               collapsable={false}
             >
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <TrendingUp size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
-                <Text style={styles.sectionTitleText}>실시간 떡상 키워드 피드</Text>
+              <View style={styles.phaseBanner}>
+                <View style={[styles.phaseNum, { backgroundColor: theme.colors.primary[500] }]}>
+                  <Text style={styles.phaseNumText}>3</Text>
+                </View>
+                <View style={styles.phaseHeaderText}>
+                  <Text style={styles.phaseTitle}>AI 마케팅 숏폼 생성 &amp; 렌더링</Text>
+                  <Text style={styles.phaseDesc}>
+                    {selectedHook ? '훅 선택 완료 — 아래 버튼을 눌러 영상을 생성하세요' : '2단계에서 훅을 먼저 선택하세요'}
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={shuffleTags} activeOpacity={0.7} style={styles.shuffleBtn}>
-                <Shuffle size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={styles.shuffleBtnText}>셔플</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.sectionDesc}>SNS 인기 해시태드 무작위 믹스 — 복사해서 바로 사용</Text>
-            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-              <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>인기 해시태그 → 1탭 복사 → 영상에 붙여넣기</Text>
-            </View>
-            <View style={styles.tagCloud}>
-              {(shuffledTags.length > 0 ? shuffledTags : TRENDING_KEYWORDS.slice(0, 8).map((k) => k.tag)).map((tag, i) => {
-                const keyword = TRENDING_KEYWORDS.find((k) => k.tag === tag);
-                const heat = keyword?.heat ?? 70;
-                return (
-                  <TouchableOpacity
-                    key={`${tag}-${i}`}
-                    style={[
-                      styles.tagChip,
-                      copiedTag === tag && styles.tagChipCopied,
-                    ]}
-                    onPress={() => handleCopyTag(tag)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.tagChipText}>{tag}</Text>
-                    <View style={styles.tagHeatBadge}>
-                      <Flame size={8} color={heat >= 90 ? theme.colors.warning[400] : theme.colors.dark.textFaint} strokeWidth={2} />
-                      <Text style={[styles.tagHeatText, heat >= 90 && styles.tagHeatTextHot]}>{heat}</Text>
-                    </View>
-                    {copiedTag === tag && (
-                      <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={styles.trendingFeedWrap}>
-              <ViralProductFeed />
-            </View>
-            <View style={styles.trendMatchWrap}>
-              <TrendMatchCard productCategory="라이프스타일" />
+
+              <View style={styles.renderSummaryCard}>
+                <View style={styles.renderSummaryRow}>
+                  <View style={styles.renderSummaryItem}>
+                    <ShoppingBag size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.renderSummaryLabel}>상품</Text>
+                    <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                      {selectedProduct || '미선택'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.renderSummaryDivider} />
+                <View style={styles.renderSummaryRow}>
+                  <View style={styles.renderSummaryItem}>
+                    <Zap size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.renderSummaryLabel}>훅</Text>
+                    <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                      {selectedHook ? HOOK_TYPES.find((h) => h.key === selectedHook)?.label : '미선택'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
-            {/* Smart CTA & Link-in-Bio */}
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.5} />
-                <Text style={styles.sectionTitleText}>스마트 CTA & Link-in-Bio</Text>
-              </View>
-            </View>
-            <Text style={styles.sectionDesc}>카운트다운 타이머 & QR/자막 워터마크로 전환율 극대화</Text>
-            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.success[500] + '18' }]}>
-              <Text style={[styles.beginnerBadgeText, { color: theme.colors.success[400] }]}>QR 코드 → 영상에 삽입 → 스캔 시 구매</Text>
-            </View>
-
-            {/* Countdown Timer Card */}
-            <View style={styles.countdownCard}>
-              <View style={styles.countdownHeader}>
-                <Timer size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
-                <Text style={styles.countdownTitle}>긴급 카운트다운</Text>
-              </View>
-              <Text style={styles.countdownTimer}>{formatCountdown(countdownSeconds)}</Text>
-              <Text style={styles.countdownDesc}>
-                제한 시간 느낌으로 구매 긴장감 조성 — CTA 클릭률 평균 23% 상승
-              </Text>
+            {/* All Marketing Tools */}
+            <View style={styles.divider} />
+            <Text style={styles.toolsSectionTitle}>전체 마케팅 도구</Text>
+            <View style={styles.toolGrid}>
               <TouchableOpacity
-                style={styles.countdownResetBtn}
-                onPress={() => setCountdownSeconds(3600)}
+                style={styles.toolCard}
+                onPress={() => router.push('/affiliate' as never)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.countdownResetText}>1시간으로 리셋</Text>
+                <View style={[styles.toolIcon, { backgroundColor: theme.colors.accent[500] + '20' }]}>
+                  <Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2.2} />
+                </View>
+                <View style={styles.toolInfo}>
+                  <Text style={styles.toolLabel}>제휴 링크 관리</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>제휴 링크 발급, 단축, 클릭 추적</Text>
+                </View>
+                <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
               </TouchableOpacity>
-            </View>
-
-            {/* QR Code Card */}
-            <View style={styles.qrCard}>
-              <View style={styles.qrHeader}>
-                <QrCode size={18} color={theme.colors.primary[400]} strokeWidth={2.2} />
-                <Text style={styles.qrTitle}>QR 워터마크</Text>
-              </View>
-              <View style={styles.qrDisplayWrap}>
-                <QRCodeDisplay value={qrValue} size={140} />
-              </View>
-              <Text style={styles.qrDesc}>
-                영상에 QR을 워터마크로 삽입 — 시청자가 스캔하면 바로 구매
-              </Text>
               <TouchableOpacity
-                style={styles.qrEditBtn}
+                style={styles.toolCard}
                 onPress={() => router.push('/affiliate/links' as never)}
                 activeOpacity={0.7}
               >
-                <Link2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={styles.qrEditText}>단축 링크 관리에서 QR 연결</Text>
+                <View style={[styles.toolIcon, { backgroundColor: theme.colors.success[500] + '20' }]}>
+                  <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.2} />
+                </View>
+                <View style={styles.toolInfo}>
+                  <Text style={styles.toolLabel}>단축 링크 관리</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>제휴 링크 단축 및 클릭 추적</Text>
+                </View>
+                <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
               </TouchableOpacity>
-            </View>
-
-            {/* Link-in-Bio Card */}
-            <View style={styles.linkInBioWrap}>
-              <LinkInBioCard scanId="" scanTitle="마케팅 허브" />
-            </View>
-            </View>
-
-            {/* Divider */}
-            <View style={styles.divider} />
-
-            {/* All Marketing Tools */}
-            <Text style={styles.toolsSectionTitle}>전체 마케팅 도구</Text>
-            <View style={styles.toolGrid}>
-              {MARKETING_TOOLS.map((tool) => {
-                const Icon = tool.icon;
-                return (
-                  <TouchableOpacity
-                    key={tool.key}
-                    style={styles.toolCard}
-                    onPress={() => handleToolPress(tool)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.toolIcon, { backgroundColor: tool.color + '20' }]}>
-                      <Icon size={20} color={tool.color} strokeWidth={2.2} />
-                    </View>
-                    <View style={styles.toolInfo}>
-                      <Text style={styles.toolLabel} numberOfLines={1}>{tool.label}</Text>
-                      <Text style={styles.toolDesc} numberOfLines={2}>{tool.desc}</Text>
-                    </View>
-                    <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                  </TouchableOpacity>
-                );
-              })}
+              <TouchableOpacity
+                style={styles.toolCard}
+                onPress={() => router.push('/affiliate/warmup' as never)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.toolIcon, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+                  <Globe size={20} color={theme.colors.primary[300]} strokeWidth={2.2} />
+                </View>
+                <View style={styles.toolInfo}>
+                  <Text style={styles.toolLabel}>스마트 예약</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>최적 업로드 시간대 자동 추천</Text>
+                </View>
+                <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
+              </TouchableOpacity>
             </View>
           </>
         )}
       </ScrollView>
+
+      {/* Sticky Floating CTA — appears when product + hook selected */}
+      {selectedProduct && selectedHook && (
+        <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]}>
+          <TouchableOpacity
+            style={styles.stickyCtaBtn}
+            onPress={handleStartGeneration}
+            activeOpacity={0.85}
+          >
+            <Film size={24} color="#fff" strokeWidth={2.5} />
+            <Text style={styles.stickyCtaText}>선택한 상품으로 AI 마케팅 영상 만들기</Text>
+            <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -617,7 +807,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
   },
   headerIconRow: {
     flexDirection: 'row',
@@ -636,19 +826,104 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
   },
   headerSubtext: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginTop: 2,
   },
+  quickNav: {
+    maxHeight: 56,
+    marginBottom: theme.spacing.sm,
+  },
+  quickNavContent: {
+    paddingHorizontal: theme.spacing.lg,
+    gap: 8,
+  },
+  quickNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    marginRight: 6,
+  },
+  quickNavIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickNavLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
   scroll: {
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
+  },
+  pipelineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    gap: 0,
+  },
+  pipelineStepWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pipelineDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 2,
+    borderColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pipelineDotActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[400],
+  },
+  pipelineDotText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.textFaint,
+  },
+  pipelineDotTextActive: {
+    color: '#fff',
+  },
+  pipelineLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginLeft: 6,
+  },
+  pipelineLabelActive: {
+    color: theme.colors.dark.text,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  pipelineConnector: {
+    width: 24,
+    height: 2,
+    backgroundColor: theme.colors.dark.border,
+    marginHorizontal: 8,
+  },
+  pipelineConnectorActive: {
+    backgroundColor: theme.colors.primary[400],
   },
   handoffHero: {
     alignItems: 'center',
@@ -713,61 +988,193 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
   },
-  trackGrid: {
+  phaseBanner: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  phaseNum: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  phaseNumText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  phaseHeaderText: {
+    flex: 1,
+  },
+  phaseTitle: {
+    fontSize: 17,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  phaseDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
   trackCard: {
-    width: '48.5%',
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
     padding: theme.spacing.md,
-    gap: 6,
+    marginBottom: theme.spacing.sm,
   },
-  trackIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.lg,
+  trackCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  trackIconSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  trackTitle: {
-    fontSize: 14,
+  trackCardInfo: {
+    flex: 1,
+  },
+  trackCardTitle: {
+    fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
   },
-  trackDesc: {
+  trackCardDesc: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-    lineHeight: 15,
-  },
-  trackTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     marginTop: 2,
   },
-  trackTag: {
+  beginnerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: theme.radius.sm,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.full,
   },
-  trackTagText: {
-    fontSize: 9,
+  beginnerBadgeText: {
+    fontSize: 10,
     fontFamily: theme.typography.fontFamily.semiBold,
   },
-  trackArrow: {
-    fontSize: 10,
-    color: theme.colors.dark.textFaint,
+  viralFeedWrap: {
+    marginBottom: theme.spacing.md,
+  },
+  urlInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    marginBottom: theme.spacing.sm,
+    minHeight: 60,
+  },
+  urlSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+  },
+  urlSubmitBtnDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  urlSubmitBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  extractErrorBox: {
+    backgroundColor: theme.colors.error[500] + '20',
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.error[400],
+  },
+  extractErrorText: {
+    color: theme.colors.error[400],
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    lineHeight: 17,
+  },
+  productMetaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.success[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: 12,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '30',
+    gap: 12,
+  },
+  productMetaImage: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.md,
+  },
+  productMetaInfo: {
+    flex: 1,
+  },
+  productMetaName: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  productMetaPrice: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+    marginTop: 2,
+  },
+  productMetaBrand: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  productMetaCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.success[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryExploreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    marginTop: theme.spacing.sm,
+  },
+  categoryExploreText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  trendMatchWrap: {
+    marginBottom: theme.spacing.md,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -781,18 +1188,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  sectionNumBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionNumText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
   sectionTitleText: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.bold,
@@ -804,19 +1199,6 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginBottom: 10,
     lineHeight: 17,
-  },
-  beginnerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: theme.radius.full,
-    marginBottom: 10,
-  },
-  beginnerBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.semiBold,
   },
   selectGrid: {
     gap: 8,
@@ -865,29 +1247,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[400],
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  startBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: theme.colors.primary[500],
-    borderRadius: theme.radius.lg,
-    paddingVertical: 14,
-    marginBottom: theme.spacing.md,
-  },
-  startBtnDisabled: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  startBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
-  startBtnTextDisabled: {
-    color: theme.colors.dark.textFaint,
   },
   personaGrid: {
     flexDirection: 'row',
@@ -985,12 +1344,6 @@ const styles = StyleSheet.create({
   tagHeatTextHot: {
     color: theme.colors.warning[400],
   },
-  trendingFeedWrap: {
-    marginBottom: theme.spacing.md,
-  },
-  trendMatchWrap: {
-    marginBottom: theme.spacing.md,
-  },
   countdownCard: {
     backgroundColor: theme.colors.warning[500] + '10',
     borderRadius: theme.radius.lg,
@@ -1085,6 +1438,40 @@ const styles = StyleSheet.create({
   linkInBioWrap: {
     marginBottom: theme.spacing.md,
   },
+  renderSummaryCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  renderSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  renderSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  renderSummaryLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  renderSummaryValue: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    flex: 1,
+  },
+  renderSummaryDivider: {
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+    marginVertical: 10,
+  },
   divider: {
     height: 1,
     backgroundColor: theme.colors.dark.border,
@@ -1132,5 +1519,26 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 15,
+  },
+  stickyCtaWrap: {
+    position: 'absolute',
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    zIndex: 50,
+  },
+  stickyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: theme.spacing.md + 2,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.warning[500],
+    ...theme.shadows.elevated,
+  },
+  stickyCtaText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
