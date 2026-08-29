@@ -575,6 +575,15 @@ export default function CameraScreen() {
           <StepIndicator activeStep={1} />
         </View>
 
+        <View style={styles.phaseDivider}>
+          <View style={styles.phaseDividerLine} />
+          <View style={styles.phaseDividerBadge}>
+            <Camera size={12} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            <Text style={styles.phaseDividerText}>1단계: 소재 준비</Text>
+          </View>
+          <View style={styles.phaseDividerLine} />
+        </View>
+
         <VerticalSectionCard
           icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
           title="1. 사진 촬영"
@@ -952,6 +961,15 @@ export default function CameraScreen() {
           </View>
         </VerticalSectionCard>
 
+        <View style={styles.phaseDivider}>
+          <View style={styles.phaseDividerLine} />
+          <View style={styles.phaseDividerBadge}>
+            <Sparkles size={12} color={theme.colors.accent[300]} strokeWidth={2.5} />
+            <Text style={styles.phaseDividerText}>2단계: AI 이미지 생성 · 보정</Text>
+          </View>
+          <View style={styles.phaseDividerLine} />
+        </View>
+
         <VerticalSectionCard
           icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
           title="3. AI 가상 피팅"
@@ -984,6 +1002,15 @@ export default function CameraScreen() {
         >
           <PromptImageGenerator />
         </VerticalSectionCard>
+
+        <View style={styles.phaseDivider}>
+          <View style={styles.phaseDividerLine} />
+          <View style={[styles.phaseDividerBadge, { backgroundColor: theme.colors.warning[500] + '18', borderColor: theme.colors.warning[400] + '30' }]}>
+            <Flame size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
+            <Text style={[styles.phaseDividerText, { color: theme.colors.warning[400] }]}>3단계: 마케팅 숏폼 제작</Text>
+          </View>
+          <View style={styles.phaseDividerLine} />
+        </View>
 
         <TouchableOpacity
           style={styles.marketingCtaButton}
@@ -2958,6 +2985,34 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.warning[400] + '40',
     marginTop: theme.spacing.sm,
     marginBottom: theme.spacing.md,
+  },
+  phaseDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  phaseDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+  },
+  phaseDividerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.accent[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '25',
+  },
+  phaseDividerText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
   },
   marketingCtaIcon: {
     width: 44,

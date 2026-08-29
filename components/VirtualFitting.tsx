@@ -598,6 +598,3 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
-
-
-export { VirtualFitting }
