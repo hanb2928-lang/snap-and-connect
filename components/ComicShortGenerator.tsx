@@ -8,12 +8,13 @@ import {
   Platform,
   Modal,
   ScrollView,
+  TextInput,
   type ViewStyle,
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check } from 'lucide-react-native';
+import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { theme } from '@/lib/theme';
@@ -1142,6 +1143,10 @@ export function ComicShortGenerator({
   const [selectedArtStyle, setSelectedArtStyle] = useState<ArtStyle | null>(null);
   const [voiceCategory, setVoiceCategory] = useState<VoiceCategory>('bright');
   const [selectedVoiceKey, setSelectedVoiceKey] = useState<string | null>(null);
+  const [previewingVoiceKey, setPreviewingVoiceKey] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [editingPanels, setEditingPanels] = useState(false);
+  const [editablePanels, setEditablePanels] = useState<ComicPanel[]>([]);
   const tpl = useHybridTemplate(
     { category: productCategory, platform: 'shorts', productName, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
     theme.colors.accent[400],
@@ -1677,6 +1682,86 @@ export function ComicShortGenerator({
     setCloudSaving(false);
   }, [resultUri, resultBlob, fileName, title, imageUrl, platform, affiliatePlatforms, resultMime, resultSize, showToast]);
 
+  const handlePreviewVoice = useCallback(async (voiceKey: string) => {
+    try {
+      if (previewingVoiceKey === voiceKey) {
+        if (previewAudioRef.current) {
+          previewAudioRef.current.pause();
+          previewAudioRef.current = null;
+        }
+        setPreviewingVoiceKey(null);
+        return;
+      }
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+      setPreviewingVoiceKey(voiceKey);
+      const voiceParams = getOpenAiVoiceParams(voiceKey, null);
+      const sampleText = '안녕하세요! 이 상품 정말 추천드려요. 지금 바로 확인해보세요!';
+      const response = await safeFetch(TTS_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          text: sampleText,
+          voice: voiceParams.voice,
+          speed: voiceParams.speed,
+          pitch: 0,
+          instructions: voiceParams.instructions,
+        }),
+        timeoutMs: 10000,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.audioBase64) {
+          const audio = new Audio(`data:audio/mpeg;base64,${data.audioBase64}`);
+          audio.onended = () => setPreviewingVoiceKey(null);
+          audio.onerror = () => setPreviewingVoiceKey(null);
+          previewAudioRef.current = audio;
+          audio.play().catch(() => setPreviewingVoiceKey(null));
+        } else {
+          setPreviewingVoiceKey(null);
+        }
+      } else {
+        setPreviewingVoiceKey(null);
+      }
+    } catch {
+      setPreviewingVoiceKey(null);
+    }
+  }, [previewingVoiceKey]);
+
+  const handleStartEditPanels = useCallback(() => {
+    if (scenarioPanels.length === 0) return;
+    setEditablePanels(scenarioPanels.map(p => ({ ...p })));
+    setEditingPanels(true);
+  }, [scenarioPanels]);
+
+  const handleSaveEditedPanels = useCallback(() => {
+    setScenarioPanels(editablePanels.map(p => ({ ...p })));
+    setEditingPanels(false);
+  }, [editablePanels]);
+
+  const handleCancelEditPanels = useCallback(() => {
+    setEditingPanels(false);
+  }, []);
+
+  const handleEditPanelField = useCallback((index: number, field: 'speech' | 'sfx' | 'emotion', value: string) => {
+    setEditablePanels(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  }, []);
+
+  const handleRegenerateWithEdits = useCallback(() => {
+    setScenarioPanels(editablePanels.map(p => ({ ...p })));
+    setEditingPanels(false);
+    setState('idle');
+    setProgress(0);
+    setResultUri(null);
+    setResultBlob(null);
+    setTimeout(() => handleGenerate(), 100);
+  }, [editablePanels, handleGenerate]);
+
   const handleReset = useCallback(() => {
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
     if (webGenCleanupRef.current) {
@@ -1927,20 +2012,34 @@ export function ComicShortGenerator({
                   <Text style={styles.voiceCatDesc}>{VOICE_CATEGORIES[voiceCategory].desc}</Text>
                   <View style={styles.voiceListScroll}>
                     {getVoicesByCategory(voiceCategory).map((v: TtsVoice) => (
-                      <TouchableOpacity
-                        key={v.key}
-                        style={[styles.voiceItem, (selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && styles.voiceItemActive]}
-                        onPress={() => setSelectedVoiceKey(v.key)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.voiceItemLeft}>
-                          <Text style={styles.voiceItemLabel}>{v.label}</Text>
-                          <Text style={styles.voiceItemDesc}>{v.desc}</Text>
-                        </View>
-                        {(selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && (
-                          <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                      <View key={v.key} style={styles.voiceItemRow}>
+                        <TouchableOpacity
+                          style={[styles.voiceItem, (selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && styles.voiceItemActive]}
+                          onPress={() => setSelectedVoiceKey(v.key)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.voiceItemLeft}>
+                            <Text style={styles.voiceItemLabel}>{v.label}</Text>
+                            <Text style={styles.voiceItemDesc}>{v.desc}</Text>
+                          </View>
+                          {(selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && (
+                            <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                          )}
+                        </TouchableOpacity>
+                        {Platform.OS === 'web' && (
+                          <TouchableOpacity
+                            style={styles.voicePreviewBtn}
+                            onPress={() => handlePreviewVoice(v.key)}
+                            activeOpacity={0.7}
+                          >
+                            {previewingVoiceKey === v.key ? (
+                              <Pause size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                            ) : (
+                              <Play size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                            )}
+                          </TouchableOpacity>
                         )}
-                      </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 </View>
@@ -2009,6 +2108,103 @@ export function ComicShortGenerator({
 
       {state === 'generating' && (
         <VideoProgressIndicator progress={progress} label={ttsEnabled ? 'AI 내레이션 만화 변환 중...' : '만화 변환 중...'} color={theme.colors.accent[400]} />
+      )}
+
+      {state === 'done' && resultUri && !editingPanels && (
+        <View style={styles.panelEditorToggleWrap}>
+          <TouchableOpacity style={styles.panelEditToggleBtn} onPress={handleStartEditPanels} activeOpacity={0.7}>
+            <Pencil size={15} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.panelEditToggleText}>컷별 대사 수정</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {state !== 'idle' && scenarioPanels.length > 0 && (
+        <View style={styles.panelTimelineWrap}>
+          <View style={styles.panelTimelineHeader}>
+            <AlignVerticalJustifyCenter size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.panelTimelineTitle}>만화 컷 타임라인</Text>
+          </View>
+          {!editingPanels ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.panelTimelineScroll}>
+              {scenarioPanels.map((panel, i) => (
+                <View key={i} style={styles.panelTimelineCard}>
+                  <View style={styles.panelTimelineNum}>
+                    <Text style={styles.panelTimelineNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.panelTimelineSpeech} numberOfLines={3}>{panel.speech}</Text>
+                  {panel.sfx ? (
+                    <View style={styles.panelTimelineSfxBadge}>
+                      <Text style={styles.panelTimelineSfxText}>{panel.sfx}</Text>
+                    </View>
+                  ) : null}
+                  {panel.emotion ? (
+                    <Text style={styles.panelTimelineEmotion}>{panel.emotion}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <View>
+              {editablePanels.map((panel, i) => (
+                <View key={i} style={styles.panelEditCard}>
+                  <View style={styles.panelEditHeader}>
+                    <View style={styles.panelEditNum}>
+                      <Text style={styles.panelEditNumText}>컷 {i + 1}</Text>
+                    </View>
+                    {panel.episodeLabel ? (
+                      <Text style={styles.panelEditLabel}>{panel.episodeLabel}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.panelEditFieldLabel}>대사</Text>
+                  <TextInput
+                    style={styles.panelEditInput}
+                    value={panel.speech}
+                    onChangeText={(text) => handleEditPanelField(i, 'speech', text)}
+                    multiline
+                    placeholder="이 컷의 대사를 입력하세요"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                  />
+                  <View style={styles.panelEditRow}>
+                    <View style={styles.panelEditFieldWrap}>
+                      <Text style={styles.panelEditFieldLabel}>효과음</Text>
+                      <TextInput
+                        style={[styles.panelEditInput, styles.panelEditInputSmall]}
+                        value={panel.sfx}
+                        onChangeText={(text) => handleEditPanelField(i, 'sfx', text)}
+                        placeholder="KWAANG!"
+                        placeholderTextColor={theme.colors.dark.textFaint}
+                      />
+                    </View>
+                    <View style={styles.panelEditFieldWrap}>
+                      <Text style={styles.panelEditFieldLabel}>감정</Text>
+                      <TextInput
+                        style={[styles.panelEditInput, styles.panelEditInputSmall]}
+                        value={panel.emotion}
+                        onChangeText={(text) => handleEditPanelField(i, 'emotion', text)}
+                        placeholder="놀람"
+                        placeholderTextColor={theme.colors.dark.textFaint}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <View style={styles.panelEditActions}>
+                <TouchableOpacity style={styles.panelEditCancelBtn} onPress={handleCancelEditPanels} activeOpacity={0.7}>
+                  <Text style={styles.panelEditCancelText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.panelEditSaveBtn} onPress={handleSaveEditedPanels} activeOpacity={0.7}>
+                  <Check size={15} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                  <Text style={styles.panelEditSaveText}>저장</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.panelEditRegenBtn} onPress={handleRegenerateWithEdits} activeOpacity={0.7}>
+                  <RefreshCw size={15} color="#fff" strokeWidth={2.5} />
+                  <Text style={styles.panelEditRegenText}>수정 후 재생성</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
       )}
 
       {state === 'done' && resultUri && (
@@ -2801,6 +2997,206 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  voiceItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voicePreviewBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.accent[500] + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  panelEditorToggleWrap: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  panelEditToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[500] + '30',
+  },
+  panelEditToggleText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  panelTimelineWrap: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  panelTimelineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  panelTimelineTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  panelTimelineScroll: {
+    flexDirection: 'row',
+  },
+  panelTimelineCard: {
+    width: 140,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 10,
+    marginRight: 8,
+    gap: 6,
+  },
+  panelTimelineNum: {
+    width: 22,
+    height: 22,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.accent[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  panelTimelineNumText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  panelTimelineSpeech: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 16,
+  },
+  panelTimelineSfxBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.warning[500] + '20',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  panelTimelineSfxText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  panelTimelineEmotion: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  panelEditCard: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    gap: 8,
+  },
+  panelEditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  panelEditNum: {
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  panelEditNumText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  panelEditLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  panelEditFieldLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textFaint,
+    marginBottom: 4,
+  },
+  panelEditInput: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 44,
+  },
+  panelEditInputSmall: {
+    minHeight: 36,
+    fontSize: 12,
+  },
+  panelEditRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  panelEditFieldWrap: {
+    flex: 1,
+  },
+  panelEditActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: theme.spacing.sm,
+  },
+  panelEditCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
+  },
+  panelEditCancelText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  panelEditSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '18',
+  },
+  panelEditSaveText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  panelEditRegenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+  },
+  panelEditRegenText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   toggleCheck: {
     width: 22,
