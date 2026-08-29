@@ -53,6 +53,7 @@ export async function getImageSize(uri: string): Promise<{ width: number; height
 export async function removeBackground(
   imageDataUrl: string,
   mimeType: string,
+  userMaskDataUrl?: string,
 ): Promise<string> {
   const functionUrl = `${supabaseUrl}/functions/v1/remove-bg`;
   const response = await safeFetch(functionUrl, {
@@ -61,7 +62,7 @@ export async function removeBackground(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ imageDataUrl, mimeType }),
+    body: JSON.stringify({ imageDataUrl, mimeType, userMaskDataUrl }),
     timeoutMs: 60000,
   });
 

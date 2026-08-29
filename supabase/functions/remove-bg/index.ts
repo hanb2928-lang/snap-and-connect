@@ -12,7 +12,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { imageDataUrl, mimeType } = await req.json();
+    const { imageDataUrl, mimeType, userMaskDataUrl } = await req.json();
 
     if (!imageDataUrl) {
       return new Response(
@@ -32,7 +32,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const editedBase64 = await removeBackgroundWithOpenAI(sanitizedDataUrl, openaiKey);
+    let editedBase64: string;
+    if (userMaskDataUrl) {
+      editedBase64 = await removeBackgroundWithMask(sanitizedDataUrl, userMaskDataUrl, openaiKey);
+    } else {
+      editedBase64 = await removeBackgroundWithOpenAI(sanitizedDataUrl, openaiKey);
+    }
     const imageUrl = await uploadToStorage(editedBase64, "image/png");
 
     return new Response(
@@ -147,6 +152,34 @@ async function removeBackgroundWithOpenAI(
   return b64;
 }
 
+async function removeBackgroundWithMask(
+  imageDataUrl: string,
+  maskDataUrl: string,
+  apiKey: string,
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  const response = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: buildMaskMultipartForm(imageDataUrl, maskDataUrl),
+    signal: controller.signal,
+  });
+  clearTimeout(timeoutId);
+
+  if (!response.ok) {
+    throw new Error(`OpenAI Image API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error("No image returned from OpenAI");
+
+  return b64;
+}
+
 function buildMultipartForm(imageDataUrl: string): FormData {
   const formData = new FormData();
 
@@ -165,6 +198,48 @@ function buildMultipartForm(imageDataUrl: string): FormData {
   formData.append("image", blob, `input.${ext}`);
   formData.append("model", "gpt-image-1-mini");
   formData.append("prompt", "Remove the background from this image, leaving the subject on a fully transparent background.");
+  formData.append("size", "auto");
+  formData.append("quality", "low");
+  formData.append("background", "transparent");
+
+  return formData;
+}
+
+function buildMaskMultipartForm(imageDataUrl: string, maskDataUrl: string): FormData {
+  const formData = new FormData();
+
+  const base64Match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!base64Match) throw new Error("Invalid image data URL");
+
+  const ext = base64Match[1] === "png" ? "png" : "jpg";
+  const base64Data = base64Match[2];
+  const imageBinary = atob(base64Data);
+  const imageBytes = new Uint8Array(imageBinary.length);
+  for (let i = 0; i < imageBinary.length; i++) {
+    imageBytes[i] = imageBinary.charCodeAt(i);
+  }
+
+  const imageBlob = new Blob([imageBytes], { type: `image/${ext}` });
+  formData.append("image", imageBlob, `input.${ext}`);
+
+  // Parse mask — must be PNG with transparency for OpenAI mask parameter
+  const maskMatch = maskDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (maskMatch) {
+    const maskBase64 = maskMatch[2];
+    const maskBinary = atob(maskBase64);
+    const maskBytes = new Uint8Array(maskBinary.length);
+    for (let i = 0; i < maskBinary.length; i++) {
+      maskBytes[i] = maskBinary.charCodeAt(i);
+    }
+    const maskBlob = new Blob([maskBytes], { type: "image/png" });
+    formData.append("mask", maskBlob, "mask.png");
+  }
+
+  formData.append("model", "gpt-image-1-mini");
+  formData.append(
+    "prompt",
+    "Using the provided mask, remove the masked areas (transparent regions) from the image, keeping only the unmasked subject on a fully transparent background.",
+  );
   formData.append("size", "auto");
   formData.append("quality", "low");
   formData.append("background", "transparent");

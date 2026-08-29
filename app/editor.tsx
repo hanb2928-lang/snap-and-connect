@@ -37,6 +37,7 @@ import {
   compositeOnBackground,
 } from '@/lib/imageEdit';
 import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundPicker';
+import { BgRemoveEditor } from '@/components/BgRemoveEditor';
 import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
 import { cleanBase64 } from '@/lib/base64';
 import { getHtml2Canvas } from '@/lib/html2canvas';
@@ -91,6 +92,9 @@ export default function EditorScreen() {
   const [canUndo, setCanUndo] = useState(false);
   const [bgPickerVisible, setBgPickerVisible] = useState(false);
   const [bgProcessing, setBgProcessing] = useState(false);
+  const [bgEditorVisible, setBgEditorVisible] = useState(false);
+  const [bgEditorDataUrl, setBgEditorDataUrl] = useState('');
+  const [bgEditorMask, setBgEditorMask] = useState<Uint8ClampedArray | null>(null);
   const undoStack = useRef<string[]>([]);
   const imageWrapRef = useRef<View | null>(null);
 
@@ -233,7 +237,7 @@ export default function EditorScreen() {
     if (processing) return;
     setProcessing(true);
     setError(null);
-    setProgressText('AI 배경 제거 중...');
+    setProgressText('AI 1차 배경 제거 중...');
     setEditMode('none');
     try {
       let dataUrl: string;
@@ -254,20 +258,109 @@ export default function EditorScreen() {
       const mimeType = dataUrl.match(/^data:(image\/\w+);/)?.[1] || 'image/png';
       const editedDataUrl = await removeBackground(dataUrl, mimeType);
 
-      let newUri: string;
+      // Get the edited image as a data URL for the editor
+      let editorDataUrl: string;
       if (editedDataUrl.startsWith('http')) {
-        newUri = editedDataUrl;
+        // Fetch the uploaded image to get it as data URL for canvas
+        if (Platform.OS === 'web') {
+          const resp = await fetch(editedDataUrl);
+          const blob = await resp.blob();
+          editorDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          editorDataUrl = editedDataUrl;
+        }
       } else {
-        const base64 = cleanBase64(editedDataUrl);
-        newUri = await uploadEditedImage(base64, 'image/png');
+        editorDataUrl = editedDataUrl;
       }
-      updateImage(newUri);
-      setBgPickerVisible(true);
+
+      // Get image dimensions for the editor
+      let editorImgW = imageDisplayWidth;
+      let editorImgH = imageDisplayHeight;
+      try {
+        const size = await getImageSize(editorDataUrl);
+        editorImgW = size.width;
+        editorImgH = size.height;
+      } catch {
+        // use defaults
+      }
+
+      // On web, extract the alpha channel as the initial mask
+      let initialMask: Uint8ClampedArray | null = null;
+      if (Platform.OS === 'web' && editorDataUrl.startsWith('data:')) {
+        try {
+          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('img load'));
+            el.src = editorDataUrl;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            initialMask = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data;
+            editorImgW = img.naturalWidth;
+            editorImgH = img.naturalHeight;
+          }
+        } catch {
+          // skip mask extraction
+        }
+      }
+
+      setBgEditorDataUrl(editorDataUrl);
+      setBgEditorMask(initialMask);
+      setBgEditorVisible(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '배경 제거 실패');
     }
     setProcessing(false);
-  }, [imageUri, processing, updateImage]);
+  }, [imageUri, processing, updateImage, imageDisplayWidth, imageDisplayHeight]);
+
+  const handleBgEditorConfirm = useCallback(async (resultDataUrl: string) => {
+    setBgEditorVisible(false);
+    if (!resultDataUrl) {
+      // No user edit — use the AI result as-is (already in bgEditorDataUrl)
+      const dataUrl = bgEditorDataUrl;
+      try {
+        let newUri: string;
+        if (dataUrl.startsWith('http')) {
+          newUri = dataUrl;
+        } else {
+          const base64 = cleanBase64(dataUrl);
+          newUri = await uploadEditedImage(base64, 'image/png');
+        }
+        updateImage(newUri);
+        setBgPickerVisible(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '이미지 저장 실패');
+      }
+      return;
+    }
+
+    // User edited the mask — send to server with mask for final processing
+    setProcessing(true);
+    setProgressText('사용자 편집 적용 중...');
+    try {
+      const base64 = cleanBase64(resultDataUrl);
+      const newUri = await uploadEditedImage(base64, 'image/png');
+      updateImage(newUri);
+      setBgPickerVisible(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '편집 결과 저장 실패');
+    }
+    setProcessing(false);
+  }, [bgEditorDataUrl, updateImage]);
+
+  const handleBgEditorCancel = useCallback(() => {
+    setBgEditorVisible(false);
+  }, []);
 
   const handleBgSelect = useCallback(async (style: BackgroundStyle) => {
     if (bgProcessing) return;
@@ -581,6 +674,16 @@ export default function EditorScreen() {
         onSelect={handleBgSelect}
         onSkip={handleBgSkip}
         processing={bgProcessing}
+      />
+
+      <BgRemoveEditor
+        visible={bgEditorVisible}
+        imageDataUrl={bgEditorDataUrl}
+        initialMask={bgEditorMask}
+        imageWidth={imageSize.width || imageDisplayWidth}
+        imageHeight={imageSize.height || imageDisplayHeight}
+        onConfirm={handleBgEditorConfirm}
+        onCancel={handleBgEditorCancel}
       />
 
       {(textOverlays.length > 0 || stickers.length > 0) && editMode === 'none' && (
