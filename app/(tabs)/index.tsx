@@ -53,6 +53,7 @@ import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { VirtualFitting } from '@/components/VirtualFitting';
+import { AIImageComposite } from '@/components/AIImageComposite';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -959,6 +960,17 @@ export default function CameraScreen() {
           stepNumber={3}
         >
           <VirtualFitting />
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Lightbulb size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
+          title="4. AI 이미지 합성"
+          desc="조명 스튜디오 합성 & 배경 교체로 전문 소재 완성"
+          iconBg={theme.colors.warning[500] + '18'}
+          accentColor={theme.colors.warning[400]}
+          stepNumber={4}
+        >
+          <AIImageComposite />
         </VerticalSectionCard>
 
         <TouchableOpacity
