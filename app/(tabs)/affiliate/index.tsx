@@ -434,7 +434,7 @@ export default function AffiliateScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + 40 }}
+        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + 24 }}
         showsVerticalScrollIndicator={false}
       >
         {loadError && (

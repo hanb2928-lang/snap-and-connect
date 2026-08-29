@@ -470,7 +470,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.bg,
   },
   scrollContent: {
-    paddingBottom: 140,
     maxWidth: 600,
     alignSelf: 'center',
     width: '100%',

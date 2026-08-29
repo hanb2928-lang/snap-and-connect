@@ -2369,7 +2369,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
-    paddingBottom: 140,
     maxWidth: 600,
     alignSelf: 'center',
     width: '100%',

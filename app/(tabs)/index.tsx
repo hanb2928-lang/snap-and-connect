@@ -1050,6 +1050,7 @@ function WebUploadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
+  const tabBarHeight = useTabBarHeight();
   const [recognitionMode, setRecognitionMode] = useState<'single' | 'multi'>('single');
   const [multiShots, setMultiShots] = useState<string[]>([]);
   const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
@@ -1230,7 +1231,7 @@ function WebUploadScreen() {
     <View style={styles.container}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.xl, paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xl + insets.bottom }}
+        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.xl, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + 24 }}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
