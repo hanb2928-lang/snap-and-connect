@@ -15,7 +15,7 @@ import { compressImageToBase64, prepareImageForApi } from '@/lib/imageEdit';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadImage } from '@/lib/analysis';
+import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 type FittingStep = 'idle' | 'product-ready' | 'model-ready' | 'processing' | 'done' | 'error';
 
@@ -109,24 +109,42 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
     setError(null);
 
     try {
-      const productMime = 'image/jpeg';
-      const modelMime = 'image/jpeg';
+      const response = await fetch(`${supabaseUrl}/functions/v1/virtual-fitting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          productImage,
+          modelImage,
+          bodyType,
+          pose,
+        }),
+      });
 
-      await uploadImage(productImage, productMime);
-      await uploadImage(modelImage, modelMime);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: '가상 피팅 생성에 실패했습니다.' }));
+        throw new Error(errData.error || `가상 피팅 실패 (${response.status})`);
+      }
 
-      const composited = productImage;
-      setResultImage(composited);
+      const data = await response.json();
+
+      if (!data.image) {
+        throw new Error('가상 피팅 이미지를 생성하지 못했습니다.');
+      }
+
+      setResultImage(data.image);
       setStep('done');
 
       if (onResult) {
-        onResult(composited, modelMime);
+        onResult(data.image, data.mimeType ?? 'image/png');
       }
     } catch (err) {
       setError(friendlyError(err, '가상 피팅 생성에 실패했습니다. 다시 시도해주세요.'));
       setStep('error');
     }
-  }, [productImage, modelImage, onResult]);
+  }, [productImage, modelImage, bodyType, pose, onResult]);
 
   const handleReset = useCallback(() => {
     setStep('idle');
@@ -305,7 +323,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
             <Text style={styles.resultTitle}>가상 피팅 완료!</Text>
           </View>
           <Image
-            source={{ uri: `data:image/jpeg;base64,${resultImage}` }}
+            source={{ uri: buildDataUrl(resultImage, 'image/png') }}
             style={styles.resultImage}
             resizeMode="contain"
           />
@@ -318,7 +336,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
               style={styles.resultBtnPrimary}
               onPress={() => {
                 if (onResult && resultImage) {
-                  onResult(resultImage, 'image/jpeg');
+                  onResult(resultImage, 'image/png');
                 }
               }}
               activeOpacity={0.7}
@@ -580,3 +598,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
+
+
+export { VirtualFitting }

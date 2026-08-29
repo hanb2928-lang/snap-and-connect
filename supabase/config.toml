@@ -66,3 +66,6 @@ verify_jwt = false
 
 [functions.generate-image]
 verify_jwt = false
+
+[functions.virtual-fitting]
+verify_jwt = false
