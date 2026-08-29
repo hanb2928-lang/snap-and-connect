@@ -18,27 +18,23 @@ import { useI18n } from '@/hooks/useI18n';
 import {
   Camera,
   FolderOpen,
-  ChartBar as BarChart3,
-  ShoppingBag,
+  Zap,
   BookMarked,
   Settings,
   MoreHorizontal,
-  Megaphone,
   type LucideIcon,
 } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
-  marketing: Megaphone,
+  marketing: Zap,
   assets: FolderOpen,
-  analytics: BarChart3,
 };
 
 const TAB_KEYS: Record<string, string> = {
   index: 'tab.camera',
-  marketing: 'tab.marketing',
-  assets: 'tab.assets',
-  analytics: 'tab.analytics',
+  marketing: 'tab.create',
+  assets: 'tab.library',
 };
 
 const TAB_WIDTH = 76;

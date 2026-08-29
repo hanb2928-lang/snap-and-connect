@@ -55,7 +55,8 @@ export default function TabLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="marketing" />
       <Tabs.Screen name="assets" />
-      <Tabs.Screen name="analytics" />
+      {/* Hidden tabs — kept in route config but not shown in tab bar */}
+      <Tabs.Screen name="analytics" options={{ href: null }} />
     </Tabs>
   );
 }
