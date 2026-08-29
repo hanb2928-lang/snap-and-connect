@@ -221,7 +221,7 @@ async function triggerTTS(scanId: string, text: string): Promise<void> {
     // use defaults
   }
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 115000);
   const response = await fetch(TTS_FUNCTION_URL, {
     method: 'POST',
     headers: {

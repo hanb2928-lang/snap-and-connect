@@ -71,12 +71,19 @@ async function processQueue(): Promise<void> {
 
     for (const req of queue) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 115000);
         const res = await fetch(req.url, {
           method: req.method,
           headers: req.headers,
           body: req.body,
+          signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
       } catch {
         if (req.retries < MAX_RETRIES) {
           remaining.push({ ...req, retries: req.retries + 1 });

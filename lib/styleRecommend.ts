@@ -23,7 +23,7 @@ export async function fetchStyleRecommendation(params: {
   platform?: string;
 }): Promise<StyleRecommendation> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 115000);
 
   try {
     const response = await fetch(RECOMMEND_FUNCTION_URL, {
@@ -38,8 +38,8 @@ export async function fetchStyleRecommendation(params: {
     });
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`Recommendation failed (${response.status}): ${errText}`);
+      const errData = await response.json().catch(() => ({ error: 'AI 스타일 추천 서버 오류가 발생했습니다.' }));
+      throw new Error(errData.error || `AI 스타일 추천 실패 (${response.status})`);
     }
 
     const data = await response.json();

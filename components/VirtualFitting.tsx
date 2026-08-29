@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ interface VirtualFittingProps {
 
 export function VirtualFitting({ onResult }: VirtualFittingProps) {
   const { t } = useI18n();
+  const abortRef = useRef<AbortController | null>(null);
   const [step, setStep] = useState<FittingStep>('idle');
   const [productImage, setProductImage] = useState<string | null>(null);
   const [modelImage, setModelImage] = useState<string | null>(null);
@@ -113,6 +114,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
 
     try {
       const controller = new AbortController();
+      abortRef.current = controller;
       const timeoutId = setTimeout(() => controller.abort(), FITTING_TIMEOUT_MS);
 
       const response = await fetch(`${supabaseUrl}/functions/v1/virtual-fitting`, {
@@ -153,8 +155,16 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
       const isNetworkError = err instanceof Error && (err.name === 'AbortError' || /network|fetch|abort/i.test(err.message));
       setError(isNetworkError ? t('common.networkError') : friendlyError(err, t('common.processingError')));
       setStep('error');
+    } finally {
+      abortRef.current = null;
     }
   }, [productImage, modelImage, bodyType, pose, onResult, t]);
+
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   const handleReset = useCallback(() => {
     setStep('idle');

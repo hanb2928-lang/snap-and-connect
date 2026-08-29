@@ -40,12 +40,12 @@ export async function analyzeImage(
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
-    timeoutMs: 60000,
+    timeoutMs: 115000,
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`AI 분석 실패 (${response.status}): ${errText}`);
+    const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
+    throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
   }
 
   const data = await response.json();
@@ -69,12 +69,12 @@ export async function analyzeMultiShot(
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ images: dataUrls, fileName, mode: 'multi-shot' }),
-    timeoutMs: 90000,
+    timeoutMs: 115000,
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`AI 다각도 분석 실패 (${response.status}): ${errText}`);
+    const errData = await response.json().catch(() => ({ error: 'AI 다각도 분석 서버 오류가 발생했습니다.' }));
+    throw new Error(errData.error || `AI 다각도 분석 실패 (${response.status})`);
   }
 
   const data = await response.json();
@@ -171,7 +171,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
     // use defaults
   }
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 115000);
   const response = await fetch(TTS_FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -257,12 +257,12 @@ export async function analyzeImageWithProductContext(
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode, productContext }),
-    timeoutMs: 60000,
+    timeoutMs: 115000,
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`AI 분석 실패 (${response.status}): ${errText}`);
+    const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
+    throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
   }
 
   const data = await response.json();
@@ -291,12 +291,12 @@ export async function extractProductMeta(
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ url }),
-    timeoutMs: 15000,
+    timeoutMs: 115000,
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`상품 정보 추출 실패 (${response.status}): ${errText}`);
+    const errData = await response.json().catch(() => ({ error: '상품 정보 추출 서버 오류가 발생했습니다.' }));
+    throw new Error(errData.error || `상품 정보 추출 실패 (${response.status})`);
   }
 
   const data = await response.json();
@@ -316,7 +316,7 @@ export async function analyzeImageQueued(
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
     { imageDataUrl, fileName, mimeType, mode, ...(preferredStyle ? { preferredStyle } : {}) },
-    { timeoutMs: 180000 },
+    { timeoutMs: 115000 },
   );
 
   if (!result.success || !result.result) {
@@ -335,7 +335,7 @@ export async function analyzeMultiShotQueued(
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
     { images: dataUrls, fileName, mode: 'multi-shot' },
-    { timeoutMs: 180000 },
+    { timeoutMs: 115000 },
   );
 
   if (!result.success || !result.result) {

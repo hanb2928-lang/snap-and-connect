@@ -63,12 +63,12 @@ export async function removeBackground(
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
     body: JSON.stringify({ imageDataUrl, mimeType, userMaskDataUrl }),
-    timeoutMs: 60000,
+    timeoutMs: 115000,
   });
 
   if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`배경 제거 실패 (${response.status}): ${errText}`);
+    const errData = await response.json().catch(() => ({ error: '배경 제거 서버 오류가 발생했습니다.' }));
+    throw new Error(errData.error || `배경 제거 실패 (${response.status})`);
   }
 
   const data = await response.json();
@@ -88,7 +88,7 @@ function base64ToBlob(base64: string, mimeType: string): any {
   return new (global as any).Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
 }
 
-export async function compressImage(uri: string, maxWidth = 1280, quality = 0.8): Promise<string> {
+export async function compressImage(uri: string, maxWidth = 1080, quality = 0.8): Promise<string> {
   const result = await ImageManipulator.manipulateAsync(
     uri,
     [{ resize: { width: maxWidth } }],
@@ -99,7 +99,7 @@ export async function compressImage(uri: string, maxWidth = 1280, quality = 0.8)
 
 export async function compressImageToBase64(
   uri: string,
-  maxDimension = 1280,
+  maxDimension = 1080,
   quality = 0.7,
 ): Promise<{ base64: string; mimeType: string }> {
   const { width: origW, height: origH } = await getImageSize(uri);

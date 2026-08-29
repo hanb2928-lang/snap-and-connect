@@ -109,12 +109,19 @@ async function doFetch(
       }
 
       if (response.status >= 500) {
+        let serverMsg = '서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        try {
+          const errData = await response.json();
+          if (errData?.error) serverMsg = errData.error;
+        } catch {
+          // body isn't JSON; keep default message
+        }
         if (attempt < retries) {
-          lastError = new ApiError('서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.', response.status);
+          lastError = new ApiError(serverMsg, response.status);
           await new Promise((r) => setTimeout(r, backoffDelay(attempt)));
           continue;
         }
-        throw new ApiError('서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.', response.status);
+        throw new ApiError(serverMsg, response.status);
       }
 
       if (cacheKey && response.ok) {
