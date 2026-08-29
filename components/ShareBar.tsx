@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, Easing } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { getShareDisclosureForPlatforms } from '@/lib/disclosure';
+import { smartRedirect } from '@/lib/smartRedirector';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import { captureRef } from 'react-native-view-shot';
@@ -27,7 +28,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   const [toast, setToast] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareModal, setShareModal] = useState<{ url: string; label: string } | null>(null);
-  const [previewModal, setPreviewModal] = useState<{ uri: string | null; fullText: string; platformLabel: string; siteUrl: string } | null>(null);
+  const [previewModal, setPreviewModal] = useState<{ uri: string | null; fullText: string; platformLabel: string; siteUrl: string; platformKey?: string } | null>(null);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const toastAnim = useSharedValue(0);
   const accordionHeight = useSharedValue(0);
@@ -153,10 +154,11 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     return disclosureText ? `${shareText}${linkLine}\n\n${disclosureText}` : `${shareText}${linkLine}`;
   }, [shareText, affiliateUrl, shortUrl, affiliatePlatforms, autoDisclosure]);
 
-  const executeShare = useCallback(async (uri: string | null, fullText: string, siteUrl: string, label: string) => {
+  const executeShare = useCallback(async (uri: string | null, fullText: string, siteUrl: string, label: string, platformKey?: string) => {
     let imageCopied = false;
     let textCopied = false;
 
+    // On web, copy first then open platform
     if (Platform.OS === 'web') {
       if (uri) {
         imageCopied = await copyImageToClipboard(uri);
@@ -181,25 +183,35 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       }
       setShareModal({ url: siteUrl, label });
     } else {
+      // Use smart redirector: clipboard-first, then app launch with web fallback
       if (uri) {
         try {
           await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `Share to ${label}` });
         } catch {
           await Share.share({ message: fullText });
         }
-      } else {
-        await Share.share({ message: fullText });
       }
-      Linking.openURL(siteUrl).catch(() => {});
+      if (platformKey) {
+        const result = await smartRedirect(platformKey, fullText, {
+          onClipboardCopied: () => {
+            showToast('문구가 복사됐어요. 앱이 열리면 붙여넣으세요');
+          },
+        });
+        if (result.method === 'web') {
+          showToast(result.message);
+        }
+      } else {
+        Linking.openURL(siteUrl).catch(() => {});
+      }
     }
   }, [copyImageToClipboard, copyTextToClipboard, showToast]);
 
-  const startPreview = useCallback(async (siteUrl: string, platformLabel: string) => {
+  const startPreview = useCallback(async (siteUrl: string, platformLabel: string, platformKey?: string) => {
     setSharing(true);
     try {
       const uri = await captureCard();
       const fullText = buildShareText();
-      setPreviewModal({ uri, fullText, platformLabel, siteUrl });
+      setPreviewModal({ uri, fullText, platformLabel, siteUrl, platformKey });
     } catch {
       showToast('이미지 캡처에 실패했어요');
     }
@@ -210,7 +222,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
     if (!previewModal) return;
     setSharing(true);
     try {
-      await executeShare(previewModal.uri, previewModal.fullText, previewModal.siteUrl, previewModal.platformLabel);
+      await executeShare(previewModal.uri, previewModal.fullText, previewModal.siteUrl, previewModal.platformLabel, previewModal.platformKey);
     } finally {
       setSharing(false);
       setPreviewModal(null);
@@ -218,7 +230,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   }, [previewModal, executeShare]);
 
   const handleNaverShare = useCallback(() => {
-    startPreview('https://clip.naver.com', '네이버클립');
+    startPreview('https://clip.naver.com', '네이버클립', 'naverBlog');
   }, [startPreview]);
 
   const handleSaveToCloud = useCallback(async () => {
@@ -263,15 +275,15 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   }, [captureCard, fileName, affiliatePlatforms, showToast]);
 
   const handleInstagramShare = useCallback(() => {
-    startPreview('https://www.instagram.com', '인스타그램');
+    startPreview('https://www.instagram.com', '인스타그램', 'instagram');
   }, [startPreview]);
 
   const handleKakaoShare = useCallback(() => {
-    startPreview('https://accounts.kakao.com/weblogin/share', '카카오톡');
+    startPreview('https://accounts.kakao.com/weblogin/share', '카카오톡', 'kakao');
   }, [startPreview]);
 
   const handleBlogShare = useCallback(() => {
-    startPreview('https://blog.naver.com', '네이버 블로그');
+    startPreview('https://blog.naver.com', '네이버 블로그', 'naverBlog');
   }, [startPreview]);
 
   const toastStyle = useAnimatedStyle(() => ({

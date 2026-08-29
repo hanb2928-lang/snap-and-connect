@@ -16,6 +16,7 @@ import { theme } from '@/lib/theme';
 import { uploadAssetBlob, uploadAssetFromFileUri, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { getUserSettings } from '@/lib/settings';
+import { applyWatermarks } from '@/lib/qrWatermark';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
@@ -204,6 +205,11 @@ async function renderFormat(
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
+
+  // Draw QR + logo watermarks if a short URL is available
+  if (opts.shortUrl) {
+    await applyWatermarks(ctx, fmt.width, fmt.height, opts.shortUrl);
+  }
 
   // Disclosure text is NOT drawn on the image — it is prepended to the caption
   // when uploading to platforms, to keep the visual template clean.

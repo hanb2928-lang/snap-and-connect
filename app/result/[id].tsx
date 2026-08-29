@@ -98,10 +98,11 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
+import { LinkInBioCard } from '@/components/LinkInBioCard';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1262,6 +1263,20 @@ export default function ResultScreen() {
               <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <Text style={styles.safetyTileBtnText}>계정 안전 확인하기</Text>
             </TouchableOpacity>
+          ),
+        },
+        {
+          key: 'linkInBio',
+          label: '링크인바이오 랜딩페이지',
+          description: '모든 상품을 한 페이지에 모아두는 프로필 바이오 링크',
+          category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <Link2Icon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          render: () => (
+            <LinkInBioCard
+              scanId={scan.id}
+              scanTitle={activeProductName || scan.title || '상품'}
+            />
           ),
         },
         {
