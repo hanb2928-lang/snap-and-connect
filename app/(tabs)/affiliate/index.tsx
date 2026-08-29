@@ -35,6 +35,7 @@ import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractPro
 import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
+import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { TrendingProductCuration } from '@/components/TrendingProductCuration';
@@ -148,6 +149,8 @@ export default function AffiliateScreen() {
   // Step 3: Content
   const [simpleMode, setSimpleMode] = useState(true);
   const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+  const [aiBundle, setAiBundle] = useState<AiRecommendBundle | null>(null);
+  const [aiRecommendLoading, setAiRecommendLoading] = useState(false);
   const [lastScanId, setLastScanId] = useState<string | null>(null);
   const [contentText, setContentText] = useState('');
   const [contentType, setContentType] = useState<string>('copy');
@@ -355,8 +358,27 @@ export default function AffiliateScreen() {
         }
       }
       markCompleted('analyze');
-      setAiRecommendation('웹툰형 만화');
       setLastScanId(scanId);
+
+      setAiRecommendLoading(true);
+      try {
+        const bundle = await fetchAiRecommendBundle({
+          productName: productMeta?.productName || '',
+          productCategory: productMeta?.platform || '',
+          hook: '',
+          oneLiner: '',
+          fallbackHashtags: [],
+        });
+        setAiBundle(bundle);
+        setAiRecommendation(bundle.templateLabel);
+        const match = TEMPLATE_STYLES.find((t) => bundle.templateLabel.includes(t.label));
+        if (match) setSelectedTemplate(match.key);
+      } catch {
+        setAiRecommendation('웹툰형 만화');
+      } finally {
+        setAiRecommendLoading(false);
+      }
+
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
@@ -932,13 +954,31 @@ export default function AffiliateScreen() {
                 </View>
               )}
 
-              {completedSteps.has('analyze') && aiRecommendation && (
-                <View style={styles.aiRecommendBadge}>
-                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.aiRecommendText}>
-                    AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
-                  </Text>
-                </View>
+              {(completedSteps.has('analyze') || aiRecommendLoading) && (
+                aiRecommendLoading ? (
+                  <View style={styles.aiRecommendBadge}>
+                    <Loader size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.aiRecommendText}>AI가 최적의 스타일을 분석하는 중...</Text>
+                  </View>
+                ) : aiBundle ? (
+                  <View style={styles.aiRecommendBundleBox}>
+                    <View style={styles.aiRecommendBadge}>
+                      <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                      <Text style={styles.aiRecommendText}>
+                        AI 추천: {aiBundle.templateLabel} · {aiBundle.style.cardStyle} · {aiBundle.style.duration}초
+                      </Text>
+                    </View>
+                    <Text style={styles.aiRecommendDetail}>{aiBundle.summary}</Text>
+                    <Text style={styles.aiRecommendReason}>{aiBundle.style.reason}</Text>
+                  </View>
+                ) : aiRecommendation ? (
+                  <View style={styles.aiRecommendBadge}>
+                    <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.aiRecommendText}>
+                      AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
+                    </Text>
+                  </View>
+                ) : null
               )}
             </>
           ) : (
@@ -973,51 +1013,72 @@ export default function AffiliateScreen() {
           stepNumber={3}
           completed={completedSteps.has('content')}
         >
-          {/* AI Recommendation badge */}
-          {aiRecommendation && (
-            <View style={styles.aiRecommendCard}>
-              <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-              <View style={styles.aiRecommendCardBody}>
-                <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
-                <Text style={styles.aiRecommendCardDesc}>
-                  이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
+          {/* AI one-tap auto-recommend button */}
+          {lastScanId && completedSteps.has('analyze') && (
+            <TouchableOpacity
+              style={styles.aiOneTapBtn}
+              onPress={() => router.push({ pathname: '/result/[id]', params: { id: lastScanId } })}
+              activeOpacity={0.85}
+            >
+              <Sparkles size={20} color="#fff" strokeWidth={2} />
+              <View style={styles.aiOneTapTextWrap}>
+                <Text style={styles.aiOneTapBtnTitle}>AI 자동 추천으로 바로 만들기</Text>
+                <Text style={styles.aiOneTapBtnSub}>
+                  {aiBundle
+                    ? aiBundle.summary
+                    : 'AI가 최적의 스타일·음성·해시태그를 자동으로 설정했어요'}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.aiRecommendApplyBtn}
-                onPress={() => {
-                  const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
-                  if (match) setSelectedTemplate(match.key);
-                }}
-                activeOpacity={0.7}
-              >
-                <Check size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
-              </TouchableOpacity>
-            </View>
+              <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+            </TouchableOpacity>
           )}
 
-          {/* Simple / Advanced mode toggle */}
-          <View style={styles.modeToggleRow}>
-            <TouchableOpacity
-              style={[styles.modeToggleBtn, simpleMode && styles.modeToggleBtnActive]}
-              onPress={() => setSimpleMode(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeToggleText, simpleMode && styles.modeToggleTextActive]}>초보자 모드</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeToggleBtn, !simpleMode && styles.modeToggleBtnActive]}
-              onPress={() => setSimpleMode(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeToggleText, !simpleMode && styles.modeToggleTextActive]}>고급 설정</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Collapsible custom options */}
+          <TouchableOpacity
+            style={styles.customToggle}
+            onPress={() => setSimpleMode(!simpleMode)}
+            activeOpacity={0.7}
+          >
+            <SettingsIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.customToggleText}>
+              {simpleMode ? '직접 스타일 선택하기' : '접기'}
+            </Text>
+            {simpleMode ? (
+              <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
 
-          {/* Template style selection */}
-          <Text style={styles.sectionLabel}>템플릿 스타일</Text>
-          <View style={styles.templateRow}>
+          {!simpleMode && (
+            <>
+              {/* AI Recommendation badge */}
+              {aiRecommendation && (
+                <View style={styles.aiRecommendCard}>
+                  <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <View style={styles.aiRecommendCardBody}>
+                    <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
+                    <Text style={styles.aiRecommendCardDesc}>
+                      이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.aiRecommendApplyBtn}
+                    onPress={() => {
+                      const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
+                      if (match) setSelectedTemplate(match.key);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Check size={14} color="#fff" strokeWidth={2.5} />
+                    <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Template style selection */}
+              <Text style={styles.sectionLabel}>템플릿 스타일</Text>
+              <View style={styles.templateRow}>
             {TEMPLATE_STYLES.map((t) => {
               const Icon = t.icon;
               const isActive = selectedTemplate === t.key;
@@ -1045,9 +1106,7 @@ export default function AffiliateScreen() {
             })}
           </View>
 
-          {/* Content type selection — hidden in simple mode */}
-          {!simpleMode && (
-            <>
+              {/* Content type selection */}
               <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
               <View style={styles.contentTypeRow}>
                 {CONTENT_TYPES.map((t) => {
@@ -1071,27 +1130,6 @@ export default function AffiliateScreen() {
                 {CONTENT_TYPES.find((t) => t.key === contentType)?.hint}
               </Text>
             </>
-          )}
-
-          {simpleMode && (
-            <View style={styles.simpleModeHintBox}>
-              <Text style={styles.simpleModeHintText}>
-                초보자 모드: AI 추천 스타일로 바로 제작할 수 있습니다. 더 많은 옵션을 보려면 '고급 설정'을 선택하세요.
-              </Text>
-            </View>
-          )}
-
-          {/* Comic short-form creation button */}
-          {lastScanId && completedSteps.has('analyze') && (
-            <TouchableOpacity
-              style={styles.comicShortBtn}
-              onPress={() => router.push({ pathname: '/result/[id]', params: { id: lastScanId } })}
-              activeOpacity={0.85}
-            >
-              <Palette size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.comicShortBtnText}>만화 숏폼 만들기</Text>
-              <ChevronDown size={16} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-            </TouchableOpacity>
           )}
 
           <TextInput
@@ -1890,6 +1928,66 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.warning[400],
     lineHeight: 17,
+  },
+  aiRecommendBundleBox: {
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '30',
+    gap: 6,
+  },
+  aiRecommendDetail: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+    lineHeight: 16,
+  },
+  aiRecommendReason: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  aiOneTapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: theme.spacing.md + 2,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500],
+    marginBottom: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  aiOneTapTextWrap: {
+    flex: 1,
+  },
+  aiOneTapBtnTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  aiOneTapBtnSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#fff' + 'CC',
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  customToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  customToggleText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
   analyzeWaitingBox: {
     alignItems: 'center',
