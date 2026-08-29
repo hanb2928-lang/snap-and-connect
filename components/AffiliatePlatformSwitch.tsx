@@ -11,6 +11,7 @@ export type AffiliatePlatformKey =
   | 'TodayHouse'
   | 'Kurly'
   | 'AliExpress'
+  | 'Amazon'
   | 'MyRealTrip'
   | 'Klook'
   | 'Custom';
@@ -29,6 +30,7 @@ const PLATFORMS: { key: AffiliatePlatformKey; label: string; icon: typeof Shoppi
   { key: 'TodayHouse', label: '오늘의집', icon: Home, color: '#35C5F0' },
   { key: 'Kurly', label: '컬리', icon: ShoppingBasket, color: '#5F0080' },
   { key: 'AliExpress', label: '알리', icon: Globe, color: '#FF4747' },
+  { key: 'Amazon', label: '아마존', icon: Globe, color: '#FF9900' },
   { key: 'MyRealTrip', label: '마이리얼트립', icon: Palmtree, color: '#FF6B35' },
   { key: 'Klook', label: '클룩', icon: Ticket, color: '#FF5722' },
 ];

@@ -2,6 +2,7 @@ import {
   detectAffiliatePlatform,
   isKnownAffiliateUrl,
   generateMarketingCopy,
+  validateAffiliateUrl,
 } from '@/lib/affiliateLinkSmart';
 
 describe('detectAffiliatePlatform', () => {
@@ -28,6 +29,13 @@ describe('detectAffiliatePlatform', () => {
   it('알리익스프레스 URL을 감지한다', () => {
     expect(detectAffiliatePlatform('https://www.aliexpress.com/item/123')).toBe('AliExpress');
     expect(detectAffiliatePlatform('https://www.aliexpress.kr/i/456')).toBe('AliExpress');
+  });
+
+  it('아마존 URL을 감지한다', () => {
+    expect(detectAffiliatePlatform('https://www.amazon.com/dp/B123')).toBe('Amazon');
+    expect(detectAffiliatePlatform('https://www.amazon.co.jp/dp/B456')).toBe('Amazon');
+    expect(detectAffiliatePlatform('https://www.amazon.co.uk/dp/B789')).toBe('Amazon');
+    expect(detectAffiliatePlatform('https://www.amazon.de/dp/B999')).toBe('Amazon');
   });
 
   it('알 수 없는 URL은 Custom을 반환한다', () => {
@@ -105,5 +113,42 @@ describe('generateMarketingCopy', () => {
       '',
     );
     expect(result.marketingCopy).toContain('나이키 에어포스');
+  });
+});
+
+describe('validateAffiliateUrl', () => {
+  it('빈 입력을 거부한다', () => {
+    const result = validateAffiliateUrl('');
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+
+  it('잘못된 URL 형식을 거부한다', () => {
+    const result = validateAffiliateUrl('not-a-url');
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+
+  it('일반 제휴 링크는 valid를 반환한다', () => {
+    const result = validateAffiliateUrl('https://www.coupang.com/vp/123');
+    expect(result.valid).toBe(true);
+    expect(result.platform).toBe('Coupang');
+    expect(result.warning).toBeUndefined();
+  });
+
+  it('아마존 URL에 경고를 포함한다', () => {
+    const result = validateAffiliateUrl('https://www.amazon.com/dp/B123');
+    expect(result.valid).toBe(true);
+    expect(result.platform).toBe('Amazon');
+    expect(result.warning).toBeTruthy();
+    expect(result.warning).toContain('아마존');
+  });
+
+  it('알리익스프레스 URL에 경고를 포함한다', () => {
+    const result = validateAffiliateUrl('https://www.aliexpress.com/item/123');
+    expect(result.valid).toBe(true);
+    expect(result.platform).toBe('AliExpress');
+    expect(result.warning).toBeTruthy();
+    expect(result.warning).toContain('알리');
   });
 });

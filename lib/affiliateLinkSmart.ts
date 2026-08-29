@@ -18,6 +18,7 @@ const ZIGZAG = /zigzag\.be/i;
 const TODAYHOUSE = /ohou\.se|todayhouse\.com/i;
 const KURLY = /kurly\.com/i;
 const ALIEXPRESS = /aliexpress\.com|aliexpress\.kr/i;
+const AMAZON = /amazon\.(com|co\.uk|co\.jp|de|fr|it|es|ca|com\.au|in|sg|com\.mx|com\.br)/i;
 const MYREALTRIP = /myrealtrip\.com/i;
 const KLOOK = /klook\.com/i;
 
@@ -30,6 +31,7 @@ const PLATFORM_PATTERNS: { pattern: RegExp; key: AffiliatePlatformKey }[] = [
   { pattern: TODAYHOUSE, key: 'TodayHouse' },
   { pattern: KURLY, key: 'Kurly' },
   { pattern: ALIEXPRESS, key: 'AliExpress' },
+  { pattern: AMAZON, key: 'Amazon' },
   { pattern: MYREALTRIP, key: 'MyRealTrip' },
   { pattern: KLOOK, key: 'Klook' },
 ];
@@ -43,6 +45,71 @@ export function detectAffiliatePlatform(url: string): AffiliatePlatformKey {
 
 export function isKnownAffiliateUrl(url: string): boolean {
   return PLATFORM_PATTERNS.some((p) => p.pattern.test(url));
+}
+
+export interface UrlValidationResult {
+  valid: boolean;
+  error?: string;
+  warning?: string;
+  platform?: AffiliatePlatformKey;
+}
+
+export function validateAffiliateUrl(rawUrl: string): UrlValidationResult {
+  let trimmed = rawUrl.trim().replace(/\s+/g, '');
+  if (!trimmed) {
+    return { valid: false, error: '링크를 입력해주세요.' };
+  }
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    trimmed = 'https://' + trimmed;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { valid: false, error: '올바르지 않은 링크 형식이에요. URL을 확인해주세요.' };
+  }
+  if (!parsed.hostname.includes('.')) {
+    return { valid: false, error: '올바르지 않은 도메인이에요. URL을 다시 확인해주세요.' };
+  }
+  const platform = detectAffiliatePlatform(trimmed);
+  if (AMAZON.test(trimmed)) {
+    const country = detectAmazonCountry(trimmed);
+    return {
+      valid: true,
+      platform: 'Amazon',
+      warning: `아마존 ${country} 링크가 감지되었습니다. 아마존 어소시에이트 프로그램 별도 가입이 필요하며, 국내 공정위 문구와 별도로 해외 배송비·통관 등 안내가 필요할 수 있어요.`,
+    };
+  }
+  if (ALIEXPRESS.test(trimmed)) {
+    return {
+      valid: true,
+      platform: 'AliExpress',
+      warning: '알리익스프레스 링크입니다. 알리익스프레스 어필리이트 프로그램 가입이 필요하며, 해외직구 안내(배송 2~3주·통관번호)를 함께 표기하는 것을 권장해요.',
+    };
+  }
+  return { valid: true, platform };
+}
+
+function detectAmazonCountry(url: string): string {
+  const match = url.match(/amazon\.([\w.]+)/i);
+  if (!match) return '';
+  const tld = match[1].toLowerCase();
+  const map: Record<string, string> = {
+    'com': 'US',
+    'co.uk': 'UK',
+    'co.jp': 'JP',
+    'de': 'DE',
+    'fr': 'FR',
+    'it': 'IT',
+    'es': 'ES',
+    'ca': 'CA',
+    'com.au': 'AU',
+    'in': 'IN',
+    'sg': 'SG',
+    'com.mx': 'MX',
+    'com.br': 'BR',
+  };
+  return map[tld] || tld.toUpperCase();
 }
 
 function extractProductNameFromUrl(url: string): string {
@@ -113,6 +180,7 @@ export function generateMarketingCopy(url: string, productName: string, priceLab
     TodayHouse: { label: '오늘의집', hint: '오늘의집 링크', tag: '오늘의집', copy: `${name}${price} 확인하기\n오늘의집에서 홈스타일링하세요!\n#오늘의집 #홈데코 #${name.replace(/\s+/g, '')}` },
     Kurly: { label: '컬리', hint: '컬리 링크', tag: '컬리', copy: `${name}${price} 확인하기\n컬리에서 신선하게 만나보세요!\n#컬리 #신선식품 #${name.replace(/\s+/g, '')}` },
     AliExpress: { label: '알리익스프레스', hint: '알리 링크', tag: '알리익스프레스', copy: `${name}${price} 확인하기\n알리익스프레스에서 최저가로!\n#알리익스프레스 #해외직구 #${name.replace(/\s+/g, '')}` },
+    Amazon: { label: '아마존', hint: '아마존 링크', tag: '아마존', copy: `${name}${price} 확인하기\n아마존에서 최저가로!\n#아마존 #해외직구 #${name.replace(/\s+/g, '')}` },
     MyRealTrip: { label: '마이리얼트립', hint: '마이리얼트립 링크', tag: '마이리얼트립', copy: `${name} 예약하기\n마이리얼트립에서 특가를 만나보세요!\n#마이리얼트립 #여행 #${name.replace(/\s+/g, '')}` },
     Klook: { label: '클룩', hint: '클룩 링크', tag: '클룩', copy: `${name} 예약하기\n클룩에서 할인가로 만나보세요!\n#클룩 #여행 #${name.replace(/\s+/g, '')}` },
     Custom: { label: '직접 추가', hint: '커스텀 링크', tag: '제휴', copy: `${name}${price} 확인하기\n링크를 통해 더 자세한 정보를 확인하세요.\n#${name.replace(/\s+/g, '')}` },

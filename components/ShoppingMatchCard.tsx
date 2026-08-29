@@ -11,9 +11,9 @@ import {
   UIManager,
   ScrollView,
 } from 'react-native';
-import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2, Search, Scissors, Shirt } from 'lucide-react-native';
+import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2, Search, Scissors, Shirt, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl } from '@/lib/affiliateLinkSmart';
+import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl, validateAffiliateUrl } from '@/lib/affiliateLinkSmart';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
 import { useAffiliateToast } from '@/components/AffiliateToast';
 import type { ShoppingMatch, AffiliateLink, CustomAffiliateLink } from '@/types/database';
@@ -55,6 +55,7 @@ const PLATFORM_META: {
   { key: 'TodayHouse', label: '오늘의집', icon: Home, color: '#35C5F0', issueUrl: 'https://ohou.se/', issueLabel: '오늘의집에서 링크 가져오기' },
   { key: 'Kurly', label: '컬리', icon: ShoppingBasket, color: '#5F0080', issueUrl: 'https://kurly.com/', issueLabel: '컬리에서 링크 가져오기' },
   { key: 'AliExpress', label: '알리', icon: Globe, color: '#FF4747', issueUrl: 'https://www.aliexpress.com/', issueLabel: '알리익스프레스에서 링크 가져오기' },
+  { key: 'Amazon', label: '아마존', icon: Globe, color: '#FF9900', issueUrl: 'https://affiliate-program.amazon.com/', issueLabel: '아마존 어소시에이트에서 링크 가져오기' },
   { key: 'MyRealTrip', label: '마이리얼트립', icon: Palmtree, color: '#FF6B35', issueUrl: 'https://www.myrealtrip.com/', issueLabel: '마이리얼트립에서 링크 가져오기' },
   { key: 'Klook', label: '클룩', icon: Ticket, color: '#FF5722', issueUrl: 'https://www.klook.com/', issueLabel: '클룩에서 링크 가져오기' },
   { key: 'Custom', label: '직접 추가', icon: Store, color: '#6366F1', issueUrl: '', issueLabel: '' },
@@ -89,6 +90,7 @@ export function ShoppingMatchCard({
   const [linkCopied, setLinkCopied] = useState(false);
   const [generatingShortUrl, setGeneratingShortUrl] = useState(false);
   const [localShortUrl, setLocalShortUrl] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const { showAffiliateToast } = useAffiliateToast();
 
   useEffect(() => {
@@ -134,6 +136,7 @@ export function ShoppingMatchCard({
     setInputLabel(customLinkForProduct?.label || '');
     setInputPlatformName(customLinkForProduct?.platform === 'Custom' ? (customLinkForProduct?.label || '') : '');
     setError(null);
+    setWarning(null);
     setEditing(true);
   };
 
@@ -143,6 +146,7 @@ export function ShoppingMatchCard({
     setInputLabel('');
     setInputPlatformName('');
     setError(null);
+    setWarning(null);
   };
 
   if (matches.length === 0 && affiliateLinks.length === 0) {
@@ -267,6 +271,7 @@ export function ShoppingMatchCard({
       TodayHouse: '오늘의집 링크',
       Kurly: '컬리 링크',
       AliExpress: '알리익스프레스 링크',
+      Amazon: '아마존 링크',
       MyRealTrip: '마이리얼트립 링크',
       Klook: '클룩 링크',
       Custom: '직접 추가 링크',
@@ -287,15 +292,18 @@ export function ShoppingMatchCard({
   const hasLinkForSelected = availablePlatforms.includes(selectedAffiliate);
 
   const handleSaveLink = async () => {
-    let trimmed = inputUrl.trim().replace(/\s+/g, '');
-    if (!trimmed) {
-      setError('링크를 입력해주세요');
+    const validation = validateAffiliateUrl(inputUrl);
+    if (!validation.valid) {
+      setError(validation.error || '링크를 확인해주세요.');
+      setWarning(null);
       return;
     }
+    let trimmed = inputUrl.trim().replace(/\s+/g, '');
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       trimmed = 'https://' + trimmed;
     }
     setError(null);
+    setWarning(validation.warning || null);
     const detected = generateMarketingCopy(trimmed, productName, priceLabel);
     const isCustomPlatform = selectedAffiliate === 'Custom';
     const finalLabel = isCustomPlatform
@@ -630,6 +638,12 @@ export function ShoppingMatchCard({
           autoCorrect={false}
         />
         {error && <Text style={styles.errorText}>{error}</Text>}
+        {warning && !error && (
+          <View style={styles.warningBox}>
+            <AlertCircle size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.warningText}>{warning}</Text>
+          </View>
+        )}
         {selectedMeta && selectedAffiliate !== 'Custom' && (
           <TouchableOpacity
             style={styles.brandConnectLink}
@@ -1050,6 +1064,25 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],
     marginTop: theme.spacing.sm,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.warning[500] + '30',
+    marginTop: 6,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    lineHeight: 14,
   },
   brandConnectLink: {
     flexDirection: 'row',
