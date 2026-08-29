@@ -639,39 +639,41 @@ export default function CameraScreen() {
 
             {!arMode && (
               <View style={styles.cameraTopControls}>
-                <TouchableOpacity
-                  style={[styles.topButton, gridVisible && styles.topButtonActive]}
-                  onPress={() => setGridVisible((g) => !g)}
-                  disabled={processing}
-                  activeOpacity={0.7}
-                >
-                  <Grid3x3 size={18} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
-                  onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
-                  disabled={processing}
-                  activeOpacity={0.7}
-                >
-                  {flash === 'on' ? (
-                    <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-                  ) : flash === 'auto' ? (
-                    <View style={styles.flashAutoWrap}>
-                      <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                      <Text style={styles.flashAutoLabel}>A</Text>
-                    </View>
-                  ) : (
-                    <ZapOff size={18} color={theme.colors.dark.text} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.topButton}
-                  onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
-                  disabled={processing}
-                  activeOpacity={0.7}
-                >
-                  <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2} />
-                </TouchableOpacity>
+                <View style={styles.cameraTopBtnGroup}>
+                  <TouchableOpacity
+                    style={[styles.topButton, gridVisible && styles.topButtonActive]}
+                    onPress={() => setGridVisible((g) => !g)}
+                    disabled={processing}
+                    activeOpacity={0.7}
+                  >
+                    <Grid3x3 size={18} color={gridVisible ? theme.colors.primary[400] : theme.colors.dark.text} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.topButton, flash !== 'off' && styles.topButtonActive]}
+                    onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
+                    disabled={processing}
+                    activeOpacity={0.7}
+                  >
+                    {flash === 'on' ? (
+                      <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                    ) : flash === 'auto' ? (
+                      <View style={styles.flashAutoWrap}>
+                        <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                        <Text style={styles.flashAutoLabel}>A</Text>
+                      </View>
+                    ) : (
+                      <ZapOff size={18} color={theme.colors.dark.text} strokeWidth={2} />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.topButton}
+                    onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+                    disabled={processing}
+                    activeOpacity={0.7}
+                  >
+                    <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
                 <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
               </View>
             )}
@@ -2727,7 +2729,12 @@ const styles = StyleSheet.create({
     right: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     zIndex: 10,
+  },
+  cameraTopBtnGroup: {
+    flexDirection: 'row',
+    gap: 6,
   },
   cameraZoomBadge: {
     position: 'absolute',

@@ -58,6 +58,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
   const [popupScale] = useState(new Animated.Value(0));
 
   const bottomPadding = Math.max(insets.bottom, 0);
+  const tabBarTotalHeight = 94 + bottomPadding;
 
   useEffect(() => {
     if (moreOpen) {
@@ -79,7 +80,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
 
   return (
     <>
-      <View style={[styles.container, { paddingBottom: 8 + bottomPadding }]}>
+      <View style={[styles.container, { paddingBottom: 8 + bottomPadding, minHeight: 62 + bottomPadding }]}>
         <View style={styles.tabRow}>
           {state.routes.map((route, index) => {
             const isFocused = state.index === index;
@@ -166,7 +167,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
               styles.popupCard,
               {
                 transform: [{ scale: popupScale }],
-                marginBottom: 80 + bottomPadding,
+                marginBottom: tabBarTotalHeight + 8,
               },
             ]}
           >

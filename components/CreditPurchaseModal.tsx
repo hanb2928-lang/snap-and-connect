@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Coins, X, Check, Zap, TrendingUp, History } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import {
@@ -20,6 +21,7 @@ interface CreditPurchaseModalProps {
 }
 
 export function CreditPurchaseModal({ visible, onClose, onPurchased }: CreditPurchaseModalProps) {
+  const insets = useSafeAreaInsets();
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +61,11 @@ export function CreditPurchaseModal({ visible, onClose, onPurchased }: CreditPur
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[styles.modalContainer, { marginBottom: insets.bottom > 0 ? insets.bottom : 0 }]}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Coins size={22} color={theme.colors.warning[400]} strokeWidth={2} />
@@ -190,7 +195,7 @@ export function CreditPurchaseModal({ visible, onClose, onPurchased }: CreditPur
             결제 시스템 연동 전까지는 테스트용으로 즉시 충전됩니다.
           </Text>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -305,7 +310,7 @@ const styles = StyleSheet.create({
     color: theme.colors.error[400],
   },
   scrollArea: {
-    maxHeight: 400,
+    maxHeight: 380,
   },
   sectionLabel: {
     fontSize: 12,
