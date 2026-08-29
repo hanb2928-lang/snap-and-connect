@@ -97,15 +97,14 @@ const TEMPLATE_STYLES = [
   { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText },
 ] as const;
 
-type StepKey = 'media' | 'affiliate' | 'analyze' | 'content' | 'upload';
+type StepKey = 'affiliate' | 'analyze' | 'content' | 'upload';
 
-const STEP_ORDER: StepKey[] = ['media', 'affiliate', 'analyze', 'content', 'upload'];
+const STEP_ORDER: StepKey[] = ['affiliate', 'analyze', 'content', 'upload'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
-  media: { num: 1, color: theme.colors.primary[400] },
-  affiliate: { num: 2, color: theme.colors.accent[400] },
-  analyze: { num: 3, color: theme.colors.success[400] },
-  content: { num: 4, color: theme.colors.warning[400] },
-  upload: { num: 5, color: theme.colors.success[400] },
+  affiliate: { num: 1, color: theme.colors.accent[400] },
+  analyze: { num: 2, color: theme.colors.success[400] },
+  content: { num: 3, color: theme.colors.warning[400] },
+  upload: { num: 4, color: theme.colors.success[400] },
 };
 
 export default function AffiliateScreen() {
@@ -123,14 +122,15 @@ export default function AffiliateScreen() {
 
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
 
-  // Step 1: Media
+  // Image for analysis (from product meta or user upload)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
   const [mediaType, setMediaType] = useState<'photo' | 'video' | null>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [imageSource, setImageSource] = useState<'product' | 'user' | null>(null);
 
-  // Step 2: Affiliate link
+  // Step 1: Affiliate link
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
@@ -148,7 +148,7 @@ export default function AffiliateScreen() {
     brand: string;
   } | null>(null);
 
-  // Step 3: AI Analysis
+  // Step 2: AI Analysis
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [activeAiTool, setActiveAiTool] = useState<'none' | 'cuts' | 'fitting'>('none');
@@ -166,11 +166,9 @@ export default function AffiliateScreen() {
     setSelectedImageMime('image/png');
   }, []);
 
-  // Step 4: Content
+  // Step 3: Content
   const [simpleMode, setSimpleMode] = useState(true);
   const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
-
-  // Step 3: Content
   const [contentText, setContentText] = useState('');
   const [contentType, setContentType] = useState<string>('copy');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('shortform');
@@ -251,7 +249,7 @@ export default function AffiliateScreen() {
     return false;
   }, [settings]);
 
-  // Step 1: Pick photo — goes through CapturePreviewModal
+  // Step 2: Pick own photo (optional — product image is used by default)
   const handlePickPhoto = async () => {
     setMediaLoading(true);
     try {
@@ -281,57 +279,48 @@ export default function AffiliateScreen() {
     setMediaLoading(false);
   };
 
-  const handlePickVideo = async () => {
-    if (isWebPlatform()) return;
-    setMediaLoading(true);
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        base64: false,
-        quality: 0.7,
-      });
-      if (result.canceled || !result.assets?.[0]?.uri) {
-        setMediaLoading(false);
-        return;
-      }
-      setSelectedImage(result.assets[0].uri);
-      setSelectedImageMime('video/mp4');
-      setMediaType('video');
-      markCompleted('media');
-    } catch {
-      setMediaLoading(false);
-    }
-    setMediaLoading(false);
-  };
-
-  // CapturePreviewModal confirm → set image and advance
+  // CapturePreviewModal confirm → set user photo as analysis image
   const handlePreviewConfirm = (base64: string, mimeType: string) => {
     setSelectedImage(base64);
     setSelectedImageMime(mimeType);
     setMediaType('photo');
+    setImageSource('user');
     setPreviewCapture(null);
-    markCompleted('media');
   };
 
   const handlePreviewRetake = () => {
     setPreviewCapture(null);
   };
 
-  // Step 2: Save affiliate link and extract product metadata
+  // Step 1: Save affiliate link and extract product metadata
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
     setExtracting(true);
     setExtractError(null);
     try {
       const meta = await extractProductMeta(affiliateUrl.trim());
-      setProductMeta({
+      const newMeta = {
         productName: meta.productName || '',
         description: meta.description || '',
         price: meta.price || '',
         image: meta.image || '',
         platform: meta.platform || '',
         brand: meta.brand || '',
-      });
+      };
+      setProductMeta(newMeta);
+      // Auto-set product image as the analysis image
+      if (newMeta.image) {
+        try {
+          const { urlToDataUrl } = await import('@/lib/base64');
+          const dataUrl = await urlToDataUrl(newMeta.image);
+          setSelectedImage(cleanBase64(dataUrl));
+          setSelectedImageMime('image/jpeg');
+          setMediaType('photo');
+          setImageSource('product');
+        } catch {
+          // image fetch failed — user can upload manually
+        }
+      }
     } catch {
       setProductMeta(null);
       setExtractError('상품 정보를 자동으로 가져오지 못했습니다. AI 분석은 계속 진행할 수 있습니다.');
@@ -343,6 +332,7 @@ export default function AffiliateScreen() {
 
   const handleAnalyzePhoto = async () => {
     if (!selectedImage || mediaType !== 'photo' || analyzing) return;
+    if (!productMeta && !affiliateUrl.trim()) return;
     setAnalyzing(true);
     setAnalyzeError(null);
     try {
@@ -459,7 +449,7 @@ export default function AffiliateScreen() {
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            아래 5단계를 위에서부터 차례대로 따라 하시면 됩니다. 각 단계를 완료하면 다음 단계로 자동 스크롤됩니다.
+            아래 4단계를 위에서부터 차례대로 따라 하시면 됩니다. 제휴 링크로 시작해서 분석, 제작, 업로드까지 한 번에 완성할 수 있습니다.
           </Text>
         </View>
 
@@ -482,79 +472,21 @@ export default function AffiliateScreen() {
 
         {/* Step indicator */}
         <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
-          <StepIndicator activeStep={activeStep} stepCount={5} />
+          <StepIndicator activeStep={activeStep} stepCount={4} />
         </View>
 
-        {/* STEP 1: Media import */}
-        <VerticalSectionCard
-          icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
-          title="1. 사진 · 영상 불러오기"
-          desc="기기 앨범에서 상품 사진이나 홍보 영상을 선택하세요."
-          iconBg={theme.colors.primary[500] + '18'}
-          accentColor={STEP_META.media.color}
-          stepNumber={1}
-          completed={completedSteps.has('media')}
-        >
-          <View style={styles.mediaHintBox}>
-            <Text style={styles.mediaHintText}>
-              갤러리에서 사진이나 동영상을 선택하세요. 사진은 미리보기에서 자르기·회전 후 AI 분석으로 연결되고, 영상은 숏폼 제작에 활용됩니다.
-            </Text>
-          </View>
-
-          {imagePreviewUri && (
-            <View style={styles.mediaPreviewWrap}>
-              <Image
-                source={{ uri: imagePreviewUri }}
-                style={styles.mediaPreview}
-                resizeMode="cover"
-              />
-              <TouchableOpacity
-                style={styles.mediaRemoveBtn}
-                onPress={() => {
-                  setSelectedImage(null);
-                  setMediaType(null);
-                  setCompletedSteps((prev) => { const n = new Set(prev); n.delete('media'); return n; });
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.mediaRemoveText}>삭제</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!imagePreviewUri && (
-            <View style={styles.mediaBtnRow}>
-              <TouchableOpacity style={styles.mediaBtn} onPress={handlePickPhoto} activeOpacity={0.7} disabled={mediaLoading}>
-                {mediaLoading ? (
-                  <Loader size={20} color={theme.colors.primary[300]} strokeWidth={2} />
-                ) : (
-                  <ImageIcon size={20} color={theme.colors.primary[300]} strokeWidth={2} />
-                )}
-                <Text style={styles.mediaBtnText}>사진 선택</Text>
-              </TouchableOpacity>
-
-              {!isWebPlatform() && (
-                <TouchableOpacity style={styles.mediaBtnSecondary} onPress={handlePickVideo} activeOpacity={0.7} disabled={mediaLoading}>
-                  <Film size={20} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.mediaBtnSecondaryText}>동영상 선택</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </VerticalSectionCard>
-
-        {/* STEP 2: Affiliate Link Connection */}
+        {/* STEP 1: Affiliate Link Connection */}
         <View
-          ref={(ref) => { stepRefs.current[2] = ref; }}
+          ref={(ref) => { stepRefs.current[1] = ref; }}
           collapsable={false}
         >
         <VerticalSectionCard
           icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="2. 제휴 링크 연결"
-          desc="먼저 어느 상품을 홍보할지 제휴 링크를 연결하세요. 각 플랫폼에 맞는 표준 공정위 문구가 자동으로 적용됩니다."
+          title="1. 제휴 링크 연결"
+          desc="어느 상품을 홍보할지 제휴 링크를 먼저 연결하세요. 상품 정보와 이미지가 자동으로 추출되어 다음 단계에 사용됩니다."
           iconBg={theme.colors.accent[500] + '18'}
           accentColor={STEP_META.affiliate.color}
-          stepNumber={2}
+          stepNumber={1}
           completed={completedSteps.has('affiliate')}
         >
           <View style={styles.affiliateHintBox}>
@@ -735,26 +667,56 @@ export default function AffiliateScreen() {
         </VerticalSectionCard>
         </View>
 
-        {/* STEP 3: AI Analysis */}
+        {/* STEP 2: AI Analysis & Image */}
         <View
-          ref={(ref) => { stepRefs.current[3] = ref; }}
+          ref={(ref) => { stepRefs.current[2] = ref; }}
           collapsable={false}
         >
         <VerticalSectionCard
           icon={<ScanSearch size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="3. AI 분석 및 스타일 추천"
-          desc="원본 사진으로 AI 분석을 진행하거나, 먼저 다양한 각도·착용 컷을 만들어 가장 좋은 이미지를 선택한 뒤 분석할 수 있습니다."
+          title="2. AI 분석 및 이미지 생성"
+          desc="제휴 링크에서 추출된 상품 이미지로 AI 분석을 진행합니다. 내 사진으로 교체하거나 AI 가상 컷·피팅으로 더 다양한 이미지를 만들 수 있습니다."
           iconBg={theme.colors.success[500] + '18'}
           accentColor={STEP_META.analyze.color}
-          stepNumber={3}
+          stepNumber={2}
           completed={completedSteps.has('analyze')}
         >
           {selectedImage && mediaType === 'photo' ? (
             <>
-              {/* 3a: AI 이미지 생성 도구 (선택) — 먼저 다양한 컷을 만들어볼 수 있습니다 */}
+              {/* Image preview + source switcher */}
+              <View style={styles.mediaPreviewWrap}>
+                <Image
+                  source={{ uri: imagePreviewUri ?? '' }}
+                  style={styles.mediaPreview}
+                  resizeMode="cover"
+                />
+                {imageSource === 'product' && (
+                  <View style={styles.imageSourceBadge}>
+                    <Check size={10} color="#fff" strokeWidth={2.5} />
+                    <Text style={styles.imageSourceBadgeText}>상품 이미지</Text>
+                  </View>
+                )}
+                {imageSource === 'user' && (
+                  <View style={[styles.imageSourceBadge, { backgroundColor: theme.colors.accent[500] + 'CC' }]}>
+                    <ImageIcon size={10} color="#fff" strokeWidth={2.5} />
+                    <Text style={styles.imageSourceBadgeText}>내 사진</Text>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity style={styles.mediaBtn} onPress={handlePickPhoto} activeOpacity={0.7} disabled={mediaLoading}>
+                {mediaLoading ? (
+                  <Loader size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+                ) : (
+                  <ImageIcon size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+                )}
+                <Text style={styles.mediaBtnText}>내 사진으로 교체</Text>
+              </TouchableOpacity>
+
+              {/* 2a: AI 이미지 생성 도구 (선택) */}
               <Text style={styles.aiToolSectionLabel}>AI 이미지 생성 도구 (선택)</Text>
               <Text style={styles.aiToolSectionDesc}>
-                사진 한 장으로 다양한 각도의 상품 컷이나 모델 착용 컷을 AI로 만들어보세요. 마음에 드는 이미지를 선택하면 그 이미지로 AI 분석이 진행됩니다. 건너뛰고 바로 분석해도 됩니다.
+                상품 이미지나 내 사진으로 다양한 각도의 컷이나 모델 착용 컷을 AI로 만들어보세요. 마음에 드는 이미지를 선택하면 그 이미지로 AI 분석이 진행됩니다.
               </Text>
 
               <View style={styles.aiToolToggleRow}>
@@ -815,7 +777,7 @@ export default function AffiliateScreen() {
                 </View>
               )}
 
-              {/* 3b: AI 분석 시작 */}
+              {/* 2b: AI 분석 시작 */}
               <View style={styles.aiToolDivider} />
 
               <TouchableOpacity
@@ -856,25 +818,33 @@ export default function AffiliateScreen() {
           ) : (
             <View style={styles.analyzeWaitingBox}>
               <Text style={styles.analyzeWaitingText}>
-                1단계에서 사진을 먼저 선택해주세요
+                1단계에서 제휴 링크를 먼저 연결하면 상품 이미지가 자동으로 설정됩니다. 내 사진을 직접 사용하려면 아래 버튼을 누르세요.
               </Text>
+              <TouchableOpacity style={styles.mediaBtn} onPress={handlePickPhoto} activeOpacity={0.7} disabled={mediaLoading}>
+                {mediaLoading ? (
+                  <Loader size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+                ) : (
+                  <ImageIcon size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+                )}
+                <Text style={styles.mediaBtnText}>내 사진 불러오기</Text>
+              </TouchableOpacity>
             </View>
           )}
         </VerticalSectionCard>
         </View>
 
-        {/* STEP 4: Content & Template Editing */}
+        {/* STEP 3: Content & Template Editing */}
         <View
-          ref={(ref) => { stepRefs.current[4] = ref; }}
+          ref={(ref) => { stepRefs.current[3] = ref; }}
           collapsable={false}
         >
         <VerticalSectionCard
           icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="4. 콘텐츠 및 템플릿 편집"
+          title="3. 콘텐츠 및 템플릿 편집"
           desc="AI가 추천한 스타일로 바로 제작하거나, 원하는 스타일을 직접 선택하세요."
           iconBg={theme.colors.warning[500] + '18'}
           accentColor={STEP_META.content.color}
-          stepNumber={4}
+          stepNumber={3}
           completed={completedSteps.has('content')}
         >
           {/* AI Recommendation badge */}
@@ -1019,18 +989,18 @@ export default function AffiliateScreen() {
         </VerticalSectionCard>
         </View>
 
-        {/* STEP 5: Platform Upload */}
+        {/* STEP 4: Platform Upload */}
         <View
-          ref={(ref) => { stepRefs.current[5] = ref; }}
+          ref={(ref) => { stepRefs.current[4] = ref; }}
           collapsable={false}
         >
         <VerticalSectionCard
           icon={<Share2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="5. 플랫폼 업로드 및 공정위 문구 확인"
+          title="4. 플랫폼 업로드 및 공정위 문구 확인"
           desc="제휴 링크가 자동으로 삽입된 콘텐츠를 릴스·쇼츠·틱톡·블로그에 업로드하세요."
           iconBg={theme.colors.success[500] + '18'}
           accentColor={STEP_META.upload.color}
-          stepNumber={5}
+          stepNumber={4}
           completed={completedSteps.has('upload')}
         >
           {/* Link summary */}
@@ -1041,7 +1011,7 @@ export default function AffiliateScreen() {
             </View>
           ) : (
             <View style={styles.linkEmptyBox}>
-              <Text style={styles.linkEmptyText}>2단계에서 제휴 링크를 먼저 입력해주세요</Text>
+              <Text style={styles.linkEmptyText}>1단계에서 제휴 링크를 먼저 입력해주세요</Text>
             </View>
           )}
 
@@ -1332,49 +1302,35 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginTop: 2,
   },
-  mediaHintBox: {
-    backgroundColor: theme.colors.primary[500] + '10',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm + 2,
-    marginBottom: theme.spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.primary[400] + '60',
-  },
-  mediaHintText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 17,
-  },
   mediaPreviewWrap: {
     position: 'relative',
     borderRadius: theme.radius.md,
     overflow: 'hidden',
     aspectRatio: 1.2,
     backgroundColor: '#000',
+    marginBottom: theme.spacing.sm,
   },
   mediaPreview: {
     flex: 1,
     width: '100%',
     height: '100%',
   },
-  mediaRemoveBtn: {
+  imageSourceBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(10, 15, 30, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: theme.radius.full,
   },
-  mediaRemoveText: {
-    fontSize: 12,
+  imageSourceBadgeText: {
+    fontSize: 11,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
-  },
-  mediaBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
   },
   mediaBtn: {
     flex: 1,
@@ -1387,28 +1343,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[500] + '15',
     borderWidth: 1.5,
     borderColor: theme.colors.primary[400] + '40',
+    marginBottom: theme.spacing.md,
   },
   mediaBtnText: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
-  },
-  mediaBtnSecondary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent[500] + '12',
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent[400] + '30',
-  },
-  mediaBtnSecondaryText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[300],
   },
   affiliateHintBox: {
     backgroundColor: theme.colors.accent[500] + '10',
@@ -1612,11 +1552,15 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md + 4,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderRadius: theme.radius.md,
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
   },
   analyzeWaitingText: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   aiToolDivider: {
     height: 1,
