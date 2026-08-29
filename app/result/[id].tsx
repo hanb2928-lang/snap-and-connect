@@ -67,7 +67,8 @@ import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
 import { VariantGenerator, type Variant } from '@/components/VariantGenerator';
 import { SmartScheduler } from '@/components/SmartScheduler';
-import { BellRing } from 'lucide-react-native';
+import { OcrTextExtractor } from '@/components/OcrTextExtractor';
+import { BellRing, ScanText as ScanTextIcon } from 'lucide-react-native';
 import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
@@ -1010,6 +1011,19 @@ export default function ResultScreen() {
       key: 'commerce',
       label: '커머스 & 공유',
       tiles: [
+        {
+          key: 'ocrText',
+          label: 'OCR 텍스트 추출',
+          description: '사진 속 브랜드/모델명을 AI로 인식하여 제휴 검색어 자동 제안',
+          category: 'commerce',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <ScanTextIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <OcrTextExtractor
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+            />
+          ),
+        },
         {
           key: 'shoppingMatch',
           label: '쇼핑커넥트',
