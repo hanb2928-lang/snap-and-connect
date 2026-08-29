@@ -13,6 +13,7 @@ import { theme } from '@/lib/theme';
 import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { TARGET_LANGUAGES } from '@/lib/globalAffiliate';
 import { getMultilingualVoice } from '@/lib/ttsVoices';
+import { getLocalizedDisclosure } from '@/lib/disclosure';
 
 interface LocalizedContent {
   language: string;
@@ -119,7 +120,17 @@ export function GlobalLocalizer({
       if (response.ok) {
         const data = await response.json();
         if (data.localizations && Array.isArray(data.localizations)) {
-          setLocalizations(data.localizations);
+          const merged = data.localizations.map((loc: LocalizedContent) => {
+            if (!loc.disclosureText) {
+              const fallback = getLocalizedDisclosure(loc.languageCode);
+              if (fallback) {
+                loc.disclosureText = fallback.text;
+                loc.disclosureRegulation = fallback.regulation;
+              }
+            }
+            return loc;
+          });
+          setLocalizations(merged);
         }
       } else {
         setError('번역에 실패했어요. 다시 시도해주세요');
@@ -129,6 +140,24 @@ export function GlobalLocalizer({
     }
     setLoading(false);
   }, [selectedLangs, hook, title, caption, hashtags, productName, productCategory, narrationText, affiliateUrl]);
+
+  const handleCopyFullPost = useCallback(async (loc: LocalizedContent) => {
+    const parts: string[] = [];
+    if (loc.hook) parts.push(loc.hook);
+    if (loc.caption) parts.push(loc.caption);
+    if (loc.hashtags && loc.hashtags.length > 0) {
+      parts.push(loc.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' '));
+    }
+    if (loc.disclosureText) parts.push(loc.disclosureText);
+    const fullText = parts.join('\n\n');
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(fullText);
+      }
+    } catch {}
+    setCopiedField(`${loc.languageCode}-fullpost`);
+    setTimeout(() => setCopiedField(null), 2000);
+  }, []);
 
   const handleGenerateTTS = useCallback(async (langCode: string, text: string, voice: string) => {
     if (!text) return;
@@ -420,6 +449,25 @@ export function GlobalLocalizer({
                       <Text style={styles.disclosureText}>{loc.disclosureText}</Text>
                     </View>
                   ) : null}
+
+                  {/* Copy full post (caption + hashtags + disclosure) */}
+                  <TouchableOpacity
+                    style={styles.copyFullPostBtn}
+                    onPress={() => handleCopyFullPost(loc)}
+                    activeOpacity={0.7}
+                  >
+                    {copiedField === `${loc.languageCode}-fullpost` ? (
+                      <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
+                    ) : (
+                      <Copy size={11} color={theme.colors.primary[300]} strokeWidth={2} />
+                    )}
+                    <Text style={[
+                      styles.copyFullPostText,
+                      copiedField === `${loc.languageCode}-fullpost` && { color: theme.colors.success[400] },
+                    ]}>
+                      {copiedField === `${loc.languageCode}-fullpost` ? '복사 완료!' : '전체 카피 복사 (캡션+해시태그+대가성표기)'}
+                    </Text>
+                  </TouchableOpacity>
 
                   <View style={styles.ttsRow}>
                     <TouchableOpacity
@@ -779,6 +827,22 @@ const styles = StyleSheet.create({
   },
   fieldCopyBtn: {
     padding: 2,
+  },
+  copyFullPostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[500] + '30',
+  },
+  copyFullPostText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   personaRow: {
     flexDirection: 'row',
