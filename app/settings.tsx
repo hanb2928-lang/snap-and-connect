@@ -22,6 +22,10 @@ import { uploadAssetBlob } from '@/lib/savedAssets';
 import { clearLogoCache } from '@/lib/logoWatermark';
 import { TTS_VOICES, DEFAULT_TTS_VOICE } from '@/lib/ttsVoices';
 import { SUBSCRIPTION_PLANS, TOKEN_PACKS, formatKRW as formatPlanKRW } from '@/lib/subscriptionPlans';
+import { CreditBalanceBadge } from '@/components/CreditBalanceBadge';
+import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
+import { getCreditBalance, getCreditHistory, type CreditBalance, type CreditTransaction } from '@/lib/credits';
+import { restorePurchases, isRevenueCatAvailable } from '@/lib/purchases';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
@@ -79,6 +83,11 @@ export default function SettingsScreen() {
   const [savedPersona, setSavedPersona] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'business'>('pro');
   const [showTokenPacks, setShowTokenPacks] = useState(false);
+  const [creditModalVisible, setCreditModalVisible] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
+  const [showCreditHistory, setShowCreditHistory] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialLinkInput, setTutorialLinkInput] = useState('');
   const router = useRouter();
@@ -123,6 +132,33 @@ export default function SettingsScreen() {
     loadSettings();
     loadRevenues();
   }, [loadSettings, loadRevenues]);
+
+  const loadCredits = useCallback(async () => {
+    try {
+      const [bal, hist] = await Promise.all([getCreditBalance(), getCreditHistory(10)]);
+      setCreditBalance(bal);
+      setCreditHistory(hist);
+    } catch {
+      setCreditBalance(null);
+      setCreditHistory([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCredits();
+  }, [loadCredits]);
+
+  const handleRestorePurchases = async () => {
+    setRestoring(true);
+    try {
+      await restorePurchases();
+      await loadCredits();
+      Alert.alert('복원 완료', '이전 구매 내역을 복원했습니다.');
+    } catch {
+      Alert.alert('복원 실패', '구매 내역 복원 중 오류가 발생했습니다.');
+    }
+    setRestoring(false);
+  };
 
   const handleSaveIds = async () => {
     setSavingIds(true);
@@ -447,105 +483,113 @@ export default function SettingsScreen() {
       </Modal>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>구독 플랜 및 결제</Text>
+        <Text style={styles.sectionTitle}>크레딧 관리</Text>
         <Text style={styles.sectionDesc}>
-          월 구독 플랜을 선택하면 매월 정해진 횟수만큼 AI 콘텐츠를 제작할 수 있습니다. 기본 쿼터를 모두 소진하면 충전 팩으로 추가할 수 있어요.
+          AI 콘텐츠 생성 시 크레딧이 소모됩니다. 크레딧을 충전하고 사용 내역을 확인할 수 있어요.
         </Text>
 
-        {SUBSCRIPTION_PLANS.map((plan) => {
-          const isPro = plan.id === 'pro';
-          const isSelected = selectedPlan === plan.id;
-          const PlanIcon = plan.id === 'basic' ? Rocket : plan.id === 'pro' ? Crown : Building2;
-          return (
-            <TouchableOpacity
-              key={plan.id}
-              style={[styles.planCard, isSelected && { borderColor: plan.accentColor, backgroundColor: plan.accentColor + '0D' }]}
-              onPress={() => setSelectedPlan(plan.id)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.planHeader}>
-                <View style={[styles.planIconWrap, { backgroundColor: plan.accentColor + '20' }]}>
-                  <PlanIcon size={20} color={plan.accentColor} strokeWidth={2} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.planNameRow}>
-                    <Text style={styles.planName}>{plan.name} 플랜</Text>
-                    {plan.badge && (
-                      <View style={[styles.planBadge, { backgroundColor: plan.accentColor }]}>
-                        <Text style={styles.planBadgeText}>{plan.badge}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.planTagline}>{plan.tagline}</Text>
-                </View>
-                <View style={[styles.planRadio, isSelected && { borderColor: plan.accentColor, backgroundColor: plan.accentColor }]}>
-                  {isSelected && <Check size={14} color="#fff" strokeWidth={2} />}
-                </View>
-              </View>
-              <View style={styles.planPriceRow}>
-                <Text style={[styles.planPrice, { color: plan.accentColor }]}>{formatPlanKRW(plan.monthlyPrice)}</Text>
-                <Text style={styles.planPriceUnit}>/ 월</Text>
-              </View>
-              <Text style={styles.planQuota}>월간 AI 콘텐츠 {plan.quota.toLocaleString()}회 제공</Text>
-              <View style={styles.planFeatureList}>
-                {plan.features.map((feat, i) => (
-                  <View key={i} style={styles.planFeatureRow}>
-                    <Check size={14} color={plan.accentColor} strokeWidth={2} />
-                    <Text style={styles.planFeatureText}>{feat}</Text>
-                  </View>
-                ))}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        <View style={styles.creditBalanceCard}>
+          <View style={styles.creditBalanceLeft}>
+            <View style={styles.creditBalanceIconWrap}>
+              <Coins size={22} color={theme.colors.warning[400]} strokeWidth={2} />
+            </View>
+            <View>
+              <Text style={styles.creditBalanceLabel}>현재 보유 크레딧</Text>
+              <Text style={styles.creditBalanceValue}>
+                {creditBalance ? creditBalance.balance.toLocaleString() : '...'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.creditBalanceStats}>
+            {creditBalance && (
+              <>
+                <Text style={styles.creditBalanceStatLabel}>총 충전</Text>
+                <Text style={styles.creditBalanceStatValue}>{creditBalance.total_purchased.toLocaleString()}</Text>
+                <Text style={[styles.creditBalanceStatLabel, { marginTop: 6 }]}>총 사용</Text>
+                <Text style={styles.creditBalanceStatValue}>{creditBalance.total_consumed.toLocaleString()}</Text>
+              </>
+            )}
+          </View>
+        </View>
 
         <TouchableOpacity
           style={styles.subscribeBtn}
-          onPress={() => Alert.alert('결제 안내', `${SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.name ?? ''} 플랜(${formatPlanKRW(SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.monthlyPrice ?? 0)}/월) 구독을 시작하시겠어요?\n\n결제 시스템 연동 후 실제 결제가 진행됩니다.`, [
-            { text: '취소', style: 'cancel' },
-            { text: '구독하기', onPress: () => Alert.alert('준비 중', '결제 시스템 연동 후 이용할 수 있어요. 곧 지원될 예정입니다.') },
-          ])}
+          onPress={() => setCreditModalVisible(true)}
           activeOpacity={0.8}
         >
-          <Crown size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.subscribeBtnText}>{SUBSCRIPTION_PLANS.find(p => p.id === selectedPlan)?.name ?? ''} 플랜 구독하기</Text>
+          <Coins size={18} color="#fff" strokeWidth={2} />
+          <Text style={styles.subscribeBtnText}>크레딧 충전하기</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.tokenPackToggle}
-          onPress={() => setShowTokenPacks(!showTokenPacks)}
+          onPress={() => setShowCreditHistory(!showCreditHistory)}
           activeOpacity={0.7}
         >
-          <Coins size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-          <Text style={styles.tokenPackToggleText}>토큰 추가 충전 팩 (Pay-as-you-go)</Text>
-          {showTokenPacks ? <ChevronDown size={18} color={theme.colors.dark.textDim} strokeWidth={2} /> : <ChevronRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />}
+          <Activity size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+          <Text style={styles.tokenPackToggleText}>사용 내역</Text>
+          {showCreditHistory ? <ChevronDown size={18} color={theme.colors.dark.textDim} strokeWidth={2} /> : <ChevronRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />}
         </TouchableOpacity>
 
-        {showTokenPacks && (
+        {showCreditHistory && (
           <View style={styles.tokenPackContainer}>
-            <Text style={styles.tokenPackHint}>기본 월간 쿼터를 모두 소진한 경우 추가 충전할 수 있어요. 구독 해지나 상위 플랜 업그레이드 없이 유연하게 이용 가능합니다.</Text>
-            {TOKEN_PACKS.map((pack) => (
-              <View key={pack.id} style={styles.tokenPackCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tokenPackName}>{pack.name}</Text>
-                  <Text style={styles.tokenPackQuota}>AI 콘텐츠 {pack.quota}회 추가</Text>
+            {creditHistory.length === 0 ? (
+              <Text style={styles.tokenPackHint}>아직 사용 내역이 없습니다.</Text>
+            ) : (
+              creditHistory.map((tx) => (
+                <View key={tx.id} style={styles.tokenPackCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tokenPackName}>{tx.description || (tx.amount > 0 ? '충전' : '사용')}</Text>
+                    <Text style={styles.tokenPackQuota}>
+                      {new Date(tx.created_at).toLocaleDateString('ko-KR')}
+                      {tx.feature ? ` · ${tx.feature}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={[styles.tokenPackPrice, { color: tx.amount > 0 ? theme.colors.success[400] : theme.colors.error[400] }]}>
+                    {tx.amount > 0 ? '+' : ''}{tx.amount}
+                  </Text>
                 </View>
-                <Text style={styles.tokenPackPrice}>{formatPlanKRW(pack.price)}</Text>
-                <TouchableOpacity
-                  style={styles.tokenPackBuyBtn}
-                  onPress={() => Alert.alert('충전 안내', `${pack.name}(${formatPlanKRW(pack.price)})을 충전하시겠어요?`, [
-                    { text: '취소', style: 'cancel' },
-                    { text: '충전하기', onPress: () => Alert.alert('준비 중', '결제 시스템 연동 후 이용할 수 있어요.') },
-                  ])}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.tokenPackBuyBtnText}>충전</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+              ))
+            )}
+          </View>
+        )}
+
+        {Platform.OS !== 'web' && isRevenueCatAvailable() && (
+          <TouchableOpacity
+            style={[styles.tokenPackToggle, { justifyContent: 'center' }]}
+            onPress={handleRestorePurchases}
+            disabled={restoring}
+            activeOpacity={0.7}
+          >
+            {restoring ? (
+              <ActivityIndicator size="small" color={theme.colors.primary[400]} />
+            ) : (
+              <>
+                <Wallet size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.tokenPackToggleText, { color: theme.colors.dark.textDim }]}>구매 내역 복원</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {!isRevenueCatAvailable() && Platform.OS === 'web' && (
+          <View style={styles.creditWebNote}>
+            <Info size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.creditWebNoteText}>
+              모바일 앱에서는 인앱 결제(RevenueCat)를 통해 실제 결제가 처리됩니다. 현재 웹에서는 테스트용 즉시 충전으로 작동합니다.
+            </Text>
           </View>
         )}
       </View>
+
+      <CreditPurchaseModal
+        visible={creditModalVisible}
+        onClose={() => {
+          setCreditModalVisible(false);
+          loadCredits();
+        }}
+        onPurchased={() => loadCredits()}
+      />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>제휴 파트너스 ID 설정</Text>
@@ -2269,6 +2313,67 @@ const styles = StyleSheet.create({
   tokenPackContainer: {
     marginTop: 10,
     gap: 10,
+  },
+  creditBalanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  creditBalanceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  creditBalanceIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  creditBalanceLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  creditBalanceValue: {
+    fontSize: 24,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  creditBalanceStats: {
+    alignItems: 'flex-end',
+  },
+  creditBalanceStatLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  creditBalanceStatValue: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  creditWebNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.sm,
+  },
+  creditWebNoteText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
   tokenPackHint: {
     fontSize: 11,
