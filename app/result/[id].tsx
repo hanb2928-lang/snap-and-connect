@@ -87,6 +87,7 @@ import { ShortFormGuideCard } from '@/components/ShortFormGuideCard';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { VirtualCutGallery } from '@/components/VirtualCutGallery';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
+import { AffiliatePromptBanner } from '@/components/AffiliatePromptBanner';
 import { AIStyleCard } from '@/components/AIStyleCard';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
@@ -134,8 +135,10 @@ export default function ResultScreen() {
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
+  const [scrollToCommerce, setScrollToCommerce] = useState(false);
 
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
   const safeTop = useSafeTop();
   const cardRef = useRef<View>(null);
   const mountedRef = useRef(true);
@@ -364,6 +367,31 @@ export default function ResultScreen() {
 
   const handleUseGeneratedImage = useCallback((url: string) => {
     setCaptureImageUrl(url);
+  }, []);
+
+  const partnerIdsConfigured = useMemo(() => {
+    return !!(settings?.coupang_partners_id || settings?.toss_share_id || settings?.naver_shopping_id);
+  }, [settings]);
+
+  const handleConnectLink = useCallback(() => {
+    setScrollToCommerce(true);
+  }, []);
+
+  useEffect(() => {
+    if (scrollToCommerce) {
+      const targetY = (scrollViewRef.current as any)?._scrollOffset ?? 0;
+      const estimatedOffset = 1400;
+      scrollViewRef.current?.scrollTo({ y: Math.max(targetY, estimatedOffset), animated: true });
+      setScrollToCommerce(false);
+    }
+  }, [scrollToCommerce]);
+
+  const handleScrollToVirtualCut = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 200, animated: true });
+  }, []);
+
+  const handleScrollToFitting = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 450, animated: true });
   }, []);
 
   const handleDelete = async () => {
@@ -988,6 +1016,9 @@ export default function ResultScreen() {
               availablePlatforms={availablePlatforms}
               shortUrl={shortUrl}
               scanId={scan.id}
+              onGenerateCut={handleScrollToVirtualCut}
+              onGenerateFitting={handleScrollToFitting}
+              captureImageUrl={captureImageUrl || null}
             />
           ),
         },
@@ -1287,7 +1318,7 @@ export default function ResultScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom + 72 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom + 72 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {analysisStatus === 'processing' && (
           <View style={styles.analysisPendingCard}>
             <View style={styles.analysisPendingHeader}>
@@ -1387,6 +1418,19 @@ export default function ResultScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
+          <AffiliatePromptBanner
+            productName={activeProductName}
+            autoLinks={currentAffiliateLinks}
+            hasCustomLink={hasCustomLink}
+            partnerIdsConfigured={partnerIdsConfigured}
+            onConnectLink={handleConnectLink}
+            onGenerateCut={handleScrollToVirtualCut}
+            onGenerateFitting={handleScrollToFitting}
+            captureImageUrl={captureImageUrl || null}
+          />
+        ) : null}
 
         {captureImageError && captureImageUrl ? (
           <View style={styles.captureErrorBanner}>
