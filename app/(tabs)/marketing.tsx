@@ -12,7 +12,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout } from 'lucide-react-native';
+import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout, Clock, Type, Music } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -72,6 +72,23 @@ const QUICK_NAV_ITEMS = [
 
 type PipelineStep = 1 | 2 | 3;
 
+const VIDEO_LENGTH_PRESETS = [
+  { key: '7s', label: '7초 폭발 바이럴', desc: '틱톡·릴스 최적', icon: Zap, color: theme.colors.warning[400], seconds: 7 },
+  { key: '15s', label: '15초 리뷰형', desc: '유튜브 숏츠 최적', icon: Film, color: theme.colors.primary[400], seconds: 15 },
+] as const;
+
+const CAPTION_TONE_PRESETS = [
+  { key: 'hook', label: '파격 훅', desc: '호기심 유발', icon: Flame, color: theme.colors.warning[400] },
+  { key: 'emotional', label: '감성/브랜드', desc: '고급 분위기', icon: Sparkles, color: theme.colors.accent[400] },
+  { key: 'info', label: '정보 전달', desc: '리뷰·팩트', icon: Lightbulb, color: theme.colors.primary[400] },
+] as const;
+
+const BGM_MOOD_PRESETS = [
+  { key: 'pop', label: '트렌디 팝', desc: '빠른 템포', icon: Music, color: theme.colors.accent[400] },
+  { key: 'lofi', label: '릴렉스 Lofi', desc: '감성 무드', icon: Music, color: theme.colors.primary[400] },
+  { key: 'none', label: '자막 전용', desc: '음성 없음', icon: Type, color: theme.colors.dark.textFaint },
+] as const;
+
 export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
@@ -90,6 +107,11 @@ export default function MarketingScreen() {
   const [countdownSeconds, setCountdownSeconds] = useState(3600);
   const [qrValue, setQrValue] = useState('https://example.com/your-link');
   const [activeStep, setActiveStep] = useState<PipelineStep>(1);
+
+  // Video style presets
+  const [videoLength, setVideoLength] = useState<string>('7s');
+  const [captionTone, setCaptionTone] = useState<string>('hook');
+  const [bgmMood, setBgmMood] = useState<string>('pop');
 
   // Step 1: Platform selection state
   const [availablePlatforms, setAvailablePlatforms] = useState<ManagedPlatform[]>([]);
@@ -252,6 +274,11 @@ export default function MarketingScreen() {
   };
 
   const handleStartGeneration = () => {
+    (async () => {
+      await setItem('marketing_video_length', videoLength);
+      await setItem('marketing_caption_tone', captionTone);
+      await setItem('marketing_bgm_mood', bgmMood);
+    })();
     if (productMeta?.productName || selectedProduct) {
       router.push('/affiliate' as never);
     } else {
@@ -646,6 +673,95 @@ export default function MarketingScreen() {
                 })}
               </View>
 
+              {/* 2a-2: Video Style Presets */}
+              <View style={styles.presetSection}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <Film size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
+                    <Text style={styles.sectionTitleText}>{t('marketing.presetTitle')}</Text>
+                  </View>
+                </View>
+                <Text style={styles.sectionDesc}>{t('marketing.presetDesc')}</Text>
+
+                {/* Video Length */}
+                <View style={styles.presetGroup}>
+                  <View style={styles.presetLabelRow}>
+                    <Clock size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.presetLabel}>{t('marketing.presetLength')}</Text>
+                  </View>
+                  <View style={styles.chipRow}>
+                    {VIDEO_LENGTH_PRESETS.map((preset) => {
+                      const Icon = preset.icon;
+                      const selected = videoLength === preset.key;
+                      return (
+                        <TouchableOpacity
+                          key={preset.key}
+                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                          onPress={() => setVideoLength(preset.key)}
+                          activeOpacity={0.7}
+                        >
+                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Caption Tone */}
+                <View style={styles.presetGroup}>
+                  <View style={styles.presetLabelRow}>
+                    <Type size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.presetLabel}>{t('marketing.presetTone')}</Text>
+                  </View>
+                  <View style={styles.chipRow}>
+                    {CAPTION_TONE_PRESETS.map((preset) => {
+                      const Icon = preset.icon;
+                      const selected = captionTone === preset.key;
+                      return (
+                        <TouchableOpacity
+                          key={preset.key}
+                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                          onPress={() => setCaptionTone(preset.key)}
+                          activeOpacity={0.7}
+                        >
+                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* BGM Mood */}
+                <View style={styles.presetGroup}>
+                  <View style={styles.presetLabelRow}>
+                    <Music size={14} color={theme.colors.primary[400]} strokeWidth={2} />
+                    <Text style={styles.presetLabel}>{t('marketing.presetBgm')}</Text>
+                  </View>
+                  <View style={styles.chipRow}>
+                    {BGM_MOOD_PRESETS.map((preset) => {
+                      const Icon = preset.icon;
+                      const selected = bgmMood === preset.key;
+                      return (
+                        <TouchableOpacity
+                          key={preset.key}
+                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                          onPress={() => setBgmMood(preset.key)}
+                          activeOpacity={0.7}
+                        >
+                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+
               {/* 2b: A/B Persona Tones */}
               <View
                 ref={(ref) => { sectionRefs.current['ab'] = ref; }}
@@ -827,6 +943,36 @@ export default function MarketingScreen() {
                     <Text style={styles.renderSummaryLabel}>{t('marketing.renderHook')}</Text>
                     <Text style={styles.renderSummaryValue} numberOfLines={1}>
                       {selectedHook ? HOOK_TYPES.find((h) => h.key === selectedHook)?.label : t('marketing.notSelected')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.renderSummaryDivider} />
+                <View style={styles.renderSummaryRow}>
+                  <View style={styles.renderSummaryItem}>
+                    <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.renderSummaryLabel}>{t('marketing.presetLength')}</Text>
+                    <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                      {VIDEO_LENGTH_PRESETS.find((p) => p.key === videoLength)?.label || t('marketing.notSelected')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.renderSummaryDivider} />
+                <View style={styles.renderSummaryRow}>
+                  <View style={styles.renderSummaryItem}>
+                    <Type size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.renderSummaryLabel}>{t('marketing.presetTone')}</Text>
+                    <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                      {CAPTION_TONE_PRESETS.find((p) => p.key === captionTone)?.label || t('marketing.notSelected')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.renderSummaryDivider} />
+                <View style={styles.renderSummaryRow}>
+                  <View style={styles.renderSummaryItem}>
+                    <Music size={16} color={theme.colors.primary[400]} strokeWidth={2} />
+                    <Text style={styles.renderSummaryLabel}>{t('marketing.presetBgm')}</Text>
+                    <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                      {BGM_MOOD_PRESETS.find((p) => p.key === bgmMood)?.label || t('marketing.notSelected')}
                     </Text>
                   </View>
                 </View>
@@ -1748,5 +1894,47 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
     marginTop: 2,
+  },
+  presetSection: {
+    marginBottom: theme.spacing.md,
+  },
+  presetGroup: {
+    marginBottom: theme.spacing.sm + 2,
+  },
+  presetLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  presetLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  chipPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    gap: 3,
+  },
+  chipPillLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  chipPillDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
   },
 });
