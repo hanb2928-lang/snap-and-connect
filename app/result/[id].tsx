@@ -75,6 +75,7 @@ import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
+import { LocalizationSafetyCard } from '@/components/LocalizationSafetyCard';
 import { TrendCopyBar } from '@/components/TrendCopyBar';
 import { HashtagCopyBar } from '@/components/HashtagCopyBar';
 import { createShortLink } from '@/lib/shortUrl';
@@ -1313,6 +1314,23 @@ export default function ResultScreen() {
                 hasUniqueAngle: false,
                 cacheHitCount: 0,
               }}
+            />
+          ),
+        },
+        {
+          key: 'localizationSafety',
+          label: '현지 적합성 스코어',
+          description: '법적 규제·금기어·현지 톤 안전성 점검 (FTC/스텔마/공정위)',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          render: () => (
+            <LocalizationSafetyCard
+              caption={activeCaption}
+              countryCode="US"
+              disclosureEnabled={!!settings?.auto_disclosure}
+              transcreationApplied={!!settings?.brand_persona}
+              nativeToneMatch={!!settings?.brand_persona}
             />
           ),
         },
