@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, Lightbulb, Sun, Aperture } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, Lightbulb, Sun, Aperture, ShoppingBag } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -719,6 +719,16 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* AR mode toggle inside camera step */}
+          <TouchableOpacity
+            style={[styles.verticalSingleBtn, { marginBottom: theme.spacing.sm }]}
+            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
+            activeOpacity={0.8}
+          >
+            <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.verticalSingleBtnText}>AR 실시간 효과 촬영</Text>
+          </TouchableOpacity>
+
           {/* Pro Tip: shooting conditions */}
           <View style={styles.proTipCard}>
             <View style={styles.proTipHeader}>
@@ -857,8 +867,8 @@ export default function CameraScreen() {
 
         <VerticalSectionCard
           icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="3. 템플릿 스타일 선택"
-          desc="AI 자동 추천 또는 원하는 스타일을 직접 골라보세요."
+          title="3. 스타일 선택 및 편집"
+          desc="AI 자동 추천 또는 원하는 스타일을 골라보세요. 분석 없이 직접 편집할 수도 있어요."
           iconBg={theme.colors.warning[500] + '18'}
           accentColor={theme.colors.warning[400]}
           stepNumber={3}
@@ -913,52 +923,46 @@ export default function CameraScreen() {
               </Text>
             </View>
           )}
-        </VerticalSectionCard>
 
-        <VerticalSectionCard
-          icon={<Wand2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="4. 편집만 하기 (AI 분석 생략)"
-          desc="분석 없이 사진만 업로드하고 직접 꾸미고 싶을 때 사용하세요."
-          iconBg={theme.colors.success[500] + '18'}
-          accentColor={theme.colors.success[400]}
-          stepNumber={4}
-        >
           <TouchableOpacity
-            style={styles.verticalSingleBtn}
+            style={[styles.verticalSingleBtn, { marginTop: theme.spacing.sm }]}
             onPress={handleTemplateOnly}
             disabled={processing}
             activeOpacity={0.7}
           >
             <Wand2 size={18} color={theme.colors.success[400]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>템플릿만 만들기</Text>
+            <Text style={styles.verticalSingleBtnText}>AI 분석 없이 직접 편집하기</Text>
           </TouchableOpacity>
         </VerticalSectionCard>
 
         <VerticalSectionCard
-          icon={<Sparkles size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="5. AR 모드"
-          desc="실시간 AR 효과를 적용하며 촬영할 수 있어요."
-          iconBg={theme.colors.accent[500] + '18'}
-          accentColor={theme.colors.accent[400]}
-          stepNumber={5}
+          icon={<ShoppingBag size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+          title="4. 제휴 쇼핑 링크 연결"
+          desc="쿠팡, 네이버, 토스 등 제휴 링크를 붙여넣어 수수료를 추적하세요."
+          iconBg={theme.colors.primary[500] + '18'}
+          accentColor={theme.colors.primary[300]}
+          stepNumber={4}
         >
           <TouchableOpacity
             style={styles.verticalSingleBtn}
-            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
-            activeOpacity={0.8}
+            onPress={() => router.push('/affiliate' as never)}
+            activeOpacity={0.7}
           >
-            <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>AR 촬영 시작</Text>
+            <ShoppingBag size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.verticalSingleBtnText}>제휴 링크 관리하기</Text>
           </TouchableOpacity>
+          <Text style={[styles.captureHint, { marginTop: theme.spacing.xs }]}>
+            분석 완료 후 결과 페이지에서도 제휴 링크를 바로 추가할 수 있어요.
+          </Text>
         </VerticalSectionCard>
 
         <VerticalSectionCard
           icon={<Share2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
-          title="6. 플랫폼 업로드 및 공유"
-          desc="완성된 콘텐츠를 SNS, 블로그 등에 바로 공유하고 제휴 링크를 관리하세요."
+          title="5. 업로드 미리보기 및 공유"
+          desc="최종 결과를 미리보기로 확인하고 마지막으로 수정한 뒤 SNS에 업로드하세요."
           iconBg={theme.colors.primary[500] + '18'}
           accentColor={theme.colors.primary[300]}
-          stepNumber={6}
+          stepNumber={5}
         >
           <TouchableOpacity
             style={styles.verticalSingleBtn}
@@ -966,7 +970,7 @@ export default function CameraScreen() {
             activeOpacity={0.7}
           >
             <Share2 size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>제휴 마케팅 / 공유하기</Text>
+            <Text style={styles.verticalSingleBtnText}>업로드 미리보기 / 공유하기</Text>
           </TouchableOpacity>
         </VerticalSectionCard>
 
