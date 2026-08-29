@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, Tag } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -20,7 +20,6 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
-import { StepIndicator } from '@/components/StepIndicator';
 import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { UploadPreviewModal, type UploadPreviewData } from '@/components/UploadPreviewModal';
@@ -501,12 +500,18 @@ export default function AffiliateScreen() {
     [selectedImage, mediaType, selectedImageMime],
   );
 
-  const activeStep = useMemo(() => {
-    for (let i = 0; i < STEP_ORDER.length; i++) {
-      if (!completedSteps.has(STEP_ORDER[i])) return i + 1;
-    }
-    return STEP_ORDER.length;
-  }, [completedSteps]);
+  const scrollToStep = (stepNum: number) => {
+    setTimeout(() => {
+      const targetRef = stepRefs.current[stepNum];
+      if (targetRef && scrollRef.current) {
+        targetRef.measureLayout(
+          scrollRef.current as any,
+          (_x, y) => { scrollRef.current?.scrollTo({ y: y - 20, animated: true }); },
+          () => {},
+        );
+      }
+    }, 100);
+  };
 
   const disclosureText = useMemo(() => {
     const platforms = selectedPlatform ? [selectedPlatform] : [];
@@ -535,8 +540,80 @@ export default function AffiliateScreen() {
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            아래 4단계를 위에서부터 차례대로 따라 하시면 됩니다. 제휴 링크로 시작해서 분석, 제작, 업로드까지 한 번에 완성할 수 있습니다.
+            오늘 어떤 방식으로 제휴 상품을 발굴하시겠습니까? 아래에서 트랙을 선택하세요.
           </Text>
+        </View>
+
+        {/* 3 Track Entry Cards */}
+        <View style={styles.trackEntryGrid}>
+          <TouchableOpacity
+            style={styles.trackEntryCard}
+            onPress={() => scrollToStep(1)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
+              <Flame size={44} color={theme.colors.warning[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.trackEntryTitle}>실시간 떡상 꿀템 픽</Text>
+            <Text style={styles.trackEntryDesc}>쿠팡·아마존·알리 실시간 급상승 파트너스 키워드</Text>
+            <View style={styles.trackEntryTagRow}>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <TrendingUp size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.warning[400] }]}>급상승</Text>
+              </View>
+              <Text style={styles.trackEntryArrow}>→</Text>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Sparkles size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.warning[400] }]}>1클릭 파싱</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.trackEntryCard}
+            onPress={() => scrollToStep(1)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
+              <Link2 size={44} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.trackEntryTitle}>URL / 제휴 링크 입력</Text>
+            <Text style={styles.trackEntryDesc}>클립보드 자동 인식 & 붙여넣기로 상품 정보 추출</Text>
+            <View style={styles.trackEntryTagRow}>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <Link2 size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.accent[300] }]}>URL 입력</Text>
+              </View>
+              <Text style={styles.trackEntryArrow}>→</Text>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <Check size={10} color={theme.colors.accent[300]} strokeWidth={2.5} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.accent[300] }]}>자동 추출</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.trackEntryCard}
+            onPress={() => router.push('/affiliate/trending' as never)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
+              <Tag size={44} color={theme.colors.primary[300]} strokeWidth={2} />
+            </View>
+            <Text style={styles.trackEntryTitle}>카테고리별 꿀조합</Text>
+            <Text style={styles.trackEntryDesc}>패션·뷰티·자취·IT 기기별 마케팅 훅과 묶음 상품</Text>
+            <View style={styles.trackEntryTagRow}>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Tag size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.primary[300] }]}>카테고리</Text>
+              </View>
+              <Text style={styles.trackEntryArrow}>→</Text>
+              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <ShoppingBag size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={[styles.trackEntryTagText, { color: theme.colors.primary[300] }]}>꿀조합</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Revenue summary */}
@@ -586,23 +663,17 @@ export default function AffiliateScreen() {
           }}
         />
 
-        {/* Step indicator */}
-        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
-          <StepIndicator activeStep={activeStep} stepCount={4} />
-        </View>
-
         {/* STEP 1: Affiliate Link Connection */}
         <View
           ref={(ref) => { stepRefs.current[1] = ref; }}
           collapsable={false}
         >
         <VerticalSectionCard
-          icon={<Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="1. 제휴 링크 연결"
-          desc="어느 상품을 홍보할지 제휴 링크를 먼저 연결하세요. 상품 정보와 이미지가 자동으로 추출되어 다음 단계에 사용됩니다."
-          iconBg={theme.colors.accent[500] + '18'}
+          icon={<Link2 size={24} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="제휴 링크 연결"
+          desc="어느 상품을 홍보할지 제휴 링크를 먼저 연결하세요. 상품 정보와 이미지가 자동으로 추출됩니다."
+          iconBg={theme.colors.accent[500] + '22'}
           accentColor={STEP_META.affiliate.color}
-          stepNumber={1}
           completed={completedSteps.has('affiliate')}
         >
           <View style={styles.affiliateHintBox}>
@@ -815,12 +886,11 @@ export default function AffiliateScreen() {
           collapsable={false}
         >
         <VerticalSectionCard
-          icon={<ScanSearch size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="2. AI 분석 및 이미지 생성"
+          icon={<ScanSearch size={24} color={theme.colors.success[400]} strokeWidth={2.5} />}
+          title="AI 분석 및 이미지 생성"
           desc="제휴 링크에서 추출된 상품 이미지로 AI 분석을 진행합니다. 내 사진으로 교체하거나 AI 가상 컷·피팅으로 더 다양한 이미지를 만들 수 있습니다."
-          iconBg={theme.colors.success[500] + '18'}
+          iconBg={theme.colors.success[500] + '22'}
           accentColor={STEP_META.analyze.color}
-          stepNumber={2}
           completed={completedSteps.has('analyze')}
         >
           {selectedImage && mediaType === 'photo' ? (
@@ -948,12 +1018,11 @@ export default function AffiliateScreen() {
           collapsable={false}
         >
         <VerticalSectionCard
-          icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="3. 콘텐츠 및 템플릿 편집"
+          icon={<Palette size={24} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="콘텐츠 및 템플릿 편집"
           desc="AI가 스타일·음성·해시태그를 자동으로 설정했어요. 버튼을 눌러 바로 제작하거나, 아래에서 직접 수정할 수 있어요."
-          iconBg={theme.colors.warning[500] + '18'}
+          iconBg={theme.colors.warning[500] + '22'}
           accentColor={STEP_META.content.color}
-          stepNumber={3}
           completed={completedSteps.has('content')}
         >
           {/* AI one-tap auto-recommend button */}
@@ -1115,12 +1184,11 @@ export default function AffiliateScreen() {
           collapsable={false}
         >
         <VerticalSectionCard
-          icon={<Share2 size={20} color={theme.colors.success[400]} strokeWidth={2} />}
-          title="4. 플랫폼 업로드 및 공정위 문구 확인"
+          icon={<Share2 size={24} color={theme.colors.success[400]} strokeWidth={2.5} />}
+          title="플랫폼 업로드 및 공정위 문구 확인"
           desc="제휴 링크가 자동으로 삽입된 콘텐츠를 릴스·쇼츠·틱톡·블로그에 업로드하세요."
-          iconBg={theme.colors.success[500] + '18'}
+          iconBg={theme.colors.success[500] + '22'}
           accentColor={STEP_META.upload.color}
-          stepNumber={4}
           completed={completedSteps.has('upload')}
         >
           {/* Link summary */}
@@ -1380,7 +1448,7 @@ export default function AffiliateScreen() {
           activeOpacity={0.85}
         >
           <View style={styles.marketingCtaIcon}>
-            <Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.2} />
+            <Flame size={28} color={theme.colors.warning[400]} strokeWidth={2.5} />
           </View>
           <View style={styles.marketingCtaTextWrap}>
             <Text style={styles.marketingCtaTitle}>이 소재로 마케팅 숏폼 만들기</Text>
@@ -1613,6 +1681,62 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     borderWidth: 1.5,
     borderColor: theme.glass.border,
+  },
+  trackEntryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  trackEntryCard: {
+    width: '48.5%',
+    backgroundColor: theme.glass.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.glass.border,
+    padding: theme.spacing.md,
+    gap: 6,
+  },
+  trackEntryIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  trackEntryTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  trackEntryDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  trackEntryTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  trackEntryTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.sm,
+  },
+  trackEntryTagText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  trackEntryArrow: {
+    fontSize: 10,
+    color: theme.colors.dark.textFaint,
   },
   summaryLeft: {
     flexDirection: 'row',
@@ -2912,8 +3036,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   marketingCtaIcon: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.warning[500] + '25',
     justifyContent: 'center',
