@@ -1,6 +1,6 @@
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 
-export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'twitter';
+export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter';
 
 export interface PlatformDeepLink {
   appUrl: string;
@@ -23,6 +23,11 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
     appUrl: 'tiktok://',
     webUrl: 'https://www.tiktok.com/upload',
     label: '틱톡 앱 열기',
+  },
+  youtube: {
+    appUrl: 'youtube://',
+    webUrl: 'https://www.youtube.com/upload',
+    label: '유튜브 숏츠 앱 열기',
   },
   twitter: {
     appUrl: 'twitter://post',
@@ -60,6 +65,12 @@ const CAPTION_TEMPLATES: Record<UploadPlatformKey, PlatformCaptionTemplate> = {
     suffix: '',
     hashtagSet: ['#제휴', '#광고', '#tiktokmademebuyit', '#오늘의장바구니'],
     captionStyle: 'Z세대 맞춤 짧은 원라이너 대사 + 트렌드 해시태그 조합',
+  },
+  youtube: {
+    prefix: '',
+    suffix: '',
+    hashtagSet: ['#쇼츠', '#제휴마케팅', '#광고', '#Shorts'],
+    captionStyle: '제목 위주의 짧고 명확한 문구 + 댓글용 단축 링크 별도 제공',
   },
   twitter: {
     prefix: '',
@@ -101,6 +112,10 @@ export function buildPlatformCaption(
     case 'tiktok':
       caption = `${baseCaption}${affiliateUrl.trim() ? '\n' + affiliateUrl.trim() : ''}`;
       fullText = `${disclosure ? disclosure + '\n' : ''}${caption}\n${hashtags}`;
+      break;
+    case 'youtube':
+      caption = baseCaption;
+      fullText = `${disclosure ? disclosure + '\n\n' : ''}${caption}${affiliateUrl.trim() ? '\n\n댓글용 단축 링크: ' + affiliateUrl.trim() : ''}${hashtags ? '\n\n' + hashtags : ''}`;
       break;
     case 'twitter':
       caption = `${baseCaption}${affiliateUrl.trim() ? ' ' + affiliateUrl.trim() : ''}`;

@@ -32,6 +32,7 @@ import {
   FileText,
   Hash,
   Type,
+  Youtube,
   ChevronDown,
   ChevronUp,
   Loader,
@@ -83,7 +84,7 @@ const PLATFORMS = [
 const UPLOAD_PLATFORMS = [
   { key: 'instagram', label: '인스타그램', icon: Camera, color: '#E1306C' },
   { key: 'blog', label: '네이버 블로그', icon: FileText, color: '#03C75A' },
-  { key: 'tiktok', label: '틱톡', icon: Film, color: '#000000' },
+  { key: 'youtube', label: '유튜브 숏츠', icon: Youtube, color: '#FF0000' },
   { key: 'twitter', label: '트위터/스레드', icon: Hash, color: '#1DA1F2' },
 ] as const;
 
