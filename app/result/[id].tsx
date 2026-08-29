@@ -98,11 +98,15 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
 import { LinkInBioCard } from '@/components/LinkInBioCard';
+import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
+import { SnapMixTuner } from '@/components/SnapMixTuner';
+import { MicroEditSlot } from '@/components/MicroEditSlot';
+import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1263,6 +1267,53 @@ export default function ResultScreen() {
               <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <Text style={styles.safetyTileBtnText}>계정 안전 확인하기</Text>
             </TouchableOpacity>
+          ),
+        },
+        {
+          key: 'creatorPersona',
+          label: '마이 페르소나',
+          description: '크리에이터 고유 어조, 시그니처 멘트, 대표 컬러 등록',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <UserIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          render: () => <CreatorPersonaCard />,
+        },
+        {
+          key: 'snapMix',
+          label: 'Snap-Mix 1초 튜닝',
+          description: '톤앤매너·시점을 1탭으로 즉시 전환',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <SlidersIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          render: () => <SnapMixTuner />,
+        },
+        {
+          key: 'microEdit',
+          label: '인간의 손길 10% 마이크로 에디팅',
+          description: '나만의 사용 후기 1줄 추가 + 실물 촬영 컷 삽입',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <PencilIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          render: () => <MicroEditSlot />,
+        },
+        {
+          key: 'originalityScore',
+          label: '크리에이터 독창성 스코어',
+          description: '현재 콘텐츠가 얼마나 중복되는지 독창성 점수 산출',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <SparklesIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          render: () => (
+            <OriginalityScoreCard
+              factors={{
+                hasPersonaSignature: !!settings?.brand_persona,
+                hasCustomTone: !!settings?.brand_persona,
+                hasVoiceClone: false,
+                hasMicroEdit: false,
+                hasUniqueAngle: false,
+                cacheHitCount: 0,
+              }}
+            />
           ),
         },
         {
