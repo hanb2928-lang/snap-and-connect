@@ -35,6 +35,7 @@ import { safeFetch } from '@/lib/apiClient';
 import type { PlatformKey, LocalStoreInfo } from '@/types/database';
 import type { StickerStyle } from '@/components/StickerLink';
 import type { StickerPosition } from '@/components/TemplateCard';
+import type { Variant } from '@/components/VariantGenerator';
 
 export interface ComicPanel {
   speech: string;
@@ -69,6 +70,7 @@ interface ComicShortGeneratorProps {
   productAdvantages?: string[];
   localStoreInfo?: LocalStoreInfo | null;
   brandPersona?: string | null;
+  preloadedVariant?: Variant | null;
 }
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';
@@ -1103,6 +1105,7 @@ export function ComicShortGenerator({
   productAdvantages = [],
   localStoreInfo = null,
   brandPersona = null,
+  preloadedVariant = null,
 }: ComicShortGeneratorProps) {
   const [state, setState] = useState<GenState>('idle');
   const [progress, setProgress] = useState(0);
@@ -1341,7 +1344,17 @@ export function ComicShortGenerator({
     let finalMbtiCommentary: MbtiCommentary[] = [];
     let finalScenarioFallback = false;
 
-    if (productName) {
+    if (preloadedVariant && preloadedVariant.panels.length > 0) {
+      panels = preloadedVariant.panels.map((p) => ({
+        speech: p.speech,
+        sfx: p.sfx,
+        emotion: p.emotion,
+      }));
+      narrationText = preloadedVariant.narrationText || preloadedVariant.hook || panels.map((p) => p.speech).join('. ');
+      panelCount = Math.min(panels.length, 3);
+      finalPanelLayout = panelCount === 1 ? 'single' : panelCount === 2 ? 'split-2' : 'split-3';
+      finalScenarioFallback = false;
+    } else if (productName) {
       setScenarioLoading(true);
       try {
         const response = await safeFetch(COMIC_SCENARIO_FUNCTION_URL, {
@@ -1536,7 +1549,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant]);
 
 
 

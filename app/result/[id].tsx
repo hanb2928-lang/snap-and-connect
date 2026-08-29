@@ -65,6 +65,7 @@ import type { LocalStoreInfo } from '@/types/database';
 import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
 import { ComicShortGenerator } from '@/components/ComicShortGenerator';
+import { VariantGenerator, type Variant } from '@/components/VariantGenerator';
 import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
@@ -125,6 +126,7 @@ export default function ResultScreen() {
   const [heroAspect, setHeroAspect] = useState<number>(1);
   const [autoMarketingCopy, setAutoMarketingCopy] = useState<string | null>(null);
   const [hookOverride, setHookOverride] = useState<string | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [editingProduct, setEditingProduct] = useState(false);
   const [productNameInput, setProductNameInput] = useState('');
   const [productCategoryInput, setProductCategoryInput] = useState('');
@@ -963,6 +965,18 @@ export default function ResultScreen() {
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
           render: () => (
+            <View>
+              <VariantGenerator
+                productName={activeProductName || scan.product_name || ''}
+                productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+                priceEstimate={activePriceEstimate || ''}
+                oneLiner={activeOneLiner || ''}
+                productAdvantages={td?.productAdvantages || []}
+                hook={activeHook}
+                brandPersona={settings?.brand_persona}
+                selectedTone={selectedVariant?.tone}
+                onSelectVariant={(v) => setSelectedVariant(v)}
+              />
             <ComicShortGenerator
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
               hook={activeHook}
@@ -983,7 +997,9 @@ export default function ResultScreen() {
               productAdvantages={td?.productAdvantages || []}
               localStoreInfo={localStoreInfo}
               brandPersona={settings?.brand_persona}
+              preloadedVariant={selectedVariant}
             />
+            </View>
           ),
         },
       ],
