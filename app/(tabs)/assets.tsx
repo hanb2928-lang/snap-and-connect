@@ -16,13 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
-import {
-  FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar,
-  Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2,
-  Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, Filter,
-  ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb,
-  Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash,
-} from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
@@ -54,6 +48,7 @@ const SNS_PLATFORMS: { key: UploadPlatformKey; label: string; icon: typeof Youtu
   { key: 'tiktok', label: '틱톡', icon: Music2, color: '#FF0050' },
   { key: 'youtube', label: '숏츠', icon: Youtube, color: '#FF0000' },
   { key: 'instagram', label: '릴스', icon: Instagram, color: '#E1306C' },
+  { key: 'pinterest', label: '핀터레스트', icon: ImageIcon, color: '#E60023' },
   { key: 'blog', label: '블로그', icon: FileText, color: '#00C4A7' },
 ];
 

@@ -1,6 +1,6 @@
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 
-export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter';
+export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter' | 'pinterest';
 
 export type DisclosurePlacement = 'body' | 'comment';
 
@@ -35,6 +35,11 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
     appUrl: 'twitter://post',
     webUrl: 'https://x.com/compose/post',
     label: 'X(트위터) 열기',
+  },
+  pinterest: {
+    appUrl: 'pinterest://',
+    webUrl: 'https://www.pinterest.com/pin/create/button/',
+    label: '핀터레스트 앱 열기',
   },
 };
 
@@ -136,6 +141,22 @@ const CAPTION_TEMPLATES: Record<UploadPlatformKey, PlatformCaptionTemplate> = {
       { label: '해시태그 최소화', desc: '2-3개만 사용 — 과도한 태그는 알고리즘 노출을 낮춤' },
     ],
   },
+  pinterest: {
+    hashtagSet: ['#제휴마케팅', '#광고', '#핀터레스트', '#인테리어', '#레시피', '#라이프스타일', '#추천', '#광고포함'],
+    captionStyle: '감성 디스크립션 + 키워드 중심 핀 제목 + 링크 클릭 유도',
+    titleMaxLen: 100,
+    titleHint: '핀 제목 (100자 이내, 키워드 포함)',
+    bodyHint: '핀 설명 (감성 문구 + 키워드)',
+    hashtagStrategy: '핀 설명에 키워드를 자연스럽게 배치 — 핀터레스트 검색 SEO 최적화',
+    linkGuidance: '핀에 직접 링크 연결 가능 — "링크에서 확인" CTA 권장',
+    disclosureDefault: 'body',
+    algorithmTips: [
+      { label: '키워드 최적화', desc: '핀 제목과 설명에 검색 키워드를 자연스럽게 포함 — 핀터레스트는 시각적 검색 엔진' },
+      { label: '세로 이미지', desc: '2:3 비율(예: 1000x1500px) 세로 이미지가 스마트필드에서 가장 잘 보임' },
+      { label: '링크 직접 연결', desc: '핀에 단축 링크를 직접 연결 — 클릭 시 랜딩페이지로 이동 가능' },
+      { label: '공정위 문구', desc: '핀 설명에 포함 — 광고 핀임을 명시' },
+    ],
+  },
 };
 
 export function getCaptionTemplate(key: UploadPlatformKey): PlatformCaptionTemplate {
@@ -203,6 +224,13 @@ export function buildPlatformCaption(
       title = baseCaption.slice(0, tmpl.titleMaxLen);
       body = `${baseCaption}${trimmedUrl ? ' ' + trimmedUrl : ''}`;
       fullText = `${disclosureInBody && disclosure ? disclosure + '\n' : ''}${body} ${hashtags}`;
+      break;
+    }
+    case 'pinterest': {
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      const linkHint = trimmedUrl ? `\n\n링크에서 확인하세요 👉 ${trimmedUrl}` : '';
+      body = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}${linkHint}`;
+      fullText = `${body}\n\n${hashtags}`;
       break;
     }
     default:
