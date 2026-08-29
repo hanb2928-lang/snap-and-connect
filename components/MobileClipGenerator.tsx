@@ -522,6 +522,7 @@ export function MobileClipGenerator({
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const [webviewKey, setWebviewKey] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [mascotEnabled, setMascotEnabled] = useState(true);
@@ -580,6 +581,7 @@ export function MobileClipGenerator({
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
       if (videoUri && Platform.OS !== 'web') {
         FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => {});
@@ -604,18 +606,22 @@ export function MobileClipGenerator({
         const isImage = msg.data.isImage === true;
         setVideoMime(mimeType);
         setVideoSize(size || 0);
+        setProgress(99);
         const ext = isImage ? 'png' : (mimeType.includes('webm') ? 'webm' : 'mp4');
         const fileUri = `${FileSystem.cacheDirectory}${fileName.replace(/\.png$|\.webm$/, '')}-${Date.now()}.${ext}`;
         try {
           await FileSystem.writeAsStringAsync(fileUri, base64, {
             encoding: FileSystem.EncodingType.Base64,
           });
+          if (!mountedRef.current) return;
           setVideoUri(fileUri);
           setState('done');
           setProgress(100);
           showToast(isImage ? '템플릿 이미지가 생성됐어요. 갤러리나 클라우드에 저장하세요' : '동영상이 생성됐어요. 갤러리에 저장하거나 클라우드에 올릴 수 있어요');
         } catch {
+          if (!mountedRef.current) return;
           setState('error');
+          setProgress(0);
           showToast('동영상 파일 저장에 실패했어요');
         }
       } else if (msg.type === 'error') {

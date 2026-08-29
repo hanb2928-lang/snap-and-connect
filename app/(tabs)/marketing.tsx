@@ -312,37 +312,31 @@ export default function MarketingScreen() {
     setTimeout(() => setTweakToast(null), 2000);
   }, []);
 
-  const handleStartGeneration = () => {
-    (async () => {
-      await setItem('marketing_video_length', videoLength);
-      await setItem('marketing_caption_tone', captionTone);
-      await setItem('marketing_bgm_mood', bgmMood);
-      await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
-      await setItem('marketing_handoff', 'false');
-      await setItem('marketing_handoff_image', '');
-      await setItem('marketing_handoff_mime', '');
-      try {
-        const settings = await getUserSettings();
-        if (settings?.brand_persona) {
-          await setItem('marketing_brand_persona', settings.brand_persona);
-        }
-        if (settings?.fixed_hook_phrase) {
-          await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
-        }
-        if (settings?.affiliate_priority_mapping) {
-          await setItem('marketing_affiliate_priority', 'true');
-        } else {
-          await setItem('marketing_affiliate_priority', 'false');
-        }
-      } catch {
-        // non-fatal
+  const handleStartGeneration = async () => {
+    await setItem('marketing_video_length', videoLength);
+    await setItem('marketing_caption_tone', captionTone);
+    await setItem('marketing_bgm_mood', bgmMood);
+    await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
+    await setItem('marketing_handoff', 'false');
+    await setItem('marketing_handoff_image', '');
+    await setItem('marketing_handoff_mime', '');
+    try {
+      const settings = await getUserSettings();
+      if (settings?.brand_persona) {
+        await setItem('marketing_brand_persona', settings.brand_persona);
       }
-    })();
-    if (productMeta?.productName || selectedProduct) {
-      router.push('/affiliate' as never);
-    } else {
-      router.push('/affiliate' as never);
+      if (settings?.fixed_hook_phrase) {
+        await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
+      }
+      if (settings?.affiliate_priority_mapping) {
+        await setItem('marketing_affiliate_priority', 'true');
+      } else {
+        await setItem('marketing_affiliate_priority', 'false');
+      }
+    } catch {
+      // non-fatal
     }
+    router.push('/affiliate' as never);
   };
 
   const totalRevenue = summary?.totalRevenue ?? 0;

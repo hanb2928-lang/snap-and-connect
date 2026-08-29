@@ -17,6 +17,7 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
       return (
         // @ts-ignore web-only img element
         <img
+          key={uri}
           src={uri}
           style={{
             width: '100%',
@@ -33,6 +34,7 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
     return (
       // @ts-ignore web-only video element
       <video
+        key={uri}
         src={uri}
         controls
         autoPlay
@@ -64,6 +66,7 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
   return (
     <View style={[styles.previewContainer, aspectStyle, { maxHeight }]}>
       <WebView
+        key={uri}
         source={{ html: videoHtml }}
         style={styles.webViewFill}
         javaScriptEnabled

@@ -447,6 +447,7 @@ function WebClipGenerator({
   const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRafRef = useRef<number | null>(null);
   const previewImgRef = useRef<any>(null);
@@ -476,6 +477,10 @@ function WebClipGenerator({
       if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
       if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
       if (renderTimeoutRef.current !== null) clearTimeout(renderTimeoutRef.current);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       if (bgmStopRef.current) {
         bgmStopRef.current();
         bgmStopRef.current = null;
@@ -1113,17 +1118,21 @@ function WebClipGenerator({
 
       if (hasRecorder) {
         const blob = await done;
+        if (cancelledRef.current) return;
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
         setVideoMime(mimeType);
       } else {
         await new Promise<void>((resolve) => setTimeout(resolve, clipDuration + 200));
+        if (cancelledRef.current) return;
         const dataUrl = canvas.toDataURL('image/png');
         const blob = await (await fetch(dataUrl)).blob();
+        if (cancelledRef.current) return;
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
         setVideoMime('image/png');
       }
+      if (cancelledRef.current) return;
       setState('done');
       setProgress(100);
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
@@ -1164,6 +1173,7 @@ function WebClipGenerator({
     cancelledRef.current = true;
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
+    if (abortControllerRef.current) { abortControllerRef.current.abort(); abortControllerRef.current = null; }
     if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
     setState('idle');
     setProgress(0);
@@ -1179,13 +1189,15 @@ function WebClipGenerator({
     if (!videoUrl) return;
     setCloudSaving(true);
     setUploadProgress(0);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
-      const res = await fetch(videoUrl);
+      const res = await fetch(videoUrl, { signal: controller.signal });
       const blob = await res.blob();
       const cloudExt = videoMime.includes('png') ? 'png' : 'webm';
       const cloudFileName = fileName.replace(/\.png$|\.webm$/, '') + '-clip-' + Date.now() + '.' + cloudExt;
-      // Upload with progress via XMLHttpRequest
       const fileUrl = await uploadAssetBlobWithProgress(blob, cloudFileName, videoMime, (pct) => setUploadProgress(pct));
+      if (controller.signal.aborted) return;
       if (!fileUrl) {
         showToast('클라우드 업로드에 실패했어요');
         setCloudSaving(false);
@@ -1206,10 +1218,12 @@ function WebClipGenerator({
         affiliate_platform: affiliatePlatforms.join(',') || null,
       });
       showToast('클라우드에 저장됐어요. 내 제작물 탭에서 확인하세요');
-    } catch {
+    } catch (err) {
+      if (controller.signal.aborted) return;
       showToast('저장 중 오류가 발생했어요');
       setUploadProgress(0);
     }
+    abortControllerRef.current = null;
     setCloudSaving(false);
   }, [videoUrl, fileName, videoMime, title, imageUrl, platform, affiliatePlatforms, showToast]);
 
