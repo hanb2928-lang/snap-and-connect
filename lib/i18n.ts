@@ -1,15 +1,40 @@
-export type AppLanguage = 'ko' | 'en' | 'ja' | 'vi' | 'es' | 'zh';
+export type AppLanguage =
+  | 'ko' | 'en' | 'ja' | 'zh' | 'vi' | 'id' | 'pt' | 'es'
+  | 'ar' | 'hi' | 'th' | 'fr' | 'de' | 'ru' | 'tr' | 'it'
+  | 'tl' | 'ms' | 'pl' | 'nl';
 
-export const SUPPORTED_LANGUAGES: { code: AppLanguage; label: string; nativeName: string; flag: string }[] = [
-  { code: 'ko', label: '한국어', nativeName: '한국어', flag: 'KR' },
-  { code: 'en', label: 'English', nativeName: 'English', flag: 'US' },
-  { code: 'ja', label: '日本語', nativeName: '日本語', flag: 'JP' },
-  { code: 'vi', label: 'Tiếng Việt', nativeName: 'Tiếng Việt', flag: 'VN' },
-  { code: 'es', label: 'Español', nativeName: 'Español', flag: 'ES' },
-  { code: 'zh', label: '中文', nativeName: '中文', flag: 'CN' },
+export const RTL_LANGUAGES: AppLanguage[] = ['ar'];
+
+export const SUPPORTED_LANGUAGES: {
+  code: AppLanguage;
+  label: string;
+  nativeName: string;
+  flag: string;
+  isRTL: boolean;
+}[] = [
+  { code: 'ko', label: '한국어', nativeName: '한국어', flag: '🇰🇷', isRTL: false },
+  { code: 'en', label: 'English', nativeName: 'English', flag: '🇺🇸', isRTL: false },
+  { code: 'ja', label: '日本語', nativeName: '日本語', flag: '🇯🇵', isRTL: false },
+  { code: 'zh', label: '中文', nativeName: '中文', flag: '🇨🇳', isRTL: false },
+  { code: 'vi', label: 'Tiếng Việt', nativeName: 'Tiếng Việt', flag: '🇻🇳', isRTL: false },
+  { code: 'id', label: 'Indonesia', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', isRTL: false },
+  { code: 'pt', label: 'Português', nativeName: 'Português', flag: '🇧🇷', isRTL: false },
+  { code: 'es', label: 'Español', nativeName: 'Español', flag: '🇪🇸', isRTL: false },
+  { code: 'ar', label: 'العربية', nativeName: 'العربية', flag: '🇸🇦', isRTL: true },
+  { code: 'hi', label: 'हिन्दी', nativeName: 'हिन्दी', flag: '🇮🇳', isRTL: false },
+  { code: 'th', label: 'ไทย', nativeName: 'ภาษาไทย', flag: '🇹🇭', isRTL: false },
+  { code: 'fr', label: 'Français', nativeName: 'Français', flag: '🇫🇷', isRTL: false },
+  { code: 'de', label: 'Deutsch', nativeName: 'Deutsch', flag: '🇩🇪', isRTL: false },
+  { code: 'ru', label: 'Русский', nativeName: 'Русский', flag: '🇷🇺', isRTL: false },
+  { code: 'tr', label: 'Türkçe', nativeName: 'Türkçe', flag: '🇹🇷', isRTL: false },
+  { code: 'it', label: 'Italiano', nativeName: 'Italiano', flag: '🇮🇹', isRTL: false },
+  { code: 'tl', label: 'Filipino', nativeName: 'Filipino', flag: '🇵🇭', isRTL: false },
+  { code: 'ms', label: 'Melayu', nativeName: 'Bahasa Melayu', flag: '🇲🇾', isRTL: false },
+  { code: 'pl', label: 'Polski', nativeName: 'Polski', flag: '🇵🇱', isRTL: false },
+  { code: 'nl', label: 'Nederlands', nativeName: 'Nederlands', flag: '🇳🇱', isRTL: false },
 ];
 
-type TranslationDict = Record<string, string>;
+export type TranslationDict = Record<string, string>;
 
 const ko: TranslationDict = {
   'app.loading': '앱을 시작하는 중...',
@@ -1475,7 +1500,25 @@ const zh: TranslationDict = {
   'marketing.links': '链接',
 };
 
-export const translations: Record<AppLanguage, TranslationDict> = { ko, en, ja, vi, es, zh };
+import id from './locales/id';
+import pt from './locales/pt';
+import ar from './locales/ar';
+import hi from './locales/hi';
+import th from './locales/th';
+import fr from './locales/fr';
+import de from './locales/de';
+import ru from './locales/ru';
+import tr from './locales/tr';
+import it from './locales/it';
+import tl from './locales/tl';
+import ms from './locales/ms';
+import pl from './locales/pl';
+import nl from './locales/nl';
+
+export const translations: Record<AppLanguage, TranslationDict> = {
+  ko, en, ja, vi, es, zh,
+  id, pt, ar, hi, th, fr, de, ru, tr, it, tl, ms, pl, nl,
+};
 
 export function detectSystemLanguage(): AppLanguage {
   if (typeof navigator !== 'undefined' && navigator.language) {

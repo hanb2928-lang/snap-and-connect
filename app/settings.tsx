@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import type { ThemePreset } from '@/lib/theme';
@@ -125,6 +125,7 @@ export default function SettingsScreen() {
   const [newAffId, setNewAffId] = useState('');
   const [newAffParam, setNewAffParam] = useState('');
   const [addingAffiliate, setAddingAffiliate] = useState(false);
+  const [langModalVisible, setLangModalVisible] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -1722,26 +1723,69 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.appLanguage')}</Text>
         <Text style={styles.sectionDesc}>{t('settings.appLanguageDesc')}</Text>
-        <View style={styles.langSelectorRow}>
-          {SUPPORTED_LANGUAGES.map((lang) => (
-            <TouchableOpacity
-              key={lang.code}
-              style={[styles.langChip, language === lang.code && styles.langChipActive]}
-              onPress={async () => {
-                await setLanguage(lang.code);
-                try {
-                  await updateUserSettings({ app_language: lang.code });
-                } catch {}
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.langChipText, language === lang.code && styles.langChipTextActive]}>
-                {lang.nativeName}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TouchableOpacity
+          style={styles.langTriggerRow}
+          onPress={() => setLangModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Globe size={20} color={theme.colors.primary[400]} strokeWidth={2} />
+          <View style={styles.langTriggerBody}>
+            <Text style={styles.langTriggerLabel}>
+              {SUPPORTED_LANGUAGES.find((l) => l.code === language)?.flag}  {SUPPORTED_LANGUAGES.find((l) => l.code === language)?.nativeName}
+            </Text>
+            <Text style={styles.langTriggerSub}>{SUPPORTED_LANGUAGES.find((l) => l.code === language)?.label}</Text>
+          </View>
+          <ChevronRight size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={langModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLangModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.langModalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Globe size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+                <Text style={styles.modalTitle}>{t('settings.appLanguage')}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setLangModalVisible(false)} activeOpacity={0.7}>
+                <Text style={styles.modalCloseText}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.langModalScroll} showsVerticalScrollIndicator={false}>
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[styles.langModalItem, language === lang.code && styles.langModalItemActive]}
+                  onPress={async () => {
+                    await setLanguage(lang.code);
+                    try {
+                      await updateUserSettings({ app_language: lang.code });
+                    } catch {}
+                    setLangModalVisible(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.langModalFlag}>{lang.flag}</Text>
+                  <View style={styles.langModalItemBody}>
+                    <Text style={[styles.langModalItemLabel, language === lang.code && styles.langModalItemLabelActive]}>
+                      {lang.nativeName}
+                    </Text>
+                    <Text style={styles.langModalItemSub}>{lang.label}</Text>
+                  </View>
+                  {language === lang.code && (
+                    <Check size={20} color={theme.colors.primary[400]} strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>브랜드 톤앤매너 (페르소나)</Text>
@@ -3146,32 +3190,73 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
-  langSelectorRow: {
+  langTriggerRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surface,
+    ...theme.shadows.card,
+  },
+  langTriggerBody: {
+    flex: 1,
+  },
+  langTriggerLabel: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  langTriggerSub: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  langModalContainer: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.md,
+    maxHeight: '80%',
+    width: '90%',
+    maxWidth: 420,
+    alignSelf: 'center',
+  },
+  langModalScroll: {
     marginTop: theme.spacing.sm,
   },
-  langChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+  langModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surface,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    marginBottom: 4,
   },
-  langChipActive: {
-    backgroundColor: theme.colors.primary[600],
-    borderColor: theme.colors.primary[500],
+  langModalItemActive: {
+    backgroundColor: theme.colors.primary[500] + '15',
   },
-  langChipText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+  langModalFlag: {
+    fontSize: 24,
   },
-  langChipTextActive: {
-    color: '#fff',
+  langModalItemBody: {
+    flex: 1,
+  },
+  langModalItemLabel: {
+    fontSize: 15,
     fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  langModalItemLabelActive: {
+    color: theme.colors.primary[400],
+  },
+  langModalItemSub: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
   platformMgmtRow: {
     flexDirection: 'row',

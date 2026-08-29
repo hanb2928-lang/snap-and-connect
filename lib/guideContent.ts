@@ -1719,7 +1719,7 @@ const zh: GuideContent = {
   onboardingDesc: '点击重新查看初始指南',
 };
 
-export const guideTranslations: Record<AppLanguage, GuideContent> = {
+export const guideTranslations: Partial<Record<AppLanguage, GuideContent>> = {
   ko,
   en,
   ja,
@@ -1729,5 +1729,5 @@ export const guideTranslations: Record<AppLanguage, GuideContent> = {
 };
 
 export function getGuideContent(lang: AppLanguage): GuideContent {
-  return guideTranslations[lang] ?? ko;
+  return guideTranslations[lang] ?? guideTranslations.en ?? ko;
 }

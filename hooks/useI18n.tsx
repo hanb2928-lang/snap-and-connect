@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { I18nManager, Platform } from 'react-native';
 import type { AppLanguage } from '@/lib/i18n';
-import { translations, detectSystemLanguage, translate } from '@/lib/i18n';
+import { translations, detectSystemLanguage, translate, RTL_LANGUAGES } from '@/lib/i18n';
 import { getItem, setItem } from '@/lib/storage';
 
 const STORAGE_KEY = 'app_language';
@@ -10,6 +11,7 @@ interface I18nContextValue {
   setLanguage: (lang: AppLanguage) => Promise<void>;
   t: (key: string, fallback?: string) => string;
   isReady: boolean;
+  isRTL: boolean;
 }
 
 const I18nContext = createContext<I18nContextValue>({
@@ -17,11 +19,14 @@ const I18nContext = createContext<I18nContextValue>({
   setLanguage: async () => {},
   t: (key) => key,
   isReady: false,
+  isRTL: false,
 });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>('ko');
   const [isReady, setIsReady] = useState(false);
+
+  const isRTL = RTL_LANGUAGES.includes(language);
 
   useEffect(() => {
     (async () => {
@@ -41,6 +46,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  useEffect(() => {
+    const shouldBeRTL = RTL_LANGUAGES.includes(language);
+    if (shouldBeRTL !== I18nManager.isRTL) {
+      I18nManager.forceRTL(shouldBeRTL);
+      if (Platform.OS !== 'web') {
+        I18nManager.allowRTL(shouldBeRTL);
+      }
+    }
+  }, [language]);
+
   const setLanguage = useCallback(async (lang: AppLanguage) => {
     setLanguageState(lang);
     try {
@@ -56,7 +71,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage, t, isReady }}>
+    <I18nContext.Provider value={{ language, setLanguage, t, isReady, isRTL }}>
       {children}
     </I18nContext.Provider>
   );
