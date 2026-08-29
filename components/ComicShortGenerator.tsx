@@ -22,7 +22,7 @@ import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
-import { getOpenAiVoiceParams } from '@/lib/ttsVoices';
+import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type VoiceCategory, type TtsVoice } from '@/lib/ttsVoices';
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
@@ -74,6 +74,76 @@ type GenState = 'idle' | 'generating' | 'done' | 'error';
 type PanelLayout = 'single' | 'split-2' | 'split-3';
 
 type MoodTemplate = 'cute-webtoon' | 'noir' | 'sale-popup' | 'retro' | 'premium-minimal' | 'energetic-popart';
+type ArtStyle = 'insta-toon' | 'b-grade' | 'food-toon' | 'american-comic' | 'ghibli';
+
+interface ArtStyleConfig {
+  label: string;
+  desc: string;
+  mood: MoodTemplate;
+  voiceCategory: VoiceCategory;
+  recommendedFor: string;
+}
+
+const ART_STYLES: Record<ArtStyle, ArtStyleConfig> = {
+  'insta-toon': {
+    label: '인스타툰 / 일상툰',
+    desc: '깔끔한 라인과 파스텔톤 컬러',
+    mood: 'cute-webtoon',
+    voiceCategory: 'bright',
+    recommendedFor: '리빙, 자취용품, 뷰티 제품에 최적화',
+  },
+  'b-grade': {
+    label: 'B급 병맛 / 짤방',
+    desc: '와일드한 필선과 과장된 표정',
+    mood: 'energetic-popart',
+    voiceCategory: 'viral',
+    recommendedFor: '가성비 아이템, 웃음 유발 마케팅에 최적화',
+  },
+  'food-toon': {
+    label: '미식 / 요리 툰',
+    desc: '음식 질감을 살린 고화질 애니메이션 컷',
+    mood: 'retro',
+    voiceCategory: 'bright',
+    recommendedFor: '식품, 주방용품, 레시피 콘텐츠에 최적화',
+  },
+  'american-comic': {
+    label: '아메리칸 코믹스',
+    desc: '강렬한 대비와 팝아트 느낌의 질감',
+    mood: 'energetic-popart',
+    voiceCategory: 'bright',
+    recommendedFor: 'IT 기기, 전자기기, 스포츠용품에 최적화',
+  },
+  'ghibli': {
+    label: '감성 지브리풍',
+    desc: '따뜻하고 몽환적인 배경 및 파스텔 느낌',
+    mood: 'premium-minimal',
+    voiceCategory: 'narration',
+    recommendedFor: '패션, 인테리어, 프래그런스 제품에 최적화',
+  },
+};
+
+const ART_STYLE_KEYS: ArtStyle[] = ['insta-toon', 'b-grade', 'food-toon', 'american-comic', 'ghibli'];
+
+const EMOTION_SFX_MAP: Record<string, string[]> = {
+  '고민': ['헐…', '으음…', '띠용?'],
+  '놀람': ['?!', '헐 대박!', '촤악!'],
+  '행복': ['샤방~', '하세요♪', '반짝반짝!'],
+  '확신': ['따봉!', '역시!', 'KWAANG!'],
+  '설렘': ['두근두근~', '샤방~', '쿵쿵!'],
+  '슬픔': ['뚝뚝…', '으앙!', '부들부들…'],
+  '분노': ['콰앙!!', '아진짜!', '불끈!'],
+  '도전': ['가보자고!', '후후후', '번쩍!'],
+  '행동': ['출발!', '슝~', 'KWAANG!'],
+  '지각': ['앗 늦었다!', '후다닥!', '찰칵!'],
+  '수다': ['주절주절~', '티키타카!', '재밌어!'],
+  '감동': ['눈물 앞둥', '감동쓰…', '오예~'],
+};
+
+function autoMatchSfx(emotion: string, fallback: string): string {
+  const sfxList = EMOTION_SFX_MAP[emotion];
+  if (!sfxList || sfxList.length === 0) return fallback;
+  return sfxList[Math.floor(Math.random() * sfxList.length)];
+}
 
 interface MoodConfig {
   filter: string;
@@ -228,27 +298,30 @@ interface AutoConfig {
   mood: MoodTemplate;
   duration: ComicDuration;
   panelCount: number;
+  artStyle?: ArtStyle;
 }
 
-const CATEGORY_MOOD_MAP: Record<string, MoodTemplate> = {
-  '뷰티': 'cute-webtoon',
-  '패션': 'energetic-popart',
-  '디지털': 'premium-minimal',
-  '가전': 'noir',
-  '생활': 'cute-webtoon',
-  '주방': 'retro',
-  '스포츠': 'energetic-popart',
-  '식품': 'retro',
-  '유아': 'cute-webtoon',
-  '반려': 'cute-webtoon',
+const CATEGORY_STYLE_MAP: Record<string, ArtStyle> = {
+  '뷰티': 'insta-toon',
+  '패션': 'ghibli',
+  '디지털': 'american-comic',
+  '가전': 'american-comic',
+  '생활': 'insta-toon',
+  '주방': 'food-toon',
+  '스포츠': 'american-comic',
+  '식품': 'food-toon',
+  '유아': 'insta-toon',
+  '반려': 'insta-toon',
 };
 
-function autoDecideConfig(category: string, advantages: string[]): AutoConfig {
-  const mood = CATEGORY_MOOD_MAP[category] || 'energetic-popart';
+function autoDecideConfig(category: string, advantages: string[], artStyleOverride?: ArtStyle): AutoConfig {
+  const style = artStyleOverride || CATEGORY_STYLE_MAP[category] || 'insta-toon';
+  const artConfig = ART_STYLES[style];
+  const mood = artConfig?.mood || 'energetic-popart';
   const hasRichStory = advantages.length >= 3;
   const panelCount = hasRichStory ? 3 : category === '뷰티' || category === '패션' ? 2 : 1;
   const duration: ComicDuration = panelCount >= 3 ? 20000 : panelCount === 2 ? 15000 : 10000;
-  return { mood, duration, panelCount };
+  return { mood, duration, panelCount, artStyle: style };
 }
 
 function fallbackSplitHook(hook: string, title: string, count: number): string[] {
@@ -1066,6 +1139,9 @@ export function ComicShortGenerator({
   const [emotionOverlay, setEmotionOverlay] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [selectedArtStyle, setSelectedArtStyle] = useState<ArtStyle | null>(null);
+  const [voiceCategory, setVoiceCategory] = useState<VoiceCategory>('bright');
+  const [selectedVoiceKey, setSelectedVoiceKey] = useState<string | null>(null);
   const tpl = useHybridTemplate(
     { category: productCategory, platform: 'shorts', productName, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
     theme.colors.accent[400],
@@ -1248,11 +1324,12 @@ export function ComicShortGenerator({
     setResultBlob(null);
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
 
-    const autoConfig = autoDecideConfig(productCategory, productAdvantages);
+    const autoConfig = autoDecideConfig(productCategory, productAdvantages, selectedArtStyle || undefined);
     let panelCount = autoConfig.panelCount;
     let panels: ComicPanel[] = [];
     let narrationText = '';
     let finalMood = autoConfig.mood;
+    let finalArtStyle = autoConfig.artStyle || selectedArtStyle || null;
     let finalPanelLayout: PanelLayout = autoConfig.panelCount === 1 ? 'single' : autoConfig.panelCount === 2 ? 'split-2' : 'split-3';
     let finalDuration: ComicDuration = autoConfig.duration;
     let finalMbtiCommentary: MbtiCommentary[] = [];
@@ -1279,6 +1356,7 @@ export function ComicShortGenerator({
             episodeMode,
             mbtiMode,
             brandPersona: brandPersona || undefined,
+            artStyle: selectedArtStyle || undefined,
           }),
           timeoutMs: 20000,
         });
@@ -1297,6 +1375,7 @@ export function ComicShortGenerator({
           if (data.autoConfig) {
             const ac = data.autoConfig as AutoConfig;
             finalMood = ac.mood;
+            finalArtStyle = ac.artStyle || finalArtStyle;
             finalPanelLayout = ac.panelCount === 1 ? 'single' : ac.panelCount === 2 ? 'split-2' : 'split-3';
             finalDuration = ac.duration;
             panelCount = ac.panelCount;
@@ -1313,11 +1392,17 @@ export function ComicShortGenerator({
       const labels = episodeMode ? ['1일차', '3일차', '7일차'] : [];
       panels = speeches.map((speech, i) => ({
         speech,
-        sfx: ['KWAANG!', 'BOOM!', 'ZAP!'][i % 3],
+        sfx: autoMatchSfx(['', '놀람', '확신'][i] || '', ['KWAANG!', 'BOOM!', 'ZAP!'][i % 3]),
         emotion: '',
         episodeLabel: labels[i] || undefined,
       }));
       finalScenarioFallback = true;
+    }
+
+    for (const panel of panels) {
+      if (panel.sfx && (panel.sfx === 'KWAANG!' || panel.sfx === 'BOOM!' || panel.sfx === 'ZAP!')) {
+        panel.sfx = autoMatchSfx(panel.emotion, panel.sfx);
+      }
     }
 
     if (!narrationText) {
@@ -1356,6 +1441,7 @@ export function ComicShortGenerator({
             voice: voiceParams.voice,
             speed: voiceParams.speed,
             pitch: resolvedPitch ?? 0,
+            instructions: voiceParams.instructions,
           }),
           timeoutMs: 15000,
         });
@@ -1380,6 +1466,12 @@ export function ComicShortGenerator({
     }
     setSafeImageUrl(finalImageUrl);
     setMoodTemplate(finalMood);
+    if (finalArtStyle) {
+      const artConfig = ART_STYLES[finalArtStyle];
+      if (artConfig) {
+        setVoiceCategory(artConfig.voiceCategory);
+      }
+    }
     setPanelLayout(finalPanelLayout);
     setComicDuration(finalDuration);
     setMbtiCommentary(finalMbtiCommentary);
@@ -1425,7 +1517,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey]);
 
 
 
@@ -1719,6 +1811,38 @@ export function ComicShortGenerator({
                 </Text>
               </View>
 
+              <Text style={styles.optionLabel}>웹툰 화풍 선택</Text>
+              <View style={styles.artStyleScroll}>
+                {ART_STYLE_KEYS.map((key) => {
+                  const sty = ART_STYLES[key];
+                  const isActive = selectedArtStyle === key || (!selectedArtStyle && autoDecideConfig(productCategory, productAdvantages).artStyle === key);
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.artStylePill, isActive && styles.artStylePillActive]}
+                      onPress={() => setSelectedArtStyle(isActive && selectedArtStyle ? null : key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.artStylePillText, isActive && styles.artStylePillTextActive]}>
+                        {sty.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {(() => {
+                const activeStyle = selectedArtStyle
+                  ? ART_STYLES[selectedArtStyle]
+                  : ART_STYLES[autoDecideConfig(productCategory, productAdvantages).artStyle || 'insta-toon'];
+                if (!activeStyle) return null;
+                return (
+                  <View style={styles.styleDescBox}>
+                    <Text style={styles.styleDescText}>{activeStyle.desc}</Text>
+                    <Text style={styles.styleDescHint}>추천: {activeStyle.recommendedFor}</Text>
+                  </View>
+                );
+              })()}
+
               <Text style={styles.optionLabel}>무드 템플릿</Text>
               <View style={styles.moodScroll}>
                 {MOOD_KEYS.map((key) => {
@@ -1778,6 +1902,49 @@ export function ComicShortGenerator({
                   <Text style={styles.toggleDesc}>만화 스토리를 AI 성우 목소리로 자동 더빙해요 (웹에서만 오디오 포함)</Text>
                 </View>
               </TouchableOpacity>
+
+              {ttsEnabled && (
+                <View style={styles.voiceSelectorWrap}>
+                  <Text style={styles.optionLabel}>AI 성우 목소리 선택</Text>
+                  <View style={styles.voiceCatScroll}>
+                    {(Object.keys(VOICE_CATEGORIES) as VoiceCategory[]).map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.voiceCatPill, voiceCategory === cat && styles.voiceCatPillActive]}
+                        onPress={() => {
+                          setVoiceCategory(cat);
+                          const voices = getVoicesByCategory(cat);
+                          if (voices.length > 0) setSelectedVoiceKey(voices[0].key);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.voiceCatPillText, voiceCategory === cat && styles.voiceCatPillTextActive]}>
+                          {VOICE_CATEGORIES[cat].label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={styles.voiceCatDesc}>{VOICE_CATEGORIES[voiceCategory].desc}</Text>
+                  <View style={styles.voiceListScroll}>
+                    {getVoicesByCategory(voiceCategory).map((v: TtsVoice) => (
+                      <TouchableOpacity
+                        key={v.key}
+                        style={[styles.voiceItem, (selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && styles.voiceItemActive]}
+                        onPress={() => setSelectedVoiceKey(v.key)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.voiceItemLeft}>
+                          <Text style={styles.voiceItemLabel}>{v.label}</Text>
+                          <Text style={styles.voiceItemDesc}>{v.desc}</Text>
+                        </View>
+                        {(selectedVoiceKey || getVoicesByCategory(voiceCategory)[0]?.key) === v.key && (
+                          <Check size={16} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.toggleRow}
@@ -2535,6 +2702,105 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     marginBottom: theme.spacing.md,
+  },
+  artStyleScroll: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  artStylePill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  artStylePillActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '20',
+  },
+  artStylePillText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  artStylePillTextActive: {
+    color: '#fff',
+  },
+  styleDescHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 4,
+  },
+  voiceSelectorWrap: {
+    marginBottom: theme.spacing.md,
+  },
+  voiceCatScroll: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  voiceCatPill: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  voiceCatPillActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '20',
+  },
+  voiceCatPillText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  voiceCatPillTextActive: {
+    color: '#fff',
+  },
+  voiceCatDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginBottom: 8,
+  },
+  voiceListScroll: {
+    gap: 6,
+  },
+  voiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  voiceItemActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '15',
+  },
+  voiceItemLeft: {
+    flex: 1,
+  },
+  voiceItemLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 2,
+  },
+  voiceItemDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
   toggleCheck: {
     width: 22,

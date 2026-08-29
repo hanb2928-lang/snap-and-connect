@@ -31,6 +31,7 @@ interface ComicScenarioRequest {
   mbtiMode?: boolean;
   multiverseMode?: boolean;
   brandPersona?: string | null;
+  artStyle?: ArtStyle;
   productContext?: {
     productName?: string;
     description?: string;
@@ -41,11 +42,58 @@ interface ComicScenarioRequest {
 }
 
 type MoodTemplate = 'cute-webtoon' | 'noir' | 'sale-popup' | 'retro' | 'premium-minimal' | 'energetic-popart';
+type ArtStyle = 'insta-toon' | 'b-grade' | 'food-toon' | 'american-comic' | 'ghibli';
 
 interface AutoConfig {
   mood: MoodTemplate;
   duration: 10000 | 15000 | 20000;
   panelCount: number;
+  artStyle?: ArtStyle;
+}
+
+const STYLE_LABELS: Record<ArtStyle, string> = {
+  'insta-toon': '인스타툰 / 일상툰',
+  'b-grade': 'B급 병맛 / 짤방',
+  'food-toon': '미식 / 요리 툰',
+  'american-comic': '아메리칸 코믹스',
+  'ghibli': '감성 지브리풍',
+};
+
+const STYLE_MOOD_MAP: Record<ArtStyle, MoodTemplate> = {
+  'insta-toon': 'cute-webtoon',
+  'b-grade': 'energetic-popart',
+  'food-toon': 'retro',
+  'american-comic': 'energetic-popart',
+  'ghibli': 'premium-minimal',
+};
+
+const STYLE_VOICE_MAP: Record<ArtStyle, string> = {
+  'insta-toon': 'bright',
+  'b-grade': 'viral',
+  'food-toon': 'bright',
+  'american-comic': 'bright',
+  'ghibli': 'narration',
+};
+
+const EMOTION_SFX_MAP: Record<string, string[]> = {
+  '고민': ['헐…', '으음…', '띠용?'],
+  '놀람': ['?!', '헐 대박!', '촤악!'],
+  '행복': ['샤방~', '하세요♪', '반짝반짝!'],
+  '확신': ['따봉!', '역시!', 'KWAANG!'],
+  '설렘': ['두근두근~', '샤방~', '쿵쿵!'],
+  '슬픔': ['뚝뚝…', '으앙!', '부들부들…'],
+  '분노': ['콰앙!!', '아진짜!', '불끈!'],
+  '도전': ['가보자고!', '후후후', '번쩍!'],
+  '행동': ['출발!', '슝~', 'KWAANG!'],
+  '지각': ['앗 늦었다!', '후다닥!', '찰칵!'],
+  '수다': ['주절주절~', '티키타카!', '재밌어!'],
+  '감동': ['눈물 앞둥', '감동쓰…', '오예~'],
+};
+
+function autoMatchSfx(emotion: string, fallback: string): string {
+  const sfxList = EMOTION_SFX_MAP[emotion];
+  if (!sfxList || sfxList.length === 0) return fallback;
+  return sfxList[Math.floor(Math.random() * sfxList.length)];
 }
 
 const CATEGORY_MOOD_MAP: Record<string, MoodTemplate> = {
@@ -61,12 +109,26 @@ const CATEGORY_MOOD_MAP: Record<string, MoodTemplate> = {
   '반려': 'cute-webtoon',
 };
 
-function autoDecideConfig(category: string, advantages: string[]): AutoConfig {
-  const mood = CATEGORY_MOOD_MAP[category] || 'energetic-popart';
+const CATEGORY_STYLE_MAP: Record<string, ArtStyle> = {
+  '뷰티': 'insta-toon',
+  '패션': 'ghibli',
+  '디지털': 'american-comic',
+  '가전': 'american-comic',
+  '생활': 'insta-toon',
+  '주방': 'food-toon',
+  '스포츠': 'american-comic',
+  '식품': 'food-toon',
+  '유아': 'insta-toon',
+  '반려': 'insta-toon',
+};
+
+function autoDecideConfig(category: string, advantages: string[], artStyleOverride?: ArtStyle): AutoConfig {
+  const style = artStyleOverride || CATEGORY_STYLE_MAP[category] || 'insta-toon';
+  const mood = STYLE_MOOD_MAP[style] || CATEGORY_MOOD_MAP[category] || 'energetic-popart';
   const hasRichStory = advantages.length >= 3;
   const panelCount = hasRichStory ? 3 : category === '뷰티' || category === '패션' ? 2 : 1;
   const duration: 10000 | 15000 | 20000 = panelCount >= 3 ? 20000 : panelCount === 2 ? 15000 : 10000;
-  return { mood, duration, panelCount };
+  return { mood, duration, panelCount, artStyle: style };
 }
 
 interface ComicPanel {
@@ -117,7 +179,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const autoConfig = autoDecideConfig(body.productCategory || '', body.productAdvantages || []);
+    const autoConfig = autoDecideConfig(body.productCategory || '', body.productAdvantages || [], body.artStyle);
     const panelCount = body.panelCount ? Math.min(Math.max(body.panelCount, 1), 3) : autoConfig.panelCount;
     const openaiKey = await resolveOpenAIKey();
 
@@ -125,12 +187,18 @@ Deno.serve(async (req: Request) => {
 
     if (openaiKey) {
       try {
-        scenario = await generateWithOpenAI(body, openaiKey, panelCount);
+        scenario = await generateWithOpenAI(body, openaiKey, panelCount, autoConfig.artStyle);
       } catch {
         scenario = generateLocalScenario(body, panelCount, body.mbtiMode === true, body.multiverseMode === true);
       }
     } else {
       scenario = generateLocalScenario(body, panelCount, body.mbtiMode === true, body.multiverseMode === true);
+    }
+
+    for (const panel of scenario.panels) {
+      if (!panel.sfx || panel.sfx === 'KWAANG!' || panel.sfx === 'BOOM!' || panel.sfx === 'ZAP!') {
+        panel.sfx = autoMatchSfx(panel.emotion, panel.sfx || 'KWAANG!');
+      }
     }
 
     scenario.autoConfig = autoConfig;
@@ -182,6 +250,7 @@ async function generateWithOpenAI(
   data: ComicScenarioRequest,
   apiKey: string,
   panelCount: number,
+  artStyle?: ArtStyle,
 ): Promise<ComicScenario> {
   const trendingKeywords = (data.trendingKeywords || []).slice(0, 8);
   const trendingHashtags = (data.trendingHashtags || []).slice(0, 8);
@@ -200,13 +269,16 @@ async function generateWithOpenAI(
       `추천 해시태그: ${trendingHashtags.join(', ')}\n`
     : "";
 
+  const styleGuidance = artStyle ? `\n선택된 웹툰 화풍: ${STYLE_LABELS[artStyle]}\n이 화풍에 맞춰 대사의 톤과 분위기를 조절해:\n${artStyle === 'insta-toon' ? '- 깔끔하고 일상적인 대화체, 공감 가는 표현' : ''}${artStyle === 'b-grade' ? '- 과장되고 호쾌한 표현, 밈스러운 유머, 반말 혼용' : ''}${artStyle === 'food-toon' ? '- 음식의 질감과 맛을 살린 표현, 침 고인다는 듯한 묘사' : ''}${artStyle === 'american-comic' ? '- 강렬하고 힘있는 표현, 영웅물 같은 dramatic한 연출' : ''}${artStyle === 'ghibli' ? '- 따뜻하고 감성적인 표현, 몽환적이고 시적인 묘사' : ''}\n` : '';
+
   const systemPrompt =
     "너는 한국인 만화 작가야. 제품을 홍보하는 숏폼 만화의 시나리오를 작성해.\n" +
     "만화는 '문제 → 해결 → 결과' 구조를 따라야 해.\n" +
     "각 패널은 만화 말풍선에 들어갈 대사(speech), 효과음(sfx), 감정(emotion)을 가져야 해.\n" +
     "대사는 일상적이고 자연스러운 한국어 대화체로 작성해. 과장된 마케팅 톤은 금지.\n" +
-    "효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!)를 사용해.\n" +
-    "감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신).\n" +
+    "효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!, 샤방~, 따봉!)를 사용하고 감정에 맞춰 자동 매칭될 거야.\n" +
+    "감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
+    `${styleGuidance}` +
     (data.brandPersona && data.brandPersona.trim()
       ? `\n다음 브랜드 톤앤매너를 만화 대사의 말투와 분위기에 반영해:\n${data.brandPersona.trim()}\n`
       : "") +

@@ -13,6 +13,8 @@ interface TTSRequest {
   text: string;
   voice?: string;
   speed?: number;
+  pitch?: number;
+  instructions?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -33,6 +35,7 @@ Deno.serve(async (req: Request) => {
     const text = body.text.slice(0, 500);
     const voice = body.voice || "alloy";
     const speed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
+    const instructions = body.instructions?.trim() || undefined;
 
     const openaiKey = await resolveOpenAIKey();
 
@@ -43,19 +46,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const ttsBody: Record<string, unknown> = {
+      model: "gpt-4o-mini-tts",
+      input: text,
+      voice: voice,
+      speed: speed,
+      response_format: "mp3",
+    };
+    if (instructions) {
+      ttsBody.instructions = instructions;
+    }
+
     const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${openaiKey}`,
       },
-      body: JSON.stringify({
-        model: "tts-1",
-        input: text,
-        voice: voice,
-        speed: speed,
-        response_format: "mp3",
-      }),
+      body: JSON.stringify(ttsBody),
     });
 
     if (!ttsResponse.ok) {
