@@ -37,6 +37,7 @@ import {
   Scissors,
   Music,
   Play,
+  Dna,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -122,6 +123,21 @@ export default function MarketingScreen() {
   const [countdownSeconds, setCountdownSeconds] = useState(3600);
   const [qrValue, setQrValue] = useState('https://example.com/your-link');
   const linkInBioRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionRefs = useRef<Record<string, View | null>>({});
+
+  const scrollToSection = (key: string) => {
+    setTimeout(() => {
+      const targetRef = sectionRefs.current[key];
+      if (targetRef && scrollRef.current) {
+        targetRef.measureLayout(
+          scrollRef.current as any,
+          (_x, y) => { scrollRef.current?.scrollTo({ y: y - 20, animated: true }); },
+          () => {},
+        );
+      }
+    }, 100);
+  };
 
   useEffect(() => {
     (async () => {
@@ -215,13 +231,14 @@ export default function MarketingScreen() {
           <View style={styles.headerTextBox}>
             <Text style={styles.headerTitle}>마케팅</Text>
             <Text style={styles.headerSubtext}>
-              소재를 구매로 전환시키는 핵심 마케팅 엔진
+              오늘 어떤 마케팅 전략으로 매출을 올리시겠습니까?
             </Text>
           </View>
         </View>
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
         showsVerticalScrollIndicator={false}
@@ -233,6 +250,78 @@ export default function MarketingScreen() {
           <ErrorRetryBanner message={loadError} onRetry={load} />
         ) : (
           <>
+            {/* 3 Strategy Track Cards */}
+            <View style={styles.trackGrid}>
+              <TouchableOpacity
+                style={styles.trackCard}
+                onPress={() => scrollToSection('hook')}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
+                  <Zap size={44} color={theme.colors.warning[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.trackTitle}>3초 훅 스튜디오</Text>
+                <Text style={styles.trackDesc}>오프닝 3초 반전 문구, 결핍 자극 자막, 팝업 연출</Text>
+                <View style={styles.trackTagRow}>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                    <Flame size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>이탈 방지</Text>
+                  </View>
+                  <Text style={styles.trackArrow}>→</Text>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                    <Lightbulb size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>3초 후킹</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.trackCard}
+                onPress={() => scrollToSection('ab')}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
+                  <Dna size={44} color={theme.colors.accent[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.trackTitle}>A/B 테스트 3종 생성</Text>
+                <Text style={styles.trackDesc}>Z세대 감성 / 3040 실용 / 팩트 리뷰 1클릭 동시 렌더링</Text>
+                <View style={styles.trackTagRow}>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                    <Users size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>3가지 톤</Text>
+                  </View>
+                  <Text style={styles.trackArrow}>→</Text>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                    <Check size={10} color={theme.colors.accent[300]} strokeWidth={2.5} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>동시 생성</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.trackCard}
+                onPress={() => scrollToSection('trending')}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
+                  <Flame size={44} color={theme.colors.primary[300]} strokeWidth={2} />
+                </View>
+                <Text style={styles.trackTitle}>떡상 키워드 & 스마트 CTA</Text>
+                <Text style={styles.trackDesc}>SNS 인기 해시태그 믹스 및 QR/카운트다운 랜딩 CTA</Text>
+                <View style={styles.trackTagRow}>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                    <TrendingUp size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.primary[300] }]}>알고리즘</Text>
+                  </View>
+                  <Text style={styles.trackArrow}>→</Text>
+                  <View style={[styles.trackTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                    <QrCode size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                    <Text style={[styles.trackTagText, { color: theme.colors.primary[300] }]}>스마트 CTA</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
             {/* Handoff Hero */}
             {handoffMode && (
               <View style={styles.handoffHero}>
@@ -272,13 +361,14 @@ export default function MarketingScreen() {
               </View>
             </View>
 
-            {/* 1. Hook Studio */}
+            {/* Hook Studio */}
+            <View
+              ref={(ref) => { sectionRefs.current['hook'] = ref; }}
+              collapsable={false}
+            >
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.warning[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>1</Text>
-                </View>
-                <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2.5} />
                 <Text style={styles.sectionTitleText}>마케팅 훅 스튜디오</Text>
               </View>
             </View>
@@ -310,39 +400,38 @@ export default function MarketingScreen() {
                 );
               })}
             </View>
+            </View>
             <TouchableOpacity
               style={[styles.startBtn, !selectedHook && styles.startBtnDisabled]}
               onPress={handleStartGeneration}
               disabled={!selectedHook}
               activeOpacity={0.85}
             >
-              <Sparkles size={18} color={selectedHook ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2.2} />
+              <Sparkles size={28} color={selectedHook ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2.5} />
               <Text style={[styles.startBtnText, !selectedHook && styles.startBtnTextDisabled]}>
                 {selectedHook ? '훅으로 콘텐츠 생성 시작' : '훅을 선택해주세요'}
               </Text>
-              {selectedHook && <ArrowRight size={16} color="#fff" strokeWidth={2.2} />}
+              {selectedHook && <ArrowRight size={20} color="#fff" strokeWidth={2.5} />}
             </TouchableOpacity>
 
-            {/* 2. AI Cut Generation */}
+            {/* AI Cut Generation */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.primary[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>2</Text>
-                </View>
-                <Scissors size={16} color={theme.colors.primary[400]} strokeWidth={2.2} />
+                <Scissors size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
                 <Text style={styles.sectionTitleText}>AI 컷 생성</Text>
               </View>
             </View>
             <Text style={styles.sectionDesc}>0.8초 템포 컷 분할 · 마이크로 비트 동기화 · 하이라이트 자동 추출</Text>
             <AICutGenerator />
 
-            {/* 3. A/B Variant Personas */}
+            {/* A/B Variant Personas */}
+            <View
+              ref={(ref) => { sectionRefs.current['ab'] = ref; }}
+              collapsable={false}
+            >
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.accent[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>3</Text>
-                </View>
-                <Users size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
+                <Users size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
                 <Text style={styles.sectionTitleText}>A/B 테스트 3종 페르소나</Text>
               </View>
             </View>
@@ -365,14 +454,16 @@ export default function MarketingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            </View>
 
-            {/* 4. Trending Keyword Feed */}
+            {/* Trending Keyword Feed */}
+            <View
+              ref={(ref) => { sectionRefs.current['trending'] = ref; }}
+              collapsable={false}
+            >
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.primary[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>4</Text>
-                </View>
-                <TrendingUp size={16} color={theme.colors.primary[400]} strokeWidth={2.2} />
+                <TrendingUp size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
                 <Text style={styles.sectionTitleText}>실시간 떡상 키워드 피드</Text>
               </View>
               <TouchableOpacity onPress={shuffleTags} activeOpacity={0.7} style={styles.shuffleBtn}>
@@ -414,13 +505,10 @@ export default function MarketingScreen() {
               <TrendMatchCard productCategory="라이프스타일" />
             </View>
 
-            {/* 5. Smart CTA & Link-in-Bio */}
+            {/* Smart CTA & Link-in-Bio */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.success[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>5</Text>
-                </View>
-                <Link2 size={16} color={theme.colors.success[400]} strokeWidth={2.2} />
+                <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.5} />
                 <Text style={styles.sectionTitleText}>스마트 CTA & Link-in-Bio</Text>
               </View>
             </View>
@@ -470,6 +558,7 @@ export default function MarketingScreen() {
             {/* Link-in-Bio Card */}
             <View style={styles.linkInBioWrap}>
               <LinkInBioCard scanId="" scanTitle="마케팅 허브" />
+            </View>
             </View>
 
             {/* Divider */}
@@ -608,6 +697,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  trackGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  trackCard: {
+    width: '48.5%',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: theme.spacing.md,
+    gap: 6,
+  },
+  trackIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  trackTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  trackDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  trackTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  trackTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.sm,
+  },
+  trackTagText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  trackArrow: {
+    fontSize: 10,
+    color: theme.colors.dark.textFaint,
   },
   sectionHeader: {
     flexDirection: 'row',
