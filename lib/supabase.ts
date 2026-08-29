@@ -41,6 +41,7 @@ export const KEYWORD_TRENDS_URL = `${supabaseUrl}/functions/v1/keyword-trends`;
 export const COMIC_SCENARIO_FUNCTION_URL = `${supabaseUrl}/functions/v1/generate-comic-scenario`;
 export const TREND_COPY_FUNCTION_URL = `${supabaseUrl}/functions/v1/trend-copy`;
 export const TTS_FUNCTION_URL = `${supabaseUrl}/functions/v1/generate-tts`;
+export const BATCH_TTS_FUNCTION_URL = `${supabaseUrl}/functions/v1/generate-batch-tts`;
 export const VIRAL_PREDICT_FUNCTION_URL = `${supabaseUrl}/functions/v1/viral-predict`;
 export const LOCALIZE_FUNCTION_URL = `${supabaseUrl}/functions/v1/translate-localize`;
 export const SHORTFORM_GUIDE_URL = `${supabaseUrl}/functions/v1/generate-shortform-guide`;

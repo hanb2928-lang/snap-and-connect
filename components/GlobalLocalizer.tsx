@@ -8,9 +8,9 @@ import {
   Platform,
 } from 'react-native';
 
-import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause, Copy, Globe as Globe2, Sparkles, ShieldCheck } from 'lucide-react-native';
+import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause, Copy, Globe as Globe2, Sparkles, ShieldCheck, Download } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { TARGET_LANGUAGES } from '@/lib/globalAffiliate';
 import { getMultilingualVoice } from '@/lib/ttsVoices';
 import { getLocalizedDisclosure } from '@/lib/disclosure';
@@ -59,6 +59,7 @@ export function GlobalLocalizer({
   const [localizations, setLocalizations] = useState<LocalizedContent[]>([]);
   const [loading, setLoading] = useState(false);
   const [ttsLoading, setTtsLoading] = useState<string | null>(null);
+  const [batchTtsLoading, setBatchTtsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [ttsResults, setTtsResults] = useState<Record<string, string>>({});
@@ -189,6 +190,66 @@ export function GlobalLocalizer({
     }
     setTtsLoading(null);
   }, []);
+
+  const handleGenerateAllTTS = useCallback(async () => {
+    if (localizations.length === 0 || batchTtsLoading) return;
+    setBatchTtsLoading(true);
+    try {
+      const items = localizations.map(loc => {
+        const mv = getMultilingualVoice(loc.languageCode);
+        return {
+          languageCode: loc.languageCode,
+          text: loc.narrationText || loc.hook,
+          voice: mv?.openaiVoice || loc.ttsVoice || 'alloy',
+          instructions: mv?.instructions,
+          speed: 1.0,
+        };
+      }).filter(item => item.text);
+      if (items.length === 0) { setBatchTtsLoading(false); return; }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const response = await fetch(BATCH_TTS_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ items }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.results && Array.isArray(data.results)) {
+          const newResults: Record<string, string> = {};
+          for (const r of data.results) {
+            if (r.audioBase64) {
+              newResults[r.languageCode] = `data:audio/mpeg;base64,${r.audioBase64}`;
+            }
+          }
+          setTtsResults(prev => ({ ...prev, ...newResults }));
+        }
+      }
+    } catch {
+      // batch TTS failed
+    }
+    setBatchTtsLoading(false);
+  }, [localizations, batchTtsLoading]);
+
+  const handleDownloadTTS = useCallback((langCode: string) => {
+    const dataUrl = ttsResults[langCode];
+    if (!dataUrl || Platform.OS !== 'web') return;
+    try {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `tts-${langCode}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      // download failed
+    }
+  }, [ttsResults]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const handlePlayTTS = useCallback(async (langCode: string) => {
@@ -328,7 +389,24 @@ export function GlobalLocalizer({
 
       {localizations.length > 0 && (
         <View style={styles.resultsBox}>
-          <Text style={styles.resultsTitle}>번역 완료 ({localizations.length}개국)</Text>
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsTitle}>번역 완료 ({localizations.length}개국)</Text>
+            <TouchableOpacity
+              style={[styles.batchTtsButton, batchTtsLoading && styles.batchTtsButtonDisabled]}
+              onPress={handleGenerateAllTTS}
+              disabled={batchTtsLoading}
+              activeOpacity={0.8}
+            >
+              {batchTtsLoading ? (
+                <ActivityIndicator size={11} color="#fff" />
+              ) : (
+                <Volume2 size={11} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.batchTtsButtonText}>
+                {batchTtsLoading ? '음성 생성 중...' : '전체 언어 음성 동시 생성'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           {localizations.map((loc) => (
             <View key={loc.languageCode} style={styles.langCard}>
               <TouchableOpacity
@@ -494,9 +572,19 @@ export function GlobalLocalizer({
                       </Text>
                     </TouchableOpacity>
                     {ttsResults[loc.languageCode] && (
-                      <View style={styles.ttsReadyBadge}>
-                        <Check size={9} color={theme.colors.success[400]} strokeWidth={2.5} />
-                        <Text style={styles.ttsReadyText}>음성 준비됨</Text>
+                      <View style={styles.ttsActions}>
+                        <View style={styles.ttsReadyBadge}>
+                          <Check size={9} color={theme.colors.success[400]} strokeWidth={2.5} />
+                          <Text style={styles.ttsReadyText}>음성 준비됨</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.ttsDownloadBtn}
+                          onPress={() => handleDownloadTTS(loc.languageCode)}
+                          activeOpacity={0.7}
+                        >
+                          <Download size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                          <Text style={styles.ttsDownloadText}>다운로드</Text>
+                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
@@ -605,6 +693,48 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  batchTtsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.success[500],
+  },
+  batchTtsButtonDisabled: {
+    opacity: 0.6,
+  },
+  batchTtsButtonText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  ttsActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ttsDownloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary[500] + '15',
+  },
+  ttsDownloadText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.primary[300],
   },
   resultsBox: {
     marginTop: theme.spacing.md,

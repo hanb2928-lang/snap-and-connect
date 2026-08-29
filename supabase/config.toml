@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.generate-tts]
 verify_jwt = false
 
+[functions.generate-batch-tts]
+verify_jwt = false
+
 [functions.generate-virtual-cuts]
 verify_jwt = false
 

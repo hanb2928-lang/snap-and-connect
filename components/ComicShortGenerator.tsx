@@ -14,7 +14,7 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil } from 'lucide-react-native';
+import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { theme } from '@/lib/theme';
@@ -23,7 +23,7 @@ import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
-import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type VoiceCategory, type TtsVoice } from '@/lib/ttsVoices';
+import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type VoiceCategory, type TtsVoice, MULTILINGUAL_VOICES, getMultilingualVoice, type MultilingualVoice } from '@/lib/ttsVoices';
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
@@ -1143,6 +1143,7 @@ export function ComicShortGenerator({
   const [selectedArtStyle, setSelectedArtStyle] = useState<ArtStyle | null>(null);
   const [voiceCategory, setVoiceCategory] = useState<VoiceCategory>('bright');
   const [selectedVoiceKey, setSelectedVoiceKey] = useState<string | null>(null);
+  const [multilingualDubLang, setMultilingualDubLang] = useState<string | null>(null);
   const [previewingVoiceKey, setPreviewingVoiceKey] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [editingPanels, setEditingPanels] = useState(false);
@@ -1434,7 +1435,20 @@ export function ComicShortGenerator({
             // use default
           }
         }
-        const voiceParams = getOpenAiVoiceParams(resolvedVoiceKey || '', resolvedSpeed);
+        let dubVoice: string;
+        let dubInstructions: string | undefined;
+        let dubSpeed: number;
+        if (multilingualDubLang) {
+          const mv = getMultilingualVoice(multilingualDubLang);
+          dubVoice = mv?.openaiVoice || 'alloy';
+          dubInstructions = mv?.instructions;
+          dubSpeed = 1.0;
+        } else {
+          const voiceParams = getOpenAiVoiceParams(resolvedVoiceKey || '', resolvedSpeed);
+          dubVoice = voiceParams.voice;
+          dubInstructions = voiceParams.instructions;
+          dubSpeed = voiceParams.speed;
+        }
         const ttsResponse = await safeFetch(TTS_FUNCTION_URL, {
           method: 'POST',
           headers: {
@@ -1443,10 +1457,10 @@ export function ComicShortGenerator({
           },
           body: JSON.stringify({
             text: narrationText,
-            voice: voiceParams.voice,
-            speed: voiceParams.speed,
+            voice: dubVoice,
+            speed: dubSpeed,
             pitch: resolvedPitch ?? 0,
-            instructions: voiceParams.instructions,
+            instructions: dubInstructions,
           }),
           timeoutMs: 15000,
         });
@@ -1522,7 +1536,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang]);
 
 
 
@@ -2042,6 +2056,35 @@ export function ComicShortGenerator({
                       </View>
                     ))}
                   </View>
+                </View>
+              )}
+
+              {ttsEnabled && (
+                <View style={styles.multilingualDubWrap}>
+                  <View style={styles.multilingualDubHeader}>
+                    <Globe size={12} color={theme.colors.primary[400]} strokeWidth={2} />
+                    <Text style={styles.multilingualDubTitle}>다국어 더빙 (글로벌 TTS)</Text>
+                  </View>
+                  <Text style={styles.multilingualDubDesc}>해당 국가 억양의 AI 성우로 내레이션을 더빙합니다. 미선택 시 한국어 성우가 적용됩니다.</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.multilingualDubScroll}>
+                    <TouchableOpacity
+                      style={[styles.multilingualDubPill, !multilingualDubLang && styles.multilingualDubPillActive]}
+                      onPress={() => setMultilingualDubLang(null)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.multilingualDubPillText, !multilingualDubLang && styles.multilingualDubPillTextActive]}>한국어 (기본)</Text>
+                    </TouchableOpacity>
+                    {MULTILINGUAL_VOICES.map((mv: MultilingualVoice) => (
+                      <TouchableOpacity
+                        key={mv.code}
+                        style={[styles.multilingualDubPill, multilingualDubLang === mv.code && styles.multilingualDubPillActive]}
+                        onPress={() => setMultilingualDubLang(mv.code)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.multilingualDubPillText, multilingualDubLang === mv.code && styles.multilingualDubPillTextActive]}>{mv.nativeName}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
 
@@ -3011,6 +3054,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+  },
+  multilingualDubWrap: {
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[500] + '20',
+  },
+  multilingualDubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  multilingualDubTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  multilingualDubDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginBottom: 8,
+    lineHeight: 14,
+  },
+  multilingualDubScroll: {
+    flexDirection: 'row',
+  },
+  multilingualDubPill: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    marginRight: 6,
+  },
+  multilingualDubPillActive: {
+    borderColor: theme.colors.primary[400],
+    backgroundColor: theme.colors.primary[500] + '20',
+  },
+  multilingualDubPillText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  multilingualDubPillTextActive: {
+    color: '#fff',
   },
   panelEditorToggleWrap: {
     marginHorizontal: theme.spacing.lg,
