@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Linking,
   Dimensions,
+  Image,
 } from 'react-native';
 import {
   Megaphone,
@@ -114,6 +115,8 @@ export default function MarketingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const [handoffMode, setHandoffMode] = useState(false);
+  const [handoffImage, setHandoffImage] = useState<string | null>(null);
+  const [handoffMime, setHandoffMime] = useState<string>('image/jpeg');
   const [shuffledTags, setShuffledTags] = useState<string[]>([]);
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(3600);
@@ -126,6 +129,14 @@ export default function MarketingScreen() {
       if (flag === 'true') {
         setHandoffMode(true);
         await setItem('marketing_handoff', 'false');
+        const img = await getItem('marketing_handoff_image');
+        const mime = await getItem('marketing_handoff_mime');
+        if (img) {
+          setHandoffImage(img);
+          setHandoffMime(mime || 'image/jpeg');
+          await setItem('marketing_handoff_image', '');
+          await setItem('marketing_handoff_mime', '');
+        }
       }
       shuffleTags();
     })();
@@ -232,6 +243,13 @@ export default function MarketingScreen() {
                 <Text style={styles.handoffHeroDesc}>
                   훅을 선택하고 마케팅 숏폼을 완성하세요
                 </Text>
+                {handoffImage && (
+                  <Image
+                    source={{ uri: `data:${handoffMime};base64,${handoffImage}` }}
+                    style={styles.handoffHeroImage}
+                    resizeMode="cover"
+                  />
+                )}
               </View>
             )}
 
@@ -556,6 +574,14 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     textAlign: 'center',
+  },
+  handoffHeroImage: {
+    width: 120,
+    height: 120,
+    borderRadius: theme.radius.md,
+    marginTop: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.warning[400] + '40',
   },
   statsRow: {
     flexDirection: 'row',

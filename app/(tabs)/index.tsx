@@ -1013,20 +1013,30 @@ export default function CameraScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.marketingCtaButton}
-          onPress={() => { setItem('marketing_handoff', 'true'); router.push('/marketing' as never); }}
+          style={styles.marketingCtaButtonLarge}
+          onPress={() => {
+            setItem('marketing_handoff', 'true');
+            if (previewCapture?.base64) {
+              setItem('marketing_handoff_image', previewCapture.base64);
+              setItem('marketing_handoff_mime', previewCapture.mimeType);
+            } else if (multiShots.length > 0) {
+              setItem('marketing_handoff_image', multiShots[0]);
+              setItem('marketing_handoff_mime', 'image/jpeg');
+            }
+            router.push('/marketing' as never);
+          }}
           activeOpacity={0.85}
         >
-          <View style={styles.marketingCtaIcon}>
-            <Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.2} />
+          <View style={styles.marketingCtaIconLarge}>
+            <Flame size={28} color={theme.colors.warning[400]} strokeWidth={2.2} />
           </View>
-          <View style={styles.marketingCtaTextWrap}>
-            <Text style={styles.marketingCtaTitle}>이 소재로 마케팅 숏폼 만들기</Text>
-            <Text style={styles.marketingCtaDesc}>
+          <View style={styles.marketingCtaTextWrapLarge}>
+            <Text style={styles.marketingCtaTitleLarge}>이 사진으로 1초 AI 마케팅 영상 만들기</Text>
+            <Text style={styles.marketingCtaDescLarge}>
               훅 선택 · 템플릿 · 카피 · TTS까지 한 번에
             </Text>
           </View>
-          <ArrowRight size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
+          <ArrowRight size={24} color={theme.colors.warning[400]} strokeWidth={2.2} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1332,7 +1342,7 @@ function WebUploadScreen() {
         <View style={styles.webGuideSection}>
           <Text style={styles.webGuideHeading}>이렇게 진행하세요</Text>
           <Text style={styles.webGuideSubheading}>
-            1번부터 4번까지 순서대로 따라 하시면 됩니다. 각 단계를 탭하면 해당 화면으로 이동합니다.
+            각 단계 카드를 탭하면 해당 편집 화면으로 이동합니다
           </Text>
           <WorkflowGuide />
         </View>
@@ -2974,17 +2984,42 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  marketingCtaButton: {
+  marketingCtaButtonLarge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.warning[500] + '15',
+    backgroundColor: theme.colors.warning[500] + '18',
+    borderRadius: theme.radius.xl,
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    gap: 16,
+    borderWidth: 2.5,
+    borderColor: theme.colors.warning[400] + '50',
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.elevated,
+  },
+  marketingCtaIconLarge: {
+    width: 56,
+    height: 56,
     borderRadius: theme.radius.lg,
-    padding: 16,
-    gap: 14,
-    borderWidth: 2,
-    borderColor: theme.colors.warning[400] + '40',
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.warning[500] + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  marketingCtaTextWrapLarge: {
+    flex: 1,
+    gap: 4,
+  },
+  marketingCtaTitleLarge: {
+    fontSize: 17,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    lineHeight: 22,
+  },
+  marketingCtaDescLarge: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
   phaseDivider: {
     flexDirection: 'row',
@@ -3013,27 +3048,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.accent[300],
-  },
-  marketingCtaIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.warning[500] + '25',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  marketingCtaTextWrap: {
-    flex: 1,
-    gap: 3,
-  },
-  marketingCtaTitle: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  marketingCtaDesc: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
   },
 });

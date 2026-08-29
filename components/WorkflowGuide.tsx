@@ -1,12 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  Camera,
-  Palette,
-  LayoutTemplate,
-  Share2,
-  ChevronRight,
-} from 'lucide-react-native';
+import { Camera, Wand as Wand2, ChevronRight } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface WorkflowStep {
@@ -29,27 +23,11 @@ const STEPS: WorkflowStep[] = [
   },
   {
     num: '2',
-    title: 'AI 자동 분석 및 스타일 선택',
-    desc: '업로드한 사진을 AI가 자동으로 분석하고, 원하시는 마케팅 템플릿 스타일을 적용하거나 변경합니다.',
-    icon: <Palette size={22} color={theme.colors.accent[400]} strokeWidth={2} />,
+    title: 'AI 이미지 보정 및 합성',
+    desc: 'AI 누끼(배경 제거), 조명 스튜디오 합성, AI 가상 피팅으로 전문 소재를 완성합니다.',
+    icon: <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2} />,
     color: theme.colors.accent[500],
     route: '/',
-  },
-  {
-    num: '3',
-    title: '콘텐츠 및 템플릿 편집',
-    desc: '추천된 템플릿을 바탕으로 문구, 상세페이지, 카드뉴스 디자인을 직접 수정하고 꾸밉니다.',
-    icon: <LayoutTemplate size={22} color={theme.colors.warning[400]} strokeWidth={2} />,
-    color: theme.colors.warning[500],
-    route: '/assets',
-  },
-  {
-    num: '4',
-    title: '제휴 링크 및 배포 관리',
-    desc: '제휴 마케팅 링크를 삽입하고, 완성된 콘텐츠를 블로그나 SNS에 바로 내보내거나 관리합니다.',
-    icon: <Share2 size={22} color={theme.colors.success[400]} strokeWidth={2} />,
-    color: theme.colors.success[500],
-    route: '/affiliate',
   },
 ];
 
@@ -73,7 +51,7 @@ export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) 
     <View style={styles.container}>
       <Text style={styles.heading}>작업 순서 가이드</Text>
       <Text style={styles.subheading}>
-        1번부터 4번까지 순서대로 따라 하시면 됩니다
+        각 카드를 탭하여 사진 촬영, AI 합성 및 보정을 진행하세요
       </Text>
 
       {STEPS.map((step, index) => {
