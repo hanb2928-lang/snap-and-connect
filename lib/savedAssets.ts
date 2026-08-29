@@ -177,3 +177,19 @@ export async function deleteSavedAsset(asset: SavedAsset): Promise<boolean> {
   await supabase.storage.from(BUCKET).remove([filePath]).catch(() => {});
   return true;
 }
+
+export async function updateAssetUploadStatus(
+  assetId: string,
+  uploadStatus: 'not_uploaded' | 'uploaded' | 'scheduled',
+  shareUrl?: string | null,
+): Promise<boolean> {
+  const update: Record<string, unknown> = { upload_status: uploadStatus };
+  if (shareUrl !== undefined) {
+    update.share_url = shareUrl;
+  }
+  const { error } = await supabase
+    .from('saved_assets')
+    .update(update)
+    .eq('id', assetId);
+  return !error;
+}

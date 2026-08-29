@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -76,6 +76,8 @@ export default function SettingsScreen() {
   const [savedPersona, setSavedPersona] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'business'>('pro');
   const [showTokenPacks, setShowTokenPacks] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [tutorialLinkInput, setTutorialLinkInput] = useState('');
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -273,6 +275,173 @@ export default function SettingsScreen() {
           })}
         </View>
       </View>
+
+      {/* Interactive Onboarding Tutorial */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>신규 유저 튜토리얼</Text>
+        <Text style={styles.sectionDesc}>
+          가상 상품 데이터로 15초 만에 '링크 입력 ➔ AI 숏폼 ➔ 공정위 문구 완성'을 직접 체험해 볼 수 있어요
+        </Text>
+        <TouchableOpacity
+          style={styles.tutorialBtn}
+          onPress={() => setTutorialStep(1)}
+          activeOpacity={0.8}
+        >
+          <Play size={18} color="#fff" strokeWidth={2} />
+          <Text style={styles.tutorialBtnText}>튜토리얼 시작하기</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Tutorial Modal */}
+      <Modal
+        visible={tutorialStep > 0}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTutorialStep(0)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.tutorialModalContent}>
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setTutorialStep(0)}
+              activeOpacity={0.7}
+            >
+              <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
+            </TouchableOpacity>
+
+            {tutorialStep === 1 && (
+              <View style={styles.tutorialStepWrap}>
+                <View style={styles.tutorialStepIndicator}>
+                  <View style={[styles.tutorialDot, styles.tutorialDotActive]} />
+                  <View style={styles.tutorialDot} />
+                  <View style={styles.tutorialDot} />
+                </View>
+                <View style={styles.tutorialIconWrap}>
+                  <Link2 size={32} color={theme.colors.primary[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.tutorialStepTitle}>1단계: 제휴 링크 입력</Text>
+                <Text style={styles.tutorialStepDesc}>
+                  가상 상품 '무선 블루투스 이어폰'의 제휴 링크를 입력해보세요. 쿠팡 파트너스 링크를 자동으로 생성하거나 직접 입력할 수 있어요.
+                </Text>
+                <View style={styles.tutorialMockCard}>
+                  <Text style={styles.tutorialMockLabel}>가상 상품</Text>
+                  <Text style={styles.tutorialMockProduct}>무선 블루투스 이어폰</Text>
+                  <Text style={styles.tutorialMockPrice}>예상가 ₩29,900</Text>
+                  <View style={styles.tutorialMockLinkRow}>
+                    <TextInput
+                      style={styles.tutorialMockInput}
+                      value={tutorialLinkInput}
+                      onChangeText={setTutorialLinkInput}
+                      placeholder="https://coupang.com/..."
+                      placeholderTextColor={theme.colors.dark.textFaint}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.tutorialMockBtn}
+                      onPress={() => {
+                        if (!tutorialLinkInput.trim()) {
+                          setTutorialLinkInput('https://coupang.com/p/1234567?ref=affiliate');
+                        }
+                        setTutorialStep(2);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Check size={16} color="#fff" strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.tutorialNextBtn}
+                  onPress={() => setTutorialStep(2)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.tutorialNextBtnText}>다음 단계</Text>
+                  <ChevronRight size={16} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {tutorialStep === 2 && (
+              <View style={styles.tutorialStepWrap}>
+                <View style={styles.tutorialStepIndicator}>
+                  <View style={[styles.tutorialDot, styles.tutorialDotDone]} />
+                  <View style={[styles.tutorialDot, styles.tutorialDotActive]} />
+                  <View style={styles.tutorialDot} />
+                </View>
+                <View style={styles.tutorialIconWrap}>
+                  <Sparkles size={32} color={theme.colors.accent[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.tutorialStepTitle}>2단계: AI 숏폼 생성</Text>
+                <Text style={styles.tutorialStepDesc}>
+                  AI가 상품 사진을 분석하고 자동으로 마케팅 카피, 만화 시나리오, 숏폼 영상 시나리오를 생성합니다.
+                </Text>
+                <View style={styles.tutorialMockCard}>
+                  <View style={styles.tutorialMockAiRow}>
+                    <Target size={14} color={theme.colors.primary[400]} strokeWidth={2} />
+                    <Text style={styles.tutorialMockAiText}>제품 분석: 무선 블루투스 이어폰 / 전자기기</Text>
+                  </View>
+                  <View style={styles.tutorialMockAiRow}>
+                    <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.tutorialMockAiText}>카피: "한 번 쓰면 못 놓는 무선 자유"</Text>
+                  </View>
+                  <View style={styles.tutorialMockAiRow}>
+                    <Film size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.tutorialMockAiText}>숏폼 시나리오: 15초 / 4컷 구성 생성됨</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.tutorialNextBtn}
+                  onPress={() => setTutorialStep(3)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.tutorialNextBtnText}>다음 단계</Text>
+                  <ChevronRight size={16} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {tutorialStep === 3 && (
+              <View style={styles.tutorialStepWrap}>
+                <View style={styles.tutorialStepIndicator}>
+                  <View style={[styles.tutorialDot, styles.tutorialDotDone]} />
+                  <View style={[styles.tutorialDot, styles.tutorialDotDone]} />
+                  <View style={[styles.tutorialDot, styles.tutorialDotActive]} />
+                </View>
+                <View style={styles.tutorialIconWrap}>
+                  <Check size={32} color={theme.colors.success[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.tutorialStepTitle}>3단계: 공정위 문구 완성</Text>
+                <Text style={styles.tutorialStepDesc}>
+                  생성된 콘텐츠에 공정거래위원회 광고 표시 문구가 자동으로 포함됩니다. 이것으로 전체 흐름이 완성됩니다.
+                </Text>
+                <View style={styles.tutorialMockCard}>
+                  <View style={styles.tutorialDisclosureBox}>
+                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                    <Text style={styles.tutorialDisclosureText}>
+                      "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+                    </Text>
+                  </View>
+                  <Text style={styles.tutorialCompleteHint}>
+                    모든 단계를 완료했습니다! 실제 제품으로 바로 시작해보세요.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.tutorialCompleteBtn}
+                  onPress={() => {
+                    setTutorialStep(0);
+                    setTutorialLinkInput('');
+                    router.push('/(tabs)/');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.tutorialCompleteBtnText}>실제 제품 분석 시작하기</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>구독 플랜 및 결제</Text>
@@ -2224,5 +2393,186 @@ const styles = StyleSheet.create({
   },
   healthBadgeStatusErr: {
     color: theme.colors.error[400],
+  },
+  modalClose: {
+    position: "absolute",
+    top: theme.spacing.md,
+    right: theme.spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  tutorialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+  },
+  tutorialBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  tutorialModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    position: 'relative',
+    ...theme.shadows.elevated,
+  },
+  tutorialStepWrap: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  tutorialStepIndicator: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  tutorialDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  tutorialDotActive: {
+    backgroundColor: theme.colors.primary[400],
+  },
+  tutorialDotDone: {
+    backgroundColor: theme.colors.success[400],
+  },
+  tutorialIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tutorialStepTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  tutorialStepDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  tutorialMockCard: {
+    width: '100%',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 14,
+    gap: 10,
+  },
+  tutorialMockLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  tutorialMockProduct: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  tutorialMockPrice: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  tutorialMockLinkRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  tutorialMockInput: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  tutorialMockBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.success[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tutorialMockAiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tutorialMockAiText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  tutorialDisclosureBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: theme.colors.success[500] + '10',
+    borderRadius: theme.radius.sm,
+    padding: 10,
+  },
+  tutorialDisclosureText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  tutorialCompleteHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    textAlign: 'center',
+  },
+  tutorialNextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  tutorialNextBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  tutorialCompleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  tutorialCompleteBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });

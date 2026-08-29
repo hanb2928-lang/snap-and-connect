@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   RefreshControl,
   Image,
+  TextInput,
 } from 'react-native';
 import {
   ChartBar as BarChart3,
@@ -34,6 +35,8 @@ import {
   Music2,
   Lightbulb,
   Award,
+  Calculator,
+  TrendingDown as TrendingDownIcon,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -90,6 +93,10 @@ export default function AnalyticsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [usingCache, setUsingCache] = useState(false);
+  const [calcClicks, setCalcClicks] = useState('');
+  const [calcCvr, setCalcCvr] = useState('3');
+  const [calcCommission, setCalcCommission] = useState('3000');
+  const prevNonEmpty = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -138,6 +145,74 @@ export default function AnalyticsScreen() {
   const maxDailyClicks = useMemo(() => {
     if (!data || data.dailyClicks.length === 0) return 1;
     return Math.max(...data.dailyClicks.map((d) => d.clicks), 1);
+  }, [data]);
+
+  const calcEstimatedEarnings = useMemo(() => {
+    const clicks = parseFloat(calcClicks) || 0;
+    const cvr = parseFloat(calcCvr) || 0;
+    const commission = parseFloat(calcCommission) || 0;
+    const conversions = clicks * (cvr / 100);
+    return Math.round(conversions * commission);
+  }, [calcClicks, calcCvr, calcCommission]);
+
+  const autoInsights = useMemo(() => {
+    if (!data) return [];
+    const insights: { icon: typeof Lightbulb; color: string; text: string }[] = [];
+    if (data.styleInsights.length > 0) {
+      const top = data.styleInsights.find((s) => s.isTopPerformer);
+      const others = data.styleInsights.filter((s) => !s.isTopPerformer);
+      if (top && others.length > 0) {
+        const avgOtherCtr = others.reduce((sum, s) => sum + s.avgCtr, 0) / others.length;
+        const diff = top.avgCtr - avgOtherCtr;
+        if (diff > 0 && avgOtherCtr > 0) {
+          const pct = Math.round((diff / avgOtherCtr) * 100);
+          insights.push({
+            icon: Lightbulb,
+            color: theme.colors.warning[400],
+            text: `${top.label} 스타일이 다른 스타일보다 클릭률이 ${pct}% 높습니다. 이 스타일을 우선적으로 제작해보세요.`,
+          });
+        }
+      }
+    }
+    if (data.dailyClicks.length >= 7) {
+      const hourBuckets: Record<number, number> = {};
+      data.dailyClicks.forEach((d) => {
+        const hour = new Date(d.date).getHours();
+        hourBuckets[hour] = (hourBuckets[hour] || 0) + d.clicks;
+      });
+      const sorted = Object.entries(hourBuckets).sort((a, b) => b[1] - a[1]);
+      if (sorted.length > 0 && sorted[0][1] > 0) {
+        const bestHour = parseInt(sorted[0][0], 10);
+        insights.push({
+          icon: Clock,
+          color: theme.colors.primary[400],
+          text: `${bestHour}시 전후에 업로드된 링크의 클릭이 가장 많습니다. 이 시간대에 공유하면 전환율이 더 좋을 수 있습니다.`,
+        });
+      }
+    }
+    if (data.totalClicks > 0 && data.totalRevenue > 0) {
+      const revPerClick = Math.round(data.totalRevenue / data.totalClicks);
+      insights.push({
+        icon: DollarSign,
+        color: theme.colors.success[400],
+        text: `현재 클릭당 평균 수익은 ${formatKRW(revPerClick)}입니다. 클릭 수를 늘리면 예상 수익이 선형적으로 증가합니다.`,
+      });
+    }
+    if (data.totalScans > 0 && data.totalAssets === 0) {
+      insights.push({
+        icon: Target,
+        color: theme.colors.accent[400],
+        text: `${data.totalScans}개의 제품을 분석했지만 아직 콘텐츠가 없습니다. 분석 후 콘텐츠를 제작하면 클릭과 수익으로 이어집니다.`,
+      });
+    }
+    if (data.totalAssets > 0 && data.totalClicks === 0) {
+      insights.push({
+        icon: MousePointerClick,
+        color: theme.colors.warning[400],
+        text: `${data.totalAssets}개의 콘텐츠를 만들었지만 아직 클릭이 없습니다. 제휴 링크를 연결하고 공유해보세요.`,
+      });
+    }
+    return insights;
   }, [data]);
 
   if (loading) {
@@ -463,6 +538,85 @@ export default function AnalyticsScreen() {
               </View>
             </View>
           )}
+
+          {/* AI Auto-Insight Report */}
+          {autoInsights.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.sectionLabel}>AI 오토 인사이트 리포트</Text>
+              </View>
+              <View style={styles.autoInsightCard}>
+                {autoInsights.map((insight, i) => {
+                  const Icon = insight.icon;
+                  return (
+                    <View key={i} style={styles.autoInsightRow}>
+                      <View style={[styles.autoInsightIcon, { backgroundColor: insight.color + '20' }]}>
+                        <Icon size={14} color={insight.color} strokeWidth={2} />
+                      </View>
+                      <Text style={styles.autoInsightText}>{insight.text}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Earnings Calculator */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Calculator size={14} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={styles.sectionLabel}>수익 추정 계산기</Text>
+            </View>
+            <View style={styles.calcCard}>
+              <View style={styles.calcInputRow}>
+                <View style={styles.calcInputCol}>
+                  <Text style={styles.calcInputLabel}>예상 클릭 수</Text>
+                  <TextInput
+                    style={styles.calcInput}
+                    value={calcClicks}
+                    onChangeText={setCalcClicks}
+                    placeholder="100"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.calcInputCol}>
+                  <Text style={styles.calcInputLabel}>전환율 (%)</Text>
+                  <TextInput
+                    style={styles.calcInput}
+                    value={calcCvr}
+                    onChangeText={setCalcCvr}
+                    placeholder="3"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              <View style={styles.calcInputRow}>
+                <View style={styles.calcInputColFull}>
+                  <Text style={styles.calcInputLabel}>건당 수수료 (원)</Text>
+                  <TextInput
+                    style={styles.calcInput}
+                    value={calcCommission}
+                    onChangeText={setCalcCommission}
+                    placeholder="3000"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              <View style={styles.calcResultRow}>
+                <Text style={styles.calcResultLabel}>예상 제휴 수수료</Text>
+                <Text style={styles.calcResultValue}>{formatKRW(calcEstimatedEarnings)}</Text>
+              </View>
+              {calcEstimatedEarnings > 0 && (
+                <Text style={styles.calcHint}>
+                  {parseFloat(calcClicks) || 0}클릭 x {parseFloat(calcCvr) || 0}% 전환 = {Math.round((parseFloat(calcClicks) || 0) * (parseFloat(calcCvr) || 0) / 100)}건 x {formatKRW(parseFloat(calcCommission) || 0)}
+                </Text>
+              )}
+            </View>
+          </View>
 
           {/* Top performing content */}
           {d.topContent.length > 0 && (
@@ -1126,5 +1280,92 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  autoInsightCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  autoInsightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
+  },
+  autoInsightIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  autoInsightText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 17,
+  },
+  calcCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  calcInputRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  calcInputCol: {
+    flex: 1,
+  },
+  calcInputColFull: {
+    flex: 1,
+  },
+  calcInputLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 4,
+  },
+  calcInput: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+  },
+  calcResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.success[500] + '10',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 14,
+  },
+  calcResultLabel: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  calcResultValue: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
+  },
+  calcHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'center',
   },
 });

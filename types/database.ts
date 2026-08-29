@@ -164,6 +164,8 @@ export interface SavedAsset {
   thumbnail_url: string | null;
   platform: string | null;
   affiliate_platform: string | null;
+  upload_status: 'not_uploaded' | 'uploaded' | 'scheduled';
+  share_url: string | null;
   created_at: string;
 }
 

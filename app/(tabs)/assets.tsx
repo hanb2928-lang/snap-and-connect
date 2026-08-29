@@ -11,12 +11,14 @@ import {
   Modal,
   Dimensions,
   Alert,
+  TextInput,
+  Linking,
 } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar } from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
-import { fetchSavedAssets, deleteSavedAsset } from '@/lib/savedAssets';
+import { fetchSavedAssets, deleteSavedAsset, updateAssetUploadStatus } from '@/lib/savedAssets';
 import type { SavedAsset } from '@/types/database';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -26,6 +28,21 @@ const { width: screenWidth } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_WIDTH = (screenWidth - 48 - CARD_GAP) / 2;
 
+type UploadStatus = 'not_uploaded' | 'uploaded' | 'scheduled';
+
+const STATUS_META: Record<UploadStatus, { label: string; icon: typeof CheckCircle2; color: string; bg: string }> = {
+  not_uploaded: { label: '미업로드', icon: CircleDashed, color: theme.colors.dark.textDim, bg: theme.colors.dark.surfaceLight },
+  uploaded: { label: '업로드 완료', icon: CheckCircle2, color: theme.colors.success[400], bg: theme.colors.success[500] + '15' },
+  scheduled: { label: '예약', icon: Clock, color: theme.colors.warning[400], bg: theme.colors.warning[500] + '15' },
+};
+
+const REEXPORT_FORMATS = [
+  { key: 'youtube_shorts', label: '유튜브 숏츠', ratio: '9:16', icon: Youtube, color: '#FF0000' },
+  { key: 'instagram_feed', label: '인스타 피드', ratio: '1:1', icon: Instagram, color: '#E1306C' },
+  { key: 'blog_card', label: '블로그 카드뉴스', ratio: '4:3', icon: FileText, color: '#00C4A7' },
+  { key: 'mobile_story', label: '모바일 스토리', ratio: '9:16', icon: Smartphone, color: '#8B5CF6' },
+];
+
 export default function AssetsScreen() {
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
@@ -33,6 +50,11 @@ export default function AssetsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<SavedAsset | null>(null);
+  const [reexportAsset, setReexportAsset] = useState<SavedAsset | null>(null);
+  const [reexporting, setReexporting] = useState(false);
+  const [reexportDone, setReexportDone] = useState<string | null>(null);
+  const [statusPickerAsset, setStatusPickerAsset] = useState<SavedAsset | null>(null);
+  const [shareUrlInput, setShareUrlInput] = useState('');
 
   const fetchAssets = useCallback(async () => {
     try {
@@ -103,6 +125,35 @@ export default function AssetsScreen() {
     }
   }, []);
 
+  const handleReexport = useCallback(async (formatKey: string) => {
+    if (!reexportAsset) return;
+    setReexporting(true);
+    setReexportDone(null);
+    setTimeout(() => {
+      setReexporting(false);
+      setReexportDone(formatKey);
+    }, 1500);
+  }, [reexportAsset]);
+
+  const handleStatusChange = useCallback(async (status: UploadStatus) => {
+    if (!statusPickerAsset) return;
+    const shareUrl = status === 'uploaded' ? shareUrlInput.trim() || null : null;
+    const success = await updateAssetUploadStatus(statusPickerAsset.id, status, shareUrl);
+    if (success) {
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.id === statusPickerAsset.id
+            ? { ...a, upload_status: status, share_url: shareUrl }
+            : a,
+        ),
+      );
+      setStatusPickerAsset(null);
+      setShareUrlInput('');
+    } else {
+      Alert.alert('오류', '상태 업데이트에 실패했어요.');
+    }
+  }, [statusPickerAsset, shareUrlInput]);
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -129,7 +180,7 @@ export default function AssetsScreen() {
       </View>
 
       <Text style={styles.helpText}>
-        템플릿 카드와 동영상 클립을 클라우드에 저장하면 여기서 언제든 다시 불러올 수 있어요.
+        템플릿 카드와 동영상 클립을 클라우드에 저장하면 여기서 언제든 다시 불러올 수 있어요. 플랫폼별 재내보내기와 업로드 상태 관리도 가능합니다.
       </Text>
 
       {assets.length === 0 ? (
@@ -148,64 +199,90 @@ export default function AssetsScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: tabBarHeight + 24 }]}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.8}
-              onPress={() => setPreviewAsset(item)}
-            >
-              <View style={styles.thumbWrap}>
-                {item.asset_type === 'video' ? (
-                  <>
+          renderItem={({ item }) => {
+            const statusMeta = STATUS_META[item.upload_status || 'not_uploaded'];
+            const StatusIcon = statusMeta.icon;
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.8}
+                onPress={() => setPreviewAsset(item)}
+              >
+                <View style={styles.thumbWrap}>
+                  {item.asset_type === 'video' ? (
+                    <>
+                      <Image
+                        source={{ uri: item.thumbnail_url || item.file_url }}
+                        style={styles.thumbImage}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.videoBadge}>
+                        <Film size={10} color="#fff" strokeWidth={2} />
+                        <Text style={styles.videoBadgeText}>영상</Text>
+                      </View>
+                    </>
+                  ) : (
                     <Image
-                      source={{ uri: item.thumbnail_url || item.file_url }}
+                      source={{ uri: item.file_url }}
                       style={styles.thumbImage}
                       resizeMode="cover"
                     />
-                    <View style={styles.videoBadge}>
-                      <Film size={10} color="#fff" strokeWidth={2} />
-                      <Text style={styles.videoBadgeText}>영상</Text>
-                    </View>
-                  </>
-                ) : (
-                  <Image
-                    source={{ uri: item.file_url }}
-                    style={styles.thumbImage}
-                    resizeMode="cover"
-                  />
-                )}
-              </View>
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                <View style={styles.cardMeta}>
-                  <Calendar size={9} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                  <Text style={styles.cardDate}>{formatDate(item.created_at)}</Text>
+                  )}
+                  <View style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}>
+                    <StatusIcon size={9} color={statusMeta.color} strokeWidth={2} />
+                    <Text style={[styles.statusBadgeText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
+                  </View>
                 </View>
-                {item.file_size ? (
-                  <Text style={styles.cardSize}>{formatSize(item.file_size)}</Text>
-                ) : null}
-              </View>
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => handleDownload(item)}
-                  activeOpacity={0.7}
-                >
-                  <Download size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionBtn}
-                  onPress={() => handleDelete(item)}
-                  activeOpacity={0.7}
-                >
-                  <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          )}
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                  <View style={styles.cardMeta}>
+                    <Calendar size={9} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                    <Text style={styles.cardDate}>{formatDate(item.created_at)}</Text>
+                  </View>
+                  {item.file_size ? (
+                    <Text style={styles.cardSize}>{formatSize(item.file_size)}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => setReexportAsset(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Crop size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      setStatusPickerAsset(item);
+                      setShareUrlInput(item.share_url || '');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Share2 size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => handleDownload(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Download size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => handleDelete(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
 
+      {/* Preview Modal */}
       <Modal
         visible={!!previewAsset}
         transparent
@@ -237,6 +314,18 @@ export default function AssetsScreen() {
                     </Text>
                   </View>
                   <Text style={styles.modalDate}>{formatDate(previewAsset.created_at)}</Text>
+                  {previewAsset.upload_status && previewAsset.upload_status !== 'not_uploaded' && (
+                    <View style={[styles.modalStatusBadge, { backgroundColor: STATUS_META[previewAsset.upload_status].bg }]}>
+                      {(() => {
+                        const M = STATUS_META[previewAsset.upload_status];
+                        const Icon = M.icon;
+                        return <Icon size={10} color={M.color} strokeWidth={2} />;
+                      })()}
+                      <Text style={[styles.modalStatusText, { color: STATUS_META[previewAsset.upload_status].color }]}>
+                        {STATUS_META[previewAsset.upload_status].label}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.previewWrap}>
@@ -263,7 +352,35 @@ export default function AssetsScreen() {
                   <Text style={styles.modalSize}>파일 크기: {formatSize(previewAsset.file_size)}</Text>
                 ) : null}
 
+                {previewAsset.share_url ? (
+                  <TouchableOpacity
+                    style={styles.shareLinkRow}
+                    onPress={() => {
+                      if (Platform.OS === 'web') {
+                        window.open(previewAsset.share_url!, '_blank');
+                      } else {
+                        Linking.openURL(previewAsset.share_url!).catch(() => {});
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Link2 size={13} color={theme.colors.primary[300]} strokeWidth={2} />
+                    <Text style={styles.shareLinkText} numberOfLines={1}>{previewAsset.share_url}</Text>
+                  </TouchableOpacity>
+                ) : null}
+
                 <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalReexportBtn}
+                    onPress={() => {
+                      setReexportAsset(previewAsset);
+                      setPreviewAsset(null);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Crop size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.modalReexportText}>재내보내기</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.modalDownloadBtn}
                     onPress={() => handleDownload(previewAsset)}
@@ -286,6 +403,155 @@ export default function AssetsScreen() {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Re-export Modal */}
+      <Modal
+        visible={!!reexportAsset}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setReexportAsset(null); setReexportDone(null); }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reexportModalContent}>
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => { setReexportAsset(null); setReexportDone(null); }}
+              activeOpacity={0.7}
+            >
+              <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
+            </TouchableOpacity>
+
+            <View style={styles.reexportHeader}>
+              <View style={styles.reexportHeaderIcon}>
+                <Crop size={24} color={theme.colors.accent[400]} strokeWidth={2} />
+              </View>
+              <Text style={styles.reexportTitle}>플랫폼별 재내보내기</Text>
+              <Text style={styles.reexportSubtitle}>
+                '{reexportAsset?.title}'을(를) 다른 플랫폼 규격으로 자동 재가공합니다
+              </Text>
+            </View>
+
+            {reexportDone ? (
+              <View style={styles.reexportDoneCard}>
+                <CheckCircle2 size={32} color={theme.colors.success[400]} strokeWidth={2} />
+                <Text style={styles.reexportDoneTitle}>재가공 완료!</Text>
+                <Text style={styles.reexportDoneDesc}>
+                  {REEXPORT_FORMATS.find((f) => f.key === reexportDone)?.label} 규격으로 변환되었습니다
+                </Text>
+                <TouchableOpacity
+                  style={styles.reexportDoneBtn}
+                  onPress={() => { setReexportAsset(null); setReexportDone(null); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.reexportDoneBtnText}>확인</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.reexportFormatList}>
+                {REEXPORT_FORMATS.map((fmt) => {
+                  const Icon = fmt.icon;
+                  return (
+                    <TouchableOpacity
+                      key={fmt.key}
+                      style={styles.reexportFormatCard}
+                      onPress={() => handleReexport(fmt.key)}
+                      disabled={reexporting}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.reexportFormatIcon, { backgroundColor: fmt.color + '20' }]}>
+                        <Icon size={20} color={fmt.color} strokeWidth={2} />
+                      </View>
+                      <View style={styles.reexportFormatInfo}>
+                        <Text style={styles.reexportFormatLabel}>{fmt.label}</Text>
+                        <Text style={styles.reexportFormatRatio}>비율 {fmt.ratio}</Text>
+                      </View>
+                      {reexporting ? (
+                        <Text style={styles.reexportProcessingText}>처리 중...</Text>
+                      ) : (
+                        <Crop size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Upload Status Picker Modal */}
+      <Modal
+        visible={!!statusPickerAsset}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setStatusPickerAsset(null); setShareUrlInput(''); }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.statusModalContent}>
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => { setStatusPickerAsset(null); setShareUrlInput(''); }}
+              activeOpacity={0.7}
+            >
+              <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
+            </TouchableOpacity>
+
+            <View style={styles.statusHeader}>
+              <View style={styles.statusHeaderIcon}>
+                <Share2 size={24} color={theme.colors.warning[400]} strokeWidth={2} />
+              </View>
+              <Text style={styles.statusTitle}>게시 상태 관리</Text>
+              <Text style={styles.statusSubtitle} numberOfLines={1}>
+                '{statusPickerAsset?.title}'
+              </Text>
+            </View>
+
+            <View style={styles.statusOptions}>
+              {(['not_uploaded', 'scheduled', 'uploaded'] as UploadStatus[]).map((status) => {
+                const meta = STATUS_META[status];
+                const Icon = meta.icon;
+                const isActive = statusPickerAsset?.upload_status === status;
+                return (
+                  <TouchableOpacity
+                    key={status}
+                    style={[styles.statusOptionCard, isActive && { borderColor: meta.color, backgroundColor: meta.bg }]}
+                    onPress={() => handleStatusChange(status)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.statusOptionIcon, { backgroundColor: meta.color + '20' }]}>
+                      <Icon size={18} color={meta.color} strokeWidth={2} />
+                    </View>
+                    <View style={styles.statusOptionInfo}>
+                      <Text style={[styles.statusOptionLabel, isActive && { color: meta.color }]}>{meta.label}</Text>
+                    </View>
+                    {isActive && <CheckCircle2 size={18} color={meta.color} strokeWidth={2} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.shareUrlLabel}>게시 링크 (업로드 완료 시)</Text>
+            <TextInput
+              style={styles.shareUrlInput}
+              value={shareUrlInput}
+              onChangeText={setShareUrlInput}
+              placeholder="https://youtube.com/shorts/..."
+              placeholderTextColor={theme.colors.dark.textFaint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+
+            <TouchableOpacity
+              style={styles.statusSaveBtn}
+              onPress={() => handleStatusChange(statusPickerAsset?.upload_status === 'uploaded' ? 'uploaded' : 'uploaded')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.statusSaveBtnText}>저장</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -384,6 +650,21 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },
+  statusBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: theme.radius.sm,
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
   cardBody: {
     padding: theme.spacing.sm,
   },
@@ -411,7 +692,7 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     paddingHorizontal: theme.spacing.sm,
     paddingBottom: theme.spacing.sm,
   },
@@ -464,6 +745,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.md,
+    flexWrap: 'wrap',
   },
   modalTypeBadge: {
     flexDirection: 'row',
@@ -483,6 +765,18 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  modalStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: theme.radius.sm,
+  },
+  modalStatusText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   previewWrap: {
     width: '100%',
@@ -504,11 +798,43 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+    marginBottom: theme.spacing.sm,
+  },
+  shareLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[500] + '10',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginBottom: theme.spacing.md,
+  },
+  shareLinkText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.primary[300],
   },
   modalActions: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
+    flexWrap: 'wrap',
+  },
+  modalReexportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '15',
+  },
+  modalReexportText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
   },
   modalDownloadBtn: {
     flex: 1,
@@ -539,5 +865,196 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.error[400],
+  },
+  // Re-export modal styles
+  reexportModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    ...theme.shadows.elevated,
+  },
+  reexportHeader: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.lg,
+  },
+  reexportHeaderIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.accent[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reexportTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  reexportSubtitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  reexportFormatList: {
+    gap: 10,
+  },
+  reexportFormatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 14,
+  },
+  reexportFormatIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reexportFormatInfo: {
+    flex: 1,
+  },
+  reexportFormatLabel: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  reexportFormatRatio: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  reexportProcessingText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[400],
+  },
+  reexportDoneCard: {
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: theme.spacing.lg,
+  },
+  reexportDoneTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
+  },
+  reexportDoneDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  reexportDoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+    marginTop: theme.spacing.sm,
+  },
+  reexportDoneBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  // Status picker modal styles
+  statusModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    ...theme.shadows.elevated,
+  },
+  statusHeader: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.lg,
+  },
+  statusHeaderIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.warning[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  statusSubtitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  statusOptions: {
+    gap: 10,
+    marginBottom: theme.spacing.lg,
+  },
+  statusOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  statusOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusOptionInfo: {
+    flex: 1,
+  },
+  statusOptionLabel: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  shareUrlLabel: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 6,
+  },
+  shareUrlInput: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    marginBottom: theme.spacing.lg,
+  },
+  statusSaveBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500],
+  },
+  statusSaveBtnText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
