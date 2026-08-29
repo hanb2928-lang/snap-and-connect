@@ -121,8 +121,8 @@ describe('generateAffiliateLinks', () => {
 });
 
 describe('generateAffiliateLinkForMatch', () => {
-  it('쿠팡 URL에 파트너 ID를 추가한다', () => {
-    const result = generateAffiliateLinkForMatch(
+  it('쿠팡 URL에 파트너 ID를 추가한다', async () => {
+    const result = await generateAffiliateLinkForMatch(
       'https://www.coupang.com/vp/123',
       'Coupang',
       fullSettings,
@@ -130,8 +130,8 @@ describe('generateAffiliateLinkForMatch', () => {
     expect(result).toContain('partner=mypartner123');
   });
 
-  it('이미 쿼리 파라미터가 있으면 &로 연결한다', () => {
-    const result = generateAffiliateLinkForMatch(
+  it('이미 쿼리 파라미터가 있으면 &로 연결한다', async () => {
+    const result = await generateAffiliateLinkForMatch(
       'https://www.coupang.com/vp/123?channel=abc',
       'Coupang',
       fullSettings,
@@ -139,8 +139,8 @@ describe('generateAffiliateLinkForMatch', () => {
     expect(result).toContain('&partner=mypartner123');
   });
 
-  it('네이버 쇼핑 URL에 nsh 파라미터를 추가한다', () => {
-    const result = generateAffiliateLinkForMatch(
+  it('네이버 쇼핑 URL에 nsh 파라미터를 추가한다', async () => {
+    const result = await generateAffiliateLinkForMatch(
       'https://search.shopping.naver.com/search/all?query=shoes',
       'BrandConnect',
       fullSettings,
@@ -148,8 +148,8 @@ describe('generateAffiliateLinkForMatch', () => {
     expect(result).toContain('nsh=navershop456');
   });
 
-  it('설정이 없으면 원본 URL을 그대로 반환한다', () => {
+  it('설정이 없으면 원본 URL을 그대로 반환한다', async () => {
     const url = 'https://www.coupang.com/vp/123';
-    expect(generateAffiliateLinkForMatch(url, 'Coupang', null)).toBe(url);
+    expect(await generateAffiliateLinkForMatch(url, 'Coupang', null)).toBe(url);
   });
 });

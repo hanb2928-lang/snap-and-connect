@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
@@ -42,6 +42,14 @@ import {
   AVAILABLE_RATIOS,
   type ManagedPlatform,
 } from '@/lib/platformManager';
+import {
+  fetchAffiliatePlatforms,
+  updateAffiliatePlatformId,
+  toggleAffiliatePlatformEnabled,
+  addCustomAffiliatePlatform,
+  deleteCustomAffiliatePlatform,
+  type ManagedAffiliatePlatform,
+} from '@/lib/affiliatePlatformManager';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -104,6 +112,15 @@ export default function SettingsScreen() {
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformRatio, setNewPlatformRatio] = useState<string>('9:16');
   const [addingPlatform, setAddingPlatform] = useState(false);
+  const [affiliatePlatforms, setAffiliatePlatforms] = useState<ManagedAffiliatePlatform[]>([]);
+  const [affiliatePlatformsLoading, setAffiliatePlatformsLoading] = useState(true);
+  const [editingAffiliateId, setEditingAffiliateId] = useState<string | null>(null);
+  const [editingAffiliateValue, setEditingAffiliateValue] = useState('');
+  const [showAddAffiliate, setShowAddAffiliate] = useState(false);
+  const [newAffName, setNewAffName] = useState('');
+  const [newAffId, setNewAffId] = useState('');
+  const [newAffParam, setNewAffParam] = useState('');
+  const [addingAffiliate, setAddingAffiliate] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -159,6 +176,19 @@ export default function SettingsScreen() {
   }, []);
 
   useEffect(() => { loadPlatforms(); }, [loadPlatforms]);
+
+  const loadAffiliatePlatforms = useCallback(async () => {
+    setAffiliatePlatformsLoading(true);
+    try {
+      const data = await fetchAffiliatePlatforms();
+      setAffiliatePlatforms(data);
+    } catch {
+      setAffiliatePlatforms([]);
+    }
+    setAffiliatePlatformsLoading(false);
+  }, []);
+
+  useEffect(() => { loadAffiliatePlatforms(); }, [loadAffiliatePlatforms]);
 
   const loadCredits = useCallback(async () => {
     try {
@@ -243,10 +273,71 @@ export default function SettingsScreen() {
       });
       setSavedIds(true);
       setTimeout(() => setSavedIds(false), 2500);
+      await loadAffiliatePlatforms();
     } catch (err) {
       Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
     }
     setSavingIds(false);
+  };
+
+  const handleSaveAffiliateId = async (id: string) => {
+    try {
+      await updateAffiliatePlatformId(id, editingAffiliateValue);
+      setEditingAffiliateId(null);
+      await loadAffiliatePlatforms();
+    } catch {
+      Alert.alert('오류', '파트너스 ID 저장에 실패했습니다.');
+    }
+  };
+
+  const handleToggleAffiliate = async (id: string, enabled: boolean) => {
+    try {
+      await toggleAffiliatePlatformEnabled(id, enabled);
+      setAffiliatePlatforms((prev) => prev.map((p) => p.id === id ? { ...p, is_enabled: enabled } : p));
+    } catch {
+      Alert.alert('오류', '플랫폼 설정 변경에 실패했습니다.');
+    }
+  };
+
+  const handleAddAffiliate = async () => {
+    if (!newAffName.trim()) {
+      Alert.alert('입력 필요', '플랫폼 이름을 입력해주세요.');
+      return;
+    }
+    setAddingAffiliate(true);
+    try {
+      await addCustomAffiliatePlatform({
+        label: newAffName.trim(),
+        partnersId: newAffId.trim(),
+        trackingParam: newAffParam.trim(),
+      });
+      setNewAffName('');
+      setNewAffId('');
+      setNewAffParam('');
+      setShowAddAffiliate(false);
+      await loadAffiliatePlatforms();
+    } catch {
+      Alert.alert('오류', '제휴 플랫폼 추가에 실패했습니다.');
+    }
+    setAddingAffiliate(false);
+  };
+
+  const handleDeleteAffiliate = (id: string) => {
+    Alert.alert('삭제', '이 커스텀 제휴 플랫폼을 삭제하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteCustomAffiliatePlatform(id);
+            await loadAffiliatePlatforms();
+          } catch {
+            Alert.alert('오류', '삭제에 실패했습니다.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleUploadLogo = async () => {
@@ -863,6 +954,159 @@ export default function SettingsScreen() {
           >
             <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
             <Text style={styles.addPlatformBtnText}>커스텀 플랫폼 추가</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Affiliate Marketing Platform Management */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>제휴 마케팅 플랫폼 관리</Text>
+        <Text style={styles.sectionDesc}>
+          제휴사 파트너스 ID를 등록하고 플랫폼을 켜고 끌 수 있습니다. 등록된 ID는 제휴쇼핑 탭과 마케팅 숏폼 생성 시 자동으로 추적 코드로 결합됩니다.
+        </Text>
+
+        {affiliatePlatformsLoading ? (
+          <ActivityIndicator size="small" color={theme.colors.primary[400]} style={{ marginVertical: 16 }} />
+        ) : (
+          <View style={styles.card}>
+            {affiliatePlatforms.map((p, idx) => (
+              <View key={p.id} style={[styles.affPlatformRow, idx > 0 && styles.affPlatformRowBorder]}>
+                <View style={[styles.platformMgmtIcon, { backgroundColor: p.color + '20' }]}>
+                  <ShoppingBag size={16} color={p.color} strokeWidth={2} />
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.affPlatformLabel}>{p.label}</Text>
+                    {!p.is_builtin && (
+                      <View style={styles.affCustomBadge}>
+                        <Text style={styles.affCustomBadgeText}>커스텀</Text>
+                      </View>
+                    )}
+                  </View>
+                  {editingAffiliateId === p.id ? (
+                    <View style={styles.affEditRow}>
+                      <TextInput
+                        style={styles.affEditInput}
+                        value={editingAffiliateValue}
+                        onChangeText={setEditingAffiliateValue}
+                        placeholder="파트너스 ID 입력"
+                        placeholderTextColor={theme.colors.dark.textFaint}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={styles.affEditSaveBtn}
+                        onPress={() => handleSaveAffiliateId(p.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Check size={14} color="#fff" strokeWidth={2.5} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => { setEditingAffiliateId(p.id); setEditingAffiliateValue(p.partners_id); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.affIdText}>
+                        {p.hasId ? `ID: ${p.partners_id}` : '파트너스 ID 미설정 — 탭하여 입력'}
+                      </Text>
+                      {p.tracking_param ? (
+                        <Text style={styles.affParamText}>추적 파라미터: {p.tracking_param}</Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {!p.is_builtin && (
+                  <TouchableOpacity
+                    style={styles.platformMgmtDelete}
+                    onPress={() => handleDeleteAffiliate(p.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={() => handleToggleAffiliate(p.id, !p.is_enabled)}
+                  activeOpacity={0.7}
+                  hitSlop={12}
+                >
+                  <View style={[styles.toggleSwitch, p.is_enabled && styles.toggleSwitchActive]}>
+                    <View style={[styles.toggleKnob, p.is_enabled && styles.toggleKnobActive]} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {showAddAffiliate ? (
+          <View style={styles.card}>
+            <Text style={styles.idInputLabel}>플랫폼 이름</Text>
+            <TextInput
+              style={styles.idInput}
+              value={newAffName}
+              onChangeText={setNewAffName}
+              placeholder="예: 11번가 제휴, 카카오채널 등"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              maxLength={20}
+            />
+            <View style={{ height: 12 }} />
+            <Text style={styles.idInputLabel}>파트너스 ID</Text>
+            <TextInput
+              style={styles.idInput}
+              value={newAffId}
+              onChangeText={setNewAffId}
+              placeholder="제휴사에서 발급받은 ID"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={{ height: 12 }} />
+            <Text style={styles.idInputLabel}>추적 URL 파라미터</Text>
+            <TextInput
+              style={styles.idInput}
+              value={newAffParam}
+              onChangeText={setNewAffParam}
+              placeholder="예: partner, tag, aff_id, ref 등"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={styles.affParamHint}>상품 URL 뒤에 ?파라미터=ID 형태로 자동 추가됩니다</Text>
+            <View style={styles.addPlatformActions}>
+              <TouchableOpacity
+                style={styles.addPlatformCancelBtn}
+                onPress={() => { setShowAddAffiliate(false); setNewAffName(''); setNewAffId(''); setNewAffParam(''); }}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.addPlatformCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveIdButton, { flex: 1 }, addingAffiliate && { opacity: 0.5 }]}
+                onPress={handleAddAffiliate}
+                disabled={addingAffiliate}
+                activeOpacity={0.8}
+              >
+                {addingAffiliate ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Check size={18} color="#fff" strokeWidth={2} />
+                    <Text style={styles.saveIdButtonText}>추가</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addPlatformBtn}
+            onPress={() => setShowAddAffiliate(true)}
+            activeOpacity={0.8}
+          >
+            <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.addPlatformBtnText}>커스텀 제휴 플랫폼 추가</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -2980,5 +3224,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
+  },
+  affPlatformRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  affPlatformRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+  },
+  affPlatformLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  affCustomBadge: {
+    backgroundColor: theme.colors.primary[500] + '20',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  affCustomBadgeText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  affIdText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  affParamText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 2,
+  },
+  affEditRow: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+  },
+  affEditInput: {
+    flex: 1,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  affEditSaveBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.success[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  affParamHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 4,
   },
 });

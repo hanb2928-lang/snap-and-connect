@@ -1,5 +1,6 @@
 import type { AnalysisResult, AffiliateLink, UserSettings } from '@/types/database';
 import { detectAffiliatePlatform } from '@/lib/affiliateLinkSmart';
+import { fetchAffiliatePlatforms, injectTrackingCode, findPlatformByUrl } from '@/lib/affiliatePlatformManager';
 
 export function isCoupangUrl(url: string): boolean {
   return /coupang\.com/i.test(url);
@@ -144,11 +145,11 @@ export function generateAffiliateLinks(
   return links;
 }
 
-export function generateAffiliateLinkForMatch(
+export async function generateAffiliateLinkForMatch(
   matchUrl: string,
   platform: string,
   settings: UserSettings | null,
-): string {
+): Promise<string> {
   if (settings?.coupang_partners_id && isCoupangUrl(matchUrl)) {
     const sep = matchUrl.includes('?') ? '&' : '?';
     return `${matchUrl}${sep}partner=${settings.coupang_partners_id}`;
@@ -160,5 +161,24 @@ export function generateAffiliateLinkForMatch(
   if (settings?.toss_share_id && isTossUrl(matchUrl)) {
     return `https://sharelink.toss.im/${settings.toss_share_id}`;
   }
+
+  // Check managed affiliate platforms (including custom ones) from Supabase
+  try {
+    const managedPlatforms = await fetchAffiliatePlatforms();
+    const matchedPlatform = findPlatformByUrl(matchUrl, managedPlatforms);
+    if (matchedPlatform) {
+      return injectTrackingCode(matchUrl, matchedPlatform);
+    }
+    // For custom platforms not matched by URL pattern, try matching by platform key
+    const customPlatform = managedPlatforms.find(
+      (p) => p.key === platform && !p.is_builtin && p.hasId && p.is_enabled,
+    );
+    if (customPlatform) {
+      return injectTrackingCode(matchUrl, customPlatform);
+    }
+  } catch {
+    // Supabase unavailable — fall through to return original URL
+  }
+
   return matchUrl;
 }
