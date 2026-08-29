@@ -100,8 +100,6 @@ export default function SettingsScreen() {
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [savedDefaults, setSavedDefaults] = useState(false);
   const [brandPersona, setBrandPersona] = useState('');
-  const [savingPersona, setSavingPersona] = useState(false);
-  const [savedPersona, setSavedPersona] = useState(false);
   const [defaultCaptionTone, setDefaultCaptionTone] = useState<string>('casual');
   const [fixedHookPhrase, setFixedHookPhrase] = useState('');
   const [affiliatePriority, setAffiliatePriority] = useState(false);

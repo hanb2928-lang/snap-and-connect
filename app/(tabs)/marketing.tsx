@@ -210,7 +210,7 @@ export default function MarketingScreen() {
           setCaptionTone(toneMap[settings.default_caption_tone] || 'hook');
         }
         if (settings?.fixed_hook_phrase) {
-          setSelectedHook('custom');
+          await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
         }
       } catch {
         // settings load failure is non-fatal — keep preset defaults
