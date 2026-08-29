@@ -9,7 +9,6 @@ import {
   TextInput,
   Image,
   Modal,
-  Platform,
 } from 'react-native';
 import {
   Flame,
@@ -30,8 +29,6 @@ import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useI18n } from '@/hooks/useI18n';
-import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings } from '@/lib/settings';
 import { HotDealPickerModal } from '@/components/HotDealPickerModal';
@@ -60,7 +57,6 @@ export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
-  const { t } = useI18n();
   const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
   const [advancedVisible, setAdvancedVisible] = useState(false);
   const [affiliateUrl, setAffiliateUrl] = useState('');
@@ -81,6 +77,7 @@ export default function MarketingScreen() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const lastActionRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -145,27 +142,37 @@ export default function MarketingScreen() {
   };
 
   const handleStartGeneration = async () => {
+    const now = Date.now();
+    if (now - lastActionRef.current < 800) return;
+    lastActionRef.current = now;
+
     setGenerating(true);
-    await setItem('marketing_video_length', videoLength);
-    await setItem('marketing_caption_tone', captionTone);
-    await setItem('marketing_bgm_mood', bgmMood);
-    await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
-    await setItem('marketing_handoff', 'false');
     try {
-      const settings = await getUserSettings();
-      if (settings?.brand_persona) {
-        await setItem('marketing_brand_persona', settings.brand_persona);
-      }
-      if (settings?.fixed_hook_phrase) {
-        await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
-      }
-      if (settings?.affiliate_priority_mapping) {
-        await setItem('marketing_affiliate_priority', 'true');
-      } else {
-        await setItem('marketing_affiliate_priority', 'false');
-      }
-    } catch {}
-    router.push('/affiliate' as never);
+      await setItem('marketing_video_length', videoLength);
+      await setItem('marketing_caption_tone', captionTone);
+      await setItem('marketing_bgm_mood', bgmMood);
+      await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
+      await setItem('marketing_handoff', 'false');
+      try {
+        const settings = await getUserSettings();
+        if (settings?.brand_persona) {
+          await setItem('marketing_brand_persona', settings.brand_persona);
+        }
+        if (settings?.fixed_hook_phrase) {
+          await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
+        }
+        if (settings?.affiliate_priority_mapping) {
+          await setItem('marketing_affiliate_priority', 'true');
+        } else {
+          await setItem('marketing_affiliate_priority', 'false');
+        }
+      } catch {}
+      router.push('/affiliate' as never);
+    } catch {
+      // navigation failure — reset so user can retry
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const canGenerate = selectedProduct || affiliateUrl.trim();

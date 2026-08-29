@@ -199,12 +199,31 @@ async function compositeOnBackgroundWeb(productDataUrl: string, bgUrl: string): 
   return canvas.toDataURL('image/png', 0.95);
 }
 
-function loadImageElement(src: string): Promise<HTMLImageElement> {
+function loadImageElement(src: string, timeoutMs = 15000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error('이미지 로딩 시간이 초과되었습니다'));
+      }
+    }, timeoutMs);
+    img.onload = () => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        resolve(img);
+      }
+    };
+    img.onerror = () => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        reject(new Error('이미지를 불러올 수 없습니다'));
+      }
+    };
     img.src = src;
   });
 }

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   Platform,
   ScrollView,
   Image,
@@ -12,7 +11,6 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X } from 'lucide-react-native';
@@ -36,11 +34,20 @@ import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { HotDealPickerModal } from '@/components/HotDealPickerModal';
 
-const { width: screenWidth } = Dimensions.get('window');
+const CAPTURE_TIMEOUT_MS = 15000;
+const PICK_TIMEOUT_MS = 20000;
+const ANALYSIS_TIMEOUT_MS = 120000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} (시간 초과)`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 export default function CameraScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
   const isMountedRef = useRef(true);
@@ -99,15 +106,23 @@ export default function CameraScreen() {
     if (!cameraRef.current || processing || !cameraReady) return;
     setProcessing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        base64: true,
-        quality: 0.7,
-        shutterSound: false,
-        ...({ mute: true } as Record<string, unknown>),
-      }) as { base64?: string; uri: string };
+      const photo = await withTimeout(
+        cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.7,
+          shutterSound: false,
+          ...({ mute: true } as Record<string, unknown>),
+        }) as Promise<{ base64?: string; uri: string }>,
+        CAPTURE_TIMEOUT_MS,
+        '사진 촬영',
+      );
       if (!photo?.base64) throw new Error('Failed to capture image data');
       const cleanB64 = cleanBase64(photo.base64);
-      const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7);
+      const compressedDataUrl = await withTimeout(
+        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
       if (!isMountedRef.current) return;
       const compressedB64 = cleanBase64(compressedDataUrl);
       const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
@@ -126,9 +141,13 @@ export default function CameraScreen() {
 
     if (isWebPlatform()) {
       try {
-        const images = await pickImageWeb(false, 1);
+        const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
         if (images.length === 0) return;
-        const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7);
+        const compressed = await withTimeout(
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          PICK_TIMEOUT_MS,
+          '이미지 압축',
+        );
         const compressedMime = getMimeTypeFromDataUrl(compressed);
         setSelectedImage(cleanBase64(compressed));
         setSelectedImageMime(compressedMime);
@@ -139,16 +158,24 @@ export default function CameraScreen() {
     }
 
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        base64: false,
-        quality: 0.7,
-      });
+      const result = await withTimeout(
+        ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          base64: false,
+          quality: 0.7,
+        }),
+        PICK_TIMEOUT_MS,
+        '사진 선택',
+      );
       if (!isMountedRef.current) return;
       if (result.canceled || !result.assets?.[0]?.uri) return;
       const asset = result.assets[0];
       if (!asset.uri) return;
-      const { base64, mimeType } = await compressImageToBase64(asset.uri, 1080, 0.7);
+      const { base64, mimeType } = await withTimeout(
+        compressImageToBase64(asset.uri, 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
       if (!isMountedRef.current) return;
       setSelectedImage(base64);
       setSelectedImageMime(mimeType);
@@ -159,21 +186,26 @@ export default function CameraScreen() {
   };
 
   const processImage = async (base64: string, mimeType: string) => {
+    let progressTimer: ReturnType<typeof setInterval> | null = null;
     try {
       setProgressStep(1);
       setProgressText('AI 분석 중...');
       progressWidth.value = withTiming(0.35, { duration: 500 });
 
-      const progressTimer = setInterval(() => {
+      progressTimer = setInterval(() => {
         progressWidth.value = withTiming(
           Math.min(progressWidth.value + 0.04, 0.75),
           { duration: 800 },
         );
       }, 3000);
 
-      const { scanId } = await startAsyncAnalysis(base64, mimeType, 'single');
+      const { scanId } = await withTimeout(
+        startAsyncAnalysis(base64, mimeType, 'single'),
+        ANALYSIS_TIMEOUT_MS,
+        'AI 분석',
+      );
 
-      clearInterval(progressTimer);
+      if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
       setProgressStep(2);
       setProgressText('결과 페이지로 이동 중...');
@@ -185,14 +217,21 @@ export default function CameraScreen() {
 
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
+      if (progressTimer) clearInterval(progressTimer);
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
+      if (progressTimer) clearInterval(progressTimer);
       if (isMountedRef.current) setProcessing(false);
     }
   };
 
+  const lastActionRef = useRef(0);
   const handleGenerate = async () => {
+    const now = Date.now();
+    if (now - lastActionRef.current < 800) return;
+    lastActionRef.current = now;
+
     const imageBase64 = selectedImage || previewCapture?.base64;
     const imageMime = selectedImage ? selectedImageMime : previewCapture?.mimeType;
     if (!imageBase64) return;

@@ -6,6 +6,24 @@ import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { buildDataUrl } from '@/lib/base64';
 
+const SUPABASE_TIMEOUT_MS = 30000;
+
+function withSupabaseTimeout<T>(
+  operation: () => Promise<{ data: T | null; error: { message: string } | null }>,
+  label: string,
+): Promise<{ data: T | null; error: { message: string } | null }> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<{ data: null; error: { message: string } }>(
+    (resolve) => {
+      timer = setTimeout(
+        () => resolve({ data: null, error: { message: `${label} 시간이 초과되었습니다.` } }),
+        SUPABASE_TIMEOUT_MS,
+      );
+    },
+  );
+  return Promise.race([Promise.resolve(operation()), timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Lightweight hash of image base64 for cache keying.
  * Uses a simple polynomial rolling hash — not cryptographic, just for dedup.
@@ -61,11 +79,15 @@ export async function startAsyncAnalysis(
   }
 
   // Check cache
-  const { data: cached } = await supabase
-    .from('analysis_cache')
-    .select('analysis_result')
-    .eq('image_hash', imageHash)
-    .maybeSingle();
+  const cacheResult = await withSupabaseTimeout(
+    () => Promise.resolve(supabase
+      .from('analysis_cache')
+      .select('analysis_result')
+      .eq('image_hash', imageHash)
+      .maybeSingle()),
+    '캐시 조회',
+  );
+  const cached = cacheResult.data as { analysis_result: unknown } | null;
 
   if (cached?.analysis_result) {
     // Cache hit — create scan with full analysis data immediately
@@ -142,13 +164,17 @@ async function createPendingScan(
     scanPayload.additional_image_urls = additionalUrls;
   }
 
-  const { data, error } = await supabase
-    .from('scans')
-    .insert(scanPayload)
-    .select('id')
-    .single();
+  const insertResult = await withSupabaseTimeout<{ id: string }>(
+    () => Promise.resolve(supabase
+      .from('scans')
+      .insert(scanPayload)
+      .select('id')
+      .single()),
+    '스캔 생성',
+  );
+  const { data, error } = insertResult;
 
-  if (error) throw new Error(`스캔 생성 실패: ${error.message}`);
+  if (error || !data) throw new Error(`스캔 생성 실패: ${error?.message || '알 수 없는 오류'}`);
   return data.id;
 }
 
@@ -184,13 +210,17 @@ async function createScanWithAnalysis(
     scanPayload.additional_image_urls = additionalUrls;
   }
 
-  const { data, error } = await supabase
-    .from('scans')
-    .insert(scanPayload)
-    .select('id')
-    .single();
+  const insertResult = await withSupabaseTimeout<{ id: string }>(
+    () => Promise.resolve(supabase
+      .from('scans')
+      .insert(scanPayload)
+      .select('id')
+      .single()),
+    '스캔 생성',
+  );
+  const { data, error } = insertResult;
 
-  if (error) throw new Error(`스캔 생성 실패: ${error.message}`);
+  if (error || !data) throw new Error(`스캔 생성 실패: ${error?.message || '알 수 없는 오류'}`);
 
   // Kick off TTS in background (same as saveScan does)
   const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
