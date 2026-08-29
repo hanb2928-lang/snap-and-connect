@@ -110,6 +110,11 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
+  const mountedRef = useRef(true);
+  const recorderRef = useRef<any>(null);
+  const canvasStreamRef = useRef<any>(null);
+  const aiAbortRef = useRef<AbortController | null>(null);
   const tpl = useHybridTemplate(
     { category: null, platform: 'shorts', fallbackHook: '', fallbackHashtags: [], fallbackAccentColor: theme.colors.primary[400], fallbackCardStyle: 'bold' },
     theme.colors.primary[400],
@@ -121,12 +126,27 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   urlsRef.current = { videoUrl, originalVideoUrl, outputUrl };
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
+      cancelledRef.current = true;
       const { videoUrl: v, originalVideoUrl: ov, outputUrl: o } = urlsRef.current;
       if (v) URL.revokeObjectURL(v);
       if (ov) URL.revokeObjectURL(ov);
       if (o) URL.revokeObjectURL(o);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+      if (aiAbortRef.current) { aiAbortRef.current.abort(); aiAbortRef.current = null; }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
+      if (videoElRef.current) {
+        videoElRef.current.pause();
+        videoElRef.current.removeAttribute('src');
+        videoElRef.current.load();
+      }
     };
   }, []);
 
@@ -140,6 +160,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     setAiGenerating(true);
     setAiError(false);
     setAiCopies(null);
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     try {
       const response = await fetch(COPY_FUNCTION_URL, {
         method: 'POST',
@@ -158,19 +180,23 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           platform: 'shortform',
           count: 3,
         }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error('AI 생성 실패');
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      setAiCopies((data.copies || []).map((c: any) => ({ hook: c.hook || '', caption: c.caption || '' })));
-    } catch {
-      setAiError(true);
+      if (mountedRef.current) setAiCopies((data.copies || []).map((c: any) => ({ hook: c.hook || '', caption: c.caption || '' })));
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      if (mountedRef.current) setAiError(true);
     }
-    setAiGenerating(false);
+    if (mountedRef.current) setAiGenerating(false);
+    aiAbortRef.current = null;
   }, []);
 
   const handleAnalyzeHighlights = useCallback(async () => {
     if (!videoUrl || Platform.OS !== 'web') return;
+    cancelledRef.current = false;
     setAnalyzing(true);
     setAnalyzeProgress(0);
     setHighlightSegments(null);
@@ -201,6 +227,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       const totalSteps = Math.floor(dur / stepSec);
 
       for (let i = 0; i < totalSteps; i++) {
+        if (cancelledRef.current) return;
         const t = i * stepSec;
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => {
@@ -215,6 +242,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           video.addEventListener('seeked', onSeeked);
           video.currentTime = t;
         });
+
+        if (cancelledRef.current) return;
 
         sctx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H);
         const curData = sctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
@@ -231,8 +260,10 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
         samples.push({ time: t, score: diff });
         prevData = new Uint8ClampedArray(curData);
-        setAnalyzeProgress(Math.round(((i + 1) / totalSteps) * 100));
+        if (mountedRef.current) setAnalyzeProgress(Math.round(((i + 1) / totalSteps) * 100));
       }
+
+      if (cancelledRef.current) return;
 
       const windowSec = 1.0;
       const windows: { start: number; score: number }[] = [];
@@ -271,10 +302,11 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       if (merged.length === 0) throw new Error('하이라이트 구간을 찾지 못했습니다');
 
-      setHighlightSegments(merged);
+      if (mountedRef.current) setHighlightSegments(merged);
       const totalSec = merged.reduce((sum, s) => sum + (s.end - s.start), 0);
       showToast(`${merged.length}개 하이라이트 구간 발견 (약 ${totalSec.toFixed(0)}초)`);
     } catch (err) {
+      if (cancelledRef.current) return;
       const msg = err instanceof Error ? err.message : '알 수 없는 오류';
       showToast('하이라이트 분석 실패: ' + msg);
     } finally {
@@ -282,7 +314,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       video.removeAttribute('src');
       video.load();
     }
-    setAnalyzing(false);
+    if (mountedRef.current) setAnalyzing(false);
   }, [videoUrl, targetDuration, showToast]);
 
   const handlePickVideo = useCallback(async () => {
@@ -345,6 +377,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
     if (!videoUrl || !videoBlob) return;
     if (Platform.OS !== 'web') return;
 
+    cancelledRef.current = false;
     setState('generating');
     setProgress(0);
     setError(null);
@@ -414,6 +447,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       if (hasRecorder && video) {
         const canvasStream = (canvas as any).captureStream(FPS);
+        canvasStreamRef.current = canvasStream;
         mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
           ? 'video/webm;codecs=vp9'
           : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
@@ -423,6 +457,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
           mimeType,
           videoBitsPerSecond: 6000000,
         });
+        recorderRef.current = recorder;
         const chunks: any[] = [];
         recorder.ondataavailable = (e: any) => {
           if (e.data.size > 0) chunks.push(e.data);
@@ -586,25 +621,40 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       if (hasRecorder) {
         const blob = await done;
+        if (cancelledRef.current) return;
+        if (canvasStreamRef.current) {
+          try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+          canvasStreamRef.current = null;
+        }
+        recorderRef.current = null;
         const url = URL.createObjectURL(blob);
         setOutputUrl(url);
         setOutputMime(mimeType);
       } else {
         await new Promise<void>((resolve) => setTimeout(resolve, totalDuration * 1000 + 300));
+        if (cancelledRef.current) return;
         const dataUrl = canvas.toDataURL('image/png');
         const blob = await (await fetch(dataUrl)).blob();
+        if (cancelledRef.current) return;
         const url = URL.createObjectURL(blob);
         setOutputUrl(url);
         setOutputMime('image/png');
       }
 
       if (video) video.pause();
-      setState('done');
-      setProgress(100);
+      if (mountedRef.current) { setState('done'); setProgress(100); }
     } catch (err) {
-      setState('error');
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      recorderRef.current = null;
+      if (videoElRef.current) videoElRef.current.pause();
+      if (cancelledRef.current) return;
+      if (mountedRef.current) { setState('error'); setError(err instanceof Error ? err.message : String(err)); }
       showToast('가공에 실패했어요');
     }
   }, [videoUrl, videoBlob, format, videoDuration, hookText, subtitleText, hookFontSize, subtitleFontSize, affiliatePlatforms, shortUrl, outputUrl, showToast, highlightMode, highlightSegments, importType, imageElRef]);
@@ -630,6 +680,17 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
   }, [outputUrl]);
 
   const handleClose = useCallback(() => {
+    cancelledRef.current = true;
+    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try { recorderRef.current.stop(); } catch {}
+    }
+    if (canvasStreamRef.current) {
+      try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+      canvasStreamRef.current = null;
+    }
+    if (videoElRef.current) { videoElRef.current.pause(); }
+    if (aiAbortRef.current) { aiAbortRef.current.abort(); aiAbortRef.current = null; }
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     if (originalVideoUrl) URL.revokeObjectURL(originalVideoUrl);
     if (outputUrl) URL.revokeObjectURL(outputUrl);

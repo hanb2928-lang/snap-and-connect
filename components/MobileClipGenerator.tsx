@@ -522,6 +522,8 @@ export function MobileClipGenerator({
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFileUriRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const [webviewKey, setWebviewKey] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
@@ -537,7 +539,8 @@ export function MobileClipGenerator({
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   useEffect(() => {
@@ -583,6 +586,10 @@ export function MobileClipGenerator({
     return () => {
       mountedRef.current = false;
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (pendingFileUriRef.current && Platform.OS !== 'web') {
+        FileSystem.deleteAsync(pendingFileUriRef.current, { idempotent: true }).catch(() => {});
+      }
     };
   }, []);
 
@@ -613,11 +620,13 @@ export function MobileClipGenerator({
         setProgress(99);
         const ext = isImage ? 'png' : (mimeType.includes('webm') ? 'webm' : 'mp4');
         const fileUri = `${FileSystem.cacheDirectory}${fileName.replace(/\.png$|\.webm$/, '')}-${Date.now()}.${ext}`;
+        pendingFileUriRef.current = fileUri;
         try {
           await FileSystem.writeAsStringAsync(fileUri, base64, {
             encoding: FileSystem.EncodingType.Base64,
           });
           if (!mountedRef.current) return;
+          pendingFileUriRef.current = null;
           setVideoUri(fileUri);
           setState('done');
           setProgress(100);
@@ -658,20 +667,21 @@ export function MobileClipGenerator({
 
   const handleGenerate = useCallback(async () => {
     if (state === 'generating') return;
-    setState('generating');
     setProgress(0);
     setVideoUri(null);
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
     try {
       const converted = await urlToDataUrl(imageUrl);
-      setSafeImageUrl(converted);
+      if (mountedRef.current) setSafeImageUrl(converted);
     } catch {
       // keep original URL; WebView fetch will retry
     }
+    if (!mountedRef.current) return;
+    setState('generating');
     generateTimeoutRef.current = setTimeout(() => {
       setState((prev) => {
         if (prev === 'generating') {
-          showToast('생성 시간이 초과됐어요. 다시 시도해주세요');
+          showToast('생 시간이 초과됐어요. 다시 시도해주세요');
           return 'error';
         }
         return prev;
@@ -1075,6 +1085,7 @@ export function MobileClipGenerator({
               onMessage={handleWebViewMessage}
               onError={() => {
                 if (stateRef.current === 'generating') {
+                  if (generateTimeoutRef.current) { clearTimeout(generateTimeoutRef.current); generateTimeoutRef.current = null; }
                   setState('error');
                   showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
                 }

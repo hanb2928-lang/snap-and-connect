@@ -76,12 +76,17 @@ export async function waitForJob<T = Record<string, unknown>>(
   return new Promise((resolve) => {
     let settled = false;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    let initialPollTimer: ReturnType<typeof setTimeout> | undefined;
+    let channel: ReturnType<typeof supabase.channel> | undefined;
 
     const cleanup = () => {
       if (pollInterval) clearInterval(pollInterval);
-      clearTimeout(timeoutTimer);
-      channel.unsubscribe();
-      supabase.removeChannel(channel);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (initialPollTimer) clearTimeout(initialPollTimer);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
 
     const finish = (result: JobResult<T>) => {
@@ -91,7 +96,7 @@ export async function waitForJob<T = Record<string, unknown>>(
       resolve(result);
     };
 
-    const channel = supabase
+    channel = supabase
       .channel(`job-wait:${jobId}`)
       .on(
         'postgres_changes',
@@ -107,7 +112,7 @@ export async function waitForJob<T = Record<string, unknown>>(
       )
       .subscribe();
 
-    const timeoutTimer = setTimeout(() => {
+    timeoutTimer = setTimeout(() => {
       finish({ success: false, error: 'Job timed out' });
     }, timeoutMs);
 
@@ -132,7 +137,7 @@ export async function waitForJob<T = Record<string, unknown>>(
       }
     };
 
-    setTimeout(poll, 5000);
+    initialPollTimer = setTimeout(poll, 5000);
     pollInterval = setInterval(poll, POLL_INTERVAL_MS);
   });
 }

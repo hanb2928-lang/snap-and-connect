@@ -442,6 +442,9 @@ function WebClipGenerator({
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const bgmStopRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
+  const recorderRef = useRef<any>(null);
+  const canvasStreamRef = useRef<any>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -477,6 +480,7 @@ function WebClipGenerator({
       if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
       if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
       if (renderTimeoutRef.current !== null) clearTimeout(renderTimeoutRef.current);
+      if (retryTimerRef.current !== null) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
@@ -484,6 +488,12 @@ function WebClipGenerator({
       if (bgmStopRef.current) {
         bgmStopRef.current();
         bgmStopRef.current = null;
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
       }
     };
   }, []);
@@ -842,6 +852,7 @@ function WebClipGenerator({
         let bgmResult: { stream: any; stop: () => void } | null = null;
         if (musicMood !== 'none') {
           bgmResult = createBgmStream(musicMood, clipDuration, false);
+          if (bgmResult) bgmStopRef.current = bgmResult.stop;
         }
 
         let combinedStream: any = canvasStream;
@@ -863,6 +874,8 @@ function WebClipGenerator({
           mimeType,
           videoBitsPerSecond: 6000000,
         });
+        recorderRef.current = recorder;
+        canvasStreamRef.current = combinedStream;
         const chunks: any[] = [];
         recorder.ondataavailable = (e: any) => {
           if (e.data.size > 0) chunks.push(e.data);
@@ -1119,6 +1132,12 @@ function WebClipGenerator({
       if (hasRecorder) {
         const blob = await done;
         if (cancelledRef.current) return;
+        if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+        if (canvasStreamRef.current) {
+          try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+          canvasStreamRef.current = null;
+        }
+        recorderRef.current = null;
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
         setVideoMime(mimeType);
@@ -1138,6 +1157,15 @@ function WebClipGenerator({
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     } catch (err) {
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
+      if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+      if (canvasStreamRef.current) {
+        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+        canvasStreamRef.current = null;
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.stop(); } catch {}
+      }
+      recorderRef.current = null;
       if (cancelledRef.current) return;
       setState('error');
       const msg = err instanceof Error ? err.message : String(err);
@@ -1175,6 +1203,14 @@ function WebClipGenerator({
     if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     if (abortControllerRef.current) { abortControllerRef.current.abort(); abortControllerRef.current = null; }
     if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try { recorderRef.current.stop(); } catch {}
+    }
+    if (canvasStreamRef.current) {
+      try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+      canvasStreamRef.current = null;
+    }
+    recorderRef.current = null;
     setState('idle');
     setProgress(0);
   }, []);
@@ -1182,7 +1218,7 @@ function WebClipGenerator({
   const handleRetry = useCallback(() => {
     setRenderTimedOut(false);
     handleReset();
-    setTimeout(() => generateClip(), 100);
+    retryTimerRef.current = setTimeout(() => generateClip(), 100);
   }, [handleReset, generateClip]);
 
   const handleSaveToCloud = useCallback(async () => {
