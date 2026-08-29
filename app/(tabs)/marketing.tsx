@@ -40,6 +40,7 @@ const HOOK_TYPES = [
   { key: 'curiosity', label: '호기심 유발', desc: '이거 모르면 손해? 3초 멈춤 보장', icon: Lightbulb, color: theme.colors.warning[400] },
   { key: 'contrarian', label: '역발상', desc: '다들 이렇게 하는데, 난 반대로', icon: Zap, color: theme.colors.accent[400] },
   { key: 'emotional', label: '감정 자극', desc: '이걸 알고 나니 눈물이...', icon: Flame, color: theme.colors.primary[400] },
+  { key: 'custom', label: '고정 훅', desc: '설정에서 저장한 맞춤 훅 문구', icon: Type, color: theme.colors.success[400] },
 ];
 
 const PERSONA_TONES = [
@@ -146,9 +147,12 @@ export default function MarketingScreen() {
         targetRef.measureLayout(
           scrollRef.current as any,
           (_x, y) => {
-            scrollRef.current?.scrollTo({ y: y - 20, animated: true });
+            const offsetY = isRTL ? Math.max(y - 20, 0) : y - 20;
+            scrollRef.current?.scrollTo({ y: offsetY, animated: true });
           },
-          () => {},
+          () => {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          },
         );
       }
     }, 100);
@@ -318,8 +322,6 @@ export default function MarketingScreen() {
     await setItem('marketing_bgm_mood', bgmMood);
     await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
     await setItem('marketing_handoff', 'false');
-    await setItem('marketing_handoff_image', '');
-    await setItem('marketing_handoff_mime', '');
     try {
       const settings = await getUserSettings();
       if (settings?.brand_persona) {
