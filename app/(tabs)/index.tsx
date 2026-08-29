@@ -270,7 +270,7 @@ export default function CameraScreen() {
         throw new Error('Failed to capture image data');
       }
       const cleanB64 = cleanBase64(photo.base64);
-      const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1280, 0.7);
+      const compressedDataUrl = await prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7);
       if (!isMountedRef.current) return;
       const compressedB64 = cleanBase64(compressedDataUrl);
       const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
@@ -360,7 +360,7 @@ export default function CameraScreen() {
         if (recognitionMode === 'multi') {
           const newShots: string[] = [];
           for (const img of images) {
-            const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+            const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1080, 0.7);
             newShots.push(cleanBase64(compressed));
           }
           setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
@@ -400,7 +400,7 @@ export default function CameraScreen() {
         const newShots: string[] = [];
         for (const a of result.assets) {
           if (!a.uri) continue;
-          const { base64 } = await compressImageToBase64(a.uri, 1280, 0.7);
+          const { base64 } = await compressImageToBase64(a.uri, 1080, 0.7);
           if (!isMountedRef.current) return;
           newShots.push(base64);
           if (newShots.length >= 4 - multiShots.length) break;
@@ -417,7 +417,7 @@ export default function CameraScreen() {
         setProcessing(false);
         return;
       }
-      const { base64: compressedB64, mimeType: compressedMime } = await compressImageToBase64(asset.uri, 1280, 0.7);
+      const { base64: compressedB64, mimeType: compressedMime } = await compressImageToBase64(asset.uri, 1080, 0.7);
       if (!isMountedRef.current) return;
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
@@ -466,7 +466,7 @@ export default function CameraScreen() {
           setProcessing(false);
           return;
         }
-        const compressed = await compressImageToBase64(asset.uri, 1280, 0.7);
+        const compressed = await compressImageToBase64(asset.uri, 1080, 0.7);
         cleanB64 = compressed.base64;
         mimeType = compressed.mimeType;
       }
@@ -1313,7 +1313,7 @@ function WebUploadScreen() {
       if (recognitionMode === 'multi') {
         const newShots: string[] = [];
         for (const img of images) {
-          const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+          const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1080, 0.7);
           newShots.push(cleanBase64(compressed));
         }
         setMultiShots((prev) => [...prev, ...newShots].slice(0, 4));
@@ -1393,7 +1393,7 @@ function WebUploadScreen() {
         setProcessing(false);
         return;
       }
-      const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1280, 0.7);
+        const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7);
       const compressedMime = getMimeTypeFromDataUrl(compressed);
       const cleanB64 = cleanBase64(compressed);
       setProgressText('이미지 업로드 중...');

@@ -11,6 +11,8 @@ import {
   Platform,
   Image,
   Dimensions,
+  AppState,
+  I18nManager,
 } from 'react-native';
 import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout, Clock, Type, Music, ChevronDown, Settings, CreditCard as Edit3, Stamp } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -144,31 +146,43 @@ export default function MarketingScreen() {
       if (targetRef && scrollRef.current) {
         targetRef.measureLayout(
           scrollRef.current as any,
-          (_x, y) => { scrollRef.current?.scrollTo({ y: y - 20, animated: true }); },
+          (_x, y) => {
+            const yOffset = I18nManager.isRTL ? y * -1 : y;
+            scrollRef.current?.scrollTo({ y: yOffset - 20, animated: true });
+          },
           () => {},
         );
       }
     }, 100);
   };
 
-  useEffect(() => {
-    (async () => {
-      const flag = await getItem('marketing_handoff');
-      if (flag === 'true') {
-        setHandoffMode(true);
-        await setItem('marketing_handoff', 'false');
-        const img = await getItem('marketing_handoff_image');
-        const mime = await getItem('marketing_handoff_mime');
-        if (img) {
-          setHandoffImage(img);
-          setHandoffMime(mime || 'image/jpeg');
-          await setItem('marketing_handoff_image', '');
-          await setItem('marketing_handoff_mime', '');
-        }
+  const checkHandoff = useCallback(async () => {
+    const flag = await getItem('marketing_handoff');
+    if (flag === 'true') {
+      setHandoffMode(true);
+      await setItem('marketing_handoff', 'false');
+      const img = await getItem('marketing_handoff_image');
+      const mime = await getItem('marketing_handoff_mime');
+      if (img) {
+        setHandoffImage(img);
+        setHandoffMime(mime || 'image/jpeg');
       }
-      shuffleTags();
-    })();
+    }
   }, []);
+
+  useEffect(() => {
+    checkHandoff();
+    shuffleTags();
+  }, [checkHandoff]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkHandoff();
+      }
+    });
+    return () => sub.remove();
+  }, [checkHandoff]);
 
   useEffect(() => {
     const interval = setInterval(() => {

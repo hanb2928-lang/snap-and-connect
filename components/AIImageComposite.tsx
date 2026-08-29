@@ -131,7 +131,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
               ? (LIGHTING_PRESETS.find((p) => p.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'])
               : (BACKGROUND_PRESETS.find((b) => b.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0']);
           setMobileGradient(gradient);
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 200));
           if (!compositeRef.current) throw new Error('합성 뷰를 초기화하지 못했습니다.');
           const uri = await captureRef(compositeRef, {
             format: 'png',
