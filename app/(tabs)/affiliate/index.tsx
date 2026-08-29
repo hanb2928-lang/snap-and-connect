@@ -379,6 +379,8 @@ export default function AffiliateScreen() {
         setAiRecommendLoading(false);
       }
 
+      markCompleted('content');
+      setAnalyzing(false);
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
@@ -1007,7 +1009,7 @@ export default function AffiliateScreen() {
         <VerticalSectionCard
           icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
           title="3. 콘텐츠 및 템플릿 편집"
-          desc="AI가 추천한 스타일로 바로 제작하거나, 원하는 스타일을 직접 선택하세요."
+          desc="AI가 스타일·음성·해시태그를 자동으로 설정했어요. 버튼을 눌러 바로 제작하거나, 아래에서 직접 수정할 수 있어요."
           iconBg={theme.colors.warning[500] + '18'}
           accentColor={STEP_META.content.color}
           stepNumber={3}
