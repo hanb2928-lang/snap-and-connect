@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Linking, RefreshControl } from 'react-native';
 import { ShoppingBag, ExternalLink, Link2 } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -10,29 +10,62 @@ export default function LinkInBioPage() {
   const [page, setPage] = useState<LinkInBioPage | null>(null);
   const [products, setProducts] = useState<LinkInBioProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    (async () => {
-      if (!slug) {
-        setLoading(false);
-        return;
-      }
+  const loadData = useCallback(async (isRefresh: boolean = false) => {
+    if (!slug) {
+      setLoading(false);
+      return;
+    }
+    try {
+      if (isRefresh) setRefreshing(true);
+
+      // Parallel fetch: page metadata + products can start as soon as we have the slug
+      // For the first load, we need the page first to get scan_ids
+      // But we can prefetch images in parallel once products are loaded
       const p = await getLinkInBioBySlug(slug);
       if (!p) {
         setLoading(false);
+        setRefreshing(false);
         return;
       }
       setPage(p);
+
       const prods = await getProductsForLinkInBio(p.scan_ids);
       setProducts(prods);
+
+      // Prefetch images for faster rendering
+      prods.forEach((prod) => {
+        if (prod.image_url && Image.prefetch) {
+          Image.prefetch(prod.image_url).catch(() => {});
+        }
+      });
+    } catch {
+      // silent fail
+    } finally {
       setLoading(false);
-    })();
+      setRefreshing(false);
+    }
   }, [slug]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleImageLoad = useCallback((scanId: string) => {
+    setImageLoaded((prev) => ({ ...prev, [scanId]: true }));
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    loadData(true);
+  }, [loadData]);
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={theme.colors.accent[400]} />
+        <Text style={styles.loadingText}>페이지를 불러오는 중...</Text>
       </View>
     );
   }
@@ -48,7 +81,13 @@ export default function LinkInBioPage() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.accent[400]} />
+      }
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.avatarWrap}>
@@ -71,11 +110,19 @@ export default function LinkInBioPage() {
             }}
             activeOpacity={0.8}
           >
-            <Image
-              source={{ uri: product.image_url }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
+            <View style={styles.cardImageWrap}>
+              <Image
+                source={{ uri: product.image_url }}
+                style={styles.cardImage}
+                resizeMode="cover"
+                onLoad={() => handleImageLoad(product.scan_id)}
+              />
+              {!imageLoaded[product.scan_id] && (
+                <View style={styles.imagePlaceholder}>
+                  <ActivityIndicator size="small" color={theme.colors.dark.textFaint} />
+                </View>
+              )}
+            </View>
             <View style={styles.cardBody}>
               <Text style={styles.cardTitle} numberOfLines={2}>{product.product_name || '상품'}</Text>
               {product.price_estimate ? (
@@ -118,6 +165,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
   header: {
     alignItems: 'center',
@@ -164,9 +216,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...theme.shadows.card,
   },
-  cardImage: {
+  cardImageWrap: {
     width: '100%',
     aspectRatio: 1,
+    position: 'relative',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardBody: {
     padding: 12,

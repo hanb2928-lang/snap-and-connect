@@ -11,6 +11,8 @@ import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import { uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { getUserSettings } from '@/lib/settings';
+import { recordShareAction, checkShareCooldown, type CooldownResult } from '@/lib/shareCooldown';
+import { ShareCooldownModal } from '@/components/ShareCooldownModal';
 
 interface ShareBarProps {
   cardRef: React.RefObject<View | null>;
@@ -30,6 +32,9 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   const [shareModal, setShareModal] = useState<{ url: string; label: string } | null>(null);
   const [previewModal, setPreviewModal] = useState<{ uri: string | null; fullText: string; platformLabel: string; siteUrl: string; platformKey?: string } | null>(null);
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [cooldownModal, setCooldownModal] = useState(false);
+  const [cooldownInfo, setCooldownInfo] = useState<CooldownResult | null>(null);
+  const [pendingShare, setPendingShare] = useState<{ fn: () => void; platform: string } | null>(null);
   const toastAnim = useSharedValue(0);
   const accordionHeight = useSharedValue(0);
   const accordionOpacity = useSharedValue(0);
@@ -70,6 +75,34 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       return null;
     }
   }, [cardRef, fileName]);
+
+  const checkBeforeShare = useCallback(async (platform: string, action: () => void): Promise<boolean> => {
+    const cooldown = await checkShareCooldown();
+    if (cooldown.shouldBlock) {
+      setCooldownInfo(cooldown);
+      setCooldownModal(true);
+      return false;
+    }
+    if (cooldown.recentActions >= 3 && cooldown.recentActions < 5) {
+      // Warning zone — show modal but allow proceed
+      setCooldownInfo(cooldown);
+      setCooldownModal(true);
+      setPendingShare({ fn: action, platform });
+      return false;
+    }
+    await recordShareAction(platform);
+    return true;
+  }, []);
+
+  const handleCooldownProceed = useCallback(() => {
+    setCooldownModal(false);
+    if (pendingShare) {
+      recordShareAction(pendingShare.platform).then(() => {
+        pendingShare.fn();
+        setPendingShare(null);
+      });
+    }
+  }, [pendingShare]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -207,6 +240,21 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
   }, [copyImageToClipboard, copyTextToClipboard, showToast]);
 
   const startPreview = useCallback(async (siteUrl: string, platformLabel: string, platformKey?: string) => {
+    const allowed = await checkBeforeShare(platformLabel, () => {});
+    if (!allowed) {
+      setPendingShare({ fn: () => {
+        setSharing(true);
+        captureCard().then((uri) => {
+          const fullText = buildShareText();
+          setPreviewModal({ uri, fullText, platformLabel, siteUrl, platformKey });
+          setSharing(false);
+        }).catch(() => {
+          showToast('이미지 캡처에 실패했어요');
+          setSharing(false);
+        });
+      }, platform: platformLabel });
+      return;
+    }
     setSharing(true);
     try {
       const uri = await captureCard();
@@ -216,7 +264,7 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
       showToast('이미지 캡처에 실패했어요');
     }
     setSharing(false);
-  }, [captureCard, buildShareText, showToast]);
+  }, [captureCard, buildShareText, showToast, checkBeforeShare]);
 
   const confirmPreview = useCallback(async () => {
     if (!previewModal) return;
@@ -509,6 +557,15 @@ export function ShareBar({ cardRef, shareText, affiliateUrl, shortUrl, fileName,
           </Pressable>
         </Pressable>
       </Modal>
+      <ShareCooldownModal
+        visible={cooldownModal}
+        onClose={() => {
+          setCooldownModal(false);
+          setPendingShare(null);
+        }}
+        onProceed={handleCooldownProceed}
+        platform={pendingShare?.platform}
+      />
     </View>
   );
 }
