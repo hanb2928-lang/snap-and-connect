@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { memo, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ViewStyle, Platform, TouchableOpacity, LayoutAnimation, Pressable } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing } from 'react-native-reanimated';
-import { Check } from 'lucide-react-native';
+import { Check, ChevronDown } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface VerticalSectionCardProps {
@@ -14,6 +14,14 @@ interface VerticalSectionCardProps {
   accentColor?: string;
   stepNumber?: number;
   completed?: boolean;
+  /** Beginner-friendly explanation badge, e.g. "옷 사진 → 모델 착샷 변환" */
+  beginnerBadge?: string;
+  /** When true, the card auto-expands to reveal its children */
+  autoExpand?: boolean;
+  /** Controlled expanded state; if not provided, the card manages its own */
+  expanded?: boolean;
+  /** Called when the user taps the header to toggle */
+  onToggle?: () => void;
 }
 
 function VerticalSectionCardInner({
@@ -26,6 +34,10 @@ function VerticalSectionCardInner({
   accentColor,
   stepNumber,
   completed,
+  beginnerBadge,
+  autoExpand,
+  expanded: controlledExpanded,
+  onToggle,
 }: VerticalSectionCardProps) {
   const glowStyle = useMemo(
     () => accentColor && Platform.OS === 'web'
@@ -38,6 +50,25 @@ function VerticalSectionCardInner({
   const checkScale = useSharedValue(0);
   const checkOpacity = useSharedValue(0);
   const cardShift = useSharedValue(0);
+
+  const [internalExpanded, setInternalExpanded] = useState(autoExpand ?? false);
+  const isControlled = controlledExpanded !== undefined;
+  const isExpanded = isControlled ? controlledExpanded : internalExpanded;
+
+  useEffect(() => {
+    if (autoExpand !== undefined && !isControlled) {
+      setInternalExpanded(autoExpand);
+    }
+  }, [autoExpand, isControlled]);
+
+  const handleToggle = useCallback(() => {
+    if (onToggle) {
+      onToggle();
+    } else if (!isControlled) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setInternalExpanded((prev) => !prev);
+    }
+  }, [onToggle, isControlled]);
 
   useEffect(() => {
     if (completed && !wasCompleted.current) {
@@ -57,12 +88,16 @@ function VerticalSectionCardInner({
     opacity: checkOpacity.value,
   }));
 
+  const chevronAnim = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${isExpanded ? 180 : 0}deg` }],
+  }));
+
   return (
-    <Animated.View style={[styles.section, glowStyle, style]}>
+    <Animated.View style={[styles.section, isExpanded && styles.sectionExpanded, glowStyle, style]}>
       {accentColor && <View style={[styles.accentLine, { backgroundColor: accentColor }]} />}
       {completed && <View style={styles.completedOverlay} pointerEvents="none" />}
 
-      <View style={styles.header}>
+      <Pressable style={styles.headerRow} onPress={handleToggle}>
         <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
           {icon}
           {typeof stepNumber === 'number' && (
@@ -79,9 +114,20 @@ function VerticalSectionCardInner({
         <View style={styles.textWrap}>
           <Text style={[styles.title, completed && styles.titleCompleted]}>{title}</Text>
           <Text style={styles.desc}>{desc}</Text>
+          {beginnerBadge ? (
+            <View style={[styles.beginnerBadge, { backgroundColor: (accentColor || theme.colors.primary[400]) + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: accentColor || theme.colors.primary[300] }]}>
+                {beginnerBadge}
+              </Text>
+            </View>
+          ) : null}
         </View>
-      </View>
-      <View style={styles.body}>{children}</View>
+        <Animated.View style={[styles.chevronWrap, chevronAnim]}>
+          <ChevronDown size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </Animated.View>
+      </Pressable>
+
+      {isExpanded && <View style={styles.body}>{children}</View>}
     </Animated.View>
   );
 }
@@ -100,9 +146,12 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
     overflow: 'visible',
-    ...(Platform.OS === 'web'
+    ...(Platform.OS === 'web')
       ? { backdropFilter: 'blur(12px)' as unknown as undefined }
-      : {}),
+      : {},
+  },
+  sectionExpanded: {
+    borderColor: (theme.colors.primary[400] + '40') as string,
   },
   accentLine: {
     position: 'absolute',
@@ -118,11 +167,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     backgroundColor: 'rgba(52, 211, 153, 0.04)',
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: theme.spacing.sm + 2,
-    marginBottom: theme.spacing.md - 2,
   },
   iconWrap: {
     width: 40,
@@ -180,7 +228,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 17,
   },
+  beginnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: theme.radius.full,
+  },
+  beginnerBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  chevronWrap: {
+    paddingTop: 10,
+  },
   body: {
     gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
   },
 });

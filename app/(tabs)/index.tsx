@@ -104,6 +104,8 @@ export default function CameraScreen() {
   const [creditModalVisible, setCreditModalVisible] = useState(false);
   const [angleGuideVisible, setAngleGuideVisible] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
+  const [expandedSection, setExpandedSection] = useState<number | null>(0);
+  const [hasPhotoReady, setHasPhotoReady] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const sectionLayouts = useRef<Array<{ y: number; height: number }>>([]);
   const isScrollingTo = useRef(false);
@@ -130,6 +132,7 @@ export default function CameraScreen() {
     isScrollingTo.current = true;
     scrollRef.current.scrollTo({ y: layout.y - 60, animated: true });
     setActiveSection(index);
+    setExpandedSection(index);
     setTimeout(() => { isScrollingTo.current = false; }, 500);
   }, []);
 
@@ -289,6 +292,7 @@ export default function CameraScreen() {
       setError(null);
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
+      setHasPhotoReady(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
@@ -374,6 +378,7 @@ export default function CameraScreen() {
         const compressedMime = getMimeTypeFromDataUrl(compressed);
         setProcessing(false);
         setPreviewCapture({ base64: cleanBase64(compressed), mimeType: compressedMime });
+        setHasPhotoReady(true);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
         setProcessing(false);
@@ -421,6 +426,7 @@ export default function CameraScreen() {
       if (!isMountedRef.current) return;
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
+      setHasPhotoReady(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -715,6 +721,9 @@ export default function CameraScreen() {
           desc="제품을 카메라에 맞추고 셔터 버튼을 눌러주세요."
           iconBg={theme.colors.primary[500] + '18'}
           accentColor={theme.colors.primary[400]}
+          beginnerBadge="제품 촬영 → AI 자동 분석 → 템플릿 완성"
+          expanded={expandedSection === 1}
+          onToggle={() => setExpandedSection(expandedSection === 1 ? null : 1)}
         >
           <View style={styles.cameraPreviewWrap}>
             {isActive && !arMode ? (
@@ -1065,6 +1074,9 @@ export default function CameraScreen() {
           desc="촬영 대신 앨범에 있는 사진이나 영상을 사용할 수 있어요."
           iconBg={theme.colors.accent[500] + '18'}
           accentColor={theme.colors.accent[400]}
+          beginnerBadge="앨범 사진 선택 → AI 분석 → 소재 생성"
+          expanded={expandedSection === 2}
+          onToggle={() => setExpandedSection(expandedSection === 2 ? null : 2)}
         >
           <View style={styles.verticalBtnRow}>
             <TouchableOpacity
@@ -1096,6 +1108,9 @@ export default function CameraScreen() {
           desc="마네킹/평면 의류 사진을 모델에게 자연스럽게 입혀 착용샷 완성"
           iconBg={theme.colors.accent[500] + '22'}
           accentColor={theme.colors.accent[400]}
+          beginnerBadge="옷 사진 → 모델 착샷 변환"
+          expanded={expandedSection === 3}
+          onToggle={() => setExpandedSection(expandedSection === 3 ? null : 3)}
         >
           <VirtualFitting />
         </VerticalSectionCard>
@@ -1109,6 +1124,9 @@ export default function CameraScreen() {
           desc="조명 스튜디오 합성 & 배경 교체로 전문 소재 완성"
           iconBg={theme.colors.warning[500] + '22'}
           accentColor={theme.colors.warning[400]}
+          beginnerBadge="1초 누끼 & 배경 스튜디오"
+          expanded={expandedSection === 4}
+          onToggle={() => setExpandedSection(expandedSection === 4 ? null : 4)}
         >
           <AIImageComposite />
         </VerticalSectionCard>
@@ -1122,6 +1140,9 @@ export default function CameraScreen() {
           desc="문장을 입력하면 AI가 새로운 이미지를 자동 생성"
           iconBg={theme.colors.primary[500] + '22'}
           accentColor={theme.colors.primary[300]}
+          beginnerBadge="글 입력 → AI 이미지 생성"
+          expanded={expandedSection === 5}
+          onToggle={() => setExpandedSection(expandedSection === 5 ? null : 5)}
         >
           <PromptImageGenerator />
         </VerticalSectionCard>
@@ -1170,6 +1191,27 @@ export default function CameraScreen() {
           <Text style={styles.guideBtnText}>작업 순서 가이드 보기</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {hasPhotoReady && !processing && !previewCapture && (
+        <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.stickyCtaBtn}
+            onPress={() => {
+              setItem('marketing_handoff', 'true');
+              if (multiShots.length > 0) {
+                setItem('marketing_handoff_image', multiShots[0]);
+                setItem('marketing_handoff_mime', 'image/jpeg');
+              }
+              router.push('/marketing' as never);
+            }}
+            activeOpacity={0.85}
+          >
+            <Flame size={24} color="#fff" strokeWidth={2.5} />
+            <Text style={styles.stickyCtaText}>이 소재로 AI 마케팅 영상 만들기</Text>
+            <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {previewCapture && (
         <CapturePreviewModal
@@ -3238,6 +3280,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  stickyCtaWrap: {
+    position: 'absolute',
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    zIndex: 50,
+  },
+  stickyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: theme.spacing.md + 2,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.warning[500],
+    ...theme.shadows.elevated,
+  },
+  stickyCtaText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   phaseDivider: {
     flexDirection: 'row',

@@ -373,6 +373,9 @@ export default function MarketingScreen() {
               </View>
             </View>
             <Text style={styles.sectionDesc}>3초 후킹 오프닝 — 시청자가 스크롤을 멈추게 만드는 첫 문장</Text>
+            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>사진 선택 → 3초 훅 문구 → 영상 생성</Text>
+            </View>
             <View style={styles.selectGrid}>
               {HOOK_TYPES.map((hook) => {
                 const Icon = hook.icon;
@@ -422,6 +425,9 @@ export default function MarketingScreen() {
               </View>
             </View>
             <Text style={styles.sectionDesc}>0.8초 템포 컷 분할 · 마이크로 비트 동기화 · 하이라이트 자동 추출</Text>
+            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>영상 올리기 → AI 자동 컷 편집</Text>
+            </View>
             <AICutGenerator />
 
             {/* A/B Variant Personas */}
@@ -436,6 +442,9 @@ export default function MarketingScreen() {
               </View>
             </View>
             <Text style={styles.sectionDesc}>Z세대 / 3040 실용 / 내돈내산 — 3가지 톤으로 1클릭 동시 생성</Text>
+            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>1클릭 → 3가지 톤 영상 동시 생성</Text>
+            </View>
             <View style={styles.personaGrid}>
               {PERSONA_TONES.map((tone) => (
                 <TouchableOpacity
@@ -472,6 +481,9 @@ export default function MarketingScreen() {
               </TouchableOpacity>
             </View>
             <Text style={styles.sectionDesc}>SNS 인기 해시태드 무작위 믹스 — 복사해서 바로 사용</Text>
+            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>인기 해시태그 → 1탭 복사 → 영상에 붙여넣기</Text>
+            </View>
             <View style={styles.tagCloud}>
               {(shuffledTags.length > 0 ? shuffledTags : TRENDING_KEYWORDS.slice(0, 8).map((k) => k.tag)).map((tag, i) => {
                 const keyword = TRENDING_KEYWORDS.find((k) => k.tag === tag);
@@ -513,6 +525,9 @@ export default function MarketingScreen() {
               </View>
             </View>
             <Text style={styles.sectionDesc}>카운트다운 타이머 & QR/자막 워터마크로 전환율 극대화</Text>
+            <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.success[500] + '18' }]}>
+              <Text style={[styles.beginnerBadgeText, { color: theme.colors.success[400] }]}>QR 코드 → 영상에 삽입 → 스캔 시 구매</Text>
+            </View>
 
             {/* Countdown Timer Card */}
             <View style={styles.countdownCard}>
@@ -789,6 +804,19 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginBottom: 10,
     lineHeight: 17,
+  },
+  beginnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.full,
+    marginBottom: 10,
+  },
+  beginnerBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   selectGrid: {
     gap: 8,
