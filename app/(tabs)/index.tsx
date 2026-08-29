@@ -2417,6 +2417,7 @@ const styles = StyleSheet.create({
   cameraPreviewWrap: {
     width: '100%',
     aspectRatio: 1,
+    flexShrink: 0,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
     backgroundColor: '#000',
