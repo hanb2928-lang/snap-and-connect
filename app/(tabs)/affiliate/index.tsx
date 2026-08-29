@@ -70,6 +70,7 @@ import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { TrendingProductCuration } from '@/components/TrendingProductCuration';
+import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -82,6 +83,10 @@ const PLATFORMS = [
   { key: 'Kurly', label: '컬리', icon: ShoppingBasket, color: '#5F0080', signupUrl: 'https://kurly.com/', desc: '컬리 상품 링크를 공유하세요' },
   { key: 'MyRealTrip', label: '마이리얼트립', icon: Palmtree, color: '#FF6B35', signupUrl: 'https://www.myrealtrip.com/', desc: '여행 상품 링크를 공유하세요' },
   { key: 'Klook', label: '클룩', icon: Ticket, color: '#FF5722', signupUrl: 'https://www.klook.com/', desc: '여행 활동 링크를 공유하세요' },
+  // Global affiliate platforms
+  { key: 'Amazon', label: 'Amazon Associates', icon: ShoppingBag, color: '#FF9900', signupUrl: 'https://affiliate-program.amazon.com/', desc: '아마존 상품 링크로 글로벌 수수료를 받으세요' },
+  { key: 'AliExpress', label: 'AliExpress Affiliate', icon: Globe, color: '#E62E04', signupUrl: 'https://portals.aliexpress.com/', desc: '알리익스프레스 제휴 링크로 전 세계 고객에게 홍보하세요' },
+  { key: 'Shopee', label: 'Shopee Affiliate', icon: ShoppingBag, color: '#EE4D2D', signupUrl: 'https://shopee.com/m/affiliate-program', desc: '동남아시아 쇼피 플랫폼 제휴 링크를 발급받으세요' },
 ] as const;
 
 const UPLOAD_PLATFORMS = [
@@ -1400,6 +1405,22 @@ export default function AffiliateScreen() {
         </VerticalSectionCard>
         </View>
 
+        {/* Global Localization — multilingual caption & TTS translation */}
+        {(contentText || productMeta?.productName) && (
+          <View style={styles.globalLocalizerWrap}>
+            <GlobalLocalizer
+              hook={contentText.slice(0, 100) || productMeta?.productName || ''}
+              title={productMeta?.productName || ''}
+              caption={contentText || ''}
+              hashtags={[]}
+              productName={productMeta?.productName || ''}
+              productCategory={productMeta?.description || ''}
+              narrationText={contentText.slice(0, 200)}
+              affiliateUrl={affiliateUrl}
+            />
+          </View>
+        )}
+
         {/* Recent revenue */}
         <Text style={styles.sectionTitle}>최근 수익 기록</Text>
         {revenue.length === 0 ? (
@@ -2522,6 +2543,9 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.sm,
+  },
+  globalLocalizerWrap: {
+    marginBottom: theme.spacing.md,
   },
   emptyRevenue: {
     alignItems: 'center',

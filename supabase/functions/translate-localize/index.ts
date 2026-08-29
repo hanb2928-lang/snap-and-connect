@@ -119,13 +119,18 @@ async function resolveOpenAIKey(): Promise<string | null> {
 }
 
 const LANG_INFO: Record<string, { code: string; nativeName: string; voice: string; platform: string }> = {
-  en: { code: 'en', nativeName: 'English', voice: 'alloy', platform: 'TikTok Shop US' },
-  ja: { code: 'ja', nativeName: '日本語', voice: 'nova', platform: 'TikTok Shop JP' },
-  zh: { code: 'zh', nativeName: '中文', voice: 'echo', platform: 'TikTok Shop CN' },
-  es: { code: 'es', nativeName: 'Español', voice: 'shimmer', platform: 'TikTok Shop LATAM' },
-  vi: { code: 'vi', nativeName: 'Tiếng Việt', voice: 'alloy', platform: 'TikTok Shop VN' },
-  th: { code: 'th', nativeName: 'ภาษาไทย', voice: 'nova', platform: 'TikTok Shop TH' },
-  id: { code: 'id', nativeName: 'Bahasa Indonesia', voice: 'echo', platform: 'TikTok Shop ID' },
+  en: { code: 'en', nativeName: 'English', voice: 'alloy', platform: 'Amazon US / TikTok Shop US' },
+  ja: { code: 'ja', nativeName: '日本語', voice: 'nova', platform: 'Amazon JP / TikTok Shop JP' },
+  zh: { code: 'zh', nativeName: '中文', voice: 'echo', platform: 'AliExpress / TikTok Shop CN' },
+  es: { code: 'es', nativeName: 'Español', voice: 'shimmer', platform: 'Amazon ES / TikTok Shop LATAM' },
+  vi: { code: 'vi', nativeName: 'Tiếng Việt', voice: 'alloy', platform: 'Shopee VN / TikTok Shop VN' },
+  th: { code: 'th', nativeName: 'ภาษาไทย', voice: 'nova', platform: 'Shopee TH / TikTok Shop TH' },
+  id: { code: 'id', nativeName: 'Bahasa Indonesia', voice: 'echo', platform: 'Shopee ID / TikTok Shop ID' },
+  pt: { code: 'pt', nativeName: 'Português', voice: 'shimmer', platform: 'Amazon BR / TikTok Shop BR' },
+  fr: { code: 'fr', nativeName: 'Français', voice: 'alloy', platform: 'Amazon FR / TikTok Shop FR' },
+  de: { code: 'de', nativeName: 'Deutsch', voice: 'echo', platform: 'Amazon DE / TikTok Shop DE' },
+  ar: { code: 'ar', nativeName: 'العربية', voice: 'nova', platform: 'AliExpress ME / TikTok Shop ME' },
+  hi: { code: 'hi', nativeName: 'हिन्दी', voice: 'shimmer', platform: 'Amazon IN / TikTok Shop IN' },
 };
 
 async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promise<LocalizeResponse> {
@@ -133,13 +138,14 @@ async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promis
     .map(l => LANG_INFO[l])
     .filter((l): l is NonNullable<typeof l> => Boolean(l));
   if (langInfos.length === 0) {
-    throw new Error("지원하지 않는 언어 코드입니다. 지원 언어: en, ja, zh, th, id");
+    throw new Error("지원하지 않는 언어 코드입니다.");
   }
 
   const systemPrompt =
     "너는 글로벌 숏폼 로컬라이징 전문가야. 한국어 콘텐츠를 각 국가 언어로 자연스럽게 번역하고 현지화해.\n" +
     "단순 번역이 아니라 현지 문화와 숏폼 트렌드에 맞게 후킹 문구와 캡션을 재작성해.\n" +
-    "해시태그는 각 국가에서 인기 있는 것으로 현지화해.\n" +
+    "해시태그는 각 국가에서 인기 있는 것으로 현지화해. 아랍어는 RTL 방향성을 고려해.\n" +
+    "각 언어별로 글로벌 이커머스 플랫폼(Amazon, AliExpress, Shopee, TikTok Shop)의 현지 마켓에 맞는 표현을 사용해.\n" +
     "결과는 JSON만 반환: { \"localizations\": [{ \"language\": \"English\", \"languageCode\": \"en\", \"hook\": \"...\", \"title\": \"...\", \"caption\": \"...\", \"hashtags\": [\"...\"], \"narrationText\": \"...\" }] }";
 
   const userPrompt =
@@ -151,7 +157,7 @@ async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promis
     `카테고리: ${data.productCategory || ''}\n` +
     `내레이션 텍스트: ${data.narrationText || ''}\n` +
     `대상 언어: ${langInfos.map(l => `${l.code}(${l.nativeName})`).join(', ')}\n` +
-    `각 언어별로 현지화된 콘텐츠를 작성해.`;
+    `각 언어별로 현지화된 콘텐츠를 작성해. 해시태그는 각 국가에서 실제로 인기 있는 태그로 교체해.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -165,7 +171,7 @@ async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promis
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 2500,
+      max_tokens: 4000,
       response_format: { type: "json_object" },
     }),
   });
@@ -196,7 +202,7 @@ async function localizeWithOpenAI(data: LocalizeRequest, apiKey: string): Promis
       title: String(loc.title || '').slice(0, 100),
       caption: String(loc.caption || '').slice(0, 1000),
       hashtags: Array.isArray(loc.hashtags) ? loc.hashtags.slice(0, 10).map((h: any) => String(h).slice(0, 50)) : [],
-      narrationText: String(loc.narrationText || '').slice(0, 300),
+      narrationText: String(loc.narrationText || '').slice(0, 500),
       ttsVoice: info.voice,
       affiliatePlatform: info.platform,
       affiliateUrl: data.affiliateUrl || '',

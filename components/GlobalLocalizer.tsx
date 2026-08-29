@@ -5,13 +5,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
   Platform,
 } from 'react-native';
 
-import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause } from 'lucide-react-native';
+import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause, Copy, Globe as Globe2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { TARGET_LANGUAGES } from '@/lib/globalAffiliate';
+import { getMultilingualVoice } from '@/lib/ttsVoices';
 
 interface LocalizedContent {
   language: string;
@@ -38,16 +39,6 @@ interface GlobalLocalizerProps {
   preloadedKoreanTtsUrl?: string | null;
 }
 
-const TARGET_LANGUAGES = [
-  { label: 'English', code: 'en', flag: 'US' },
-  { label: '日本語', code: 'ja', flag: 'JP' },
-  { label: '中文', code: 'zh', flag: 'CN' },
-  { label: 'Español', code: 'es', flag: 'ES' },
-  { label: 'Tiếng Việt', code: 'vi', flag: 'VN' },
-  { label: 'ภาษาไทย', code: 'th', flag: 'TH' },
-  { label: 'Bahasa', code: 'id', flag: 'ID' },
-];
-
 export function GlobalLocalizer({
   hook,
   title,
@@ -66,8 +57,10 @@ export function GlobalLocalizer({
   const [error, setError] = useState<string | null>(null);
   const [expandedLang, setExpandedLang] = useState<string | null>(null);
   const [ttsResults, setTtsResults] = useState<Record<string, string>>({});
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [guideExpanded, setGuideExpanded] = useState(false);
   const [koreanTtsPlaying, setKoreanTtsPlaying] = useState(false);
+  const [showGlobalOnly, setShowGlobalOnly] = useState(false);
 
   const handlePlayKoreanTTS = useCallback(async () => {
     if (!preloadedKoreanTtsUrl) return;
@@ -137,6 +130,9 @@ export function GlobalLocalizer({
     if (!text) return;
     setTtsLoading(langCode);
     try {
+      const multilingualVoice = getMultilingualVoice(langCode);
+      const ttsVoice = multilingualVoice?.openaiVoice || voice;
+      const instructions = multilingualVoice?.instructions;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(TTS_FUNCTION_URL, {
@@ -145,7 +141,7 @@ export function GlobalLocalizer({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${supabaseAnonKey}`,
         },
-        body: JSON.stringify({ text, voice, speed: 1.0 }),
+        body: JSON.stringify({ text, voice: ttsVoice, speed: 1.0, instructions }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -186,7 +182,7 @@ export function GlobalLocalizer({
       </View>
 
       <Text style={styles.description}>
-        버튼 하나로 후킹, 캡션, 해시태그, AI 내레이션을 7개국 언어로 동시 번역하고 글로벌 이커머스 링크를 연동합니다. 각 국가의 틱톡샵 플랫폼에 맞춰 현지화된 카피와 AI 성우 음성을 자동 생성합니다.
+        버튼 하나로 후킹, 캡션, 해시태그, AI 내레이션을 12개국 언어로 동시 번역하고 글로벌 이커머스 링크를 연동합니다. Amazon, AliExpress, Shopee 등 글로벌 제휴 플랫폼과 각 국가의 TikTok Shop에 맞춰 현지화된 카피와 AI 성우 음성을 자동 생성합니다.
       </Text>
 
       <TouchableOpacity
@@ -207,7 +203,7 @@ export function GlobalLocalizer({
           </View>
           <View style={styles.guideStep}>
             <Text style={styles.guideStepNum}>2</Text>
-            <Text style={styles.guideStepText}>"동시 번역" 버튼을 누르면 AI가 후킹·캡션·해시태그를 현지화합니다</Text>
+            <Text style={styles.guideStepText}>&quot;동시 번역&quot; 버튼을 누르면 AI가 후킹·캡션·해시태그를 현지화합니다</Text>
           </View>
           <View style={styles.guideStep}>
             <Text style={styles.guideStepNum}>3</Text>
@@ -215,7 +211,7 @@ export function GlobalLocalizer({
           </View>
           <View style={styles.guideStep}>
             <Text style={styles.guideStepNum}>4</Text>
-            <Text style={styles.guideStepText}>"AI 음성 생성"으로 현지 언어 내레이션을 만들고 재생하세요</Text>
+            <Text style={styles.guideStepText}>&quot;AI 음성 생성&quot;으로 현지 언어 내레이션을 만들고 재생하세요</Text>
           </View>
           <View style={styles.guideTipRow}>
             <ShoppingBag size={10} color={theme.colors.primary[300]} strokeWidth={2} />
@@ -224,7 +220,17 @@ export function GlobalLocalizer({
         </View>
       )}
 
-      <Text style={styles.optionLabel}>대상 언어 선택</Text>
+      <Text style={styles.optionLabel}>대상 언어 선택 (12개국)</Text>
+      <TouchableOpacity
+        style={styles.filterToggle}
+        onPress={() => setShowGlobalOnly(!showGlobalOnly)}
+        activeOpacity={0.7}
+      >
+        <Globe2 size={11} color={showGlobalOnly ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
+        <Text style={[styles.filterToggleText, showGlobalOnly && { color: theme.colors.primary[300] }]}>
+          {showGlobalOnly ? '글로벌 플랫폼 대상만 보기' : '전체 언어 보기'}
+        </Text>
+      </TouchableOpacity>
       <View style={styles.langGrid}>
         {TARGET_LANGUAGES.map((lang) => (
           <TouchableOpacity
@@ -312,11 +318,51 @@ export function GlobalLocalizer({
               {expandedLang === loc.languageCode && (
                 <View style={styles.langCardBody}>
                   <View style={styles.fieldBox}>
-                    <Text style={styles.fieldLabel}>후킹</Text>
+                    <View style={styles.fieldHeader}>
+                      <Text style={styles.fieldLabel}>후킹</Text>
+                      <TouchableOpacity
+                        style={styles.fieldCopyBtn}
+                        onPress={async () => {
+                          try {
+                            if (Platform.OS === 'web') {
+                              await navigator.clipboard.writeText(loc.hook);
+                            }
+                          } catch {}
+                          setCopiedField(`${loc.languageCode}-hook`);
+                          setTimeout(() => setCopiedField(null), 2000);
+                        }}
+                      >
+                        {copiedField === `${loc.languageCode}-hook` ? (
+                          <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />
+                        ) : (
+                          <Copy size={10} color={theme.colors.dark.textDim} strokeWidth={2} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                     <Text style={styles.fieldValue}>{loc.hook}</Text>
                   </View>
                   <View style={styles.fieldBox}>
-                    <Text style={styles.fieldLabel}>캡션</Text>
+                    <View style={styles.fieldHeader}>
+                      <Text style={styles.fieldLabel}>캡션</Text>
+                      <TouchableOpacity
+                        style={styles.fieldCopyBtn}
+                        onPress={async () => {
+                          try {
+                            if (Platform.OS === 'web') {
+                              await navigator.clipboard.writeText(loc.caption);
+                            }
+                          } catch {}
+                          setCopiedField(`${loc.languageCode}-caption`);
+                          setTimeout(() => setCopiedField(null), 2000);
+                        }}
+                      >
+                        {copiedField === `${loc.languageCode}-caption` ? (
+                          <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />
+                        ) : (
+                          <Copy size={10} color={theme.colors.dark.textDim} strokeWidth={2} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                     <Text style={styles.fieldValue}>{loc.caption}</Text>
                   </View>
                   <View style={styles.fieldBox}>
@@ -660,5 +706,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    marginBottom: theme.spacing.xs,
+  },
+  filterToggleText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  fieldHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  fieldCopyBtn: {
+    padding: 2,
   },
 });

@@ -63,3 +63,30 @@ export function getOpenAiVoiceParams(key: string, speedOverride?: number | null)
   const speed = speedOverride != null ? Math.min(Math.max(speedOverride, 0.5), 2.0) : baseSpeed;
   return { voice: v?.openaiVoice ?? 'alloy', speed, instructions: v?.instructions };
 }
+
+export interface MultilingualVoice {
+  code: string;
+  label: string;
+  nativeName: string;
+  openaiVoice: string;
+  instructions: string;
+}
+
+export const MULTILINGUAL_VOICES: MultilingualVoice[] = [
+  { code: 'en', label: 'English', nativeName: 'English', openaiVoice: 'alloy', instructions: 'Speak in a natural, engaging American English tone like a social media influencer reviewing a product.' },
+  { code: 'ja', label: '日本語', nativeName: '日本語', openaiVoice: 'nova', instructions: 'Speak in a natural, energetic Japanese tone like a TikTok creator reviewing a product.' },
+  { code: 'zh', label: '中文', nativeName: '中文', openaiVoice: 'echo', instructions: 'Speak in a natural, engaging Mandarin Chinese tone like a social media product reviewer.' },
+  { code: 'es', label: 'Español', nativeName: 'Español', openaiVoice: 'shimmer', instructions: 'Speak in a natural, energetic Latin American Spanish tone like a product reviewer on TikTok.' },
+  { code: 'vi', label: 'Tiếng Việt', nativeName: 'Tiếng Việt', openaiVoice: 'alloy', instructions: 'Speak in a natural, engaging Vietnamese tone like a TikTok product reviewer.' },
+  { code: 'th', label: 'ภาษาไทย', nativeName: 'ภาษาไทย', openaiVoice: 'nova', instructions: 'Speak in a natural, friendly Thai tone like a social media product reviewer.' },
+  { code: 'id', label: 'Bahasa', nativeName: 'Bahasa Indonesia', openaiVoice: 'echo', instructions: 'Speak in a natural, engaging Indonesian tone like a TikTok product reviewer.' },
+  { code: 'pt', label: 'Português', nativeName: 'Português', openaiVoice: 'shimmer', instructions: 'Speak in a natural, energetic Brazilian Portuguese tone like a product reviewer on TikTok.' },
+  { code: 'fr', label: 'Français', nativeName: 'Français', openaiVoice: 'alloy', instructions: 'Speak in a natural, engaging French tone like a social media product reviewer.' },
+  { code: 'de', label: 'Deutsch', nativeName: 'Deutsch', openaiVoice: 'echo', instructions: 'Speak in a natural, clear German tone like a product reviewer on social media.' },
+  { code: 'ar', label: 'العربية', nativeName: 'العربية', openaiVoice: 'nova', instructions: 'Speak in a natural, engaging Modern Standard Arabic tone like a social media product reviewer.' },
+  { code: 'hi', label: 'हिन्दी', nativeName: 'हिन्दी', openaiVoice: 'shimmer', instructions: 'Speak in a natural, energetic Hindi tone like a TikTok product reviewer in India.' },
+];
+
+export function getMultilingualVoice(code: string): MultilingualVoice | undefined {
+  return MULTILINGUAL_VOICES.find((v) => v.code === code);
+}
