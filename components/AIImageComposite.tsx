@@ -8,8 +8,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  ViewStyle,
 } from 'react-native';
 import { Lightbulb, Check, Sun, Moon, Sparkles, Camera, Store, Palette, Upload, RefreshCw, CircleAlert as AlertCircle, Image as ImageIcon } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { captureRef } from 'react-native-view-shot';
 import { theme } from '@/lib/theme';
 import { friendlyError } from '@/lib/errors';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -62,6 +65,8 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
   const [selectedBackground, setSelectedBackground] = useState<BackgroundStyle | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mobileGradient, setMobileGradient] = useState<[string, string]>(['#ffffff', '#f0f0f0']);
+  const compositeRef = useRef<View>(null);
 
   const handlePickSource = useCallback(async () => {
     setError(null);
@@ -121,7 +126,20 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
             );
           }
         } else {
-          throw new Error('모바일 앱에서는 조명 합성 기능이 곧 지원될 예정입니다. 웹에서 이용해주세요.');
+          const gradient: [string, string] =
+            mode === 'lighting'
+              ? (LIGHTING_PRESETS.find((p) => p.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'])
+              : (BACKGROUND_PRESETS.find((b) => b.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0']);
+          setMobileGradient(gradient);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (!compositeRef.current) throw new Error('합성 뷰를 초기화하지 못했습니다.');
+          const uri = await captureRef(compositeRef, {
+            format: 'png',
+            quality: 0.95,
+            width: 1080,
+            height: 1080,
+          });
+          result = buildDataUrl(cleanBase64(uri), 'image/png');
         }
 
         if (!result) throw new Error('합성 결과를 생성하지 못했습니다.');
@@ -136,7 +154,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         setStep('error');
       }
     },
-    [sourceImage, mode, onResult],
+    [sourceImage, mode, onResult, mobileGradient],
   );
 
   const handleReset = useCallback(() => {
@@ -297,6 +315,27 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         <View style={styles.errorBanner}>
           <AlertCircle size={14} color={theme.colors.error[400]} strokeWidth={2} />
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {/* Mobile composite capture target (hidden off-screen) */}
+      {Platform.OS !== 'web' && sourceImage && step === 'processing' && (
+        <View
+          ref={compositeRef}
+          style={styles.mobileCaptureTarget as ViewStyle}
+          collapsable={false}
+        >
+          <LinearGradient
+            colors={mobileGradient}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+          <Image
+            source={{ uri: buildDataUrl(sourceImage, 'image/jpeg') }}
+            style={styles.mobileCaptureImage}
+            resizeMode="contain"
+          />
         </View>
       )}
 
@@ -663,5 +702,19 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 16,
+  },
+  mobileCaptureTarget: {
+    position: 'absolute',
+    width: 1080,
+    height: 1080,
+    left: -9999,
+    top: 0,
+    overflow: 'hidden',
+  },
+  mobileCaptureImage: {
+    width: '82%',
+    height: '82%',
+    alignSelf: 'center',
+    marginTop: '9%',
   },
 });

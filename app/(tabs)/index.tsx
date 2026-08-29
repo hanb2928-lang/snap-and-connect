@@ -1031,7 +1031,7 @@ export default function CameraScreen() {
             <Flame size={28} color={theme.colors.warning[400]} strokeWidth={2.2} />
           </View>
           <View style={styles.marketingCtaTextWrapLarge}>
-            <Text style={styles.marketingCtaTitleLarge}>이 사진으로 1초 AI 마케팅 영상 만들기</Text>
+            <Text style={styles.marketingCtaTitleLarge}>이 사진으로 AI 마케팅 영상 만들기</Text>
             <Text style={styles.marketingCtaDescLarge}>
               훅 선택 · 템플릿 · 카피 · TTS까지 한 번에
             </Text>
