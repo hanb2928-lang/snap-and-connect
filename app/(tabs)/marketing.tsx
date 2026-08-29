@@ -12,7 +12,6 @@ import {
   Image,
   Dimensions,
   AppState,
-  I18nManager,
 } from 'react-native';
 import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout, Clock, Type, Music, ChevronDown, Settings, CreditCard as Edit3, Stamp } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -147,8 +146,7 @@ export default function MarketingScreen() {
         targetRef.measureLayout(
           scrollRef.current as any,
           (_x, y) => {
-            const yOffset = I18nManager.isRTL ? y * -1 : y;
-            scrollRef.current?.scrollTo({ y: yOffset - 20, animated: true });
+            scrollRef.current?.scrollTo({ y: y - 20, animated: true });
           },
           () => {},
         );
@@ -157,16 +155,12 @@ export default function MarketingScreen() {
   };
 
   const checkHandoff = useCallback(async () => {
-    const flag = await getItem('marketing_handoff');
-    if (flag === 'true') {
-      setHandoffMode(true);
-      await setItem('marketing_handoff', 'false');
-      const img = await getItem('marketing_handoff_image');
+    const img = await getItem('marketing_handoff_image');
+    if (img) {
       const mime = await getItem('marketing_handoff_mime');
-      if (img) {
-        setHandoffImage(img);
-        setHandoffMime(mime || 'image/jpeg');
-      }
+      setHandoffMode(true);
+      setHandoffImage(img);
+      setHandoffMime(mime || 'image/jpeg');
     }
   }, []);
 
@@ -324,6 +318,9 @@ export default function MarketingScreen() {
       await setItem('marketing_caption_tone', captionTone);
       await setItem('marketing_bgm_mood', bgmMood);
       await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
+      await setItem('marketing_handoff', 'false');
+      await setItem('marketing_handoff_image', '');
+      await setItem('marketing_handoff_mime', '');
       try {
         const settings = await getUserSettings();
         if (settings?.brand_persona) {
@@ -369,7 +366,12 @@ export default function MarketingScreen() {
       </View>
 
       {/* Quick Nav Bar */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickNav} contentContainerStyle={styles.quickNavContent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.quickNav}
+        contentContainerStyle={[styles.quickNavContent, isRTL && styles.quickNavContentRTL]}
+      >
         {QUICK_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
@@ -1226,6 +1228,9 @@ const styles = StyleSheet.create({
   quickNavContent: {
     paddingHorizontal: theme.spacing.lg,
     gap: 8,
+  },
+  quickNavContentRTL: {
+    flexDirection: 'row-reverse',
   },
   quickNavItem: {
     flexDirection: 'row',
