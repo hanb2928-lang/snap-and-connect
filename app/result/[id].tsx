@@ -98,9 +98,10 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
+import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -140,6 +141,7 @@ export default function ResultScreen() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
   const [scrollToCommerce, setScrollToCommerce] = useState(false);
+  const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -1245,6 +1247,24 @@ export default function ResultScreen() {
           ),
         },
         {
+          key: 'accountSafety',
+          label: '계정 안전 헬스체커',
+          description: '발행 간격 쿨다운 타이머 + 안전 점수로 섀도우반 방지',
+          category: 'export',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          render: () => (
+            <TouchableOpacity
+              style={styles.safetyTileBtn}
+              onPress={() => setSafetyCheckerVisible(true)}
+              activeOpacity={0.7}
+            >
+              <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={styles.safetyTileBtnText}>계정 안전 확인하기</Text>
+            </TouchableOpacity>
+          ),
+        },
+        {
           key: 'smartScheduler',
           label: '스마트 업로드 알림',
           description: '골든타임 예약 푸시 알림과 원클릭 캡션 복사',
@@ -1804,6 +1824,12 @@ export default function ResultScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <AccountSafetyChecker
+        platform={activePlatform}
+        visible={safetyCheckerVisible}
+        onClose={() => setSafetyCheckerVisible(false)}
+      />
     </View>
   );
 }
@@ -1979,6 +2005,22 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
+  },
+  safetyTileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.success[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '40',
+  },
+  safetyTileBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
   },
   analysisPendingCard: {
     marginHorizontal: theme.spacing.lg,

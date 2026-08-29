@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
-import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown } from 'lucide-react-native';
+import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
 import type { PlatformKey } from '@/types/database';
+import { spinCaption, type CaptionVariation } from '@/lib/humanLikeEngine';
 
 type CopyType = 'viral' | 'info' | 'deal';
 
@@ -66,6 +67,8 @@ export function CopyWriter({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showOtherVersions, setShowOtherVersions] = useState(false);
   const [otherVersionTab, setOtherVersionTab] = useState<CopyType>('info');
+  const [spinningKey, setSpinningKey] = useState<string | null>(null);
+  const [spunVariations, setSpunVariations] = useState<Record<string, CaptionVariation>>({});
 
   const handleGenerate = useCallback(async () => {
     if (!productName) return;
@@ -149,10 +152,21 @@ export function CopyWriter({
     }
   }, [otherGroups, otherVersionTab]);
 
+  const handleSpin = useCallback((item: CopyItem, cardKey: string) => {
+    setSpinningKey(cardKey);
+    const variation = spinCaption(item.hook, item.caption, item.hashtags);
+    setSpunVariations((prev) => ({ ...prev, [cardKey]: variation }));
+    setSpinningKey(null);
+  }, []);
+
   const renderCopyCard = (item: CopyItem, i: number, color: string, isBest: boolean) => {
     const cardKey = isBest ? `best-${i}` : `other-${otherVersionTab}-${i}`;
     const isExpanded = expandedKey === cardKey;
     const isCopied = copiedKey === cardKey;
+    const spun = spunVariations[cardKey];
+    const displayItem: CopyItem = spun
+      ? { hook: spun.hook, caption: spun.caption, hashtags: spun.hashtags }
+      : item;
     return (
       <View key={i} style={[styles.copyCard, isBest && styles.copyCardBest]}>
         <TouchableOpacity
@@ -167,7 +181,7 @@ export function CopyWriter({
               <Text style={[styles.copyIndex, { color: color }]}>{i + 1}</Text>
             )}
           </View>
-          <Text style={styles.copyHook} numberOfLines={isExpanded ? 0 : 1}>{item.hook}</Text>
+          <Text style={styles.copyHook} numberOfLines={isExpanded ? 0 : 1}>{displayItem.hook}</Text>
           {isExpanded ? (
             <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
           ) : (
@@ -177,10 +191,10 @@ export function CopyWriter({
 
         {isExpanded && (
           <View style={styles.copyBody}>
-            <Text style={styles.copyCaption}>{item.caption}</Text>
-            {item.hashtags.length > 0 && (
+            <Text style={styles.copyCaption}>{displayItem.caption}</Text>
+            {displayItem.hashtags.length > 0 && (
               <Text style={styles.copyHashtags}>
-                {item.hashtags.map((h) => `#${h}`).join(' ')}
+                {displayItem.hashtags.map((h) => `#${h}`).join(' ')}
               </Text>
             )}
           </View>
@@ -189,7 +203,7 @@ export function CopyWriter({
         <View style={styles.copyActions}>
           <TouchableOpacity
             style={[styles.copyBtn, isCopied && styles.copyBtnDone]}
-            onPress={() => handleCopy(item, cardKey)}
+            onPress={() => handleCopy(displayItem, cardKey)}
             activeOpacity={0.7}
           >
             {isCopied ? (
@@ -202,26 +216,39 @@ export function CopyWriter({
             </Text>
           </TouchableOpacity>
           {isExpanded && (
-            <TouchableOpacity
-              style={styles.copyBtn}
-              onPress={async () => {
-                try {
-                  if (Platform.OS === 'web' && navigator.clipboard) {
-                    await navigator.clipboard.writeText(item.hook);
-                  } else {
-                    await Clipboard.setStringAsync(item.hook);
+            <>
+              <TouchableOpacity
+                style={[styles.copyBtn, spinningKey === cardKey && styles.copyBtnActive]}
+                onPress={() => handleSpin(displayItem, cardKey)}
+                disabled={spinningKey === cardKey}
+                activeOpacity={0.7}
+              >
+                <Shuffle size={13} color={spun ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.copyBtnText, spun && { color: theme.colors.accent[400] }]}>
+                  {spun ? '스핀됨 · 다시' : '캡션 스핀'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.copyBtn}
+                onPress={async () => {
+                  try {
+                    if (Platform.OS === 'web' && navigator.clipboard) {
+                      await navigator.clipboard.writeText(displayItem.hook);
+                    } else {
+                      await Clipboard.setStringAsync(displayItem.hook);
+                    }
+                    setCopiedKey(cardKey);
+                    setTimeout(() => setCopiedKey(null), 2000);
+                  } catch {
+                    // clipboard failed silently
                   }
-                  setCopiedKey(cardKey);
-                  setTimeout(() => setCopiedKey(null), 2000);
-                } catch {
-                  // clipboard failed silently
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.copyBtnText}>후킹만 복사</Text>
-            </TouchableOpacity>
+                }}
+                activeOpacity={0.7}
+              >
+                <Copy size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.copyBtnText}>후킹만</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </View>
@@ -613,6 +640,9 @@ const styles = StyleSheet.create({
   },
   copyBtnDone: {
     backgroundColor: theme.colors.success[500] + '15',
+  },
+  copyBtnActive: {
+    backgroundColor: theme.colors.accent[500] + '15',
   },
   copyBtnText: {
     fontSize: 11,

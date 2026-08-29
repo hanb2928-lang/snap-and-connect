@@ -9,9 +9,10 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { ZoomIn, ZoomOut, Move, Film, Check, Loader, Download } from 'lucide-react-native';
+import { ZoomIn, ZoomOut, Move, Film, Check, Loader, Download, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { generateVisualParams, type VisualRandomizationParams } from '@/lib/humanLikeEngine';
 
 type MotionPreset = 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right' | 'tilt-up' | 'cinematic';
 
@@ -49,6 +50,8 @@ export function MotionZoomVideo({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [visualParams, setVisualParams] = useState<VisualRandomizationParams | null>(null);
+  const [randomizeEnabled, setRandomizeEnabled] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -75,23 +78,26 @@ export function MotionZoomVideo({
     return () => cleanup();
   }, [cleanup]);
 
-  const getMotionParams = useCallback((motion: MotionPreset, t: number) => {
-    // t: 0..1 progress through the video
+  const getMotionParams = useCallback((motion: MotionPreset, t: number, vp: VisualRandomizationParams | null) => {
+    // Apply human-like zoom speed randomization
+    const speedMul = vp ? vp.zoomSpeed : 1.0;
+    const tAdj = Math.min(t * speedMul, 1);
+    // t: 0..1 progress through the video (with randomization)
     switch (motion) {
       case 'zoom-in':
-        return { scale: 1.0 + t * 0.5, panX: 0, panY: 0 };
+        return { scale: 1.0 + tAdj * 0.5, panX: 0, panY: 0 };
       case 'zoom-out':
-        return { scale: 1.5 - t * 0.5, panX: 0, panY: 0 };
+        return { scale: 1.5 - tAdj * 0.5, panX: 0, panY: 0 };
       case 'pan-left':
-        return { scale: 1.3, panX: -t * 200, panY: 0 };
+        return { scale: 1.3, panX: -tAdj * (200 + (vp?.textXOffset ?? 0) * 4), panY: 0 };
       case 'pan-right':
-        return { scale: 1.3, panX: t * 200, panY: 0 };
+        return { scale: 1.3, panX: tAdj * (200 + (vp?.textXOffset ?? 0) * 4), panY: 0 };
       case 'tilt-up':
-        return { scale: 1.3, panX: 0, panY: -t * 200 };
+        return { scale: 1.3, panX: 0, panY: -tAdj * (200 + (vp?.textYOffset ?? 0) * 4) };
       case 'cinematic': {
-        const scale = 1.1 + t * 0.4;
-        const panX = Math.sin(t * Math.PI) * 80;
-        const panY = -t * 60;
+        const scale = 1.1 + tAdj * 0.4;
+        const panX = Math.sin(tAdj * Math.PI) * (80 + (vp?.textXOffset ?? 0) * 2);
+        const panY = -tAdj * (60 + (vp?.textYOffset ?? 0) * 2);
         return { scale, panX, panY };
       }
       default:
@@ -106,6 +112,10 @@ export function MotionZoomVideo({
     setVideoUrl(null);
     setProgress(0);
     cleanup();
+
+    // Generate human-like visual randomization params
+    const vp = randomizeEnabled ? generateVisualParams() : null;
+    setVisualParams(vp);
 
     try {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -173,13 +183,28 @@ export function MotionZoomVideo({
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
 
-        const { scale, panX, panY } = getMotionParams(selectedMotion, t);
+        const { scale, panX, panY } = getMotionParams(selectedMotion, t, vp);
         const drawW = baseW * scale;
         const drawH = baseH * scale;
         const drawX = (W - drawW) / 2 + panX;
         const drawY = (H - drawH) / 2 + panY;
 
         ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+        // Apply subtle pixel noise for fingerprint randomization
+        if (vp && Math.abs(vp.hueShift) > 0.01 && t > 0.98) {
+          try {
+            const noiseStrength = vp.hueShift / 100;
+            const imageData = ctx.getImageData(0, 0, W, H);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.max(0, Math.min(255, data[i] + noiseStrength * 2));
+            }
+            ctx.putImageData(imageData, 0, 0);
+          } catch {
+            // getImageData may fail if tainted, skip noise
+          }
+        }
 
         // Subtle cinematic vignette for cinematic mode
         if (selectedMotion === 'cinematic') {
@@ -216,7 +241,7 @@ export function MotionZoomVideo({
       setGenerating(false);
       setProgress(0);
     }
-  }, [generating, dataUrl, selectedMotion, getMotionParams, cleanup, onVideoReady]);
+  }, [generating, dataUrl, selectedMotion, getMotionParams, cleanup, onVideoReady, randomizeEnabled]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;
@@ -284,6 +309,18 @@ export function MotionZoomVideo({
       <Text style={styles.selectedDesc}>
         {MOTION_OPTIONS.find((m) => m.id === selectedMotion)?.desc} · 5초 · 1080×1920
       </Text>
+
+      {/* Randomization toggle */}
+      <TouchableOpacity
+        style={[styles.randomToggle, randomizeEnabled && styles.randomToggleActive]}
+        onPress={() => setRandomizeEnabled((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <Shuffle size={13} color={randomizeEnabled ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
+        <Text style={[styles.randomToggleText, randomizeEnabled && { color: theme.colors.accent[400] }]}>
+          {randomizeEnabled ? '인간형 무작위화 적용 중' : '무작위화 끄기'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Generate button */}
       {!generating && !videoUrl && (
@@ -411,6 +448,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  randomToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    alignSelf: 'flex-start',
+  },
+  randomToggleActive: {
+    borderColor: theme.colors.accent[400] + '60',
+    backgroundColor: theme.colors.accent[500] + '10',
+  },
+  randomToggleText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
   generateBtn: {
     flexDirection: 'row',

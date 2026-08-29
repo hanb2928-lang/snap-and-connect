@@ -34,8 +34,13 @@ Deno.serve(async (req: Request) => {
 
     const text = body.text.slice(0, 500);
     const voice = body.voice || "alloy";
-    const speed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
+    const baseSpeed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
     const instructions = body.instructions?.trim() || undefined;
+
+    // Human-like TTS variation: apply subtle speed jitter (±0.08)
+    // to avoid identical audio waveforms across generations
+    const speedJitter = (Math.random() - 0.5) * 0.16;
+    const speed = Math.min(Math.max(baseSpeed + speedJitter, 0.5), 2.0);
 
     const openaiKey = await resolveOpenAIKey();
 

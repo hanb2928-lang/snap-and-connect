@@ -1,9 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
-import { Hash, Copy, Check, TrendingUp } from 'lucide-react-native';
+import { Hash, Copy, Check, TrendingUp, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import * as Clipboard from 'expo-clipboard';
 import type { PlatformKey } from '@/types/database';
+import { mutateHashtags } from '@/lib/humanLikeEngine';
 
 interface HashtagCopyBarProps {
   hashtags: string[];
@@ -47,8 +48,10 @@ function matchCategoryKey(category: string): string | null {
 
 export function HashtagCopyBar({ hashtags, productCategory, platform }: HashtagCopyBarProps) {
   const [copied, setCopied] = useState(false);
+  const [mixed, setMixed] = useState(false);
+  const [mixCount, setMixCount] = useState(0);
 
-  const optimizedHashtags = useMemo(() => {
+  const baseHashtags = useMemo(() => {
     const limit = PLATFORM_TAG_LIMITS[platform] ?? 10;
     const existing = new Set(hashtags.map((h) => h.toLowerCase()));
 
@@ -75,6 +78,20 @@ export function HashtagCopyBar({ hashtags, productCategory, platform }: HashtagC
 
     return combined.slice(0, limit);
   }, [hashtags, productCategory, platform]);
+
+  const optimizedHashtags = useMemo(() => {
+    if (!mixed) return baseHashtags;
+    const limit = PLATFORM_TAG_LIMITS[platform] ?? 10;
+    const essentialCount = Math.min(2, hashtags.length);
+    const essential = baseHashtags.slice(0, essentialCount);
+    const pool = baseHashtags.slice(essentialCount);
+    return mutateHashtags(essential, pool, limit);
+  }, [baseHashtags, mixed, mixCount, hashtags.length, platform]);
+
+  const handleMix = useCallback(() => {
+    setMixed(true);
+    setMixCount((c) => c + 1);
+  }, []);
 
   const handleCopyAll = useCallback(async () => {
     const text = optimizedHashtags.map((h) => `#${h}`).join(' ');
@@ -119,20 +136,32 @@ export function HashtagCopyBar({ hashtags, productCategory, platform }: HashtagC
         ))}
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.copyAllBtn, copied && styles.copyAllBtnDone]}
-        onPress={handleCopyAll}
-        activeOpacity={0.8}
-      >
-        {copied ? (
-          <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
-        ) : (
-          <Copy size={16} color="#fff" strokeWidth={2} />
-        )}
-        <Text style={[styles.copyAllBtnText, copied && { color: theme.colors.success[400] }]}>
-          {copied ? '복사 완료! 바로 붙여넣으세요' : '해시태그 뭉치 복사'}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[styles.copyAllBtn, copied && styles.copyAllBtnDone, { flex: 1 }]}
+          onPress={handleCopyAll}
+          activeOpacity={0.8}
+        >
+          {copied ? (
+            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          ) : (
+            <Copy size={16} color="#fff" strokeWidth={2} />
+          )}
+          <Text style={[styles.copyAllBtnText, copied && { color: theme.colors.success[400] }]}>
+            {copied ? '복사 완료!' : '해시태그 복사'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.mixBtn, mixed && styles.mixBtnActive]}
+          onPress={handleMix}
+          activeOpacity={0.7}
+        >
+          <Shuffle size={14} color={mixed ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
+          <Text style={[styles.mixBtnText, mixed && { color: theme.colors.accent[400] }]}>
+            {mixed ? `믹스${mixCount > 0 ? ` ${mixCount}` : ''}` : '무작위 믹스'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -223,5 +252,30 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  mixBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  mixBtnActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '12',
+  },
+  mixBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
 });
