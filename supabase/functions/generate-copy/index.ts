@@ -17,6 +17,118 @@ function stripJsonFence(s: string): string {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+// ─── Hybrid AI Model Router ────────────────────────────────────────────
+// Routes simple tasks (short copy, basic hashtags) to gpt-4o-mini (95% cheaper)
+// and complex tasks (long creative copy, brand persona) to gpt-4o.
+function classifyCopyComplexity(data: CopyRequest): 'simple' | 'complex' {
+  // Brand persona and local store info require nuanced tone → complex
+  if (data.brandPersona && data.brandPersona.trim().length > 50) return 'complex';
+  if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) return 'complex';
+  // Long input with many advantages → complex
+  if (data.productAdvantages.length >= 5) return 'complex';
+  // 'all' mode generates 3 types → keep on mini for cost
+  return 'simple';
+}
+
+function pickModel(complexity: 'simple' | 'complex'): string {
+  return complexity === 'complex' ? 'gpt-4o' : 'gpt-4o-mini';
+}
+
+// ─── Content Cache ─────────────────────────────────────────────────────
+// Hashes the input and checks Supabase for a cached result before calling OpenAI.
+function contentHash(input: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  const len = input.length;
+  const step = Math.max(1, Math.floor(len / 2048));
+  for (let i = 0; i < len; i += step) {
+    const ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+
+function buildCopyCacheKey(data: CopyRequest): string {
+  const input = JSON.stringify({
+    n: data.productName,
+    c: data.productCategory,
+    p: data.priceEstimate,
+    o: data.oneLiner,
+    a: data.productAdvantages,
+    t: data.copyType,
+    pl: data.platform,
+    ls: data.localStoreInfo?.storeName ?? '',
+    bp: data.brandPersona ?? '',
+  });
+  return `generate-copy:${contentHash(input)}`;
+}
+
+async function checkCopyCache(cacheKey: string): Promise<{ copies: CopyItem[]; groups: CopyGroup[] } | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/ai_content_cache?select=result,model_used,hit_count&cache_key=eq.${cacheKey}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (!resp.ok) return null;
+    const rows = await resp.json() as Array<{ result: any; model_used: string; hit_count: number }>;
+    if (!rows[0]?.result) return null;
+
+    // Increment hit count (fire-and-forget)
+    fetch(`${supabaseUrl}/rest/v1/ai_content_cache?cache_key=eq.${cacheKey}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ hit_count: (rows[0].hit_count ?? 0) + 1, updated_at: new Date().toISOString() }),
+    }).catch(() => {});
+
+    return rows[0].result;
+  } catch {
+    return null;
+  }
+}
+
+async function storeCopyCache(cacheKey: string, result: any, modelUsed: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await fetch(`${supabaseUrl}/rest/v1/ai_content_cache`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        cache_key: cacheKey,
+        task_type: 'generate-copy',
+        input_hash: cacheKey.split(':')[1] ?? '',
+        result,
+        model_used: modelUsed,
+        expires_at: expiresAt,
+      }),
+    });
+  } catch {
+    // cache write failure is non-fatal
+  }
+}
+
 type CopyType = "deal" | "info" | "viral" | "all";
 type CopyPlatform = "shortform" | "instagram" | "blog" | "x" | "threads" | "naverBlog" | "twitter" | "smartstore" | "pinterest";
 
@@ -92,6 +204,25 @@ Deno.serve(async (req: Request) => {
     const count = body.count;
     const openaiKey = await resolveOpenAIKey();
     const isAllMode = body.copyType === "all";
+    const complexity = classifyCopyComplexity(body);
+    const model = pickModel(complexity);
+    const cacheKey = buildCopyCacheKey(body);
+
+    // Check cache first — skip API entirely on hit
+    const cached = await checkCopyCache(cacheKey);
+    if (cached) {
+      if (isAllMode && cached.groups) {
+        return new Response(
+          JSON.stringify({ groups: cached.groups, isFallback: false, cached: true, modelUsed: 'cache' }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } else if (cached.copies) {
+        return new Response(
+          JSON.stringify({ copies: cached.copies, isFallback: false, cached: true, modelUsed: 'cache' }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     if (isAllMode) {
       const types: CopyType[] = ["viral", "info", "deal"];
@@ -115,6 +246,9 @@ Deno.serve(async (req: Request) => {
         groups.push({ type: ct, label: typeLabel(ct), copies });
       }
 
+      // Store groups in cache
+      storeCopyCache(cacheKey, { groups }, model).catch(() => {});
+
       return new Response(
         JSON.stringify({ groups, isFallback }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -126,7 +260,7 @@ Deno.serve(async (req: Request) => {
 
     if (openaiKey) {
       try {
-        copies = await generateWithOpenAI(body, openaiKey, count);
+        copies = await generateWithOpenAI(body, openaiKey, count, model);
       } catch {
         copies = generateLocalCopies(body, count);
         isFallback = true;
@@ -136,8 +270,11 @@ Deno.serve(async (req: Request) => {
       isFallback = true;
     }
 
+    // Store in cache for future hits
+    storeCopyCache(cacheKey, { copies }, model).catch(() => {});
+
     return new Response(
-      JSON.stringify({ copies, isFallback }),
+      JSON.stringify({ copies, isFallback, modelUsed: isFallback ? 'local' : model }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
@@ -209,6 +346,7 @@ async function generateWithOpenAI(
   data: CopyRequest,
   apiKey: string,
   count: number,
+  model: string = 'gpt-4o-mini',
 ): Promise<CopyItem[]> {
   let systemPrompt =
     "너는 한국인 SNS 유저야. 마케터가 아니라 실제로 제품을 써본 사람처럼 글을 써.\n" +
@@ -278,7 +416,7 @@ async function generateWithOpenAI(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

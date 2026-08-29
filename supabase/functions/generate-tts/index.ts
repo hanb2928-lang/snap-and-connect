@@ -51,6 +51,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // ─── Content Cache: check for cached TTS by text hash ──────────────
+    // TTS for the same text+voice+speed produces identical audio — no need
+    // to call OpenAI again. 30-day TTL.
+    const ttsCacheKey = `generate-tts:${contentHashTts(`${text}|${voice}|${baseSpeed}`)}`;
+    const cachedTts = await checkTtsCache(ttsCacheKey);
+    if (cachedTts) {
+      return new Response(
+        JSON.stringify({
+          audioBase64: cachedTts,
+          mimeType: "audio/mpeg",
+          duration: estimateDuration(text, speed),
+          cached: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const ttsBody: Record<string, unknown> = {
       model: "gpt-4o-mini-tts",
       input: text,
@@ -89,6 +106,9 @@ Deno.serve(async (req: Request) => {
       binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
     }
     const base64Audio = btoa(binary);
+
+    // Store in cache for future hits (fire-and-forget)
+    storeTtsCache(ttsCacheKey, base64Audio).catch(() => {});
 
     return new Response(
       JSON.stringify({
@@ -143,4 +163,70 @@ async function resolveOpenAIKey(): Promise<string | null> {
     }
   }
   return null;
+}
+
+// ─── TTS Content Cache helpers ──────────────────────────────────────────
+function contentHashTts(input: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  const len = input.length;
+  for (let i = 0; i < len; i++) {
+    const ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+
+async function checkTtsCache(cacheKey: string): Promise<string | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/ai_content_cache?select=result&cache_key=eq.${cacheKey}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (!resp.ok) return null;
+    const rows = await resp.json() as Array<{ result: any }>;
+    if (!rows[0]?.result?.audioBase64) return null;
+    return rows[0].result.audioBase64 as string;
+  } catch {
+    return null;
+  }
+}
+
+async function storeTtsCache(cacheKey: string, audioBase64: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await fetch(`${supabaseUrl}/rest/v1/ai_content_cache`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        cache_key: cacheKey,
+        task_type: 'generate-tts',
+        input_hash: cacheKey.split(':')[1] ?? '',
+        result: { audioBase64 },
+        model_used: 'gpt-4o-mini-tts',
+        expires_at: expiresAt,
+      }),
+    });
+  } catch {
+    // cache write failure is non-fatal
+  }
 }
