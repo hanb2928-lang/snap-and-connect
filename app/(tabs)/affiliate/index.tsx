@@ -66,6 +66,7 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
+import { getDeepLink, getCaptionTemplate, buildPlatformCaption, getCaptionStyleDescription, type UploadPlatformKey } from '@/lib/platformUpload';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
 const PLATFORMS = [
@@ -177,8 +178,10 @@ export default function AffiliateScreen() {
 
   // Step 4: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
+  const [uploadedPlatforms, setUploadedPlatforms] = useState<Set<string>>(new Set());
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [previewUpload, setPreviewUpload] = useState<UploadPreviewData | null>(null);
+  const [deepLinkFeedback, setDeepLinkFeedback] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -403,9 +406,37 @@ export default function AffiliateScreen() {
     setAffiliateUrl(edited.affiliateUrl);
     setAutoDisclosure(edited.autoDisclosure);
     setUploadPlatform(previewUpload.platformKey);
+    setUploadedPlatforms((prev) => new Set(prev).add(previewUpload.platformKey));
     setPreviewUpload(null);
     markCompleted('upload');
   };
+
+  const handleOpenDeepLink = (key: string) => {
+    const dl = getDeepLink(key as UploadPlatformKey);
+    if (!dl) return;
+    setDeepLinkFeedback(key);
+    setTimeout(() => setDeepLinkFeedback(null), 2500);
+    Linking.openURL(dl.appUrl).catch(() => {
+      Linking.openURL(dl.webUrl).catch(() => {});
+    });
+  };
+
+  const handleMarkUploaded = (key: string) => {
+    setUploadedPlatforms((prev) => new Set(prev).add(key));
+    setUploadPlatform(key);
+    markCompleted('upload');
+  };
+
+  const platformCaptionData = useMemo(() => {
+    if (!uploadPlatform) return null;
+    return buildPlatformCaption(
+      uploadPlatform as UploadPlatformKey,
+      contentText,
+      affiliateUrl,
+      selectedPlatform ? [selectedPlatform] : [],
+      autoDisclosure,
+    );
+  }, [uploadPlatform, contentText, affiliateUrl, selectedPlatform, autoDisclosure]);
 
   const imagePreviewUri = useMemo(
     () => selectedImage
@@ -1078,7 +1109,7 @@ export default function AffiliateScreen() {
           {/* Caption preview with disclosure */}
           {autoDisclosure && disclosureText && (contentText || affiliateUrl).trim() && (
             <View style={styles.captionPreviewBox}>
-              <Text style={styles.captionPreviewLabel}>업로드 시 캡션 미리보기</Text>
+              <Text style={styles.captionPreviewLabel}>기본 캡션 미리보기</Text>
               <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
               <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
               <Text style={styles.captionPreviewContent}>
@@ -1093,32 +1124,106 @@ export default function AffiliateScreen() {
           <View style={styles.uploadGrid}>
             {UPLOAD_PLATFORMS.map((p) => {
               const Icon = p.icon;
-              const isUploaded = uploadPlatform === p.key;
+              const isUploaded = uploadedPlatforms.has(p.key);
+              const isActive = uploadPlatform === p.key;
+              const dl = getDeepLink(p.key as UploadPlatformKey);
+              const tmpl = getCaptionTemplate(p.key as UploadPlatformKey);
               return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.uploadCard, isUploaded && { borderColor: p.color, backgroundColor: p.color + '12' }]}
-                  onPress={() => handleUploadToPlatform(p.key)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.uploadIcon, { backgroundColor: p.color + '20' }]}>
-                    <Icon size={22} color={p.color} strokeWidth={2} />
-                  </View>
-                  <Text style={styles.uploadLabel}>{p.label}</Text>
-                  {isUploaded ? (
-                    <View style={styles.uploadDoneBadge}>
-                      <Check size={10} color="#fff" strokeWidth={2.5} />
-                      <Text style={styles.uploadDoneText}>완료</Text>
+                <View key={p.key} style={[styles.uploadCardWrap, isActive && { borderColor: p.color }]}>
+                  <TouchableOpacity
+                    style={[styles.uploadCard, isUploaded && { borderColor: p.color, backgroundColor: p.color + '12' }]}
+                    onPress={() => handleUploadToPlatform(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.uploadIcon, { backgroundColor: p.color + '20' }]}>
+                      <Icon size={22} color={p.color} strokeWidth={2} />
                     </View>
-                  ) : (
-                    <Text style={styles.uploadBtn}>업로드</Text>
+                    <Text style={styles.uploadLabel}>{p.label}</Text>
+                    {isUploaded ? (
+                      <View style={[styles.uploadDoneBadge, { backgroundColor: p.color }]}>
+                        <Check size={10} color="#fff" strokeWidth={2.5} />
+                        <Text style={styles.uploadDoneText}>완료</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.uploadBtn}>업로드</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Deep link button — opens the platform app directly */}
+                  <TouchableOpacity
+                    style={[styles.deepLinkBtn, { borderColor: p.color + '40' }]}
+                    onPress={() => handleOpenDeepLink(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    <ExternalLink size={12} color={p.color} strokeWidth={2} />
+                    <Text style={[styles.deepLinkBtnText, { color: p.color }]}>
+                      {deepLinkFeedback === p.key ? '앱 여는 중...' : dl.label}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Caption style description */}
+                  <Text style={styles.captionStyleDesc}>{tmpl.captionStyle}</Text>
+
+                  {/* Platform-specific hashtags */}
+                  <Text style={styles.platformHashtags} numberOfLines={1}>
+                    {tmpl.hashtagSet.join(' ')}
+                  </Text>
+
+                  {/* Mark as uploaded — manual tracking */}
+                  {!isUploaded && (
+                    <TouchableOpacity
+                      style={styles.markUploadedBtn}
+                      onPress={() => handleMarkUploaded(p.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
+                      <Text style={styles.markUploadedText}>업로드 완료로 표시</Text>
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
+                </View>
               );
             })}
           </View>
 
-          {uploadPlatform && (
+          {/* Platform-specific caption preview for the selected platform */}
+          {platformCaptionData && uploadPlatform && (
+            <View style={styles.platformCaptionPreviewBox}>
+              <Text style={styles.platformCaptionPreviewLabel}>
+                {UPLOAD_PLATFORMS.find((p) => p.key === uploadPlatform)?.label} 맞춤 캡션
+              </Text>
+              <Text style={styles.platformCaptionStyleHint}>
+                {getCaptionStyleDescription(uploadPlatform as UploadPlatformKey)}
+              </Text>
+              <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
+              <Text style={styles.platformCaptionText}>
+                {platformCaptionData.fullText}
+              </Text>
+            </View>
+          )}
+
+          {/* Upload checklist */}
+          {uploadedPlatforms.size > 0 && (
+            <View style={styles.uploadChecklistBox}>
+              <Text style={styles.uploadChecklistTitle}>업로드 체크리스트</Text>
+              {UPLOAD_PLATFORMS.filter((p) => uploadedPlatforms.has(p.key)).map((p) => {
+                const Icon = p.icon;
+                return (
+                  <View key={p.key} style={styles.checklistItem}>
+                    <View style={[styles.checklistIcon, { backgroundColor: p.color + '20' }]}>
+                      <Icon size={12} color={p.color} strokeWidth={2} />
+                    </View>
+                    <Text style={styles.checklistLabel}>{p.label}</Text>
+                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  </View>
+                );
+              })}
+              <Text style={styles.checklistHint}>
+                제작물 탭에서 해당 콘텐츠의 발행 상태가 '업로드 완료'로 표시됩니다.
+              </Text>
+            </View>
+          )}
+
+          {uploadPlatform && uploadedPlatforms.has(uploadPlatform) && (
             <View style={styles.uploadSuccessBox}>
               <Check size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <Text style={styles.uploadSuccessText}>
@@ -2288,5 +2393,116 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.accent[300],
     lineHeight: 17,
+  },
+  uploadCardWrap: {
+    width: '48%',
+    gap: 4,
+  },
+  deepLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 6,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  deepLinkBtnText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+  },
+  captionStyleDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  platformHashtags: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  markUploadedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.success[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingVertical: 5,
+    marginTop: 4,
+  },
+  markUploadedText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  platformCaptionPreviewBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    gap: 6,
+  },
+  platformCaptionPreviewLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  platformCaptionStyleHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 14,
+  },
+  platformCaptionText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 16,
+  },
+  uploadChecklistBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.success[500] + '30',
+    gap: 8,
+  },
+  uploadChecklistTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  checklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checklistIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: theme.radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checklistLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  checklistHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 14,
+    marginTop: 2,
   },
 });

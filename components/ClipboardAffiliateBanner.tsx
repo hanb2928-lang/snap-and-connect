@@ -7,7 +7,7 @@ import {
   Platform,
   LayoutAnimation,
 } from 'react-native';
-import { ClipboardPaste, Check, X, Link2 } from 'lucide-react-native';
+import { ClipboardPaste, Check, X } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface ClipboardAffiliateBannerProps {
