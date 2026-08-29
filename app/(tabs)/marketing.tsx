@@ -307,7 +307,7 @@ export default function MarketingScreen() {
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.generateBtnText}>3초 만에 숏폼 만들기</Text>
+          <Text style={styles.generateBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>

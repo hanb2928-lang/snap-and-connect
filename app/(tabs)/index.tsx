@@ -433,7 +433,7 @@ export default function CameraScreen() {
               {hasImage ? (
                 <>
                   <Flame size={26} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.captureBtnText}>3초 만에 숏폼 만들기</Text>
+                  <Text style={styles.captureBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
                   <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
                 </>
               ) : (
@@ -550,9 +550,9 @@ function WebSimpleScreen({
           <View style={styles.webHeroIcon}>
             <Sparkles size={40} color={theme.colors.primary[400]} strokeWidth={1.8} />
           </View>
-          <Text style={styles.webHeroTitle}>3초 만에 숏폼 만들기</Text>
+          <Text style={styles.webHeroTitle}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
           <Text style={styles.webHeroSub}>
-            사진을 올리면 AI가 제품을 분석하고 마케팅 숏폼을 자동 생성합니다
+            사진을 올리면 AI가 제품을 분석하고 동네 매장 홍보와 온라인 제휴 수익을 동시에 잡는 숏폼을 자동 생성합니다
           </Text>
         </View>
 
@@ -583,7 +583,7 @@ function WebSimpleScreen({
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.webGenerateBtnText}>3초 만에 숏폼 만들기</Text>
+          <Text style={styles.webGenerateBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
 

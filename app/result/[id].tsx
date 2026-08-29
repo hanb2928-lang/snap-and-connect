@@ -71,6 +71,7 @@ import { OcrTextExtractor } from '@/components/OcrTextExtractor';
 import { BellRing, ScanText as ScanTextIcon } from 'lucide-react-native';
 import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
+import { HybridBannerCard } from '@/components/HybridBannerCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
@@ -1612,6 +1613,12 @@ export default function ResultScreen() {
             onConnectLink={handleConnectLink}
           />
         ) : null}
+
+        {scan.hybrid_mapping && scan.hybrid_mapping.localStoreContext && (
+          <View style={styles.section}>
+            <HybridBannerCard hybridMapping={scan.hybrid_mapping} />
+          </View>
+        )}
 
         <View style={styles.body}>
           <View style={styles.titleRow}>

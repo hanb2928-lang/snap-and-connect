@@ -60,6 +60,22 @@ interface DetectedProduct {
   templateData: TemplateData;
 }
 
+interface LocalStoreContext {
+  isLocalStore: boolean;
+  storeType: string;
+  detectedItems: string[];
+  suggestedOffer: string;
+  neighborhoodTag: string;
+}
+
+interface HybridMapping {
+  localStoreContext: LocalStoreContext | null;
+  affiliateMatch: { platform: string; productName: string; price: string; url: string } | null;
+  combinedHook: string;
+  combinedCaption: string;
+  qrCouponText: string;
+}
+
 interface AnalysisResult {
   title: string;
   summary: string;
@@ -72,6 +88,8 @@ interface AnalysisResult {
   shoppingMatches: ShoppingMatch[];
   templateData: TemplateData;
   detectedProducts: DetectedProduct[];
+  localStoreContext?: LocalStoreContext | null;
+  hybridMapping?: HybridMapping | null;
 }
 
 const DEFAULT_TEMPLATE: TemplateData = {
@@ -243,6 +261,23 @@ async function analyzeWithOpenAI(
     productInstruction + "\n" +
     "For shoppingMatches, use the official Naver Brand Connect creator page: https://brandconnect.naver.com/about/creator\n" +
     "Also populate the top-level productName, productCategory, priceEstimate, oneLiner, shoppingMatches, and templateData with the FIRST/primary product's data for backward compatibility.\n" +
+    "\n" +
+    "LOCAL STORE DETECTION (CRITICAL):\n" +
+    "If the photo shows a local store scene (menu board, storefront sign, restaurant interior, cafe menu, market stall, salon price list, food display, etc.), set localStoreContext with:\n" +
+    "  - isLocalStore: true\n" +
+    "  - storeType: one of 'restaurant', 'cafe', 'bakery', 'salon', 'fashion', 'market', 'pharmacy', 'electronics', 'beauty', 'other'\n" +
+    "  - detectedItems: array of visible menu items or products (in Korean)\n" +
+    "  - suggestedOffer: a catchy today-only promotion phrase in Korean (e.g. '오늘만 김치찌개 5,000원!')\n" +
+    "  - neighborhoodTag: a Korean neighborhood-style tag (e.g. '동네맛집', '우리동네카페', '로컬스토어')\n" +
+    "\n" +
+    "HYBRID MAPPING (CRITICAL):\n" +
+    "If localStoreContext.isLocalStore is true, ALSO generate a hybridMapping object:\n" +
+    "  - localStoreContext: same as above\n" +
+    "  - affiliateMatch: if the detected items can be matched to an online affiliate product (e.g. a kitchen tool on the menu can be bought online), include { platform: 'Coupang' or 'Naver', productName, price, url: 'https://brandconnect.naver.com/about/creator' }. If no good match, set to null.\n" +
+    "  - combinedHook: a hook that combines the local store angle with the affiliate opportunity (e.g. '이 동네 숨은 맛집 + 집에서도 같은 맛?')\n" +
+    "  - combinedCaption: a 2-3 line caption combining the local store promo and the affiliate product link naturally\n" +
+    "  - qrCouponText: a short QR coupon banner text for the video ending credit (e.g. 'QR 스캔시 10% 할인쿠폰 + 온라인 주문 링크')\n" +
+    "If the photo is NOT a local store scene, set localStoreContext to null and hybridMapping to null.\n" +
     "Return ONLY valid JSON, no markdown." +
     styleHint;
 
@@ -593,6 +628,41 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
     shoppingMatches,
     templateData,
     detectedProducts,
+    localStoreContext: normalizeLocalStoreContext(raw.localStoreContext),
+    hybridMapping: normalizeHybridMapping(raw.hybridMapping),
+  };
+}
+
+function normalizeLocalStoreContext(raw: unknown): LocalStoreContext | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (obj.isLocalStore !== true) return null;
+  return {
+    isLocalStore: true,
+    storeType: String(obj.storeType || "other"),
+    detectedItems: Array.isArray(obj.detectedItems) ? obj.detectedItems.map(String).filter(Boolean) : [],
+    suggestedOffer: String(obj.suggestedOffer || ""),
+    neighborhoodTag: String(obj.neighborhoodTag || "동네맛집"),
+  };
+}
+
+function normalizeHybridMapping(raw: unknown): HybridMapping | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const ctx = normalizeLocalStoreContext(obj.localStoreContext);
+  if (!ctx) return null;
+  const am = obj.affiliateMatch as Record<string, unknown> | null;
+  return {
+    localStoreContext: ctx,
+    affiliateMatch: am && typeof am === "object" ? {
+      platform: String(am.platform || "Coupang"),
+      productName: String(am.productName || ""),
+      price: String(am.price || ""),
+      url: String(am.url || "https://brandconnect.naver.com/about/creator"),
+    } : null,
+    combinedHook: String(obj.combinedHook || ""),
+    combinedCaption: String(obj.combinedCaption || ""),
+    qrCouponText: String(obj.qrCouponText || "QR 스캔시 할인쿠폰 + 온라인 주문 링크"),
   };
 }
 

@@ -61,6 +61,27 @@ export interface LocalStoreInfo {
   todayOffer: string;
 }
 
+export interface LocalStoreContext {
+  isLocalStore: boolean;
+  storeType: string;
+  detectedItems: string[];
+  suggestedOffer: string;
+  neighborhoodTag: string;
+}
+
+export interface HybridMapping {
+  localStoreContext: LocalStoreContext | null;
+  affiliateMatch: {
+    platform: string;
+    productName: string;
+    price: string;
+    url: string;
+  } | null;
+  combinedHook: string;
+  combinedCaption: string;
+  qrCouponText: string;
+}
+
 export interface Scan {
   id: string;
   image_url: string;
@@ -82,6 +103,7 @@ export interface Scan {
   additional_image_urls?: string[] | null;
   custom_review?: CustomReview | null;
   local_store_info?: LocalStoreInfo | null;
+  hybrid_mapping?: HybridMapping | null;
   scan_source?: 'single' | 'multi' | 'template' | null;
   tts_url?: string | null;
   analysis_job_id?: string | null;
@@ -110,6 +132,8 @@ export interface AnalysisResult {
   shoppingMatches: ShoppingMatch[];
   templateData: TemplateData;
   detectedProducts: DetectedProduct[];
+  localStoreContext?: LocalStoreContext | null;
+  hybridMapping?: HybridMapping | null;
 }
 
 export interface UserSettings {

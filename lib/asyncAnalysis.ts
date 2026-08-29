@@ -204,6 +204,7 @@ async function createScanWithAnalysis(
     template_data: analysis.templateData,
     detected_products: analysis.detectedProducts,
     image_hash: imageHash,
+    hybrid_mapping: analysis.hybridMapping ?? null,
   };
 
   if (additionalUrls.length > 0) {
@@ -306,6 +307,7 @@ export async function finalizeAnalysisFromJob(
     template_data: analysis.templateData,
     detected_products: analysis.detectedProducts,
     analysis_job_id: null,
+    hybrid_mapping: analysis.hybridMapping ?? null,
   }).eq('id', scanId);
 
   if (error) throw new Error(`스캔 업데이트 실패: ${error.message}`);
@@ -348,5 +350,7 @@ function normalizeJobResult(data: Record<string, unknown>): AnalysisResult {
       caption: (data.caption as string) || '',
     },
     detectedProducts: Array.isArray(data.detectedProducts) ? data.detectedProducts : [],
+    localStoreContext: (data.localStoreContext as AnalysisResult['localStoreContext']) ?? null,
+    hybridMapping: (data.hybridMapping as AnalysisResult['hybridMapping']) ?? null,
   };
 }
