@@ -111,11 +111,11 @@ export default function CameraScreen() {
   const pinchScale = useSharedValue(1);
 
   const QUICK_NAV_ITEMS: { label: string; icon: React.ReactNode; color: string }[] = [
-    { label: '촬영', icon: <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[400] },
+    { label: '촬영·합성', icon: <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[400] },
     { label: '갤러리', icon: <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
-    { label: '피팅', icon: <Shirt size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
-    { label: '합성', icon: <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
-    { label: '생성', icon: <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[300] },
+    { label: 'AI 피팅', icon: <Shirt size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
+    { label: 'AI 합성', icon: <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
+    { label: '프롬프트', icon: <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[300] },
     { label: '마케팅', icon: <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
   ];
 
@@ -607,13 +607,85 @@ export default function CameraScreen() {
         scrollEnabled={!arMode}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={[2]}
       >
         <View style={styles.verticalHeader} onLayout={handleSectionLayout(0)}>
           <Text style={styles.verticalTitle}>{t('camera.heroTitle')}</Text>
           <Text style={styles.verticalSubtitle}>
-            아래 순서대로 따라 하시면 됩니다. 각 단계를 탭하여 진행하세요.
+            오늘 어떤 작업으로 소재를 만드시겠습니까? 아래에서 모드를 선택하세요.
           </Text>
+        </View>
+
+        {/* 3 Mode Entry Cards */}
+        <View style={styles.modeEntryGrid}>
+          <TouchableOpacity
+            style={styles.modeEntryCard}
+            onPress={() => handleScrollToSection(1)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+              <Camera size={44} color={theme.colors.primary[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.modeEntryTitle}>직접 촬영 & AI 합성</Text>
+            <Text style={styles.modeEntryDesc}>실물 촬영 후 조명·배경 스튜디오 합성</Text>
+            <View style={styles.modeEntryTagRow}>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Camera size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>촬영</Text>
+              </View>
+              <Text style={styles.modeEntryArrow}>→</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Lightbulb size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.warning[400] }]}>AI 합성</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.modeEntryCard}
+            onPress={() => handleScrollToSection(3)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
+              <Shirt size={44} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.modeEntryTitle}>AI 가상 피팅</Text>
+            <Text style={styles.modeEntryDesc}>평면 의류를 모델에게 자연스럽게 착용</Text>
+            <View style={styles.modeEntryTagRow}>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <Shirt size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.accent[300] }]}>의류 업로드</Text>
+              </View>
+              <Text style={styles.modeEntryArrow}>→</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <Sparkles size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.accent[300] }]}>AI 피팅</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.modeEntryCard}
+            onPress={() => handleScrollToSection(5)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
+              <Wand2 size={44} color={theme.colors.primary[300]} strokeWidth={2} />
+            </View>
+            <Text style={styles.modeEntryTitle}>AI 프롬프트 생성</Text>
+            <Text style={styles.modeEntryDesc}>문장 입력만으로 새로운 이미지 생성</Text>
+            <View style={styles.modeEntryTagRow}>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Wand2 size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>프롬프트</Text>
+              </View>
+              <Text style={styles.modeEntryArrow}>→</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Sparkles size={10} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>AI 생성</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.quickNavSticky}>
@@ -635,27 +707,14 @@ export default function CameraScreen() {
             ))}
           </ScrollView>
         </View>
-        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }} onLayout={handleSectionLayout(1)}>
-          <StepIndicator activeStep={1} />
-        </View>
 
-        <View style={styles.phaseDivider}>
-          <View style={styles.phaseDividerLine} />
-          <View style={styles.phaseDividerBadge}>
-            <Camera size={12} color={theme.colors.primary[300]} strokeWidth={2.5} />
-            <Text style={styles.phaseDividerText}>1단계: 소재 준비</Text>
-          </View>
-          <View style={styles.phaseDividerLine} />
-        </View>
-
-        <View onLayout={handleSectionLayout(2)}>
+        <View onLayout={handleSectionLayout(1)}>
         <VerticalSectionCard
-          icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
-          title="1. 사진 촬영"
+          icon={<Camera size={24} color={theme.colors.primary[400]} strokeWidth={2.5} />}
+          title="직접 촬영"
           desc="제품을 카메라에 맞추고 셔터 버튼을 눌러주세요."
           iconBg={theme.colors.primary[500] + '18'}
           accentColor={theme.colors.primary[400]}
-          stepNumber={1}
         >
           <View style={styles.cameraPreviewWrap}>
             {isActive && !arMode ? (
@@ -999,14 +1058,13 @@ export default function CameraScreen() {
 
         </View>
 
-        <View onLayout={handleSectionLayout(3)}>
+        <View onLayout={handleSectionLayout(2)}>
         <VerticalSectionCard
-          icon={<ImageIcon size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="2. 갤러리에서 불러오기"
+          icon={<ImageIcon size={24} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="갤러리에서 불러오기"
           desc="촬영 대신 앨범에 있는 사진이나 영상을 사용할 수 있어요."
           iconBg={theme.colors.accent[500] + '18'}
           accentColor={theme.colors.accent[400]}
-          stepNumber={2}
         >
           <View style={styles.verticalBtnRow}>
             <TouchableOpacity
@@ -1031,67 +1089,50 @@ export default function CameraScreen() {
 
         </View>
 
-        <View style={styles.phaseDivider}>
-          <View style={styles.phaseDividerLine} />
-          <View style={styles.phaseDividerBadge}>
-            <Sparkles size={12} color={theme.colors.accent[300]} strokeWidth={2.5} />
-            <Text style={styles.phaseDividerText}>2단계: AI 이미지 생성 · 보정</Text>
-          </View>
-          <View style={styles.phaseDividerLine} />
-        </View>
-
-        <View onLayout={handleSectionLayout(4)}>
+        <View onLayout={handleSectionLayout(3)}>
         <VerticalSectionCard
-          icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
-          title="3. AI 가상 피팅"
+          icon={<Shirt size={24} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="AI 가상 피팅"
           desc="마네킹/평면 의류 사진을 모델에게 자연스럽게 입혀 착용샷 완성"
-          iconBg={theme.colors.accent[500] + '18'}
+          iconBg={theme.colors.accent[500] + '22'}
           accentColor={theme.colors.accent[400]}
-          stepNumber={3}
         >
           <VirtualFitting />
         </VerticalSectionCard>
 
         </View>
 
-        <View onLayout={handleSectionLayout(5)}>
+        <View onLayout={handleSectionLayout(4)}>
         <VerticalSectionCard
-          icon={<Lightbulb size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="4. AI 이미지 합성"
+          icon={<Lightbulb size={24} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="AI 이미지 합성"
           desc="조명 스튜디오 합성 & 배경 교체로 전문 소재 완성"
-          iconBg={theme.colors.warning[500] + '18'}
+          iconBg={theme.colors.warning[500] + '22'}
           accentColor={theme.colors.warning[400]}
-          stepNumber={4}
         >
           <AIImageComposite />
         </VerticalSectionCard>
 
         </View>
 
-        <View onLayout={handleSectionLayout(6)}>
+        <View onLayout={handleSectionLayout(5)}>
         <VerticalSectionCard
-          icon={<Wand2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
-          title="5. 프롬프트 AI 이미지 생성"
+          icon={<Wand2 size={24} color={theme.colors.primary[300]} strokeWidth={2.5} />}
+          title="AI 프롬프트 이미지 생성"
           desc="문장을 입력하면 AI가 새로운 이미지를 자동 생성"
-          iconBg={theme.colors.primary[500] + '18'}
+          iconBg={theme.colors.primary[500] + '22'}
           accentColor={theme.colors.primary[300]}
-          stepNumber={5}
         >
           <PromptImageGenerator />
         </VerticalSectionCard>
 
-        <View style={styles.phaseDivider}>
-          <View style={styles.phaseDividerLine} />
-          <View style={[styles.phaseDividerBadge, { backgroundColor: theme.colors.warning[500] + '18', borderColor: theme.colors.warning[400] + '30' }]}>
-            <Flame size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
-            <Text style={[styles.phaseDividerText, { color: theme.colors.warning[400] }]}>3단계: 마케팅 숏폼 제작</Text>
-          </View>
-          <View style={styles.phaseDividerLine} />
         </View>
 
+        <View onLayout={handleSectionLayout(6)}>
+        <View style={styles.marketingSectionLabel}>
+          <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+          <Text style={styles.marketingSectionLabelText}>마케팅 숏폼 제작</Text>
         </View>
-
-        <View onLayout={handleSectionLayout(7)}>
         <TouchableOpacity
           style={styles.marketingCtaButtonLarge}
           onPress={() => {
@@ -1108,7 +1149,7 @@ export default function CameraScreen() {
           activeOpacity={0.85}
         >
           <View style={styles.marketingCtaIconLarge}>
-            <Flame size={28} color={theme.colors.warning[400]} strokeWidth={2.2} />
+            <Flame size={32} color={theme.colors.warning[400]} strokeWidth={2.5} />
           </View>
           <View style={styles.marketingCtaTextWrapLarge}>
             <Text style={styles.marketingCtaTitleLarge}>이 사진으로 AI 마케팅 영상 만들기</Text>
@@ -2785,6 +2826,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     marginHorizontal: -theme.spacing.lg,
   },
+  modeEntryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  modeEntryCard: {
+    width: '48.5%',
+    backgroundColor: theme.glass.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.glass.border,
+    padding: theme.spacing.md,
+    gap: 6,
+  },
+  modeEntryIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modeEntryTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  modeEntryDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  modeEntryTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  modeEntryTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.sm,
+  },
+  modeEntryTagText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  modeEntryArrow: {
+    fontSize: 10,
+    color: theme.colors.dark.textFaint,
+  },
   quickNavScroll: {
     gap: 6,
     alignItems: 'center',
@@ -3103,15 +3200,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.warning[500] + '18',
-    borderRadius: theme.radius.xl,
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-    gap: 16,
-    borderWidth: 2.5,
-    borderColor: theme.colors.warning[400] + '50',
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-    ...theme.shadows.elevated,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '40',
+    padding: theme.spacing.md,
+  },
+  marketingSectionLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  marketingSectionLabelText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
   },
   marketingCtaIconLarge: {
     width: 56,
