@@ -137,6 +137,28 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}>
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="editor" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="guide"
+                  options={{
+                    headerShown: true,
+                    headerTitle: '사용설명서',
+                    headerStyle: { backgroundColor: theme.colors.dark.surface },
+                    headerTintColor: theme.colors.dark.text,
+                    headerTitleStyle: { fontFamily: theme.typography.fontFamily.bold },
+                    headerShadowVisible: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="settings"
+                  options={{
+                    headerShown: true,
+                    headerTitle: '설정',
+                    headerStyle: { backgroundColor: theme.colors.dark.surface },
+                    headerTintColor: theme.colors.dark.text,
+                    headerTitleStyle: { fontFamily: theme.typography.fontFamily.bold },
+                    headerShadowVisible: false,
+                  }}
+                />
                 <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
                 <Stack.Screen name="+not-found" />
               </Stack>

@@ -23,16 +23,14 @@ import { clearLogoCache } from '@/lib/logoWatermark';
 import { TTS_VOICES, DEFAULT_TTS_VOICE } from '@/lib/ttsVoices';
 import { SUBSCRIPTION_PLANS, TOKEN_PACKS, formatKRW as formatPlanKRW } from '@/lib/subscriptionPlans';
 import type { UserSettings, RevenueRecord } from '@/types/database';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useSafeTop } from '@/hooks/useSafeTop';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
 import { formatKRW } from '@/lib/dashboard';
 import { useMascotSettings, type MascotStyle } from '@/hooks/useMascotSettings';
 import { invalidateSettingsCache, updateUserSettings as persistUserSettings } from '@/lib/settings';
 
 export default function SettingsScreen() {
-  const tabBarHeight = useTabBarHeight();
-  const safeTop = useSafeTop();
+  const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -243,16 +241,7 @@ export default function SettingsScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-      <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <View style={styles.logoWrap}>
-          <Camera size={32} color={theme.colors.primary[400]} strokeWidth={2} />
-        </View>
-        <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>ShortConnect</Text>
-        <Text style={styles.appTagline}>사진 한 장으로 끝내는 숏폼 마케팅</Text>
-        <Text style={styles.appVersion}>Version 1.0.0</Text>
-      </View>
-
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingTop: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>구독 플랜 및 결제</Text>
         <Text style={styles.sectionDesc}>
@@ -1288,37 +1277,6 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: 'center',
     width: '100%',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: theme.spacing.xl,
-  },
-  logoWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[500] + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  appName: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  appTagline: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.primary[400],
-    marginTop: 4,
-  },
-  appVersion: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    marginTop: 4,
   },
   section: {
     paddingHorizontal: theme.spacing.lg,

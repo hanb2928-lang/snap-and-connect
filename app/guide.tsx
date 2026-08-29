@@ -17,28 +17,19 @@ import {
   History, BookMarked,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { useSafeTop } from '@/hooks/useSafeTop';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OnboardingModal } from '@/components/OnboardingModal';
 
 export default function GuideScreen() {
-  const tabBarHeight = useTabBarHeight();
-  const safeTop = useSafeTop();
+  const insets = useSafeAreaInsets();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + 24 }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingTop: 16 }]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <View style={styles.logoWrap}>
-          <BookMarked size={32} color={theme.colors.primary[400]} strokeWidth={2} />
-        </View>
-        <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit>사용설명서</Text>
-        <Text style={styles.appTagline}>ShortConnect 모든 기능 사용법 가이드</Text>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>네이버 쇼핑커넥트 안내</Text>
@@ -1085,31 +1076,6 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: 'center',
     width: '100%',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: theme.spacing.xl,
-  },
-  logoWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[500] + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  appName: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  appTagline: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.primary[400],
-    marginTop: 4,
   },
   section: {
     paddingHorizontal: theme.spacing.lg,
