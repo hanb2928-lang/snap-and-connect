@@ -26,8 +26,6 @@ export type CreditFeature =
   | 'tts_generation'
   | 'batch_tts'
   | 'variant_generation'
-  | 'virtual_cuts'
-  | 'virtual_fitting'
   | 'remove_bg'
   | 'ocr_extract'
   | 'viral_predict'
@@ -45,8 +43,6 @@ export const CREDIT_COSTS: Record<CreditFeature, number> = {
   tts_generation: 1,
   batch_tts: 3,
   variant_generation: 2,
-  virtual_cuts: 3,
-  virtual_fitting: 3,
   remove_bg: 2,
   ocr_extract: 1,
   viral_predict: 1,

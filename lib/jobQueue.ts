@@ -2,8 +2,6 @@ import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 export type JobType =
   | 'analyze-photo'
-  | 'virtual-fitting'
-  | 'virtual-cuts'
   | 'generate-tts'
   | 'generate-copy'
   | 'generate-review'

@@ -16,7 +16,6 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
-import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
@@ -2442,16 +2441,7 @@ export function ComicShortGenerator({
                 contentContainerStyle={styles.fittingModalContent}
                 showsVerticalScrollIndicator={false}
               >
-                <VirtualFittingGallery
-                  imageDataUrl={safeImageUrl}
-                  productName={productName}
-                  productCategory={productCategory}
-                  onUseImage={(url) => {
-                    setFittingResultUrl(url);
-                    setFittingModalOpen(false);
-                    showToast('가상 피팅 결과가 완성됐어요');
-                  }}
-                />
+                <Text style={styles.fittingModalEmpty}>이 기능은 더 이상 제공되지 않습니다.</Text>
               </ScrollView>
             </View>
           </View>
@@ -2781,6 +2771,13 @@ const styles = StyleSheet.create({
   },
   fittingModalContent: {
     padding: theme.spacing.md,
+  },
+  fittingModalEmpty: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    paddingVertical: theme.spacing.lg,
   },
   doneNotice: {
     fontSize: theme.typography.caption,

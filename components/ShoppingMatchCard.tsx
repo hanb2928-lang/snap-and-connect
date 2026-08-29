@@ -11,7 +11,7 @@ import {
   UIManager,
   ScrollView,
 } from 'react-native';
-import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2, Search, Scissors, Shirt, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { ShoppingBag, ExternalLink, Link2, Check, X, CreditCard as Edit3, Sparkles, Zap, ChevronDown, ChevronUp, ShoppingBasket, Globe, Send, Hop as Home, TreePalm as Palmtree, Ticket, Plus, Store, Copy, Loader as Loader2, Search, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl, validateAffiliateUrl } from '@/lib/affiliateLinkSmart';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
@@ -34,9 +34,6 @@ interface ShoppingMatchCardProps {
   availablePlatforms: AffiliatePlatformKey[];
   shortUrl?: string | null;
   scanId?: string;
-  onGenerateCut?: () => void;
-  onGenerateFitting?: () => void;
-  captureImageUrl?: string | null;
 }
 
 const PLATFORM_META: {
@@ -77,9 +74,6 @@ export function ShoppingMatchCard({
   availablePlatforms,
   shortUrl: propShortUrl,
   scanId,
-  onGenerateCut,
-  onGenerateFitting,
-  captureImageUrl,
 }: ShoppingMatchCardProps) {
   const [editing, setEditing] = useState(false);
   const [inputUrl, setInputUrl] = useState('');
@@ -542,30 +536,6 @@ export function ShoppingMatchCard({
             </View>
           )}
 
-          {!editing && customLinkForProduct && captureImageUrl && (onGenerateCut || onGenerateFitting) && (
-            <View style={styles.aiShortcutBox}>
-              <View style={styles.aiShortcutHeader}>
-                <Sparkles size={13} color={theme.colors.accent[300]} strokeWidth={2} />
-                <Text style={styles.aiShortcutTitle}>링크 연결 완료 — AI 이미지로 강화</Text>
-              </View>
-              <Text style={styles.aiShortcutDesc}>제품 사진을 다양한 각도·착용 컷으로 확장하세요.</Text>
-              <View style={styles.aiShortcutBtnRow}>
-                {onGenerateCut && (
-                  <TouchableOpacity style={styles.aiShortcutBtn} onPress={onGenerateCut} activeOpacity={0.7}>
-                    <Scissors size={15} color={theme.colors.accent[300]} strokeWidth={2} />
-                    <Text style={styles.aiShortcutBtnText}>가상 컷</Text>
-                  </TouchableOpacity>
-                )}
-                {onGenerateFitting && (
-                  <TouchableOpacity style={styles.aiShortcutBtn} onPress={onGenerateFitting} activeOpacity={0.7}>
-                    <Shirt size={15} color={theme.colors.accent[300]} strokeWidth={2} />
-                    <Text style={styles.aiShortcutBtnText}>AI 피팅</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          )}
-
           {editing && renderEditor()}
 
         </>
@@ -979,50 +949,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
-  },
-  aiShortcutBox: {
-    marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.accent[500] + '12',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.accent[500] + '25',
-  },
-  aiShortcutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  aiShortcutTitle: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[300],
-  },
-  aiShortcutDesc: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginBottom: 10,
-    lineHeight: 18,
-  },
-  aiShortcutBtnRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  aiShortcutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.dark.surface,
-  },
-  aiShortcutBtnText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[300],
   },
   editorBox: {
     marginTop: theme.spacing.md,

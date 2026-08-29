@@ -89,8 +89,6 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { LazySection } from '@/components/LazySection';
 import { ShortFormGuideCard } from '@/components/ShortFormGuideCard';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
-import { VirtualCutGallery } from '@/components/VirtualCutGallery';
-import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
 import { AffiliatePromptBanner } from '@/components/AffiliatePromptBanner';
 import { AIStyleCard } from '@/components/AIStyleCard';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
@@ -125,7 +123,6 @@ export default function ResultScreen() {
   const [addedHashtags, setAddedHashtags] = useState<string[]>([]);
   const [selectedAffiliate, setSelectedAffiliate] = useState<AffiliatePlatformKey>('Coupang');
   const [captureImageUrl, setCaptureImageUrl] = useState<string>('');
-  const [captureImageError, setCaptureImageError] = useState(false);
   const [heroAspect, setHeroAspect] = useState<number>(1);
   const [autoMarketingCopy, setAutoMarketingCopy] = useState<string | null>(null);
   const [hookOverride, setHookOverride] = useState<string | null>(null);
@@ -338,7 +335,6 @@ export default function ResultScreen() {
         const compressed = await prepareImageForApi(dataUrl, 1024, 0.8);
         if (!cancelled) {
           setCaptureImageUrl(compressed);
-          setCaptureImageError(false);
         }
       } catch {
         if (!cancelled) {
@@ -346,12 +342,10 @@ export default function ResultScreen() {
             const fallbackDataUrl = await urlToDataUrl(url);
             if (!cancelled) {
               setCaptureImageUrl(fallbackDataUrl);
-              setCaptureImageError(false);
             }
           } catch {
             if (!cancelled) {
               setCaptureImageUrl(url);
-              setCaptureImageError(true);
             }
           }
         }
@@ -370,9 +364,6 @@ export default function ResultScreen() {
     return () => { cancelled = true; };
   }, [scan?.edited_image_url, scan?.image_url]);
 
-  const handleUseGeneratedImage = useCallback((url: string) => {
-    setCaptureImageUrl(url);
-  }, []);
 
   const partnerIdsConfigured = useMemo(() => {
     return !!(settings?.coupang_partners_id || settings?.toss_share_id || settings?.naver_shopping_id);
@@ -390,14 +381,6 @@ export default function ResultScreen() {
       setScrollToCommerce(false);
     }
   }, [scrollToCommerce]);
-
-  const handleScrollToVirtualCut = useCallback(() => {
-    scrollViewRef.current?.scrollTo({ y: 200, animated: true });
-  }, []);
-
-  const handleScrollToFitting = useCallback(() => {
-    scrollViewRef.current?.scrollTo({ y: 450, animated: true });
-  }, []);
 
   const handleDelete = async () => {
     if (!scan) return;
@@ -1050,9 +1033,6 @@ export default function ResultScreen() {
               availablePlatforms={availablePlatforms}
               shortUrl={shortUrl}
               scanId={scan.id}
-              onGenerateCut={handleScrollToVirtualCut}
-              onGenerateFitting={handleScrollToFitting}
-              captureImageUrl={captureImageUrl || null}
             />
           ),
         },
@@ -1477,45 +1457,7 @@ export default function ResultScreen() {
             hasCustomLink={hasCustomLink}
             partnerIdsConfigured={partnerIdsConfigured}
             onConnectLink={handleConnectLink}
-            onGenerateCut={handleScrollToVirtualCut}
-            onGenerateFitting={handleScrollToFitting}
-            captureImageUrl={captureImageUrl || null}
           />
-        ) : null}
-
-        {captureImageError && captureImageUrl ? (
-          <View style={styles.captureErrorBanner}>
-            <CircleAlert size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-            <Text style={styles.captureErrorText}>
-              이미지 변환 실패: 일부 캔버스 기능(가상 컷·피팅)이 동작하지 않을 수 있어요.
-            </Text>
-          </View>
-        ) : null}
-
-        {captureImageUrl ? (
-          <View style={styles.section}>
-            <Text style={styles.aiToolExtraLabel}>추가 AI 이미지 생성</Text>
-            <Text style={styles.aiToolExtraDesc}>
-              제휴쇼핑 탭 3단계에서 만든 이미지 외에, 여기서 추가로 다양한 각도·착용 컷을 더 만들 수 있습니다.
-            </Text>
-            <VirtualCutGallery
-              imageDataUrl={captureImageUrl}
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              onUseImage={handleUseGeneratedImage}
-            />
-          </View>
-        ) : null}
-
-        {captureImageUrl ? (
-          <View style={styles.section}>
-            <VirtualFittingGallery
-              imageDataUrl={captureImageUrl}
-              productName={activeProductName}
-              productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
-              onUseImage={handleUseGeneratedImage}
-            />
-          </View>
         ) : null}
 
         <View style={styles.body}>
@@ -2005,39 +1947,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
-  },
-  aiToolExtraLabel: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-    marginBottom: 4,
-  },
-  aiToolExtraDesc: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 16,
-    marginBottom: theme.spacing.sm,
-  },
-  captureErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: theme.spacing.md,
-    marginHorizontal: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.warning[500] + '15',
-    borderWidth: 1,
-    borderColor: theme.colors.warning[400] + '30',
-  },
-  captureErrorText: {
-    flex: 1,
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.warning[400],
-    lineHeight: 20,
   },
   analysisPendingCard: {
     marginHorizontal: theme.spacing.lg,

@@ -7,7 +7,7 @@ import {
   LayoutAnimation,
   Platform,
 } from 'react-native';
-import { ShoppingBag, Link2, ChevronRight, Scissors, Shirt, Check, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { ShoppingBag, Link2, ChevronRight, Check, CircleAlert as AlertCircle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { AffiliateLink } from '@/types/database';
 
@@ -17,9 +17,6 @@ interface AffiliatePromptBannerProps {
   hasCustomLink: boolean;
   partnerIdsConfigured: boolean;
   onConnectLink: () => void;
-  onGenerateCut: () => void;
-  onGenerateFitting: () => void;
-  captureImageUrl: string | null;
 }
 
 export function AffiliatePromptBanner({
@@ -28,9 +25,6 @@ export function AffiliatePromptBanner({
   hasCustomLink,
   partnerIdsConfigured,
   onConnectLink,
-  onGenerateCut,
-  onGenerateFitting,
-  captureImageUrl,
 }: AffiliatePromptBannerProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -102,29 +96,6 @@ export function AffiliatePromptBanner({
         </TouchableOpacity>
       </View>
 
-      {captureImageUrl ? (
-        <View style={styles.aiShortcutRow}>
-          <Text style={styles.aiShortcutLabel}>빠른 AI 이미지 생성:</Text>
-          <View style={styles.aiShortcutBtns}>
-            <TouchableOpacity
-              style={styles.aiShortcutBtn}
-              onPress={onGenerateCut}
-              activeOpacity={0.7}
-            >
-              <Scissors size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.aiShortcutText}>가상 컷</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.aiShortcutBtn}
-              onPress={onGenerateFitting}
-              activeOpacity={0.7}
-            >
-              <Shirt size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.aiShortcutText}>AI 피팅</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -232,35 +203,5 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },
-  aiShortcutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: theme.spacing.sm,
-    borderTopColor: theme.colors.dark.border,
-    borderTopWidth: 1,
-  },
-  aiShortcutLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textFaint,
-  },
-  aiShortcutBtns: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  aiShortcutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.accent[500] + '18',
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  aiShortcutText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.accent[300],
-  },
+
 });

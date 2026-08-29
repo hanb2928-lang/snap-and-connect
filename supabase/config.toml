@@ -28,12 +28,6 @@ verify_jwt = false
 [functions.generate-variants]
 verify_jwt = false
 
-[functions.generate-virtual-cuts]
-verify_jwt = false
-
-[functions.generate-virtual-fitting]
-verify_jwt = false
-
 [functions.keyword-trends]
 verify_jwt = false
 
