@@ -9,6 +9,9 @@ import {
   PanResponder,
   Image,
   ScrollView,
+  Platform,
+  Linking,
+  Modal,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,6 +30,16 @@ import {
   Wand as Wand2,
   Play,
   RotateCcw,
+  Sun,
+  SunDim,
+  CircleCheckBig as CheckCircle2,
+  Mic,
+  MicOff,
+  ShoppingBag,
+  Link2,
+  ChevronRight,
+  Target,
+  Lightbulb,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -109,6 +122,15 @@ export function ARComicCamera({
     y: number;
     visible: boolean;
   }>({ x: 0, y: 0, visible: false });
+  const [guideEnabled, setGuideEnabled] = useState(true);
+  const [guideMessage, setGuideMessage] = useState<string | null>(null);
+  const [guideIcon, setGuideIcon] = useState<'light' | 'composition' | 'ok'>('ok');
+  const [voiceCaptureActive, setVoiceCaptureActive] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [showAffiliatePrompt, setShowAffiliatePrompt] = useState(false);
+  const [lastCaptureBase64, setLastCaptureBase64] = useState<string | null>(null);
+  const [lastCaptureMime, setLastCaptureMime] = useState<string>('image/jpeg');
+  const [guideCheckTimer, setGuideCheckTimer] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const scanAnim = useRef(new RNAnimated.Value(0)).current;
   const pulseAnim = useRef(new RNAnimated.Value(0)).current;
@@ -122,6 +144,128 @@ export function ARComicCamera({
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
   const zoomShared = useSharedValue(0);
+
+  const guideMessages = useCallback(() => {
+    if (!guideEnabled) {
+      setGuideMessage(null);
+      return;
+    }
+    const messages = [
+      { msg: '상품을 화면 중앙에 배치하세요', icon: 'composition' as const, weight: 3 },
+      { msg: '화면이 어두워요 — 조명을 켜거나 밝은 곳으로 이동하세요', icon: 'light' as const, weight: 2 },
+      { msg: '좋은 구도입니다! 셔터를 누르세요', icon: 'ok' as const, weight: 1 },
+    ];
+    const pick = messages[Math.floor(Math.random() * messages.length)];
+    setGuideMessage(pick.msg);
+    setGuideIcon(pick.icon);
+  }, [guideEnabled]);
+
+  useEffect(() => {
+    if (guideEnabled && cameraReady && !processing) {
+      guideMessages();
+      const timer = setInterval(guideMessages, 4000);
+      setGuideCheckTimer(timer);
+      return () => {
+        clearInterval(timer);
+      };
+    } else {
+      setGuideMessage(null);
+      if (guideCheckTimer) clearInterval(guideCheckTimer);
+    }
+  }, [guideEnabled, cameraReady, processing, guideMessages]);
+
+  const voiceRecognitionRef = useRef<{ supported: boolean }>({ supported: false });
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const SR = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+      voiceRecognitionRef.current.supported = !!SR;
+    }
+  }, []);
+
+  const voiceRecRef = useRef<unknown>(null);
+
+  const startVoiceListening = useCallback(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof window === 'undefined') return;
+    const SR = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SR) return;
+
+    const rec = new (SR as unknown as new () => {
+      lang: string;
+      continuous: boolean;
+      interimResults: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onerror: () => void;
+      onend: () => void;
+      start: () => void;
+      stop: () => void;
+    })();
+    rec.lang = 'ko-KR';
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const transcript = e.results[e.results.length - 1][0].transcript.trim().toLowerCase();
+      if (transcript.includes('촬영') || transcript.includes('찰칵') || transcript.includes('capture')) {
+        handleCaptureRef.current();
+      } else if (transcript.includes('다음') || transcript.includes('next')) {
+        handleCaptureRef.current();
+      }
+    };
+    rec.onerror = () => {
+      setVoiceListening(false);
+    };
+    rec.onend = () => {
+      if (voiceCaptureActive) {
+        try { rec.start(); } catch { /* already started */ }
+      } else {
+        setVoiceListening(false);
+      }
+    };
+    rec.start();
+    voiceRecRef.current = rec;
+    setVoiceListening(true);
+  }, [voiceCaptureActive]);
+
+  const stopVoiceListening = useCallback(() => {
+    const rec = voiceRecRef.current as { stop?: () => void } | null;
+    if (rec?.stop) {
+      try { rec.stop(); } catch { /* ignore */ }
+    }
+    voiceRecRef.current = null;
+    setVoiceListening(false);
+  }, []);
+
+  const toggleVoiceCapture = useCallback(() => {
+    if (voiceCaptureActive) {
+      stopVoiceListening();
+      setVoiceCaptureActive(false);
+    } else {
+      setVoiceCaptureActive(true);
+      setTimeout(() => startVoiceListening(), 100);
+    }
+  }, [voiceCaptureActive, stopVoiceListening, startVoiceListening]);
+
+  useEffect(() => {
+    return () => {
+      stopVoiceListening();
+    };
+  }, [stopVoiceListening]);
+
+  const handleCaptureRef = useRef<() => void>(() => {});
+  const processImageRef = useRef<(b64: string, mime: string) => Promise<void>>(() => Promise.resolve());
+
+  const handleAffiliateConnect = useCallback(() => {
+    setShowAffiliatePrompt(false);
+    router.push('/(tabs)/affiliate/links');
+  }, [router]);
+
+  const handleAffiliateSkip = useCallback(() => {
+    setShowAffiliatePrompt(false);
+    if (lastCaptureBase64) {
+      processImageRef.current(lastCaptureBase64, lastCaptureMime);
+    }
+  }, [lastCaptureBase64, lastCaptureMime]);
 
   const updateZoom = useCallback(
     (newZoom: number) => {
@@ -355,11 +499,10 @@ export function ARComicCamera({
         return;
       }
 
-      setProgressStep(0);
-      setProgressText('사진 촬영 중...');
-      progressWidth.value = withTiming(0.15, { duration: 300 });
-      fadeAnim.value = 0;
-      await processImage(compressedB64, compressedMime);
+      setLastCaptureBase64(compressedB64);
+      setLastCaptureMime(compressedMime);
+      setShowAffiliatePrompt(true);
+      setProcessing(false);
     } catch (err) {
       setError(friendlyError(err, '촬영에 실패했습니다. 다시 시도해주세요.'));
       setProcessing(false);
@@ -372,6 +515,8 @@ export function ARComicCamera({
     router,
     onClose,
   ]);
+
+  handleCaptureRef.current = handleCapture;
 
   const handleAnalyzeMultiShot = async () => {
     if (multiShots.length === 0 || processing) return;
@@ -754,6 +899,29 @@ export function ARComicCamera({
           <Text style={styles.zoomIndicatorText}>{zoomLabel}</Text>
         </View>
 
+        {guideMessage && guideEnabled && !processing && (
+          <View style={[styles.guideBanner, { top: safeTop + 60 }]} pointerEvents="none">
+            {guideIcon === 'light' && <SunDim size={16} color={theme.colors.warning[400]} strokeWidth={2} />}
+            {guideIcon === 'composition' && <Target size={16} color={theme.colors.accent[400]} strokeWidth={2} />}
+            {guideIcon === 'ok' && <CheckCircle2 size={16} color={theme.colors.success[400]} strokeWidth={2} />}
+            <Text style={[
+              styles.guideBannerText,
+              guideIcon === 'light' && { color: theme.colors.warning[400] },
+              guideIcon === 'composition' && { color: theme.colors.accent[400] },
+              guideIcon === 'ok' && { color: theme.colors.success[400] },
+            ]}>
+              {guideMessage}
+            </Text>
+          </View>
+        )}
+
+        {voiceCaptureActive && voiceListening && !processing && (
+          <View style={styles.voiceListeningBadge} pointerEvents="none">
+            <View style={styles.voicePulseDot} />
+            <Text style={styles.voiceListeningText}>음성 명령 대기 중... "촬영" 또는 "다음"</Text>
+          </View>
+        )}
+
         <View style={[styles.topBar, { top: safeTop + 8 }]}>
           <View style={styles.topBarLeft}>
             <TouchableOpacity
@@ -782,6 +950,32 @@ export function ARComicCamera({
             <Text style={styles.modeTitle}>AR 매직 컷</Text>
           </View>
           <View style={styles.topBarRight}>
+            <TouchableOpacity
+              style={[styles.topButton, guideEnabled && styles.topButtonActive]}
+              onPress={() => setGuideEnabled((g) => !g)}
+              disabled={processing}
+              activeOpacity={0.7}
+            >
+              <Target
+                size={20}
+                color={guideEnabled ? theme.colors.success[400] : theme.colors.dark.text}
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+            {(Platform.OS === 'web' && voiceRecognitionRef.current.supported) && (
+              <TouchableOpacity
+                style={[styles.topButton, voiceCaptureActive && styles.topButtonActive]}
+                onPress={toggleVoiceCapture}
+                disabled={processing}
+                activeOpacity={0.7}
+              >
+                {voiceCaptureActive ? (
+                  <Mic size={20} color={theme.colors.success[400]} strokeWidth={2} />
+                ) : (
+                  <MicOff size={20} color={theme.colors.dark.text} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.topButton}
               onPress={() =>
@@ -1048,6 +1242,56 @@ export function ARComicCamera({
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {showAffiliatePrompt && lastCaptureBase64 && (
+        <Modal visible={showAffiliatePrompt} transparent animationType="fade" onRequestClose={handleAffiliateSkip}>
+          <View style={styles.affiliateModalOverlay}>
+            <View style={styles.affiliateModalCard}>
+              <View style={styles.affiliateModalHeader}>
+                <View style={styles.affiliateModalIcon}>
+                  <ShoppingBag size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+                </View>
+                <Text style={styles.affiliateModalTitle}>촬영 완료!</Text>
+                <Text style={styles.affiliateModalSubtitle}>
+                  방금 촬영한 제품의 제휴 링크를 입력하거나 검색하시겠어요?
+                </Text>
+              </View>
+
+              <View style={styles.affiliatePreviewRow}>
+                <Image
+                  source={{ uri: `data:${lastCaptureMime};base64,${lastCaptureBase64}` }}
+                  style={styles.affiliatePreviewImg}
+                />
+                <View style={styles.affiliatePreviewInfo}>
+                  <Text style={styles.affiliatePreviewLabel}>촬영된 이미지</Text>
+                  <Text style={styles.affiliatePreviewHint}>
+                    제휴 링크를 연결하면 단축 URL과 스티커가 자동 생성됩니다
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.affiliateModalActions}>
+                <TouchableOpacity
+                  style={styles.affiliateModalPrimaryBtn}
+                  onPress={handleAffiliateConnect}
+                  activeOpacity={0.8}
+                >
+                  <Link2 size={18} color="#fff" strokeWidth={2} />
+                  <Text style={styles.affiliateModalPrimaryText}>제휴 링크 연결하기</Text>
+                  <ChevronRight size={16} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.affiliateModalSecondaryBtn}
+                  onPress={handleAffiliateSkip}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.affiliateModalSecondaryText}>나중에 하고 AI 분석 먼저</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
 
       {processing && (
@@ -1691,5 +1935,147 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  topButtonActive: {
+    backgroundColor: 'rgba(10, 15, 30, 0.8)',
+  },
+  guideBanner: {
+    position: 'absolute',
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 15, 30, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    zIndex: 8,
+  },
+  guideBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#fff',
+  },
+  voiceListeningBadge: {
+    position: 'absolute',
+    bottom: 240,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 15, 30, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    zIndex: 8,
+  },
+  voicePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.success[400],
+  },
+  voiceListeningText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  affiliateModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  affiliateModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    ...theme.shadows.elevated,
+  },
+  affiliateModalHeader: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  affiliateModalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  affiliateModalTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  affiliateModalSubtitle: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  affiliatePreviewRow: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    marginBottom: theme.spacing.md,
+  },
+  affiliatePreviewImg: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.md,
+    resizeMode: 'cover',
+  },
+  affiliatePreviewInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  affiliatePreviewLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  affiliatePreviewHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  affiliateModalActions: {
+    gap: 10,
+  },
+  affiliateModalPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  affiliateModalPrimaryText: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  affiliateModalSecondaryBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  affiliateModalSecondaryText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
 });
