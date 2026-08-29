@@ -370,7 +370,7 @@ export default function CameraScreen() {
         setProcessing(true);
         setError(null);
         const img = images[0];
-        const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1280, 0.7);
+        const compressed = await prepareImageForApi(buildDataUrl(cleanBase64(img.base64), img.mimeType), 1080, 0.7);
         const compressedMime = getMimeTypeFromDataUrl(compressed);
         setProcessing(false);
         setPreviewCapture({ base64: cleanBase64(compressed), mimeType: compressedMime });
@@ -1145,14 +1145,14 @@ export default function CameraScreen() {
       <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.stickyCtaBtn}
-          onPress={() => {
-            setItem('marketing_handoff', 'true');
+          onPress={async () => {
+            await setItem('marketing_handoff', 'true');
             if (previewCapture?.base64) {
-              setItem('marketing_handoff_image', previewCapture.base64);
-              setItem('marketing_handoff_mime', previewCapture.mimeType);
+              await setItem('marketing_handoff_image', previewCapture.base64);
+              await setItem('marketing_handoff_mime', previewCapture.mimeType);
             } else if (multiShots.length > 0) {
-              setItem('marketing_handoff_image', multiShots[0]);
-              setItem('marketing_handoff_mime', 'image/jpeg');
+              await setItem('marketing_handoff_image', multiShots[0]);
+              await setItem('marketing_handoff_mime', 'image/jpeg');
             }
             router.push('/marketing' as never);
           }}

@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { useI18n } from '@/hooks/useI18n';
 
-const FITTING_TIMEOUT_MS = 150_000;
+const FITTING_TIMEOUT_MS = 115_000;
 
 type FittingStep = 'idle' | 'product-ready' | 'model-ready' | 'processing' | 'done' | 'error';
 
@@ -177,7 +177,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           >
             {productImage ? (
               <Image
-                source={{ uri: `data:image/jpeg;base64,${productImage}` }}
+                source={{ uri: `data:image/png;base64,${productImage}` }}
                 style={styles.uploadPreview}
                 resizeMode="contain"
               />
@@ -212,7 +212,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           >
             {modelImage ? (
               <Image
-                source={{ uri: `data:image/jpeg;base64,${modelImage}` }}
+                source={{ uri: `data:image/png;base64,${modelImage}` }}
                 style={styles.uploadPreview}
                 resizeMode="contain"
               />

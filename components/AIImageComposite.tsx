@@ -66,6 +66,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mobileGradient, setMobileGradient] = useState<[string, string]>(['#ffffff', '#f0f0f0']);
+  const [captureImageLoaded, setCaptureImageLoaded] = useState(false);
   const compositeRef = useRef<View>(null);
 
   const handlePickSource = useCallback(async () => {
@@ -131,7 +132,12 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
               ? (LIGHTING_PRESETS.find((p) => p.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'])
               : (BACKGROUND_PRESETS.find((b) => b.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0']);
           setMobileGradient(gradient);
+          setCaptureImageLoaded(false);
           await new Promise((resolve) => setTimeout(resolve, 200));
+          const start = Date.now();
+          while (!captureImageLoaded && Date.now() - start < 3000) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
           if (!compositeRef.current) throw new Error('합성 뷰를 초기화하지 못했습니다.');
           const uri = await captureRef(compositeRef, {
             format: 'png',
@@ -154,7 +160,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         setStep('error');
       }
     },
-    [sourceImage, mode, onResult, mobileGradient],
+    [sourceImage, mode, onResult, mobileGradient, captureImageLoaded],
   );
 
   const handleReset = useCallback(() => {
@@ -335,6 +341,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
             source={{ uri: buildDataUrl(sourceImage, 'image/jpeg') }}
             style={styles.mobileCaptureImage}
             resizeMode="contain"
+            onLoadEnd={() => setCaptureImageLoaded(true)}
           />
         </View>
       )}
