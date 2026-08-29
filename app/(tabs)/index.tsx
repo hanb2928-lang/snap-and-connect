@@ -700,23 +700,90 @@ export default function CameraScreen() {
             ))}
           </View>
 
-          <View style={styles.modeToggleContainer}>
+          <View style={styles.modeGuideContainer}>
+            <Text style={styles.modeGuideSectionLabel}>촬영 방식 선택</Text>
             <TouchableOpacity
-              style={[styles.modeButton, recognitionMode === 'single' && styles.modeButtonActive]}
+              style={[styles.modeGuideCard, recognitionMode === 'single' && styles.modeGuideCardActive]}
               onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.modeButtonText, recognitionMode === 'single' && styles.modeButtonTextActive]}>단품</Text>
+              <View style={styles.modeGuideCardLeft}>
+                <View style={[styles.modeGuideIconWrap, recognitionMode === 'single' && styles.modeGuideIconWrapActive]}>
+                  <ScanLine size={16} color={recognitionMode === 'single' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+                </View>
+                <View style={styles.modeGuideTextWrap}>
+                  <Text style={[styles.modeGuideTitle, recognitionMode === 'single' && styles.modeGuideTitleActive]}>단품 촬영</Text>
+                  <Text style={styles.modeGuideDesc}>사진 1장으로 빠르게 AI 분석</Text>
+                  <View style={styles.modeGuideFlowRow}>
+                    <View style={styles.modeGuideFlowChip}>
+                      <Camera size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>촬영</Text>
+                    </View>
+                    <Text style={styles.modeGuideFlowArrow}>→</Text>
+                    <View style={styles.modeGuideFlowChip}>
+                      <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>AI 분석</Text>
+                    </View>
+                    <Text style={styles.modeGuideFlowArrow}>→</Text>
+                    <View style={styles.modeGuideFlowChip}>
+                      <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>소스 생성</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              {recognitionMode === 'single' && (
+                <View style={styles.modeGuideCheckBadge}>
+                  <Check size={11} color="#fff" strokeWidth={3} />
+                </View>
+              )}
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={[styles.modeButton, recognitionMode === 'multi' && styles.modeButtonActive]}
+              style={[styles.modeGuideCard, recognitionMode === 'multi' && styles.modeGuideCardActive]}
               onPress={() => { setRecognitionMode('multi'); setMultiShots([]); }}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.modeButtonText, recognitionMode === 'multi' && styles.modeButtonTextActive]}>다각도 (1~4장)</Text>
+              <View style={styles.modeGuideCardLeft}>
+                <View style={[styles.modeGuideIconWrap, recognitionMode === 'multi' && styles.modeGuideIconWrapActive]}>
+                  <Layers size={16} color={recognitionMode === 'multi' ? '#fff' : theme.colors.accent[300]} strokeWidth={2} />
+                </View>
+                <View style={styles.modeGuideTextWrap}>
+                  <Text style={[styles.modeGuideTitle, recognitionMode === 'multi' && styles.modeGuideTitleActive]}>다각도 촬영 (1~4장)</Text>
+                  <Text style={styles.modeGuideDesc}>앞·옆·뒤·디테일 입체 분석으로 정밀도 UP</Text>
+                  <View style={styles.modeGuideFlowRow}>
+                    <View style={styles.modeGuideFlowChip}>
+                      <Layers size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>다각도 촬영</Text>
+                    </View>
+                    <Text style={styles.modeGuideFlowArrow}>→</Text>
+                    <View style={styles.modeGuideFlowChip}>
+                      <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>입체 AI 분석</Text>
+                    </View>
+                    <Text style={styles.modeGuideFlowArrow}>→</Text>
+                    <View style={styles.modeGuideFlowChip}>
+                      <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.modeGuideFlowText}>고정밀 소스</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+              {recognitionMode === 'multi' && (
+                <View style={styles.modeGuideCheckBadge}>
+                  <Check size={11} color="#fff" strokeWidth={3} />
+                </View>
+              )}
             </TouchableOpacity>
+
+            <View style={styles.modeGuideRecommendBox}>
+              <Lightbulb size={11} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.modeGuideRecommendText}>
+                {recognitionMode === 'multi'
+                  ? '다각도 모드: 의류, 신발, 3D 제품 등 입체감이 중요한 제품에 추천'
+                  : '단품 모드: 스크린샷, 패키지, 평면 제품 등 빠른 결과가 필요할 때 추천'}
+              </Text>
+            </View>
           </View>
 
           {/* AR mode toggle inside camera step */}
@@ -1260,23 +1327,90 @@ function WebUploadScreen() {
           <WorkflowGuide />
         </View>
 
-        <View style={styles.webModeRow}>
+        <View style={styles.webModeGuideContainer}>
+          <Text style={styles.modeGuideSectionLabel}>촬영 방식 선택</Text>
           <TouchableOpacity
-            style={[styles.webModePill, recognitionMode === 'single' && styles.webModePillActive]}
+            style={[styles.modeGuideCard, recognitionMode === 'single' && styles.modeGuideCardActive]}
             onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <ScanLine size={14} color={recognitionMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={[styles.modeButtonText, recognitionMode === 'single' && styles.modeButtonTextActive]}>단품</Text>
+            <View style={styles.modeGuideCardLeft}>
+              <View style={[styles.modeGuideIconWrap, recognitionMode === 'single' && styles.modeGuideIconWrapActive]}>
+                <ScanLine size={16} color={recognitionMode === 'single' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+              </View>
+              <View style={styles.modeGuideTextWrap}>
+                <Text style={[styles.modeGuideTitle, recognitionMode === 'single' && styles.modeGuideTitleActive]}>단품 업로드</Text>
+                <Text style={styles.modeGuideDesc}>사진 1장으로 빠르게 AI 분석</Text>
+                <View style={styles.modeGuideFlowRow}>
+                  <View style={styles.modeGuideFlowChip}>
+                    <ImageIcon size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>사진 업로드</Text>
+                  </View>
+                  <Text style={styles.modeGuideFlowArrow}>→</Text>
+                  <View style={styles.modeGuideFlowChip}>
+                    <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>AI 분석</Text>
+                  </View>
+                  <Text style={styles.modeGuideFlowArrow}>→</Text>
+                  <View style={styles.modeGuideFlowChip}>
+                    <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>소스 생성</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            {recognitionMode === 'single' && (
+              <View style={styles.modeGuideCheckBadge}>
+                <Check size={11} color="#fff" strokeWidth={3} />
+              </View>
+            )}
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.webModePill, recognitionMode === 'multi' && styles.webModePillActive]}
+            style={[styles.modeGuideCard, recognitionMode === 'multi' && styles.modeGuideCardActive]}
             onPress={() => { setRecognitionMode('multi'); setMultiShots([]); }}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <Layers size={14} color={recognitionMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={[styles.modeButtonText, recognitionMode === 'multi' && styles.modeButtonTextActive]}>다각도 (1~4장)</Text>
+            <View style={styles.modeGuideCardLeft}>
+              <View style={[styles.modeGuideIconWrap, recognitionMode === 'multi' && styles.modeGuideIconWrapActive]}>
+                <Layers size={16} color={recognitionMode === 'multi' ? '#fff' : theme.colors.accent[300]} strokeWidth={2} />
+              </View>
+              <View style={styles.modeGuideTextWrap}>
+                <Text style={[styles.modeGuideTitle, recognitionMode === 'multi' && styles.modeGuideTitleActive]}>다각도 업로드 (1~4장)</Text>
+                <Text style={styles.modeGuideDesc}>앞·옆·뒤·디테일 입체 분석으로 정밀도 UP</Text>
+                <View style={styles.modeGuideFlowRow}>
+                  <View style={styles.modeGuideFlowChip}>
+                    <Layers size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>다각도 업로드</Text>
+                  </View>
+                  <Text style={styles.modeGuideFlowArrow}>→</Text>
+                  <View style={styles.modeGuideFlowChip}>
+                    <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>입체 AI 분석</Text>
+                  </View>
+                  <Text style={styles.modeGuideFlowArrow}>→</Text>
+                  <View style={styles.modeGuideFlowChip}>
+                    <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.modeGuideFlowText}>고정밀 소스</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+            {recognitionMode === 'multi' && (
+              <View style={styles.modeGuideCheckBadge}>
+                <Check size={11} color="#fff" strokeWidth={3} />
+              </View>
+            )}
           </TouchableOpacity>
+
+          <View style={styles.modeGuideRecommendBox}>
+            <Lightbulb size={11} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={styles.modeGuideRecommendText}>
+              {recognitionMode === 'multi'
+                ? '다각도 모드: 의류, 신발, 3D 제품 등 입체감이 중요한 제품에 추천'
+                : '단품 모드: 스크린샷, 패키지, 평면 제품 등 빠른 결과가 필요할 때 추천'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.webUploadCard}>
@@ -1654,6 +1788,123 @@ const styles = StyleSheet.create({
   },
   modeButtonTextActive: {
     color: '#fff',
+  },
+  modeGuideContainer: {
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  modeGuideSectionLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    paddingHorizontal: theme.spacing.xs,
+    marginBottom: 2,
+  },
+  modeGuideCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  modeGuideCardActive: {
+    borderColor: theme.colors.primary[400],
+    backgroundColor: theme.colors.primary[500] + '12',
+  },
+  modeGuideCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  modeGuideIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  modeGuideIconWrapActive: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  modeGuideTextWrap: {
+    flex: 1,
+  },
+  modeGuideTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 2,
+  },
+  modeGuideTitleActive: {
+    color: theme.colors.primary[300],
+  },
+  modeGuideDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginBottom: 6,
+  },
+  modeGuideFlowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  modeGuideFlowChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.bg,
+  },
+  modeGuideFlowText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  modeGuideFlowArrow: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  modeGuideCheckBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  modeGuideRecommendBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '10',
+  },
+  modeGuideRecommendText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    lineHeight: 14,
+  },
+  webModeGuideContainer: {
+    width: '100%',
+    maxWidth: 440,
+    gap: 8,
+    marginBottom: theme.spacing.md,
   },
   pillButton: {
     flexDirection: 'row',
