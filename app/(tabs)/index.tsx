@@ -41,7 +41,6 @@ import { getUserSettings } from '@/lib/settings';
 import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
-import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { ViralProductFeed } from '@/components/ViralProductFeed';
 import { StepIndicator } from '@/components/StepIndicator';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
@@ -99,13 +98,11 @@ export default function CameraScreen() {
   const [arMode, setArMode] = useState(false);
   const [videoImportVisible, setVideoImportVisible] = useState(false);
   const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
-  const [workflowGuideVisible, setWorkflowGuideVisible] = useState(false);
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
   const [angleGuideVisible, setAngleGuideVisible] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
   const [expandedSection, setExpandedSection] = useState<number | null>(0);
-  const [hasPhotoReady, setHasPhotoReady] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const sectionLayouts = useRef<Array<{ y: number; height: number }>>([]);
   const isScrollingTo = useRef(false);
@@ -292,7 +289,6 @@ export default function CameraScreen() {
       setError(null);
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
-      setHasPhotoReady(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
@@ -378,7 +374,6 @@ export default function CameraScreen() {
         const compressedMime = getMimeTypeFromDataUrl(compressed);
         setProcessing(false);
         setPreviewCapture({ base64: cleanBase64(compressed), mimeType: compressedMime });
-        setHasPhotoReady(true);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
         setProcessing(false);
@@ -426,7 +421,6 @@ export default function CameraScreen() {
       if (!isMountedRef.current) return;
       setProcessing(false);
       setPreviewCapture({ base64: compressedB64, mimeType: compressedMime });
-      setHasPhotoReady(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -617,12 +611,9 @@ export default function CameraScreen() {
       >
         <View style={styles.verticalHeader} onLayout={handleSectionLayout(0)}>
           <Text style={styles.verticalTitle}>{t('camera.heroTitle')}</Text>
-          <Text style={styles.verticalSubtitle}>
-            오늘 어떤 작업으로 소재를 만드시겠습니까? 아래에서 모드를 선택하세요.
-          </Text>
         </View>
 
-        {/* 3 Mode Entry Cards */}
+        {/* 3 Large Visual Mode Entry Cards */}
         <View style={styles.modeEntryGrid}>
           <TouchableOpacity
             style={styles.modeEntryCard}
@@ -632,17 +623,17 @@ export default function CameraScreen() {
             <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
               <Camera size={44} color={theme.colors.primary[400]} strokeWidth={2} />
             </View>
-            <Text style={styles.modeEntryTitle}>직접 촬영 & AI 합성</Text>
-            <Text style={styles.modeEntryDesc}>실물 촬영 후 조명·배경 스튜디오 합성</Text>
+            <Text style={styles.modeEntryTitle}>3초 촬영 / 앨범</Text>
+            <Text style={styles.modeEntryDesc}>카메라로 찍거나 앨범에서 불러와 AI 분석</Text>
             <View style={styles.modeEntryTagRow}>
               <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
                 <Camera size={10} color={theme.colors.primary[300]} strokeWidth={2} />
                 <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>촬영</Text>
               </View>
               <Text style={styles.modeEntryArrow}>→</Text>
-              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                <Lightbulb size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={[styles.modeEntryTagText, { color: theme.colors.warning[400] }]}>AI 합성</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <ImageIcon size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.accent[300] }]}>앨범</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -655,7 +646,7 @@ export default function CameraScreen() {
             <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
               <Shirt size={44} color={theme.colors.accent[400]} strokeWidth={2} />
             </View>
-            <Text style={styles.modeEntryTitle}>AI 가상 피팅</Text>
+            <Text style={styles.modeEntryTitle}>AI 모델 가상 피팅</Text>
             <Text style={styles.modeEntryDesc}>평면 의류를 모델에게 자연스럽게 착용</Text>
             <View style={styles.modeEntryTagRow}>
               <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
@@ -672,23 +663,23 @@ export default function CameraScreen() {
 
           <TouchableOpacity
             style={styles.modeEntryCard}
-            onPress={() => handleScrollToSection(5)}
+            onPress={() => handleScrollToSection(4)}
             activeOpacity={0.85}
           >
-            <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
-              <Wand2 size={44} color={theme.colors.primary[300]} strokeWidth={2} />
+            <View style={[styles.modeEntryIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
+              <Lightbulb size={44} color={theme.colors.warning[400]} strokeWidth={2} />
             </View>
-            <Text style={styles.modeEntryTitle}>AI 프롬프트 생성</Text>
-            <Text style={styles.modeEntryDesc}>문장 입력만으로 새로운 이미지 생성</Text>
+            <Text style={styles.modeEntryTitle}>AI 스튜디오 배경합성</Text>
+            <Text style={styles.modeEntryDesc}>조명·배경 교체로 전문 스튜디오급 소재</Text>
             <View style={styles.modeEntryTagRow}>
-              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <Wand2 size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>프롬프트</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Lightbulb size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.warning[400] }]}>누끼</Text>
               </View>
               <Text style={styles.modeEntryArrow}>→</Text>
-              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <Sparkles size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={[styles.modeEntryTagText, { color: theme.colors.primary[300] }]}>AI 생성</Text>
+              <View style={[styles.modeEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Sparkles size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={[styles.modeEntryTagText, { color: theme.colors.warning[400] }]}>배경합성</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -1149,13 +1140,11 @@ export default function CameraScreen() {
 
         </View>
 
-        <View onLayout={handleSectionLayout(6)}>
-        <View style={styles.marketingSectionLabel}>
-          <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
-          <Text style={styles.marketingSectionLabelText}>마케팅 숏폼 제작</Text>
-        </View>
+      </ScrollView>
+
+      <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]} pointerEvents="box-none">
         <TouchableOpacity
-          style={styles.marketingCtaButtonLarge}
+          style={styles.stickyCtaBtn}
           onPress={() => {
             setItem('marketing_handoff', 'true');
             if (previewCapture?.base64) {
@@ -1169,49 +1158,11 @@ export default function CameraScreen() {
           }}
           activeOpacity={0.85}
         >
-          <View style={styles.marketingCtaIconLarge}>
-            <Flame size={32} color={theme.colors.warning[400]} strokeWidth={2.5} />
-          </View>
-          <View style={styles.marketingCtaTextWrapLarge}>
-            <Text style={styles.marketingCtaTitleLarge}>이 사진으로 AI 마케팅 영상 만들기</Text>
-            <Text style={styles.marketingCtaDescLarge}>
-              훅 선택 · 템플릿 · 카피 · TTS까지 한 번에
-            </Text>
-          </View>
-          <ArrowRight size={24} color={theme.colors.warning[400]} strokeWidth={2.2} />
+          <Flame size={24} color="#fff" strokeWidth={2.5} />
+          <Text style={styles.stickyCtaText}>이 사진으로 AI 마케팅 영상 만들기</Text>
+          <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.guideBtnInline}
-          onPress={() => setWorkflowGuideVisible(true)}
-          activeOpacity={0.7}
-        >
-          <LayoutTemplate size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={styles.guideBtnText}>작업 순서 가이드 보기</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {hasPhotoReady && !processing && !previewCapture && (
-        <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.stickyCtaBtn}
-            onPress={() => {
-              setItem('marketing_handoff', 'true');
-              if (multiShots.length > 0) {
-                setItem('marketing_handoff_image', multiShots[0]);
-                setItem('marketing_handoff_mime', 'image/jpeg');
-              }
-              router.push('/marketing' as never);
-            }}
-            activeOpacity={0.85}
-          >
-            <Flame size={24} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.stickyCtaText}>이 소재로 AI 마케팅 영상 만들기</Text>
-            <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
-          </TouchableOpacity>
-        </View>
-      )}
+      </View>
 
       {previewCapture && (
         <CapturePreviewModal
@@ -1241,24 +1192,6 @@ export default function CameraScreen() {
       />
 
       <RecentWorkButton />
-
-      {workflowGuideVisible && (
-        <View style={styles.guideOverlay}>
-          <View style={styles.guideOverlayCard}>
-            <View style={styles.guideOverlayHeader}>
-              <Text style={styles.guideOverlayTitle}>작업 순서 가이드</Text>
-              <TouchableOpacity
-                onPress={() => setWorkflowGuideVisible(false)}
-                style={styles.guideCloseBtn}
-                activeOpacity={0.7}
-              >
-                <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-            <WorkflowGuide />
-          </View>
-        </View>
-      )}
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
@@ -1501,14 +1434,6 @@ function WebUploadScreen() {
 
         <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
           <StepIndicator activeStep={1} />
-        </View>
-
-        <View style={styles.webGuideSection}>
-          <Text style={styles.webGuideHeading}>이렇게 진행하세요</Text>
-          <Text style={styles.webGuideSubheading}>
-            각 단계 카드를 탭하면 해당 편집 화면으로 이동합니다
-          </Text>
-          <WorkflowGuide />
         </View>
 
         <View style={{ marginBottom: theme.spacing.lg }}>
