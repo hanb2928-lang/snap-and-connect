@@ -5,6 +5,7 @@ import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
+import { deductCredits } from '@/lib/credits';
 
 export async function uploadImage(
   base64: string,
@@ -30,6 +31,8 @@ export async function analyzeImage(
   mimeType: string,
   mode: 'single' | 'multi' = 'multi',
 ): Promise<AnalysisResult> {
+  await deductCredits('photo_analysis');
+
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -55,6 +58,8 @@ export async function analyzeMultiShot(
   base64Images: string[],
   fileName: string,
 ): Promise<AnalysisResult> {
+  await deductCredits('multi_shot_analysis');
+
   const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
 
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
@@ -243,6 +248,8 @@ export async function analyzeImageWithProductContext(
   mode: 'single' | 'multi' = 'multi',
   productContext?: { productName?: string; description?: string; price?: string; brand?: string; platform?: string },
 ): Promise<AnalysisResult> {
+  await deductCredits('photo_analysis');
+
   const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
     headers: {
@@ -304,6 +311,8 @@ export async function analyzeImageQueued(
   mode: 'single' | 'multi' = 'multi',
   preferredStyle?: string,
 ): Promise<AnalysisResult> {
+  await deductCredits('photo_analysis');
+
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',
     { imageDataUrl, fileName, mimeType, mode, ...(preferredStyle ? { preferredStyle } : {}) },
@@ -320,6 +329,8 @@ export async function analyzeMultiShotQueued(
   base64Images: string[],
   fileName: string,
 ): Promise<AnalysisResult> {
+  await deductCredits('multi_shot_analysis');
+
   const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
   const result = await enqueueAndWait<Record<string, unknown>>(
     'analyze-photo',

@@ -44,6 +44,8 @@ import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { StepIndicator } from '@/components/StepIndicator';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
+import { CreditBalanceBadge } from '@/components/CreditBalanceBadge';
+import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
@@ -94,6 +96,7 @@ export default function CameraScreen() {
   const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
   const [workflowGuideVisible, setWorkflowGuideVisible] = useState(false);
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [creditModalVisible, setCreditModalVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
@@ -669,6 +672,7 @@ export default function CameraScreen() {
                 >
                   <RotateCcw size={18} color={theme.colors.dark.text} strokeWidth={2} />
                 </TouchableOpacity>
+                <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
               </View>
             )}
 
@@ -1115,6 +1119,11 @@ export default function CameraScreen() {
           )}
         </Animated.View>
       )}
+
+      <CreditPurchaseModal
+        visible={creditModalVisible}
+        onClose={() => setCreditModalVisible(false)}
+      />
     </View>
   );
 }
@@ -1133,6 +1142,7 @@ function WebUploadScreen() {
   const [progressStep, setProgressStep] = useState(0);
   const [cropState, setCropState] = useState<{ base64: string; mimeType: string } | null>(null);
   const [showMultiTip, setShowMultiTip] = useState(true);
+  const [creditModalVisible, setCreditModalVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
@@ -1308,6 +1318,9 @@ function WebUploadScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
+          <View style={{ position: 'absolute', top: 0, right: 0 }}>
+            <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} />
+          </View>
           <View style={styles.webHeroIcon}>
             <Camera size={44} color={theme.colors.primary[400]} strokeWidth={1.5} />
           </View>
@@ -1589,6 +1602,11 @@ function WebUploadScreen() {
           )}
         </Animated.View>
       )}
+
+      <CreditPurchaseModal
+        visible={creditModalVisible}
+        onClose={() => setCreditModalVisible(false)}
+      />
     </View>
   );
 }
