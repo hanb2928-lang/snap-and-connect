@@ -11,13 +11,14 @@ import type {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { theme } from '@/lib/theme';
-import { Camera, Settings, FolderOpen, ChartBar as BarChart3, ShoppingBag, type LucideIcon } from 'lucide-react-native';
+import { Camera, Settings, FolderOpen, ChartBar as BarChart3, ShoppingBag, BookMarked, type LucideIcon } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
   affiliate: ShoppingBag,
   assets: FolderOpen,
   analytics: BarChart3,
+  guide: BookMarked,
   settings: Settings,
 };
 
@@ -26,10 +27,11 @@ const TAB_LABELS: Record<string, string> = {
   affiliate: '제휴쇼핑',
   assets: '제작물',
   analytics: '분석',
+  guide: '사용설명서',
   settings: '설정',
 };
 
-const TAB_WIDTH = 76;
+const TAB_WIDTH = 72;
 const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 export type TabBadgeMap = Record<string, boolean>;
@@ -86,7 +88,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
             >
               <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
                 <Icon
-                  size={22}
+                  size={26}
                   color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textDim}
                   strokeWidth={isFocused ? 2.5 : 2.2}
                   fill={isFocused ? theme.colors.primary[400] + '3C' : 'transparent'}
@@ -130,8 +132,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   iconWrap: {
-    width: 48,
-    height: 38,
+    width: 54,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: theme.radius.full,
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textFaint,
     marginTop: 6,
-    maxWidth: TAB_WIDTH - 4,
+    maxWidth: TAB_WIDTH - 2,
   },
   tabLabelActive: {
     color: theme.colors.primary[400],
