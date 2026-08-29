@@ -69,6 +69,7 @@ import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
+import { TrendingProductCuration } from '@/components/TrendingProductCuration';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -555,6 +556,36 @@ export default function AffiliateScreen() {
             <Text style={styles.summaryCountLabel}>최근 기록</Text>
           </View>
         </View>
+
+        {/* Trending product curation — top 10 viral affiliate products */}
+        <TrendingProductCuration
+          onSelectProduct={(product) => {
+            setAffiliateUrl(product.link);
+            const lower = (product.marketplace || '').toLowerCase();
+            if (lower.includes('coupang')) setSelectedPlatform('Coupang');
+            else if (lower.includes('toss')) setSelectedPlatform('Toss');
+            else if (lower.includes('naver')) setSelectedPlatform('BrandConnect');
+            setProductMeta({
+              productName: product.name,
+              description: '',
+              price: product.price,
+              image: product.imageUrl,
+              platform: product.marketplace || '',
+              brand: '',
+            });
+            if (product.imageUrl) {
+              import('@/lib/base64').then(({ urlToDataUrl }) => {
+                urlToDataUrl(product.imageUrl).then((dataUrl) => {
+                  setSelectedImage(cleanBase64(dataUrl));
+                  setSelectedImageMime('image/jpeg');
+                  setMediaType('photo');
+                  setImageSource('product');
+                }).catch(() => {});
+              }).catch(() => {});
+            }
+            markCompleted('affiliate');
+          }}
+        />
 
         {/* Step indicator */}
         <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
