@@ -350,10 +350,12 @@ async function callOpenAIWithRetry(
       if (!response.ok) {
         const errText = await response.text();
         const err = new Error(`OpenAI API error: ${response.status} - ${errText}`);
-        if (response.status >= 500 && attempt < MAX_RETRIES) {
+        if ((response.status >= 500 || response.status === 429) && attempt < MAX_RETRIES) {
           lastError = err;
           clearTimeout(timeout);
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          const retryAfter = response.headers.get('Retry-After');
+          const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1000 * (attempt + 1);
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
         throw err;
@@ -420,7 +422,7 @@ async function callOpenAIWithRetry(
         const parsed = JSON.parse(stripJsonFence(content));
         return normalizeResult(parsed);
       } catch {
-        return normalizeResult({});
+        throw new Error('AI 분석 결과를 파싱하지 못했습니다. 잠시 후 다시 시도해주세요.');
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {

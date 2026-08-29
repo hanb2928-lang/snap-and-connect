@@ -307,6 +307,8 @@ async function generateWithOpenAI(
     `${trendingGuidance}` +
     `\n${panelCount}컷 만화 시나리오를 만들어줘.`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -322,11 +324,12 @@ async function generateWithOpenAI(
       max_tokens: 1500,
       response_format: { type: "json_object" },
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+    throw new Error(`OpenAI API error: ${response.status}`);
   }
 
   const result = await response.json();
@@ -337,7 +340,7 @@ async function generateWithOpenAI(
   try {
     parsed = JSON.parse(stripJsonFence(content));
   } catch {
-    return generateLocalScenario(data, panelCount, mbtiMode, multiverseMode);
+    throw new Error('JSON parse failed');
   }
   const rawPanels = Array.isArray(parsed.panels) ? parsed.panels : [];
 

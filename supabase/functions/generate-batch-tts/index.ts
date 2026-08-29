@@ -59,66 +59,82 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const results = await Promise.all(
-      body.items.map(async (item): Promise<BatchTTSResult> => {
-        try {
-          const text = item.text.slice(0, 500);
-          if (!text.trim()) {
-            return { languageCode: item.languageCode, audioBase64: "", mimeType: "audio/mpeg", duration: 0, error: "Empty text" };
+    const CONCURRENCY = 3;
+    const results: BatchTTSResult[] = new Array(body.items.length);
+
+    for (let i = 0; i < body.items.length; i += CONCURRENCY) {
+      const batch = body.items.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (item, idx): Promise<BatchTTSResult> => {
+          const itemIndex = i + idx;
+          try {
+            const text = item.text.slice(0, 500);
+            if (!text.trim()) {
+              return { languageCode: item.languageCode, audioBase64: "", mimeType: "audio/mpeg", duration: 0, error: "Empty text" };
+            }
+
+            const speed = Math.min(Math.max(item.speed || 1.0, 0.5), 2.0);
+            const ttsBody: Record<string, unknown> = {
+              model: "gpt-4o-mini-tts",
+              input: text,
+              voice: item.voice,
+              speed: speed,
+              response_format: "mp3",
+            };
+            if (item.instructions?.trim()) {
+              ttsBody.instructions = item.instructions.trim();
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${openaiKey}`,
+              },
+              body: JSON.stringify(ttsBody),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!ttsResponse.ok) {
+              return { languageCode: item.languageCode, audioBase64: "", mimeType: "audio/mpeg", duration: 0, error: `TTS error: ${ttsResponse.status}` };
+            }
+
+            const audioBuffer = await ttsResponse.arrayBuffer();
+            const bytes = new Uint8Array(audioBuffer);
+            let binary = "";
+            const chunk = 0x8000;
+            for (let j = 0; j < bytes.length; j += chunk) {
+              binary += String.fromCharCode(...bytes.subarray(j, j + chunk));
+            }
+            const base64Audio = btoa(binary);
+
+            return {
+              languageCode: item.languageCode,
+              audioBase64: base64Audio,
+              mimeType: "audio/mpeg",
+              duration: estimateDuration(text, speed),
+            };
+          } catch (err) {
+            const msg = err instanceof Error && err.name === 'AbortError'
+              ? 'TTS timeout'
+              : err instanceof Error ? err.message : "TTS generation failed";
+            return {
+              languageCode: item.languageCode,
+              audioBase64: "",
+              mimeType: "audio/mpeg",
+              duration: 0,
+              error: msg,
+            };
           }
-
-          const speed = Math.min(Math.max(item.speed || 1.0, 0.5), 2.0);
-          const ttsBody: Record<string, unknown> = {
-            model: "gpt-4o-mini-tts",
-            input: text,
-            voice: item.voice,
-            speed: speed,
-            response_format: "mp3",
-          };
-          if (item.instructions?.trim()) {
-            ttsBody.instructions = item.instructions.trim();
-          }
-
-          const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${openaiKey}`,
-            },
-            body: JSON.stringify(ttsBody),
-          });
-
-          if (!ttsResponse.ok) {
-            const errText = await ttsResponse.text();
-            return { languageCode: item.languageCode, audioBase64: "", mimeType: "audio/mpeg", duration: 0, error: `TTS error: ${ttsResponse.status} - ${errText.slice(0, 200)}` };
-          }
-
-          const audioBuffer = await ttsResponse.arrayBuffer();
-          const bytes = new Uint8Array(audioBuffer);
-          let binary = "";
-          const chunk = 0x8000;
-          for (let i = 0; i < bytes.length; i += chunk) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-          }
-          const base64Audio = btoa(binary);
-
-          return {
-            languageCode: item.languageCode,
-            audioBase64: base64Audio,
-            mimeType: "audio/mpeg",
-            duration: estimateDuration(text, speed),
-          };
-        } catch (err) {
-          return {
-            languageCode: item.languageCode,
-            audioBase64: "",
-            mimeType: "audio/mpeg",
-            duration: 0,
-            error: err instanceof Error ? err.message : "TTS generation failed",
-          };
-        }
-      }),
-    );
+        }),
+      );
+      for (let k = 0; k < batchResults.length; k++) {
+        results[i + k] = batchResults[k];
+      }
+    }
 
     return new Response(
       JSON.stringify({ results }),

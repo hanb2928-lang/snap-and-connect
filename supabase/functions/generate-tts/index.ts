@@ -57,6 +57,9 @@ Deno.serve(async (req: Request) => {
       ttsBody.instructions = instructions;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -64,11 +67,13 @@ Deno.serve(async (req: Request) => {
         Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify(ttsBody),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!ttsResponse.ok) {
-      const errText = await ttsResponse.text();
-      throw new Error(`OpenAI TTS error: ${ttsResponse.status} - ${errText}`);
+      throw new Error(`OpenAI TTS error: ${ttsResponse.status}`);
     }
 
     const audioBuffer = await ttsResponse.arrayBuffer();
@@ -89,8 +94,11 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
+    const msg = err instanceof Error && err.name === 'AbortError'
+      ? 'TTS 생성 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+      : err instanceof Error ? err.message : 'TTS generation failed';
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "TTS generation failed" }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

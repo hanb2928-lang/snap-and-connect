@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
     if (!openaiKey) {
       return new Response(
         JSON.stringify({ error: "OpenAI API 키가 설정되지 않았습니다. 설정에서 API 키를 입력하세요." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -52,7 +52,7 @@ async function uploadToStorage(b64: string, mimeType: string): Promise<string> {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   if (!supabaseUrl) throw new Error("Storage not configured: missing SUPABASE_URL");
-  const authKey = anonKey || serviceRoleKey;
+  const authKey = serviceRoleKey || anonKey;
   if (!authKey) throw new Error("Storage not configured: missing auth key");
 
   const fileName = `bg-removed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
@@ -124,17 +124,20 @@ async function removeBackgroundWithOpenAI(
   imageDataUrl: string,
   apiKey: string,
 ): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
   const response = await fetch("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
     body: buildMultipartForm(imageDataUrl),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI Image API error: ${response.status} - ${errText}`);
+    throw new Error(`OpenAI Image API error: ${response.status}`);
   }
 
   const data = await response.json();
