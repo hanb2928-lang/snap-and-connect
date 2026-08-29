@@ -249,12 +249,12 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingTop: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* API Health Check Badges */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>API 연동 상태</Text>
+        <Text style={styles.sectionTitle}>{t('settings.apiStatus')}</Text>
         <View style={styles.healthCheckRow}>
           {[
-            { label: '쿠팡', value: coupangId, color: '#FF3E3E', icon: 'C' },
-            { label: '네이버', value: naverId, color: '#03C75A', icon: 'N' },
-            { label: '토스', value: tossId, color: '#0064FF', icon: 'T' },
+            { label: t('settings.coupang'), value: coupangId, color: '#FF3E3E', icon: 'C' },
+            { label: t('settings.naver'), value: naverId, color: '#03C75A', icon: 'N' },
+            { label: t('settings.toss'), value: tossId, color: '#0064FF', icon: 'T' },
             { label: 'OpenAI', value: openaiKey, color: theme.colors.primary[400], icon: 'AI' },
           ].map((item, i) => {
             const isSet = item.value && item.value.trim().length > 0;
@@ -271,7 +271,7 @@ export default function SettingsScreen() {
                   {item.label}
                 </Text>
                 <Text style={[styles.healthBadgeStatus, isSet ? styles.healthBadgeStatusOk : styles.healthBadgeStatusErr]}>
-                  {isSet ? '연결됨' : '미설정'}
+                  {isSet ? t('settings.connected') : t('settings.notSet')}
                 </Text>
               </View>
             );
@@ -281,9 +281,9 @@ export default function SettingsScreen() {
 
       {/* Interactive Onboarding Tutorial */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>신규 유저 튜토리얼</Text>
+        <Text style={styles.sectionTitle}>{t('settings.tutorial')}</Text>
         <Text style={styles.sectionDesc}>
-          가상 상품 데이터로 15초 만에 '링크 입력 ➔ AI 숏폼 ➔ 공정위 문구 완성'을 직접 체험해 볼 수 있어요
+          {t('settings.tutorialDesc')}
         </Text>
         <TouchableOpacity
           style={styles.tutorialBtn}
@@ -291,7 +291,7 @@ export default function SettingsScreen() {
           activeOpacity={0.8}
         >
           <Play size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.tutorialBtnText}>튜토리얼 시작하기</Text>
+          <Text style={styles.tutorialBtnText}>{t('settings.tutorialStart')}</Text>
         </TouchableOpacity>
       </View>
 

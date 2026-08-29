@@ -51,6 +51,7 @@ import {
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import { useI18n } from '@/hooks/useI18n';
 import { getStaleCached, setCached } from '@/lib/offlineCache';
 
 const PLATFORM_META: Record<string, { label: string; icon: typeof ShoppingBag; color: string }> = {
@@ -87,6 +88,7 @@ export default function AnalyticsScreen() {
   const router = useRouter();
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
+  const { t } = useI18n();
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,7 +115,7 @@ export default function AnalyticsScreen() {
         setUsingCache(true);
         setLoadError(null);
       } else {
-        setLoadError('성과 데이터를 불러오는 중 오류가 발생했어요');
+        setLoadError(t('analytics.error.load'));
       }
     } finally {
       setLoading(false);
@@ -134,7 +136,7 @@ export default function AnalyticsScreen() {
     if (!ts) return '';
     const diff = Date.now() - ts;
     const min = Math.floor(diff / 60000);
-    if (min < 1) return '방금 전';
+    if (min < 1) return t('analytics.time.justNow');
     if (min < 60) return `${min}분 전`;
     const hr = Math.floor(min / 60);
     if (hr < 24) return `${hr}시간 전`;
@@ -223,9 +225,9 @@ export default function AnalyticsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{loadError || '데이터를 불러올 수 없습니다'}</Text>
+          <Text style={styles.errorText}>{loadError || t('analytics.error.default')}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => { setLoading(true); loadData(); }} activeOpacity={0.8}>
-            <Text style={styles.retryText}>다시 시도</Text>
+            <Text style={styles.retryText}>{t('analytics.retry')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -244,7 +246,7 @@ export default function AnalyticsScreen() {
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
         <View style={styles.headerTopRow}>
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>통합 성과 대시보드</Text>
+            <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>{t('analytics.title')}</Text>
             <Text style={styles.headerSubtext}>
               제품 분석부터 콘텐츠 제작, 클릭, 수익까지 한눈에 추적합니다
             </Text>
@@ -263,7 +265,7 @@ export default function AnalyticsScreen() {
             {usingCache ? (
               <>
                 <WifiOff size={11} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.updateInfoTextWarn}>오프라인 · 캐시 데이터 표시 중</Text>
+                <Text style={styles.updateInfoTextWarn}>{t('analytics.offline')}</Text>
               </>
             ) : (
               <>

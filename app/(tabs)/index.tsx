@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useI18n } from '@/hooks/useI18n';
 import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, Lightbulb, Sun, Aperture, ShoppingBag } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
@@ -59,6 +60,7 @@ const ZOOM_LEVELS = [
 
 export default function CameraScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
@@ -501,7 +503,7 @@ export default function CameraScreen() {
   if (!permission) {
     return (
       <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>카메라 로딩 중...</Text>
+        <Text style={styles.permissionText}>{t('camera.loading')}</Text>
       </View>
     );
   }
@@ -510,16 +512,16 @@ export default function CameraScreen() {
     return (
       <View style={styles.permissionContainer}>
         <Camera size={56} color={theme.colors.primary[400]} strokeWidth={1.5} />
-        <Text style={styles.permissionTitle}>카메라 접근이 필요해요</Text>
+        <Text style={styles.permissionTitle}>{t('camera.permission.title2')}</Text>
         <Text style={styles.permissionText}>
-          실시간으로 사진을 촬영하고 AI 분석을 하려면 카메라 접근 권한이 필요합니다.
+          {t('camera.permission.desc2')}
         </Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
-          <Text style={styles.permissionButtonText}>카메라 접근 허용</Text>
+          <Text style={styles.permissionButtonText}>{t('camera.permission.grantBtn')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.uploadAltButton} onPress={handlePickImage} activeOpacity={0.8}>
           <ImageIcon size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={styles.uploadAltText}>갤러리에서 사진 선택</Text>
+          <Text style={styles.uploadAltText}>{t('camera.gallery')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -555,7 +557,7 @@ export default function CameraScreen() {
         scrollEnabled={!arMode}
       >
         <View style={styles.verticalHeader}>
-          <Text style={styles.verticalTitle}>제품 촬영부터 공유까지</Text>
+          <Text style={styles.verticalTitle}>{t('camera.heroTitle')}</Text>
           <Text style={styles.verticalSubtitle}>
             아래 순서대로 따라 하시면 됩니다. 각 단계를 탭하여 진행하세요.
           </Text>
@@ -701,7 +703,7 @@ export default function CameraScreen() {
           </View>
 
           <View style={styles.modeGuideContainer}>
-            <Text style={styles.modeGuideSectionLabel}>촬영 방식 선택</Text>
+            <Text style={styles.modeGuideSectionLabel}>{t('camera.modeSelect')}</Text>
             <TouchableOpacity
               style={[styles.modeGuideCard, recognitionMode === 'single' && styles.modeGuideCardActive]}
               onPress={() => { setRecognitionMode('single'); setMultiShots([]); }}
@@ -712,22 +714,22 @@ export default function CameraScreen() {
                   <ScanLine size={16} color={recognitionMode === 'single' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
                 </View>
                 <View style={styles.modeGuideTextWrap}>
-                  <Text style={[styles.modeGuideTitle, recognitionMode === 'single' && styles.modeGuideTitleActive]}>단품 촬영</Text>
-                  <Text style={styles.modeGuideDesc}>사진 1장으로 빠르게 AI 분석</Text>
+                  <Text style={[styles.modeGuideTitle, recognitionMode === 'single' && styles.modeGuideTitleActive]}>{t('camera.mode.single')}</Text>
+                  <Text style={styles.modeGuideDesc}>{t('camera.mode.singleDesc')}</Text>
                   <View style={styles.modeGuideFlowRow}>
                     <View style={styles.modeGuideFlowChip}>
                       <Camera size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>촬영</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.capture')}</Text>
                     </View>
                     <Text style={styles.modeGuideFlowArrow}>→</Text>
                     <View style={styles.modeGuideFlowChip}>
                       <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>AI 분석</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.analyze')}</Text>
                     </View>
                     <Text style={styles.modeGuideFlowArrow}>→</Text>
                     <View style={styles.modeGuideFlowChip}>
                       <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>소스 생성</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.source')}</Text>
                     </View>
                   </View>
                 </View>
@@ -749,22 +751,22 @@ export default function CameraScreen() {
                   <Layers size={16} color={recognitionMode === 'multi' ? '#fff' : theme.colors.accent[300]} strokeWidth={2} />
                 </View>
                 <View style={styles.modeGuideTextWrap}>
-                  <Text style={[styles.modeGuideTitle, recognitionMode === 'multi' && styles.modeGuideTitleActive]}>다각도 촬영 (1~4장)</Text>
-                  <Text style={styles.modeGuideDesc}>앞·옆·뒤·디테일 입체 분석으로 정밀도 UP</Text>
+                  <Text style={[styles.modeGuideTitle, recognitionMode === 'multi' && styles.modeGuideTitleActive]}>{t('camera.mode.multi')}</Text>
+                  <Text style={styles.modeGuideDesc}>{t('camera.mode.multiDesc')}</Text>
                   <View style={styles.modeGuideFlowRow}>
                     <View style={styles.modeGuideFlowChip}>
                       <Layers size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>다각도 촬영</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.multiCapture')}</Text>
                     </View>
                     <Text style={styles.modeGuideFlowArrow}>→</Text>
                     <View style={styles.modeGuideFlowChip}>
                       <Wand2 size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>입체 AI 분석</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.multiAnalyze')}</Text>
                     </View>
                     <Text style={styles.modeGuideFlowArrow}>→</Text>
                     <View style={styles.modeGuideFlowChip}>
                       <LayoutTemplate size={9} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.modeGuideFlowText}>고정밀 소스</Text>
+                      <Text style={styles.modeGuideFlowText}>{t('camera.flow.highPrecision')}</Text>
                     </View>
                   </View>
                 </View>
@@ -793,7 +795,7 @@ export default function CameraScreen() {
             activeOpacity={0.8}
           >
             <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>AR 실시간 효과 촬영</Text>
+            <Text style={styles.verticalSingleBtnText}>{t('camera.arMode')}</Text>
           </TouchableOpacity>
 
           {/* Pro Tip: shooting conditions */}

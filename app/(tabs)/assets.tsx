@@ -23,6 +23,7 @@ import type { SavedAsset } from '@/types/database';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import { useI18n } from '@/hooks/useI18n';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -46,6 +47,7 @@ const REEXPORT_FORMATS = [
 export default function AssetsScreen() {
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
+  const { t } = useI18n();
   const [assets, setAssets] = useState<SavedAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,7 +86,7 @@ export default function AssetsScreen() {
         setAssets((prev) => prev.filter((a) => a.id !== asset.id));
       }
     } catch {
-      Alert.alert('오류', '삭제 중 문제가 발생했어요. 다시 시도해주세요.');
+      Alert.alert(t('common.error'), t('assets.alert.deleteError'));
     }
   }, []);
 
@@ -102,14 +104,14 @@ export default function AssetsScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('권한 필요', '사진 접근 권한이 필요해요. 설정에서 허용해주세요.');
+        Alert.alert(t('assets.alert.permission'), t('assets.alert.permission'));
         return;
       }
       const ext = asset.asset_type === 'video' ? 'webm' : 'png';
       const localUri = `${FileSystem.cacheDirectory}${asset.file_name.replace(/\.[^.]+$/, '')}-${Date.now()}.${ext}`;
       const downloadRes = await FileSystem.downloadAsync(asset.file_url, localUri);
       if (downloadRes.status !== 200) {
-        Alert.alert('오류', '파일을 다운로드하지 못했어요.');
+        Alert.alert(t('common.error'), t('assets.alert.downloadError'));
         return;
       }
       const mediaAsset = await MediaLibrary.createAssetAsync(downloadRes.uri);
@@ -119,9 +121,9 @@ export default function AssetsScreen() {
       } catch {
         // Album creation can fail on scoped storage; the asset is already saved to gallery.
       }
-      Alert.alert('저장 완료', '갤러리에 저장됐어요.');
+      Alert.alert(t('assets.alert.saveSuccess'), t('assets.alert.saveSuccess'));
     } catch {
-      Alert.alert('오류', '다운로드 중 문제가 발생했어요.');
+      Alert.alert(t('common.error'), t('assets.alert.saveError'));
     }
   }, []);
 
@@ -150,7 +152,7 @@ export default function AssetsScreen() {
       setStatusPickerAsset(null);
       setShareUrlInput('');
     } else {
-      Alert.alert('오류', '상태 업데이트에 실패했어요.');
+      Alert.alert(t('common.error'), t('assets.alert.statusError'));
     }
   }, [statusPickerAsset, shareUrlInput]);
 
@@ -173,7 +175,7 @@ export default function AssetsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <Text style={styles.headerTitle}>내 제작물</Text>
+        <Text style={styles.headerTitle}>{t('assets.title')}</Text>
         <Text style={styles.headerSubtext}>
           {assets.length}개의 저장된 결과물
         </Text>
@@ -186,9 +188,9 @@ export default function AssetsScreen() {
       {assets.length === 0 ? (
         <View style={styles.emptyState}>
           <FolderOpen size={56} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
-          <Text style={styles.emptyTitle}>아직 저장된 제작물이 없습니다</Text>
+          <Text style={styles.emptyTitle}>{t('assets.empty')}</Text>
           <Text style={styles.emptyText}>
-            결과 화면에서 '클라우드에 저장' 버튼을 누르면 템플릿 이미지와 동영상이 여기에 저장됩니다.
+            {t('assets.emptyDesc')}
           </Text>
         </View>
       ) : (
