@@ -222,13 +222,13 @@ export default function SettingsScreen() {
       await togglePlatformEnabled(id, enabled);
       setManagedPlatforms((prev) => prev.map((p) => p.id === id ? { ...p, isEnabled: enabled } : p));
     } catch {
-      Alert.alert('오류', '플랫폼 설정 변경에 실패했습니다.');
+      Alert.alert(t('common.error'), t('settings.platformToggleFail'));
     }
   };
 
   const handleAddPlatform = async () => {
     if (!newPlatformName.trim()) {
-      Alert.alert('입력 필요', '플랫폼 이름을 입력해주세요.');
+      Alert.alert(t('settings.inputRequired'), t('settings.platformNameRequired'));
       return;
     }
     setAddingPlatform(true);
@@ -239,23 +239,23 @@ export default function SettingsScreen() {
       setShowAddPlatform(false);
       await loadPlatforms();
     } catch {
-      Alert.alert('오류', '플랫폼 추가에 실패했습니다.');
+      Alert.alert(t('common.error'), t('settings.platformAddFail'));
     }
     setAddingPlatform(false);
   };
 
   const handleDeletePlatform = (id: string) => {
-    Alert.alert('삭제', '이 커스텀 플랫폼을 삭제하시겠어요?', [
-      { text: '취소', style: 'cancel' },
+    Alert.alert(t('common.delete'), t('settings.platformDeleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: '삭제',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteCustomPlatform(id);
             await loadPlatforms();
           } catch {
-            Alert.alert('오류', '삭제에 실패했습니다.');
+            Alert.alert(t('common.error'), t('settings.deleteFail'));
           }
         },
       },
@@ -286,7 +286,7 @@ export default function SettingsScreen() {
       setEditingAffiliateId(null);
       await loadAffiliatePlatforms();
     } catch {
-      Alert.alert('오류', '파트너스 ID 저장에 실패했습니다.');
+      Alert.alert(t('common.error'), t('settings.partnersIdSaveFail'));
     }
   };
 
@@ -295,13 +295,13 @@ export default function SettingsScreen() {
       await toggleAffiliatePlatformEnabled(id, enabled);
       setAffiliatePlatforms((prev) => prev.map((p) => p.id === id ? { ...p, is_enabled: enabled } : p));
     } catch {
-      Alert.alert('오류', '플랫폼 설정 변경에 실패했습니다.');
+      Alert.alert(t('common.error'), t('settings.platformToggleFail'));
     }
   };
 
   const handleAddAffiliate = async () => {
     if (!newAffName.trim()) {
-      Alert.alert('입력 필요', '플랫폼 이름을 입력해주세요.');
+      Alert.alert(t('settings.inputRequired'), t('settings.platformNameRequired'));
       return;
     }
     setAddingAffiliate(true);
@@ -317,23 +317,23 @@ export default function SettingsScreen() {
       setShowAddAffiliate(false);
       await loadAffiliatePlatforms();
     } catch {
-      Alert.alert('오류', '제휴 플랫폼 추가에 실패했습니다.');
+      Alert.alert(t('common.error'), t('settings.affiliateAddFail'));
     }
     setAddingAffiliate(false);
   };
 
   const handleDeleteAffiliate = (id: string) => {
-    Alert.alert('삭제', '이 커스텀 제휴 플랫폼을 삭제하시겠어요?', [
-      { text: '취소', style: 'cancel' },
+    Alert.alert(t('common.delete'), t('settings.affiliateDeleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: '삭제',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteCustomAffiliatePlatform(id);
             await loadAffiliatePlatforms();
           } catch {
-            Alert.alert('오류', '삭제에 실패했습니다.');
+            Alert.alert(t('common.error'), t('settings.deleteFail'));
           }
         },
       },
@@ -854,9 +854,9 @@ export default function SettingsScreen() {
 
       {/* Marketing Platform Management */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>마케팅 플랫폼 관리</Text>
+        <Text style={styles.sectionTitle}>{t('settings.platformMgmt')}</Text>
         <Text style={styles.sectionDesc}>
-          마케팅 탭에서 영상을 만들 때 선택할 SNS 플랫폼을 켜고 끄거나, 커스텀 플랫폼을 추가할 수 있습니다.
+          {t('settings.platformMgmtDesc')}
         </Text>
 
         {platformsLoading ? (
@@ -897,17 +897,17 @@ export default function SettingsScreen() {
 
         {showAddPlatform ? (
           <View style={styles.card}>
-            <Text style={styles.idInputLabel}>플랫폼 이름</Text>
+            <Text style={styles.idInputLabel}>{t('settings.platformName')}</Text>
             <TextInput
               style={styles.idInput}
               value={newPlatformName}
               onChangeText={setNewPlatformName}
-              placeholder="예: 나의 블로그, 카카오채널 등"
+              placeholder={t('settings.platformNamePlaceholder')}
               placeholderTextColor={theme.colors.dark.textFaint}
               maxLength={20}
             />
             <View style={{ height: 12 }} />
-            <Text style={styles.idInputLabel}>화면 비율</Text>
+            <Text style={styles.idInputLabel}>{t('settings.platformRatio')}</Text>
             <View style={styles.platformPickerRow}>
               {AVAILABLE_RATIOS.map((r) => (
                 <TouchableOpacity
@@ -953,16 +953,16 @@ export default function SettingsScreen() {
             activeOpacity={0.8}
           >
             <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.addPlatformBtnText}>커스텀 플랫폼 추가</Text>
+            <Text style={styles.addPlatformBtnText}>{t('settings.platformAddCustom')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Affiliate Marketing Platform Management */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>제휴 마케팅 플랫폼 관리</Text>
+        <Text style={styles.sectionTitle}>{t('settings.affiliatePlatformMgmt')}</Text>
         <Text style={styles.sectionDesc}>
-          제휴사 파트너스 ID를 등록하고 플랫폼을 켜고 끌 수 있습니다. 등록된 ID는 제휴쇼핑 탭과 마케팅 숏폼 생성 시 자동으로 추적 코드로 결합됩니다.
+          {t('settings.affiliatePlatformMgmtDesc')}
         </Text>
 
         {affiliatePlatformsLoading ? (
@@ -979,7 +979,7 @@ export default function SettingsScreen() {
                     <Text style={styles.affPlatformLabel}>{p.label}</Text>
                     {!p.is_builtin && (
                       <View style={styles.affCustomBadge}>
-                        <Text style={styles.affCustomBadgeText}>커스텀</Text>
+                        <Text style={styles.affCustomBadgeText}>{t('settings.customBadge')}</Text>
                       </View>
                     )}
                   </View>
@@ -989,7 +989,7 @@ export default function SettingsScreen() {
                         style={styles.affEditInput}
                         value={editingAffiliateValue}
                         onChangeText={setEditingAffiliateValue}
-                        placeholder="파트너스 ID 입력"
+                        placeholder={t('settings.partnersIdPlaceholder')}
                         placeholderTextColor={theme.colors.dark.textFaint}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -1008,7 +1008,7 @@ export default function SettingsScreen() {
                       activeOpacity={0.7}
                     >
                       <Text style={styles.affIdText}>
-                        {p.hasId ? `ID: ${p.partners_id}` : '파트너스 ID 미설정 — 탭하여 입력'}
+                        {p.hasId ? `ID: ${p.partners_id}` : t('settings.partnersIdNotSet')}
                       </Text>
                       {p.tracking_param ? (
                         <Text style={styles.affParamText}>추적 파라미터: {p.tracking_param}</Text>
@@ -1041,38 +1041,38 @@ export default function SettingsScreen() {
 
         {showAddAffiliate ? (
           <View style={styles.card}>
-            <Text style={styles.idInputLabel}>플랫폼 이름</Text>
+            <Text style={styles.idInputLabel}>{t('settings.platformName')}</Text>
             <TextInput
               style={styles.idInput}
               value={newAffName}
               onChangeText={setNewAffName}
-              placeholder="예: 11번가 제휴, 카카오채널 등"
+              placeholder={t('settings.affiliatePlatformNamePlaceholder')}
               placeholderTextColor={theme.colors.dark.textFaint}
               maxLength={20}
             />
             <View style={{ height: 12 }} />
-            <Text style={styles.idInputLabel}>파트너스 ID</Text>
+            <Text style={styles.idInputLabel}>{t('settings.partnersId')}</Text>
             <TextInput
               style={styles.idInput}
               value={newAffId}
               onChangeText={setNewAffId}
-              placeholder="제휴사에서 발급받은 ID"
+              placeholder={t('settings.partnersIdHint')}
               placeholderTextColor={theme.colors.dark.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
             />
             <View style={{ height: 12 }} />
-            <Text style={styles.idInputLabel}>추적 URL 파라미터</Text>
+            <Text style={styles.idInputLabel}>{t('settings.trackingParam')}</Text>
             <TextInput
               style={styles.idInput}
               value={newAffParam}
               onChangeText={setNewAffParam}
-              placeholder="예: partner, tag, aff_id, ref 등"
+              placeholder={t('settings.trackingParamPlaceholder')}
               placeholderTextColor={theme.colors.dark.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Text style={styles.affParamHint}>상품 URL 뒤에 ?파라미터=ID 형태로 자동 추가됩니다</Text>
+            <Text style={styles.affParamHint}>{t('settings.trackingParamHint')}</Text>
             <View style={styles.addPlatformActions}>
               <TouchableOpacity
                 style={styles.addPlatformCancelBtn}
@@ -1106,7 +1106,7 @@ export default function SettingsScreen() {
             activeOpacity={0.8}
           >
             <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.addPlatformBtnText}>커스텀 제휴 플랫폼 추가</Text>
+            <Text style={styles.addPlatformBtnText}>{t('settings.affiliateAddCustom')}</Text>
           </TouchableOpacity>
         )}
       </View>

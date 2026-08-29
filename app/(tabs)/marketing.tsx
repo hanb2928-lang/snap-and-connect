@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
+import { useI18n } from '@/hooks/useI18n';
 import { fetchDashboardSummary, type DashboardSummary } from '@/lib/affiliateDashboard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { friendlyError } from '@/lib/errors';
@@ -61,12 +62,12 @@ const TRENDING_KEYWORDS = [
 ];
 
 const QUICK_NAV_ITEMS = [
-  { key: 'platform', label: '플랫폼', icon: Smartphone, color: theme.colors.primary[300] },
-  { key: 'viral', label: '떡상 꿀템', icon: Flame, color: theme.colors.warning[400] },
-  { key: 'url', label: 'URL 입력', icon: Link2, color: theme.colors.accent[400] },
-  { key: 'hook', label: '3초 훅', icon: Zap, color: theme.colors.warning[400] },
-  { key: 'ab', label: 'A/B 테스트', icon: Dna, color: theme.colors.accent[400] },
-  { key: 'render', label: '영상 만들기', icon: Film, color: theme.colors.primary[400] },
+  { key: 'platform', labelKey: 'nav.platform', icon: Smartphone, color: theme.colors.primary[300] },
+  { key: 'viral', labelKey: 'nav.viralProduct', icon: Flame, color: theme.colors.warning[400] },
+  { key: 'url', labelKey: 'nav.urlInput', icon: Link2, color: theme.colors.accent[400] },
+  { key: 'hook', labelKey: 'nav.hook', icon: Zap, color: theme.colors.warning[400] },
+  { key: 'ab', labelKey: 'nav.abTest', icon: Dna, color: theme.colors.accent[400] },
+  { key: 'render', labelKey: 'nav.render', icon: Film, color: theme.colors.primary[400] },
 ];
 
 type PipelineStep = 1 | 2 | 3;
@@ -75,6 +76,7 @@ export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
+  const { t } = useI18n();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -269,9 +271,9 @@ export default function MarketingScreen() {
             <Megaphone size={22} color={theme.colors.primary[300]} strokeWidth={2.5} />
           </View>
           <View style={styles.headerTextBox}>
-            <Text style={styles.headerTitle}>마케팅 &amp; 제휴쇼핑</Text>
+            <Text style={styles.headerTitle}>{t('marketing.title')}</Text>
             <Text style={styles.headerSubtext}>
-              플랫폼 선택 → 템플릿 &amp; 훅 → AI 영상 생성, 한 화면에서 끝내세요
+              {t('marketing.subtitle')}
             </Text>
           </View>
         </View>
@@ -291,7 +293,7 @@ export default function MarketingScreen() {
               <View style={[styles.quickNavIcon, { backgroundColor: item.color + '18' }]}>
                 <Icon size={16} color={item.color} strokeWidth={2} />
               </View>
-              <Text style={styles.quickNavLabel}>{item.label}</Text>
+              <Text style={styles.quickNavLabel}>{t(item.labelKey)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -318,7 +320,7 @@ export default function MarketingScreen() {
                     <Text style={[styles.pipelineDotText, activeStep >= step && styles.pipelineDotTextActive]}>{step}</Text>
                   </View>
                   <Text style={[styles.pipelineLabel, activeStep >= step && styles.pipelineLabelActive]}>
-                    {step === 1 ? '플랫폼 선택' : step === 2 ? '템플릿 &amp; 훅' : 'AI 영상 생성'}
+                    {step === 1 ? t('marketing.step.platform') : step === 2 ? t('marketing.step.template') : t('marketing.step.render')}
                   </Text>
                   {idx < 2 && <View style={[styles.pipelineConnector, activeStep > step && styles.pipelineConnectorActive]} />}
                 </View>
@@ -350,17 +352,17 @@ export default function MarketingScreen() {
               <View style={styles.statPill}>
                 <TrendingUp size={14} color={theme.colors.success[400]} strokeWidth={2} />
                 <Text style={styles.statPillValue}>{totalRevenue.toLocaleString('ko-KR')}원</Text>
-                <Text style={styles.statPillLabel}>수익</Text>
+                <Text style={styles.statPillLabel}>{t('marketing.revenue')}</Text>
               </View>
               <View style={styles.statPill}>
                 <Link2 size={14} color={theme.colors.primary[400]} strokeWidth={2} />
                 <Text style={styles.statPillValue}>{totalClicks}</Text>
-                <Text style={styles.statPillLabel}>클릭</Text>
+                <Text style={styles.statPillLabel}>{t('marketing.clicks')}</Text>
               </View>
               <View style={styles.statPill}>
                 <ShoppingBag size={14} color={theme.colors.accent[400]} strokeWidth={2} />
                 <Text style={styles.statPillValue}>{totalLinks}</Text>
-                <Text style={styles.statPillLabel}>링크</Text>
+                <Text style={styles.statPillLabel}>{t('marketing.links')}</Text>
               </View>
             </View>
 
@@ -374,8 +376,8 @@ export default function MarketingScreen() {
                   <Text style={styles.phaseNumText}>1</Text>
                 </View>
                 <View style={styles.phaseHeaderText}>
-                  <Text style={styles.phaseTitle}>타깃 플랫폼 선택</Text>
-                  <Text style={styles.phaseDesc}>영상을 업로드할 SNS 플랫폼을 선택하세요 — 비율과 안전영역이 자동 적용됩니다</Text>
+                  <Text style={styles.phaseTitle}>{t('marketing.targetPlatform')}</Text>
+                  <Text style={styles.phaseDesc}>{t('marketing.targetPlatformDesc')}</Text>
                 </View>
               </View>
 
@@ -417,7 +419,7 @@ export default function MarketingScreen() {
                   <View style={styles.safeZoneCard}>
                     <View style={styles.safeZoneHeader}>
                       <Layout size={16} color={spec.color} strokeWidth={2} />
-                      <Text style={styles.safeZoneTitle}>{spec.label} 안전영역 (Safe Zone) 미리보기</Text>
+                      <Text style={styles.safeZoneTitle}>{spec.label} {t('marketing.safeZonePreview')}</Text>
                     </View>
                     <View style={styles.safeZonePreviewRow}>
                       <View style={[styles.safeZoneFrame, { width: previewW, height: previewH }]}>
@@ -438,7 +440,7 @@ export default function MarketingScreen() {
                         }]} />
                       </View>
                       <View style={styles.safeZoneInfo}>
-                        <Text style={styles.safeZoneInfoTitle}>화면 비율 {spec.ratio}</Text>
+                        <Text style={styles.safeZoneInfoTitle}>{t('marketing.aspectRatio')} {spec.ratio}</Text>
                         <Text style={styles.safeZoneInfoDesc}>{spec.desc}</Text>
                         <Text style={styles.safeZoneInfoDim}>{spec.width}×{spec.height}px</Text>
                       </View>
@@ -458,11 +460,11 @@ export default function MarketingScreen() {
                   <Text style={styles.phaseNumText}>2</Text>
                 </View>
                 <View style={styles.phaseHeaderText}>
-                  <Text style={styles.phaseTitle}>맞춤 템플릿 &amp; 3초 훅 선택</Text>
+                  <Text style={styles.phaseTitle}>{t('marketing.templateHook')}</Text>
                   <Text style={styles.phaseDesc}>
                     {selectedPlatform
-                      ? `${selectedPlatform.label} · ${selectedPlatform.ratio} 비율에 맞춘 템플릿`
-                      : '1단계에서 플랫폼을 먼저 선택하세요'}
+                      ? `${selectedPlatform.label} · ${selectedPlatform.ratio} ${t('marketing.templateForRatio')}`
+                      : t('marketing.selectPlatformFirst')}
                   </Text>
                 </View>
               </View>
@@ -474,11 +476,11 @@ export default function MarketingScreen() {
                     <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2} />
                   </View>
                   <View style={styles.trackCardInfo}>
-                    <Text style={styles.trackCardTitle}>실시간 떡상 꿀템 TOP 20</Text>
-                    <Text style={styles.trackCardDesc}>쿠팡·아마존·알리 클릭 급상승 상품</Text>
+                    <Text style={styles.trackCardTitle}>{t('marketing.viralTop20')}</Text>
+                    <Text style={styles.trackCardDesc}>{t('marketing.viralTop20Desc')}</Text>
                   </View>
                   <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                    <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>추천 트랙</Text>
+                    <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>{t('marketing.recommendedTrack')}</Text>
                   </View>
                 </View>
               </View>
@@ -497,11 +499,11 @@ export default function MarketingScreen() {
                       <Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2} />
                     </View>
                     <View style={styles.trackCardInfo}>
-                      <Text style={styles.trackCardTitle}>제휴 URL 직접 입력</Text>
-                      <Text style={styles.trackCardDesc}>클립보드 자동 인식 &amp; 상품 정보 추출</Text>
+                      <Text style={styles.trackCardTitle}>{t('marketing.urlDirectInput')}</Text>
+                      <Text style={styles.trackCardDesc}>{t('marketing.urlDirectInputDesc')}</Text>
                     </View>
                     <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>직접 트랙</Text>
+                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>{t('marketing.manualTrack')}</Text>
                     </View>
                   </View>
 
@@ -514,7 +516,7 @@ export default function MarketingScreen() {
                     style={styles.urlInput}
                     value={affiliateUrl}
                     onChangeText={setAffiliateUrl}
-                    placeholder="제휴 링크 URL을 여기에 붙여넣으세요"
+                    placeholder={t('marketing.urlPlaceholder')}
                     placeholderTextColor={theme.colors.dark.textFaint}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -529,7 +531,7 @@ export default function MarketingScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.urlSubmitBtnText}>
-                      {extracting ? '상품 정보 추출 중...' : '링크에서 상품 정보 추출 →'}
+                      {extracting ? t('marketing.extracting') : t('marketing.extractBtn')}
                     </Text>
                     <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
                   </TouchableOpacity>
@@ -579,11 +581,11 @@ export default function MarketingScreen() {
                       <Tag size={20} color={theme.colors.primary[300]} strokeWidth={2} />
                     </View>
                     <View style={styles.trackCardInfo}>
-                      <Text style={styles.trackCardTitle}>카테고리별 카탈로그</Text>
-                      <Text style={styles.trackCardDesc}>패션·뷰티·자취·IT 기기 묶음 상품</Text>
+                      <Text style={styles.trackCardTitle}>{t('marketing.categoryCatalog')}</Text>
+                      <Text style={styles.trackCardDesc}>{t('marketing.categoryCatalogDesc')}</Text>
                     </View>
                     <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>탐색 트랙</Text>
+                      <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>{t('marketing.exploreTrack')}</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -591,7 +593,7 @@ export default function MarketingScreen() {
                     onPress={() => router.push('/affiliate/trending' as never)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.categoryExploreText}>카테고리별 꿀조합 보기 →</Text>
+                    <Text style={styles.categoryExploreText}>{t('marketing.categoryExplore')}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.trendMatchWrap}>
@@ -609,12 +611,12 @@ export default function MarketingScreen() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderLeft}>
                   <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                  <Text style={styles.sectionTitleText}>3초 오프닝 훅 스튜디오</Text>
+                  <Text style={styles.sectionTitleText}>{t('marketing.hookStudio')}</Text>
                 </View>
               </View>
-              <Text style={styles.sectionDesc}>시청자가 스크롤을 멈추게 만드는 첫 문장을 선택하세요</Text>
+              <Text style={styles.sectionDesc}>{t('marketing.hookStudioDesc')}</Text>
               <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>사진 선택 → 3초 훅 문구 → 영상 생성</Text>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.warning[400] }]}>{t('marketing.hookFlowBadge')}</Text>
               </View>
               <View style={styles.selectGrid}>
                 {HOOK_TYPES.map((hook) => {
@@ -652,12 +654,12 @@ export default function MarketingScreen() {
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionHeaderLeft}>
                     <Users size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                    <Text style={styles.sectionTitleText}>A/B 테스트 3종 페르소나</Text>
+                    <Text style={styles.sectionTitleText}>{t('marketing.abPersona')}</Text>
                   </View>
                 </View>
-                <Text style={styles.sectionDesc}>Z세대 / 3040 실용 / 내돈내산 — 1클릭 동시 적용</Text>
+                <Text style={styles.sectionDesc}>{t('marketing.abPersonaDesc')}</Text>
                 <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                  <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>1클릭 → 3가지 톤 영상 동시 생성</Text>
+                  <Text style={[styles.beginnerBadgeText, { color: theme.colors.accent[300] }]}>{t('marketing.abBadge')}</Text>
                 </View>
                 <View style={styles.personaGrid}>
                   {PERSONA_TONES.map((tone) => (
@@ -672,7 +674,7 @@ export default function MarketingScreen() {
                       <Text style={styles.personaDesc} numberOfLines={2}>{tone.desc}</Text>
                       <View style={[styles.personaGenBtn, { backgroundColor: tone.color + '18' }]}>
                         <Sparkles size={12} color={tone.color} strokeWidth={2} />
-                        <Text style={[styles.personaGenText, { color: tone.color }]}>생성</Text>
+                        <Text style={[styles.personaGenText, { color: tone.color }]}>{t('marketing.generate')}</Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -683,16 +685,16 @@ export default function MarketingScreen() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderLeft}>
                   <TrendingUp size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
-                  <Text style={styles.sectionTitleText}>실시간 떡상 키워드 &amp; 스마트 CTA</Text>
+                  <Text style={styles.sectionTitleText}>{t('marketing.trendingKeywords')}</Text>
                 </View>
                 <TouchableOpacity onPress={shuffleTags} activeOpacity={0.7} style={styles.shuffleBtn}>
                   <Shuffle size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={styles.shuffleBtnText}>셔플</Text>
+                  <Text style={styles.shuffleBtnText}>{t('marketing.shuffle')}</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.sectionDesc}>SNS 인기 해시태그 무작위 믹스 — 복사해서 바로 사용</Text>
+              <Text style={styles.sectionDesc}>{t('marketing.trendingDesc')}</Text>
               <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>인기 해시태그 → 1탭 복사 → 영상에 붙여넣기</Text>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.primary[300] }]}>{t('marketing.hashtagBadge')}</Text>
               </View>
               <View style={styles.tagCloud}>
                 {(shuffledTags.length > 0 ? shuffledTags : TRENDING_KEYWORDS.slice(0, 8).map((k) => k.tag)).map((tag, i) => {
@@ -722,42 +724,42 @@ export default function MarketingScreen() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderLeft}>
                   <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  <Text style={styles.sectionTitleText}>스마트 CTA &amp; Link-in-Bio</Text>
+                  <Text style={styles.sectionTitleText}>{t('marketing.smartCta')}</Text>
                 </View>
               </View>
-              <Text style={styles.sectionDesc}>카운트다운 타이머 &amp; QR/자막 워터마크로 전환율 극대화</Text>
+              <Text style={styles.sectionDesc}>{t('marketing.smartCtaDesc')}</Text>
               <View style={[styles.beginnerBadge, { backgroundColor: theme.colors.success[500] + '18' }]}>
-                <Text style={[styles.beginnerBadgeText, { color: theme.colors.success[400] }]}>QR 코드 → 영상에 삽입 → 스캔 시 구매</Text>
+                <Text style={[styles.beginnerBadgeText, { color: theme.colors.success[400] }]}>{t('marketing.qrBadge')}</Text>
               </View>
 
               <View style={styles.countdownCard}>
                 <View style={styles.countdownHeader}>
                   <Timer size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
-                  <Text style={styles.countdownTitle}>긴급 카운트다운</Text>
+                  <Text style={styles.countdownTitle}>{t('marketing.countdown')}</Text>
                 </View>
                 <Text style={styles.countdownTimer}>{formatCountdown(countdownSeconds)}</Text>
                 <Text style={styles.countdownDesc}>
-                  제한 시간 느낌으로 구매 긴장감 조성 — CTA 클릭률 평균 23% 상승
+                  {t('marketing.countdownDesc')}
                 </Text>
                 <TouchableOpacity
                   style={styles.countdownResetBtn}
                   onPress={() => setCountdownSeconds(3600)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.countdownResetText}>1시간으로 리셋</Text>
+                  <Text style={styles.countdownResetText}>{t('marketing.countdownReset')}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.qrCard}>
                 <View style={styles.qrHeader}>
                   <QrCode size={18} color={theme.colors.primary[400]} strokeWidth={2.2} />
-                  <Text style={styles.qrTitle}>QR 워터마크</Text>
+                  <Text style={styles.qrTitle}>{t('marketing.qrWatermark')}</Text>
                 </View>
                 <View style={styles.qrDisplayWrap}>
                   <QRCodeDisplay value={qrValue} size={140} />
                 </View>
                 <Text style={styles.qrDesc}>
-                  영상에 QR을 워터마크로 삽입 — 시청자가 스캔하면 바로 구매
+                  {t('marketing.qrDesc')}
                 </Text>
                 <TouchableOpacity
                   style={styles.qrEditBtn}
@@ -765,7 +767,7 @@ export default function MarketingScreen() {
                   activeOpacity={0.7}
                 >
                   <Link2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={styles.qrEditText}>단축 링크 관리에서 QR 연결</Text>
+                  <Text style={styles.qrEditText}>{t('marketing.qrEditLink')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -784,9 +786,9 @@ export default function MarketingScreen() {
                   <Text style={styles.phaseNumText}>3</Text>
                 </View>
                 <View style={styles.phaseHeaderText}>
-                  <Text style={styles.phaseTitle}>AI 마케팅 숏폼 생성 &amp; 렌더링</Text>
+                  <Text style={styles.phaseTitle}>{t('marketing.renderTitle')}</Text>
                   <Text style={styles.phaseDesc}>
-                    {selectedHook ? '훅 선택 완료 — 아래 버튼을 눌러 영상을 생성하세요' : '2단계에서 훅을 먼저 선택하세요'}
+                    {selectedHook ? t('marketing.renderHookReady') : t('marketing.renderHookPending')}
                   </Text>
                 </View>
               </View>
@@ -799,7 +801,7 @@ export default function MarketingScreen() {
                       <View style={styles.renderSummaryRow}>
                         <View style={styles.renderSummaryItem}>
                           <Smartphone size={16} color={spec.color} strokeWidth={2} />
-                          <Text style={styles.renderSummaryLabel}>플랫폼</Text>
+                          <Text style={styles.renderSummaryLabel}>{t('marketing.renderPlatform')}</Text>
                           <Text style={styles.renderSummaryValue} numberOfLines={1}>
                             {spec.label} · {spec.ratio}
                           </Text>
@@ -812,9 +814,9 @@ export default function MarketingScreen() {
                 <View style={styles.renderSummaryRow}>
                   <View style={styles.renderSummaryItem}>
                     <ShoppingBag size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={styles.renderSummaryLabel}>상품</Text>
+                    <Text style={styles.renderSummaryLabel}>{t('marketing.renderProduct')}</Text>
                     <Text style={styles.renderSummaryValue} numberOfLines={1}>
-                      {selectedProduct || '미선택'}
+                      {selectedProduct || t('marketing.notSelected')}
                     </Text>
                   </View>
                 </View>
@@ -822,9 +824,9 @@ export default function MarketingScreen() {
                 <View style={styles.renderSummaryRow}>
                   <View style={styles.renderSummaryItem}>
                     <Zap size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-                    <Text style={styles.renderSummaryLabel}>훅</Text>
+                    <Text style={styles.renderSummaryLabel}>{t('marketing.renderHook')}</Text>
                     <Text style={styles.renderSummaryValue} numberOfLines={1}>
-                      {selectedHook ? HOOK_TYPES.find((h) => h.key === selectedHook)?.label : '미선택'}
+                      {selectedHook ? HOOK_TYPES.find((h) => h.key === selectedHook)?.label : t('marketing.notSelected')}
                     </Text>
                   </View>
                 </View>
@@ -833,7 +835,7 @@ export default function MarketingScreen() {
 
             {/* All Marketing Tools */}
             <View style={styles.divider} />
-            <Text style={styles.toolsSectionTitle}>전체 마케팅 도구</Text>
+            <Text style={styles.toolsSectionTitle}>{t('marketing.allTools')}</Text>
             <View style={styles.toolGrid}>
               <TouchableOpacity
                 style={styles.toolCard}
@@ -844,8 +846,8 @@ export default function MarketingScreen() {
                   <Link2 size={20} color={theme.colors.accent[400]} strokeWidth={2.2} />
                 </View>
                 <View style={styles.toolInfo}>
-                  <Text style={styles.toolLabel}>제휴 링크 관리</Text>
-                  <Text style={styles.toolDesc} numberOfLines={2}>제휴 링크 발급, 단축, 클릭 추적</Text>
+                  <Text style={styles.toolLabel}>{t('marketing.toolLinkMgmt')}</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>{t('marketing.toolLinkMgmtDesc')}</Text>
                 </View>
                 <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
               </TouchableOpacity>
@@ -858,8 +860,8 @@ export default function MarketingScreen() {
                   <Link2 size={20} color={theme.colors.success[400]} strokeWidth={2.2} />
                 </View>
                 <View style={styles.toolInfo}>
-                  <Text style={styles.toolLabel}>단축 링크 관리</Text>
-                  <Text style={styles.toolDesc} numberOfLines={2}>제휴 링크 단축 및 클릭 추적</Text>
+                  <Text style={styles.toolLabel}>{t('marketing.toolShortLink')}</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>{t('marketing.toolShortLinkDesc')}</Text>
                 </View>
                 <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
               </TouchableOpacity>
@@ -872,8 +874,8 @@ export default function MarketingScreen() {
                   <Globe size={20} color={theme.colors.primary[300]} strokeWidth={2.2} />
                 </View>
                 <View style={styles.toolInfo}>
-                  <Text style={styles.toolLabel}>스마트 예약</Text>
-                  <Text style={styles.toolDesc} numberOfLines={2}>최적 업로드 시간대 자동 추천</Text>
+                  <Text style={styles.toolLabel}>{t('marketing.toolScheduler')}</Text>
+                  <Text style={styles.toolDesc} numberOfLines={2}>{t('marketing.toolSchedulerDesc')}</Text>
                 </View>
                 <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
               </TouchableOpacity>
@@ -891,7 +893,7 @@ export default function MarketingScreen() {
             activeOpacity={0.85}
           >
             <Film size={24} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.stickyCtaText}>선택한 상품으로 AI 마케팅 영상 만들기</Text>
+            <Text style={styles.stickyCtaText}>{t('marketing.stickyCta')}</Text>
             <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
         </View>

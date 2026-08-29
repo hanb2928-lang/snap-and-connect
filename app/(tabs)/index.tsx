@@ -109,13 +109,13 @@ export default function CameraScreen() {
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
 
-  const QUICK_NAV_ITEMS: { label: string; icon: React.ReactNode; color: string }[] = [
-    { label: '촬영·합성', icon: <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[400] },
-    { label: '갤러리', icon: <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
-    { label: 'AI 피팅', icon: <Shirt size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
-    { label: 'AI 합성', icon: <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
-    { label: '프롬프트', icon: <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[300] },
-    { label: '마케팅', icon: <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
+  const QUICK_NAV_ITEMS: { labelKey: string; icon: React.ReactNode; color: string }[] = [
+    { labelKey: 'nav.captureComposite', icon: <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[400] },
+    { labelKey: 'nav.gallery', icon: <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
+    { labelKey: 'nav.aiFitting', icon: <Shirt size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
+    { labelKey: 'nav.aiComposite', icon: <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
+    { labelKey: 'nav.prompt', icon: <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[300] },
+    { labelKey: 'nav.marketing', icon: <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
   ];
 
   const handleSectionLayout = useCallback((index: number) => (e: LayoutChangeEvent) => {
@@ -699,7 +699,7 @@ export default function CameraScreen() {
                 activeOpacity={0.7}
               >
                 {item.icon}
-                <Text style={[styles.quickNavPillText, activeSection === i && styles.quickNavPillTextActive]}>{item.label}</Text>
+                <Text style={[styles.quickNavPillText, activeSection === i && styles.quickNavPillTextActive]}>{t(item.labelKey)}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
