@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, type DimensionValue } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   withSequence,
   withRepeat,
+  withDelay,
   Easing,
   useDerivedValue,
   type SharedValue,
@@ -27,6 +28,17 @@ interface VideoProgressIndicatorProps {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+
+const TIPS = [
+  '팁: 9:16 세로형이 숏폼에서 조회수가 2배 높아요',
+  '팁: 첫 3초에 후킹 장면을 넣으면 이탈이 줄어요',
+  '팁: 자막이 있으면 소음 끄고 시청하는 유저도 끝까지 봐요',
+  '팁: 트렌딩 음악을 입히면 노출이 늘어나요',
+  '팁: 상품 클로즈업 샷은 구매 전환율을 높여요',
+  '팁: 마지막에 CTA 링크를 꼭 남겨주세요',
+  '곧 완성됩니다. 조금만 더 기다려주세요!',
+  'AI가 화면을 분석하고 최적의 컷을 배치하는 중이에요',
+];
 
 export function VideoProgressIndicator({
   progress,
@@ -53,28 +65,98 @@ export function VideoProgressIndicator({
   return <CircularProgress progress={progress} label={label} color={color} hint={hint} />;
 }
 
+function useRotatingTip(progress: number) {
+  const [tipIndex, setTipIndex] = useState(0);
+  const lastChangeRef = useRef(0);
+
+  useEffect(() => {
+    if (progress >= 100) return;
+    lastChangeRef.current = Date.now();
+    const interval = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % TIPS.length);
+      lastChangeRef.current = Date.now();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [progress]);
+
+  return TIPS[tipIndex];
+}
+
+function useElapsedSeconds(active: boolean) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const interval = setInterval(() => {
+      setElapsed((e) => e + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [active]);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `0:${secs.toString().padStart(2, '0')}`;
+}
+
 function CircularProgress({ progress, label, color, hint }: VideoProgressIndicatorProps) {
   const progressSV = useSharedValue(0);
   const progressWidth = useSharedValue(0);
+  const shimmerX = useSharedValue(-100);
+  const glowOpacity = useSharedValue(0.3);
+  const tip = useRotatingTip(progress);
+  const elapsed = useElapsedSeconds(progress < 100);
 
   useEffect(() => {
     progressSV.value = withTiming(progress / 100, { duration: 300, easing: Easing.out(Easing.quad) });
     progressWidth.value = withTiming(progress, { duration: 300, easing: Easing.out(Easing.quad) });
   }, [progress, progressSV, progressWidth]);
 
+  useEffect(() => {
+    if (progress >= 100) return;
+    shimmerX.value = withRepeat(
+      withTiming(200, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+      -1, false,
+    );
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.7, { duration: 800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1, false,
+    );
+  }, [progress, shimmerX, glowOpacity]);
+
   const barStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value}%` as unknown as DimensionValue }));
   const pctStyle = useAnimatedStyle(() => ({ opacity: progressSV.value > 0.02 ? 1 : 0.4 }));
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
 
   return (
     <View style={styles.wrap}>
       <View style={styles.circularBarBg}>
-        <Animated.View style={[styles.circularBarFill, { backgroundColor: color }, barStyle]} />
+        <Animated.View style={[styles.circularBarFill, { backgroundColor: color }, barStyle]}>
+          <Animated.View style={[styles.shimmer, shimmerStyle]} />
+        </Animated.View>
+        <Animated.View
+          style={[styles.glowOverlay, { backgroundColor: color }, glowStyle, barStyle]}
+          pointerEvents="none"
+        />
       </View>
       <View style={styles.circularLabelRow}>
         <Animated.Text style={[styles.circularPct, { color }, pctStyle]}>{Math.round(progress)}%</Animated.Text>
         <Text style={styles.labelText}>{label}</Text>
+        <Text style={styles.elapsedText}>{elapsed}</Text>
       </View>
       {hint && <Text style={styles.hintText}>{hint}</Text>}
+      {progress < 100 && (
+        <View style={styles.tipRow}>
+          <Text style={styles.tipText}>{tip}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -91,6 +173,8 @@ function BabyRunProgress({ progress, label, color, hint }: VideoProgressIndicato
   const legRight = useSharedValue(0);
   const headBob = useSharedValue(0);
   const isComplete = progress >= 100;
+  const tip = useRotatingTip(progress);
+  const elapsed = useElapsedSeconds(progress < 100);
 
   useEffect(() => {
     progressSV.value = withTiming(progress / 100, { duration: 300, easing: Easing.out(Easing.quad) });
@@ -156,8 +240,16 @@ function BabyRunProgress({ progress, label, color, hint }: VideoProgressIndicato
           </Svg>
         </Animated.View>
       </View>
-      <Text style={[styles.labelText, { textAlign: 'center' }]}>{label} {progress}%</Text>
+      <View style={styles.labelRow}>
+        <Text style={[styles.labelText, { textAlign: 'center' }]}>{label} {progress}%</Text>
+        <Text style={styles.elapsedText}>{elapsed}</Text>
+      </View>
       {hint && <Text style={styles.hintText}>{hint}</Text>}
+      {progress < 100 && (
+        <View style={styles.tipRow}>
+          <Text style={styles.tipText}>{tip}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -175,6 +267,9 @@ function StatusBarProgress({ progress, label, color, hint }: VideoProgressIndica
   const eyeScale = useSharedValue(1);
   const mouthOpen = useSharedValue(0);
   const progressWidth = useSharedValue(0);
+  const shimmerX = useSharedValue(-100);
+  const tip = useRotatingTip(progress);
+  const elapsed = useElapsedSeconds(progress < 100);
 
   const stageIdx = Math.min(Math.floor(progress / 25), 3);
   const stage = STAGES[stageIdx];
@@ -193,6 +288,14 @@ function StatusBarProgress({ progress, label, color, hint }: VideoProgressIndica
     }
   }, [bodyBob, eyeScale, mouthOpen, isComplete]);
 
+  useEffect(() => {
+    if (isComplete) return;
+    shimmerX.value = withRepeat(
+      withTiming(200, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+      -1, false,
+    );
+  }, [isComplete, shimmerX]);
+
   const headProps = useAnimatedProps(() => ({ cy: 14 + bodyBob.value }));
   const bodyProps = useAnimatedProps(() => ({ cy: 30 + bodyBob.value }));
   const leftEyeProps = useAnimatedProps(() => ({ r: 0.9 * eyeScale.value }));
@@ -201,6 +304,9 @@ function StatusBarProgress({ progress, label, color, hint }: VideoProgressIndica
     d: mouthOpen.value > 0.5 ? `M21 ${16 - mouthOpen.value} Q24 ${19 + mouthOpen.value} 27 ${16 - mouthOpen.value}` : `M21 15.5 Q24 18 27 15.5`,
   }));
   const barStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value}%` as unknown as DimensionValue }));
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }],
+  }));
 
   return (
     <View style={styles.wrap}>
@@ -240,10 +346,20 @@ function StatusBarProgress({ progress, label, color, hint }: VideoProgressIndica
         </View>
       </View>
       <View style={styles.barBg}>
-        <Animated.View style={[styles.barFill, { backgroundColor: color }, barStyle]} />
+        <Animated.View style={[styles.barFill, { backgroundColor: color }, barStyle]}>
+          <Animated.View style={[styles.shimmer, shimmerStyle]} />
+        </Animated.View>
       </View>
-      <Text style={[styles.labelText, { textAlign: 'center' }]}>{label} {progress}%</Text>
+      <View style={styles.labelRow}>
+        <Text style={[styles.labelText, { textAlign: 'center' }]}>{label} {progress}%</Text>
+        <Text style={styles.elapsedText}>{elapsed}</Text>
+      </View>
       {hint && <Text style={styles.hintText}>{hint}</Text>}
+      {progress < 100 && (
+        <View style={styles.tipRow}>
+          <Text style={styles.tipText}>{tip}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -264,6 +380,7 @@ const styles = StyleSheet.create({
   barFill: {
     height: '100%',
     borderRadius: 3,
+    overflow: 'hidden',
   },
   labelRow: {
     flexDirection: 'row',
@@ -280,6 +397,7 @@ const styles = StyleSheet.create({
   circularBarFill: {
     height: '100%',
     borderRadius: 4,
+    overflow: 'hidden',
   },
   circularLabelRow: {
     flexDirection: 'row',
@@ -297,11 +415,47 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
+  elapsedText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginLeft: 'auto',
+  },
   hintText: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     textAlign: 'center',
+  },
+  tipRow: {
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    maxWidth: 280,
+  },
+  tipText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  shimmer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 60,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    transform: [{ skewX: '-20deg' }],
+  },
+  glowOverlay: {
+    position: 'absolute',
+    top: -2,
+    height: 12,
+    borderRadius: 6,
+    opacity: 0.3,
   },
   babyTrackWrap: {
     width: TRACK_W,
