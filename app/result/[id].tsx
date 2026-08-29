@@ -76,6 +76,7 @@ import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { LocalizationSafetyCard } from '@/components/LocalizationSafetyCard';
+import { HyperHumanEngineCard } from '@/components/HyperHumanEngineCard';
 import { TrendCopyBar } from '@/components/TrendCopyBar';
 import { HashtagCopyBar } from '@/components/HashtagCopyBar';
 import { createShortLink } from '@/lib/shortUrl';
@@ -99,7 +100,7 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -1296,6 +1297,22 @@ export default function ResultScreen() {
           modes: ['single', 'multi'] as ScanMode[],
           icon: <PencilIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
           render: () => <MicroEditSlot />,
+        },
+        {
+          key: 'hyperHumanEngine',
+          label: '1% 크리에이터 AI 엔진',
+          description: '역발상 훅 + 감정 곡선 TTS + 비트 동기화 3단게 자동 적용',
+          category: 'optimize',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <ZapIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          render: () => (
+            <HyperHumanEngineCard
+              productName={activeProductName || scan?.product_name || ''}
+              caption={activeCaption}
+              hashtags={allDisplayHashtags}
+              videoDurationSec={15}
+            />
+          ),
         },
         {
           key: 'originalityScore',
