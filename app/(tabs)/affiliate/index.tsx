@@ -56,6 +56,7 @@ import { StepIndicator } from '@/components/StepIndicator';
 import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { UploadPreviewModal, type UploadPreviewData } from '@/components/UploadPreviewModal';
+import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { VirtualCutGallery } from '@/components/VirtualCutGallery';
 import { VirtualFittingGallery } from '@/components/VirtualFittingGallery';
@@ -585,6 +586,22 @@ export default function AffiliateScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          <ClipboardAffiliateBanner
+            onInsert={(url) => {
+              setAffiliateUrl(url);
+              if (!selectedPlatform) {
+                const lower = url.toLowerCase();
+                if (lower.includes('coupang')) setSelectedPlatform('Coupang');
+                else if (lower.includes('toss')) setSelectedPlatform('Toss');
+                else if (lower.includes('naver') || lower.includes('brandconnect')) setSelectedPlatform('BrandConnect');
+                else if (lower.includes('oliveyoung')) setSelectedPlatform('OliveYoung');
+                else if (lower.includes('ohou')) setSelectedPlatform('TodayHouse');
+                else if (lower.includes('kurly')) setSelectedPlatform('Kurly');
+              }
+            }}
+            currentUrl={affiliateUrl}
+          />
 
           <TextInput
             style={styles.affiliateInput}
