@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop } from 'lucide-react-native';
+import type { FlatList as FlatListType } from 'react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, Filter, ArrowDownUp, Music2, Sparkles, ArrowRight } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
@@ -44,6 +45,15 @@ const REEXPORT_FORMATS = [
   { key: 'mobile_story', label: '모바일 스토리', ratio: '9:16', icon: Smartphone, color: '#8B5CF6' },
 ];
 
+const SNS_PLATFORMS = [
+  { key: 'tiktok', label: '틱톡', icon: Music2, color: '#FF0050' },
+  { key: 'shorts', label: '숏츠', icon: Youtube, color: '#FF0000' },
+  { key: 'reels', label: '릴스', icon: Instagram, color: '#E1306C' },
+  { key: 'blog', label: '블로그', icon: FileText, color: '#00C4A7' },
+];
+
+type SortMode = 'date' | 'views' | 'title';
+
 export default function AssetsScreen() {
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
@@ -57,6 +67,19 @@ export default function AssetsScreen() {
   const [reexportDone, setReexportDone] = useState<string | null>(null);
   const [statusPickerAsset, setStatusPickerAsset] = useState<SavedAsset | null>(null);
   const [shareUrlInput, setShareUrlInput] = useState('');
+  const scrollRef = useRef<FlatListType<SavedAsset>>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('date');
+
+  const sortedAssets = useCallback(() => {
+    const sorted = [...assets];
+    if (sortMode === 'date') sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    else if (sortMode === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
+    return sorted;
+  }, [assets, sortMode]);
+
+  const bestPerformers = useCallback(() => {
+    return assets.filter((a) => a.upload_status === 'uploaded').slice(0, 3);
+  }, [assets]);
 
   const fetchAssets = useCallback(async () => {
     try {
@@ -177,13 +200,137 @@ export default function AssetsScreen() {
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
         <Text style={styles.headerTitle}>{t('assets.title')}</Text>
         <Text style={styles.headerSubtext}>
-          {assets.length}개의 저장된 결과물
+          완성된 제작물로 무엇을 하시겠습니까? {assets.length}개 저장됨
         </Text>
       </View>
 
-      <Text style={styles.helpText}>
-        템플릿 카드와 동영상 클립을 클라우드에 저장하면 여기서 언제든 다시 불러올 수 있어요. 플랫폼별 재내보내기와 업로드 상태 관리도 가능합니다.
-      </Text>
+      {/* 3 Action Track Cards */}
+      <View style={styles.trackGrid}>
+        <TouchableOpacity
+          style={styles.trackCard}
+          onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
+            <Rocket size={44} color={theme.colors.warning[400]} strokeWidth={2} />
+          </View>
+          <Text style={styles.trackTitle}>1초 SNS 멀티 업로드</Text>
+          <Text style={styles.trackDesc}>틱톡·숏츠·릴스·블로그에 캡션/해시태그와 함께 원클릭 내보내기</Text>
+          <View style={styles.trackTagRow}>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+              <Rocket size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>즉시 배포</Text>
+            </View>
+            <Text style={styles.trackArrow}>→</Text>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+              <Share2 size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>원클릭</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.trackCard}
+          onPress={() => setSortMode('views')}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.success[500] + '22' }]}>
+            <TrendingUp size={44} color={theme.colors.success[400]} strokeWidth={2} />
+          </View>
+          <Text style={styles.trackTitle}>전환율 최고작 BEST</Text>
+          <Text style={styles.trackDesc}>A/B 테스트 중 조회수·전환율이 가장 높은 효자 콘텐츠 모아보기</Text>
+          <View style={styles.trackTagRow}>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.success[500] + '18' }]}>
+              <TrendingUp size={10} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.success[400] }]}>성과 정렬</Text>
+            </View>
+            <Text style={styles.trackArrow}>→</Text>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.success[500] + '18' }]}>
+              <CheckCircle2 size={10} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.success[400] }]}>상단 고정</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.trackCard}
+          onPress={() => {
+            const first = assets[0];
+            if (first) setReexportAsset(first);
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
+            <Repeat2 size={44} color={theme.colors.accent[400]} strokeWidth={2} />
+          </View>
+          <Text style={styles.trackTitle}>1클릭 리믹스 & 변형</Text>
+          <Text style={styles.trackDesc}>기존 완성작의 훅 자막이나 BGM만 1초 만에 교체해 재생산</Text>
+          <View style={styles.trackTagRow}>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+              <Repeat2 size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>소재 재활용</Text>
+            </View>
+            <Text style={styles.trackArrow}>→</Text>
+            <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+              <Music2 size={10} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>BGM 교체</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* SNS Quick Upload Hub */}
+      {assets.length > 0 && (
+        <View style={styles.snsHub}>
+          <Text style={styles.snsHubTitle}>빠른 SNS 배포</Text>
+          <View style={styles.snsHubRow}>
+            {SNS_PLATFORMS.map((p) => {
+              const Icon = p.icon;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.snsPlatformBadge, { borderColor: p.color + '40' }]}
+                  onPress={() => {
+                    if (assets[0]) {
+                      setStatusPickerAsset(assets[0]);
+                      setShareUrlInput('');
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.snsPlatformIcon, { backgroundColor: p.color + '20' }]}>
+                    <Icon size={36} color={p.color} strokeWidth={2} />
+                  </View>
+                  <Text style={styles.snsPlatformLabel}>{p.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Sort/Filter Bar */}
+      {assets.length > 0 && (
+        <View style={styles.sortBar}>
+          <View style={styles.sortLeft}>
+            <Filter size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.sortLabel}>정렬</Text>
+          </View>
+          <View style={styles.sortBtnRow}>
+            {([['date', '최신순'], ['views', '조회수순'], ['title', '이름순']] as [SortMode, string][]).map(([mode, label]) => (
+              <TouchableOpacity
+                key={mode}
+                style={[styles.sortBtn, sortMode === mode && styles.sortBtnActive]}
+                onPress={() => setSortMode(mode)}
+                activeOpacity={0.7}
+              >
+                <ArrowDownUp size={14} color={sortMode === mode ? theme.colors.primary[300] : theme.colors.dark.textFaint} strokeWidth={2} />
+                <Text style={[styles.sortBtnText, sortMode === mode && styles.sortBtnTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
 
       {assets.length === 0 ? (
         <View style={styles.emptyState}>
@@ -195,8 +342,9 @@ export default function AssetsScreen() {
         </View>
       ) : (
         <FlatList
-          data={assets}
+          data={sortedAssets()}
           keyExtractor={(item) => item.id}
+          ref={scrollRef}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary[400]} />}
           contentContainerStyle={[styles.listContent, { paddingBottom: tabBarHeight + 24 }]}
           numColumns={2}
@@ -251,7 +399,7 @@ export default function AssetsScreen() {
                     onPress={() => setReexportAsset(item)}
                     activeOpacity={0.7}
                   >
-                    <Crop size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Repeat2 size={24} color={theme.colors.accent[400]} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionBtn}
@@ -261,21 +409,21 @@ export default function AssetsScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Share2 size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Share2 size={24} color={theme.colors.warning[400]} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => handleDownload(item)}
                     activeOpacity={0.7}
                   >
-                    <Download size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                    <Download size={24} color={theme.colors.primary[300]} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => handleDelete(item)}
                     activeOpacity={0.7}
                   >
-                    <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                    <Trash2 size={24} color={theme.colors.error[400]} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -582,13 +730,143 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     marginTop: 4,
   },
-  helpText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 20,
+  trackGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+  },
+  trackCard: {
+    width: '48.5%',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: theme.spacing.md,
+    gap: 6,
+  },
+  trackIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  trackTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  trackDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  trackTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  trackTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: theme.radius.sm,
+  },
+  trackTagText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  trackArrow: {
+    fontSize: 10,
+    color: theme.colors.dark.textFaint,
+  },
+  snsHub: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  snsHubTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: 8,
+  },
+  snsHubRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+  },
+  snsPlatformBadge: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  snsPlatformIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  snsPlatformLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  sortBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  sortLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  sortBtnRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  sortBtnActive: {
+    borderColor: theme.colors.primary[400],
+    backgroundColor: theme.colors.primary[500] + '12',
+  },
+  sortBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  sortBtnTextActive: {
+    color: theme.colors.primary[300],
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   emptyState: {
     flex: 1,
