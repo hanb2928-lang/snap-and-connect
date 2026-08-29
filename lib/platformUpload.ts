@@ -12,7 +12,7 @@ export interface PlatformDeepLink {
 
 const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   instagram: {
-    appUrl: 'instagram://app/camera',
+    appUrl: 'instagram://story-camera',
     webUrl: 'https://www.instagram.com/',
     label: '인스타그램 앱 열기',
   },
@@ -22,7 +22,7 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
     label: '네이버 블로그 열기',
   },
   tiktok: {
-    appUrl: 'tiktok://',
+    appUrl: 'snssdk1128://',
     webUrl: 'https://www.tiktok.com/upload',
     label: '틱톡 앱 열기',
   },

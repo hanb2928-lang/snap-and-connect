@@ -21,7 +21,7 @@ import {
   Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2,
   Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, Filter,
   ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb,
-  Users, Volume2, Type, Flame, ChevronDown, ChevronUp,
+  Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash,
 } from 'lucide-react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -56,6 +56,8 @@ const SNS_PLATFORMS: { key: UploadPlatformKey; label: string; icon: typeof Youtu
   { key: 'instagram', label: '릴스', icon: Instagram, color: '#E1306C' },
   { key: 'blog', label: '블로그', icon: FileText, color: '#00C4A7' },
 ];
+
+type SnsStep = 'idle' | 'downloading' | 'caption_copied' | 'hashtag_copied' | 'opening';
 
 const REMIX_HOOKS = [
   { key: 'curiosity', label: '호기심 유발', text: '이거 모르면 손해? 3초만 확인하세요', icon: Lightbulb, color: theme.colors.warning[400] },
@@ -233,8 +235,32 @@ export default function AssetsScreen() {
   };
 
   // SNS 1-click upload: copy caption + hashtags, then open app
+  const [snsStep, setSnsStep] = useState<SnsStep>('idle');
+
   const handleSnsQuickUpload = async (platformKey: UploadPlatformKey, asset: SavedAsset) => {
     setSnsUploadAsset(asset);
+    setSnsStep('downloading');
+    setSnsCopiedCaption(null);
+    setSnsCopiedHashtags(null);
+
+    // 1. Download video to device gallery (skip on web)
+    if (Platform.OS !== 'web') {
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          const ext = asset.asset_type === 'video' ? 'webm' : 'png';
+          const localUri = `${FileSystem.cacheDirectory}${asset.file_name.replace(/\.[^.]+$/, '')}-${Date.now()}.${ext}`;
+          const downloadRes = await FileSystem.downloadAsync(asset.file_url, localUri);
+          if (downloadRes.status === 200) {
+            const mediaAsset = await MediaLibrary.createAssetAsync(downloadRes.uri);
+            const albumName = asset.asset_type === 'video' ? '숏커넥트 영상' : '숏커넥트';
+            try { await MediaLibrary.createAlbumAsync(albumName, mediaAsset, false); } catch { /* scoped storage */ }
+          }
+        }
+      } catch { /* gallery save failed — continue anyway */ }
+    }
+
+    // 2. Build AI caption + trending hashtags
     const built = buildPlatformCaption(platformKey, asset.title, '', [], false, 'body');
     const trendingTags = getTrendingSuggestions(
       built.hashtags.split(' ').filter(Boolean),
@@ -243,26 +269,31 @@ export default function AssetsScreen() {
     );
     const fullHashtags = built.hashtags + (trendingTags.length > 0 ? ' ' + trendingTags.join(' ') : '');
 
+    // 3. Copy caption to clipboard
     const captionCopied = await handleCopyText(built.fullText);
     if (captionCopied) {
       setSnsCopiedCaption(platformKey);
+      setSnsStep('caption_copied');
       setTimeout(() => setSnsCopiedCaption(null), 2500);
     }
 
-    setTimeout(async () => {
-      const tagsCopied = await handleCopyText(fullHashtags);
-      if (tagsCopied) {
-        setSnsCopiedHashtags(platformKey);
-        setTimeout(() => setSnsCopiedHashtags(null), 2500);
-      }
-    }, 500);
+    // 4. Copy hashtags to clipboard (sequential)
+    await new Promise((r) => setTimeout(r, 400));
+    const tagsCopied = await handleCopyText(fullHashtags);
+    if (tagsCopied) {
+      setSnsCopiedHashtags(platformKey);
+      setSnsStep('hashtag_copied');
+      setTimeout(() => setSnsCopiedHashtags(null), 2500);
+    }
 
+    // 5. Open SNS app via deep link
+    setSnsStep('opening');
     const dl = getDeepLink(platformKey);
-    setTimeout(() => {
-      Linking.openURL(dl.appUrl).catch(() => {
-        Linking.openURL(dl.webUrl).catch(() => {});
-      });
-    }, 1000);
+    await new Promise((r) => setTimeout(r, 300));
+    Linking.openURL(dl.appUrl).catch(() => {
+      Linking.openURL(dl.webUrl).catch(() => {});
+    });
+    setTimeout(() => setSnsStep('idle'), 2000);
   };
 
   const handlePin = (assetId: string) => {
@@ -395,11 +426,12 @@ export default function AssetsScreen() {
       {/* SNS Quick Upload Hub */}
       {assets.length > 0 && (
         <View style={styles.snsHub}>
-          <Text style={styles.snsHubTitle}>빠른 SNS 배포 — 캡션/해시태그 자동 복사</Text>
-          <Text style={styles.snsHubDesc}>원하는 플랫폼을 탭하면 캡션과 해시태그가 클립보드에 복사되고 앱이 열립니다</Text>
+          <Text style={styles.snsHubTitle}>🚀 플랫폼 간편 업로드 — 영상 저장 + 캡션 복사 + 앱 실행</Text>
+          <Text style={styles.snsHubDesc}>아이콘을 탭하면 영상이 갤러리에 저장되고, AI 캡션/해시태그가 클립보드에 복사된 후 SNS 앱이 자동으로 열립니다</Text>
           <View style={styles.snsHubRow}>
             {SNS_PLATFORMS.map((p) => {
               const Icon = p.icon;
+              const isActive = snsStep !== 'idle' && snsUploadAsset?.id === assets[0]?.id;
               return (
                 <TouchableOpacity
                   key={p.key}
@@ -421,6 +453,31 @@ export default function AssetsScreen() {
               );
             })}
           </View>
+          {snsStep !== 'idle' && snsUploadAsset && (
+            <View style={styles.snsStepBar}>
+              {([
+                { key: 'downloading', label: '영상 저장', icon: Download },
+                { key: 'caption_copied', label: '캡션 복사', icon: Copy },
+                { key: 'hashtag_copied', label: '해시태그 복사', icon: Hash },
+                { key: 'opening', label: '앱 실행', icon: Share2 },
+              ] as { key: SnsStep; label: string; icon: typeof Download }[]).map((step, i) => {
+                const stepOrder = ['downloading', 'caption_copied', 'hashtag_copied', 'opening'];
+                const currentIdx = stepOrder.indexOf(snsStep);
+                const stepIdx = i;
+                const done = stepIdx < currentIdx;
+                const active = stepIdx === currentIdx;
+                const StepIcon = step.icon;
+                return (
+                  <View key={step.key} style={styles.snsStepItem}>
+                    <View style={[styles.snsStepCircle, done && styles.snsStepCircleDone, active && styles.snsStepCircleActive]}>
+                      {done ? <Check size={12} color="#fff" strokeWidth={2.5} /> : <StepIcon size={12} color={active ? theme.colors.warning[400] : theme.colors.dark.textFaint} strokeWidth={2} />}
+                    </View>
+                    <Text style={[styles.snsStepLabel, active && styles.snsStepLabelActive]}>{step.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 
@@ -891,6 +948,13 @@ const styles = StyleSheet.create({
   snsPlatformLabel: { fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.text },
   snsCopiedBadge: { position: 'absolute', top: -6, right: -6, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 3, borderRadius: theme.radius.sm },
   snsCopiedText: { fontSize: 8, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
+  snsStepBar: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 8 },
+  snsStepItem: { alignItems: 'center', gap: 4 },
+  snsStepCircle: { width: 24, height: 24, borderRadius: 12, backgroundColor: theme.colors.dark.surfaceLight, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: theme.colors.dark.border },
+  snsStepCircleDone: { backgroundColor: theme.colors.success[500], borderColor: theme.colors.success[500] },
+  snsStepCircleActive: { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[500] + '20' },
+  snsStepLabel: { fontSize: 9, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textFaint },
+  snsStepLabelActive: { color: theme.colors.warning[400], fontFamily: theme.typography.fontFamily.semiBold },
   sortBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.sm },
   sortLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sortLabel: { fontSize: 12, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.textDim },
