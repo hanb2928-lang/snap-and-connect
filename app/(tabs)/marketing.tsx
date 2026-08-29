@@ -10,6 +10,7 @@ import {
   Linking,
   Platform,
   Image,
+  Dimensions,
 } from 'react-native';
 import {
   Megaphone,
@@ -30,6 +31,8 @@ import {
   Dna,
   Tag,
   Globe,
+  Smartphone,
+  Layout,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -46,6 +49,9 @@ import { LinkInBioCard } from '@/components/LinkInBioCard';
 import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
 import { validateAffiliateUrl } from '@/lib/affiliate';
 import { extractProductMeta } from '@/lib/analysis';
+import { PLATFORM_SPECS, getPlatformSpec, type PlatformKey } from '@/lib/platformSpecs';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const HOOK_TYPES = [
   { key: 'curiosity', label: '호기심 유발', desc: '이거 모르면 손해? 3초 멈춤 보장', icon: Lightbulb, color: theme.colors.warning[400] },
@@ -75,9 +81,9 @@ const TRENDING_KEYWORDS = [
 ];
 
 const QUICK_NAV_ITEMS = [
+  { key: 'platform', label: '플랫폼', icon: Smartphone, color: theme.colors.primary[300] },
   { key: 'viral', label: '떡상 꿀템', icon: Flame, color: theme.colors.warning[400] },
   { key: 'url', label: 'URL 입력', icon: Link2, color: theme.colors.accent[400] },
-  { key: 'category', label: '카테고리', icon: Tag, color: theme.colors.primary[300] },
   { key: 'hook', label: '3초 훅', icon: Zap, color: theme.colors.warning[400] },
   { key: 'ab', label: 'A/B 테스트', icon: Dna, color: theme.colors.accent[400] },
   { key: 'render', label: '영상 만들기', icon: Film, color: theme.colors.primary[400] },
@@ -103,7 +109,10 @@ export default function MarketingScreen() {
   const [qrValue, setQrValue] = useState('https://example.com/your-link');
   const [activeStep, setActiveStep] = useState<PipelineStep>(1);
 
-  // Step 1: Product input state
+  // Step 1: Platform selection state
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(null);
+
+  // Step 2: Product input & hook state
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -199,6 +208,12 @@ export default function MarketingScreen() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const handlePlatformSelect = (key: PlatformKey) => {
+    setSelectedPlatform(key);
+    setActiveStep(2);
+    scrollToSection('viral');
+  };
+
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
     const validation = validateAffiliateUrl(affiliateUrl);
@@ -220,8 +235,8 @@ export default function MarketingScreen() {
         brand: meta.brand || '',
       });
       setSelectedProduct(meta.productName || '선택된 상품');
-      setActiveStep(2);
-      scrollToSection('hook');
+      setActiveStep(3);
+      scrollToSection('render');
     } catch {
       setProductMeta(null);
       setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 직접 입력하거나 다른 링크를 시도해주세요.');
@@ -232,8 +247,8 @@ export default function MarketingScreen() {
 
   const handleQuickProductSelect = (productName: string) => {
     setSelectedProduct(productName);
-    setActiveStep(2);
-    scrollToSection('hook');
+    setActiveStep(3);
+    scrollToSection('render');
   };
 
   const handleHookSelect = (hookKey: string) => {
@@ -264,7 +279,7 @@ export default function MarketingScreen() {
           <View style={styles.headerTextBox}>
             <Text style={styles.headerTitle}>마케팅 &amp; 제휴쇼핑</Text>
             <Text style={styles.headerSubtext}>
-              상품 선택 → 훅/전략 → 영상 생성, 한 화면에서 끝내세요
+              플랫폼 선택 → 템플릿 &amp; 훅 → AI 영상 생성, 한 화면에서 끝내세요
             </Text>
           </View>
         </View>
@@ -311,7 +326,7 @@ export default function MarketingScreen() {
                     <Text style={[styles.pipelineDotText, activeStep >= step && styles.pipelineDotTextActive]}>{step}</Text>
                   </View>
                   <Text style={[styles.pipelineLabel, activeStep >= step && styles.pipelineLabelActive]}>
-                    {step === 1 ? '상품 수집' : step === 2 ? '전략 가공' : '영상 렌더링'}
+                    {step === 1 ? '플랫폼 선택' : step === 2 ? '템플릿 &amp; 훅' : 'AI 영상 생성'}
                   </Text>
                   {idx < 2 && <View style={[styles.pipelineConnector, activeStep > step && styles.pipelineConnectorActive]} />}
                 </View>
@@ -357,18 +372,106 @@ export default function MarketingScreen() {
               </View>
             </View>
 
-            {/* ========== STEP 1: Product Input Track ========== */}
+            {/* ========== STEP 1: Platform Selection ========== */}
+            <View
+              ref={(ref) => { sectionRefs.current['platform'] = ref; }}
+              collapsable={false}
+            >
+              <View style={styles.phaseBanner}>
+                <View style={[styles.phaseNum, { backgroundColor: theme.colors.primary[500] }]}>
+                  <Text style={styles.phaseNumText}>1</Text>
+                </View>
+                <View style={styles.phaseHeaderText}>
+                  <Text style={styles.phaseTitle}>타깃 플랫폼 선택</Text>
+                  <Text style={styles.phaseDesc}>영상을 업로드할 SNS 플랫폼을 선택하세요 — 비율과 안전영역이 자동 적용됩니다</Text>
+                </View>
+              </View>
+
+              <View style={styles.platformGrid}>
+                {PLATFORM_SPECS.map((spec) => {
+                  const selected = selectedPlatform === spec.key;
+                  return (
+                    <TouchableOpacity
+                      key={spec.key}
+                      style={[styles.platformCard, selected && { borderColor: spec.color, backgroundColor: spec.color + '12' }]}
+                      onPress={() => handlePlatformSelect(spec.key)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.platformIconBox, { backgroundColor: spec.color + '20' }]}>
+                        <Smartphone size={20} color={spec.color} strokeWidth={2.2} />
+                      </View>
+                      <Text style={styles.platformLabel}>{spec.label}</Text>
+                      <Text style={styles.platformRatio}>{spec.ratio}</Text>
+                      {selected && (
+                        <View style={[styles.platformCheck, { backgroundColor: spec.color }]}>
+                          <Check size={12} color="#fff" strokeWidth={2.5} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Safe Zone Preview */}
+              {selectedPlatform && (() => {
+                const spec = getPlatformSpec(selectedPlatform)!;
+                const previewH = 160;
+                const previewW = previewH * (spec.width / spec.height);
+                const scale = previewH / spec.height;
+                const szTop = spec.safeZoneTop * scale;
+                const szBottom = spec.safeZoneBottom * scale;
+                const szSide = spec.safeZoneSides * scale;
+                return (
+                  <View style={styles.safeZoneCard}>
+                    <View style={styles.safeZoneHeader}>
+                      <Layout size={16} color={spec.color} strokeWidth={2} />
+                      <Text style={styles.safeZoneTitle}>{spec.label} 안전영역 (Safe Zone) 미리보기</Text>
+                    </View>
+                    <View style={styles.safeZonePreviewRow}>
+                      <View style={[styles.safeZoneFrame, { width: previewW, height: previewH }]}>
+                        <View style={[styles.safeZoneDanger, {
+                          top: 0, left: 0, right: 0, height: szTop,
+                        }]} />
+                        <View style={[styles.safeZoneDanger, {
+                          bottom: 0, left: 0, right: 0, height: szBottom,
+                        }]} />
+                        <View style={[styles.safeZoneDanger, {
+                          top: szTop, bottom: szBottom, left: 0, width: szSide,
+                        }]} />
+                        <View style={[styles.safeZoneDanger, {
+                          top: szTop, bottom: szBottom, right: 0, width: szSide,
+                        }]} />
+                        <View style={[styles.safeZoneSafe, {
+                          top: szTop, bottom: szBottom, left: szSide, right: szSide,
+                        }]} />
+                      </View>
+                      <View style={styles.safeZoneInfo}>
+                        <Text style={styles.safeZoneInfoTitle}>화면 비율 {spec.ratio}</Text>
+                        <Text style={styles.safeZoneInfoDesc}>{spec.desc}</Text>
+                        <Text style={styles.safeZoneInfoDim}>{spec.width}×{spec.height}px</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+
+            {/* ========== STEP 2: Template & Hook Selection ========== */}
             <View
               ref={(ref) => { sectionRefs.current['viral'] = ref; }}
               collapsable={false}
             >
               <View style={styles.phaseBanner}>
                 <View style={[styles.phaseNum, { backgroundColor: theme.colors.warning[500] }]}>
-                  <Text style={styles.phaseNumText}>1</Text>
+                  <Text style={styles.phaseNumText}>2</Text>
                 </View>
                 <View style={styles.phaseHeaderText}>
-                  <Text style={styles.phaseTitle}>상품 소재 수집</Text>
-                  <Text style={styles.phaseDesc}>마케팅할 상품을 선택하세요 — 3가지 방법 중 하나</Text>
+                  <Text style={styles.phaseTitle}>맞춤 템플릿 &amp; 3초 훅 선택</Text>
+                  <Text style={styles.phaseDesc}>
+                    {selectedPlatform
+                      ? `${getPlatformSpec(selectedPlatform)?.label} · ${getPlatformSpec(selectedPlatform)?.ratio} 비율에 맞춘 템플릿`
+                      : '1단계에서 플랫폼을 먼저 선택하세요'}
+                  </Text>
                 </View>
               </View>
 
@@ -505,23 +608,11 @@ export default function MarketingScreen() {
               </View>
             </View>
 
-            {/* ========== STEP 2: Marketing Strategy Track ========== */}
+            {/* ========== (Step 2 continued: Hook & Strategy) ========== */}
             <View
               ref={(ref) => { sectionRefs.current['hook'] = ref; }}
               collapsable={false}
             >
-              <View style={styles.phaseBanner}>
-                <View style={[styles.phaseNum, { backgroundColor: theme.colors.accent[500] }]}>
-                  <Text style={styles.phaseNumText}>2</Text>
-                </View>
-                <View style={styles.phaseHeaderText}>
-                  <Text style={styles.phaseTitle}>마케팅 전환율 전략 가공</Text>
-                  <Text style={styles.phaseDesc}>
-                    {selectedProduct ? `선택 상품: ${selectedProduct}` : '1단계에서 상품을 먼저 선택하세요'}
-                  </Text>
-                </View>
-              </View>
-
               {/* 2a: Hook Studio */}
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderLeft}>
@@ -709,6 +800,23 @@ export default function MarketingScreen() {
               </View>
 
               <View style={styles.renderSummaryCard}>
+                {selectedPlatform && (() => {
+                  const spec = getPlatformSpec(selectedPlatform)!;
+                  return (
+                    <>
+                      <View style={styles.renderSummaryRow}>
+                        <View style={styles.renderSummaryItem}>
+                          <Smartphone size={16} color={spec.color} strokeWidth={2} />
+                          <Text style={styles.renderSummaryLabel}>플랫폼</Text>
+                          <Text style={styles.renderSummaryValue} numberOfLines={1}>
+                            {spec.label} · {spec.ratio}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.renderSummaryDivider} />
+                    </>
+                  );
+                })()}
                 <View style={styles.renderSummaryRow}>
                   <View style={styles.renderSummaryItem}>
                     <ShoppingBag size={16} color={theme.colors.warning[400]} strokeWidth={2} />
@@ -782,8 +890,8 @@ export default function MarketingScreen() {
         )}
       </ScrollView>
 
-      {/* Sticky Floating CTA — appears when product + hook selected */}
-      {selectedProduct && selectedHook && (
+      {/* Sticky Floating CTA — appears when platform + product + hook selected */}
+      {selectedPlatform && selectedProduct && selectedHook && (
         <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]}>
           <TouchableOpacity
             style={styles.stickyCtaBtn}
@@ -1540,5 +1648,111 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  platformGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  platformCard: {
+    width: (screenWidth - theme.spacing.lg * 2 - 16) / 3,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: 12,
+    alignItems: 'center',
+    gap: 6,
+  },
+  platformIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  platformLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  platformRatio: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  platformCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  safeZoneCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: 16,
+    marginBottom: theme.spacing.md,
+    gap: 12,
+  },
+  safeZoneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  safeZoneTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  safeZonePreviewRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  safeZoneFrame: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  safeZoneDanger: {
+    position: 'absolute',
+    backgroundColor: theme.colors.error[500] + '25',
+  },
+  safeZoneSafe: {
+    position: 'absolute',
+    backgroundColor: theme.colors.success[500] + '20',
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '50',
+    borderRadius: 4,
+  },
+  safeZoneInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  safeZoneInfoTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  safeZoneInfoDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  safeZoneInfoDim: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    marginTop: 2,
   },
 });
