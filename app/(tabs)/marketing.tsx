@@ -33,6 +33,9 @@ import {
   Shuffle,
   Copy,
   ShoppingBag,
+  Scissors,
+  Music,
+  Play,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -49,6 +52,7 @@ import { LinkInBioCard } from '@/components/LinkInBioCard';
 import { VariantGenerator } from '@/components/VariantGenerator';
 import { CopyWriter } from '@/components/CopyWriter';
 import { HashtagCopyBar } from '@/components/HashtagCopyBar';
+import { AICutGenerator } from '@/components/AICutGenerator';
 import type { PlatformKey } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -301,11 +305,24 @@ export default function MarketingScreen() {
               {selectedHook && <ArrowRight size={16} color="#fff" strokeWidth={2.2} />}
             </TouchableOpacity>
 
-            {/* 2. A/B Variant Personas */}
+            {/* 2. AI Cut Generation */}
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+                  <Text style={styles.sectionNumText}>2</Text>
+                </View>
+                <Scissors size={16} color={theme.colors.primary[400]} strokeWidth={2.2} />
+                <Text style={styles.sectionTitleText}>AI 컷 생성</Text>
+              </View>
+            </View>
+            <Text style={styles.sectionDesc}>0.8초 템포 컷 분할 · 마이크로 비트 동기화 · 하이라이트 자동 추출</Text>
+            <AICutGenerator />
+
+            {/* 3. A/B Variant Personas */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.accent[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>2</Text>
+                  <Text style={styles.sectionNumText}>3</Text>
                 </View>
                 <Users size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
                 <Text style={styles.sectionTitleText}>A/B 테스트 3종 페르소나</Text>
@@ -331,11 +348,11 @@ export default function MarketingScreen() {
               ))}
             </View>
 
-            {/* 3. Trending Keyword Feed */}
+            {/* 4. Trending Keyword Feed */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.primary[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>3</Text>
+                  <Text style={styles.sectionNumText}>4</Text>
                 </View>
                 <TrendingUp size={16} color={theme.colors.primary[400]} strokeWidth={2.2} />
                 <Text style={styles.sectionTitleText}>실시간 떡상 키워드 피드</Text>
@@ -379,11 +396,11 @@ export default function MarketingScreen() {
               <TrendMatchCard productCategory="라이프스타일" />
             </View>
 
-            {/* 4. Smart CTA & Link-in-Bio */}
+            {/* 5. Smart CTA & Link-in-Bio */}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={[styles.sectionNumBadge, { backgroundColor: theme.colors.success[500] + '20' }]}>
-                  <Text style={styles.sectionNumText}>4</Text>
+                  <Text style={styles.sectionNumText}>5</Text>
                 </View>
                 <Link2 size={16} color={theme.colors.success[400]} strokeWidth={2.2} />
                 <Text style={styles.sectionTitleText}>스마트 CTA & Link-in-Bio</Text>
