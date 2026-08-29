@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useI18n } from '@/hooks/useI18n';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Lightbulb, Sun, Aperture, Flame, ArrowRight } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Lightbulb, Sun, Aperture, Flame, ArrowRight, Shirt } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -52,6 +52,7 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
+import { VirtualFitting } from '@/components/VirtualFitting';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -947,6 +948,17 @@ export default function CameraScreen() {
               <Text style={styles.verticalBtnText}>동영상 선택</Text>
             </TouchableOpacity>
           </View>
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          title="3. AI 가상 피팅"
+          desc="마네킹/평면 의류 사진을 모델에게 자연스럽게 입혀 착용샷 완성"
+          iconBg={theme.colors.accent[500] + '18'}
+          accentColor={theme.colors.accent[400]}
+          stepNumber={3}
+        >
+          <VirtualFitting />
         </VerticalSectionCard>
 
         <TouchableOpacity
