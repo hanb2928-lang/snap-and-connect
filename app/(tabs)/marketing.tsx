@@ -25,6 +25,7 @@ import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings } from '@/lib/settings';
 import { ViralProductFeed } from '@/components/ViralProductFeed';
+import { HotDealPickerModal } from '@/components/HotDealPickerModal';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { LinkInBioCard } from '@/components/LinkInBioCard';
@@ -113,6 +114,7 @@ export default function MarketingScreen() {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [tweakToast, setTweakToast] = useState<string | null>(null);
+  const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
 
   // Video style presets
   const [videoLength, setVideoLength] = useState<string>('7s');
@@ -301,6 +303,21 @@ export default function MarketingScreen() {
 
   const handleQuickProductSelect = (productName: string) => {
     setSelectedProduct(productName);
+    setActiveStep(3);
+    scrollToSection('render');
+  };
+
+  const handleHotDealSelect = (product: { name: string; price: string; link: string; imageUrl?: string }) => {
+    setSelectedProduct(product.name);
+    setAffiliateUrl(product.link);
+    setProductMeta({
+      productName: product.name,
+      description: '',
+      price: product.price,
+      image: product.imageUrl || '',
+      platform: '',
+      brand: '',
+    });
     setActiveStep(3);
     scrollToSection('render');
   };
@@ -571,6 +588,22 @@ export default function MarketingScreen() {
                   </View>
                 </View>
               </View>
+              {/* Hot Deal Shortcut Button */}
+              <TouchableOpacity
+                style={styles.hotDealBtn}
+                onPress={() => setHotDealModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.hotDealBtnIcon}>
+                  <Flame size={18} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                </View>
+                <View style={styles.hotDealBtnText}>
+                  <Text style={styles.hotDealBtnTitle}>⚡ 실시간 핫딜에서 가져오기</Text>
+                  <Text style={styles.hotDealBtnSub}>쿠팡·네이버·토스 베스트셀러를 한 번에</Text>
+                </View>
+                <ArrowRight size={18} color={theme.colors.warning[400]} strokeWidth={2.5} />
+              </TouchableOpacity>
+
               <View style={styles.viralFeedWrap}>
                 <ViralProductFeed />
               </View>
@@ -1160,6 +1193,12 @@ export default function MarketingScreen() {
         )}
       </ScrollView>
 
+      <HotDealPickerModal
+        visible={hotDealModalVisible}
+        onClose={() => setHotDealModalVisible(false)}
+        onSelect={handleHotDealSelect}
+      />
+
       {/* Sticky Floating CTA — appears when platform + product + hook selected */}
       {selectedPlatform && selectedProduct && selectedHook && (
         <View style={[styles.stickyCtaWrap, { bottom: tabBarHeight + theme.spacing.sm }]}>
@@ -1451,6 +1490,39 @@ const styles = StyleSheet.create({
   },
   viralFeedWrap: {
     marginBottom: theme.spacing.md,
+  },
+  hotDealBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.lg,
+    padding: 14,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '40',
+  },
+  hotDealBtnIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hotDealBtnText: {
+    flex: 1,
+  },
+  hotDealBtnTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  hotDealBtnSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
   urlInput: {
     backgroundColor: theme.colors.dark.surfaceLight,
