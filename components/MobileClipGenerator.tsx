@@ -583,9 +583,13 @@ export function MobileClipGenerator({
     return () => {
       mountedRef.current = false;
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-      if (videoUri && Platform.OS !== 'web') {
-        FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => {});
-      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!videoUri || Platform.OS === 'web') return;
+    return () => {
+      FileSystem.deleteAsync(videoUri, { idempotent: true }).catch(() => {});
     };
   }, [videoUri]);
 
