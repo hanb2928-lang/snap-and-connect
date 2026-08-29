@@ -14,8 +14,10 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { useAppTheme } from '@/hooks/useAppTheme';
+import type { ThemePreset } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings, updateUserSettings } from '@/lib/settings';
 import { uploadAssetBlob } from '@/lib/savedAssets';
@@ -54,6 +56,7 @@ import {
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { t, language, setLanguage } = useI18n();
+  const { setPreset: applyThemePreset, setMode: applyThemeMode } = useAppTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +92,7 @@ export default function SettingsScreen() {
   const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
   const [uiPerformance, setUiPerformance] = useState<'high' | 'lite'>('high');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [themePreset, setThemePreset] = useState<ThemePreset>('cinematic-dark');
   const [displayDensity, setDisplayDensity] = useState<'compact' | 'standard' | 'wide'>('standard');
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
@@ -141,7 +145,11 @@ export default function SettingsScreen() {
       setCaptureGuideMode((data?.capture_guide_mode as 'beginner' | 'pro') || 'beginner');
       setUiPerformance((data?.ui_performance as 'high' | 'lite') || 'high');
       setThemeMode((data?.theme_mode as 'dark' | 'light') || 'dark');
+      setThemePreset((data?.theme_preset as ThemePreset) || 'cinematic-dark');
       setDisplayDensity((data?.display_density as 'compact' | 'standard' | 'wide') || 'standard');
+      const tp = (data?.theme_preset as ThemePreset) || 'cinematic-dark';
+      if (tp === 'studio-light') { setThemeMode('light'); }
+      else if (tp === 'cinematic-dark' || tp === 'trendy-viral') { setThemeMode('dark'); }
       setBrandPersona(data?.brand_persona || '');
     } catch {
       setSettings(null);
@@ -1586,36 +1594,43 @@ export default function SettingsScreen() {
           <Divider />
 
           {/* Theme Mode */}
-          <Text style={styles.idInputLabel}>테마 및 디스플레이 모드</Text>
+          <Text style={styles.idInputLabel}>{t('settings.themePreset')}</Text>
+          <Text style={styles.ttsCategoryLabel}>{t('settings.themePresetDesc')}</Text>
           <View style={styles.progressStyleRow}>
             <TouchableOpacity
-              style={[styles.progressStyleCard, themeMode === 'dark' && styles.progressStyleCardActive]}
-              onPress={() => setThemeMode('dark')}
+              style={[styles.progressStyleCard, themePreset === 'cinematic-dark' && styles.progressStyleCardActive]}
+              onPress={() => { setThemePreset('cinematic-dark'); setThemeMode('dark'); applyThemePreset('cinematic-dark'); applyThemeMode('dark'); }}
               activeOpacity={0.7}
             >
-              <View style={[styles.progressStyleIcon, themeMode === 'dark' && styles.progressStyleIconActive]}>
-                <Palette size={22} color={themeMode === 'dark' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <View style={[styles.progressStyleIcon, themePreset === 'cinematic-dark' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'cinematic-dark' ? '#167ef5' : theme.colors.dark.surfaceLight }]}>
+                <Palette size={22} color={themePreset === 'cinematic-dark' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               </View>
-              <Text style={[styles.progressStyleName, themeMode === 'dark' && styles.progressStyleNameActive]}>다크 크리에이터</Text>
-              <Text style={styles.progressStyleDesc}>딥 다크 그라데이션</Text>
+              <Text style={[styles.progressStyleName, themePreset === 'cinematic-dark' && styles.progressStyleNameActive]}>{t('settings.themeCinematicDark')}</Text>
+              <Text style={styles.progressStyleDesc}>{t('settings.themeCinematicDarkDesc')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.progressStyleCard, themeMode === 'light' && styles.progressStyleCardActive]}
-              onPress={() => setThemeMode('light')}
+              style={[styles.progressStyleCard, themePreset === 'studio-light' && styles.progressStyleCardActive]}
+              onPress={() => { setThemePreset('studio-light'); setThemeMode('light'); applyThemePreset('studio-light'); applyThemeMode('light'); }}
               activeOpacity={0.7}
             >
-              <View style={[styles.progressStyleIcon, themeMode === 'light' && styles.progressStyleIconActive]}>
-                <Sun size={22} color={themeMode === 'light' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <View style={[styles.progressStyleIcon, themePreset === 'studio-light' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'studio-light' ? '#3b82f6' : theme.colors.dark.surfaceLight }]}>
+                <Sun size={22} color={themePreset === 'studio-light' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               </View>
-              <Text style={[styles.progressStyleName, themeMode === 'light' && styles.progressStyleNameActive]}>라이트 클린</Text>
-              <Text style={styles.progressStyleDesc}>밝고 화사한 모드</Text>
+              <Text style={[styles.progressStyleName, themePreset === 'studio-light' && styles.progressStyleNameActive]}>{t('settings.themeStudioLight')}</Text>
+              <Text style={styles.progressStyleDesc}>{t('settings.themeStudioLightDesc')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.progressStyleCard, themePreset === 'trendy-viral' && styles.progressStyleCardActive]}
+              onPress={() => { setThemePreset('trendy-viral'); setThemeMode('dark'); applyThemePreset('trendy-viral'); applyThemeMode('dark'); }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.progressStyleIcon, themePreset === 'trendy-viral' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'trendy-viral' ? '#e02eff' : theme.colors.dark.surfaceLight }]}>
+                <Flame size={22} color={themePreset === 'trendy-viral' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              </View>
+              <Text style={[styles.progressStyleName, themePreset === 'trendy-viral' && styles.progressStyleNameActive]}>{t('settings.themeTrendyViral')}</Text>
+              <Text style={styles.progressStyleDesc}>{t('settings.themeTrendyViralDesc')}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.ttsCategoryLabel}>
-            {themeMode === 'dark'
-              ? '다크 모드: 딥 다크 그라데이션의 세련된 감성을 유지합니다. 야외나 밝은 곳에서는 라이트 모드를 추천합니다'
-              : '라이트 모드: 밝고 화사한 분위기로, 야외 촬영이나 밝은 환경에서 가시성이 좋습니다'}
-          </Text>
 
           <Divider />
 
@@ -1674,6 +1689,7 @@ export default function SettingsScreen() {
                 capture_guide_mode: captureGuideMode,
                 ui_performance: uiPerformance,
                 theme_mode: themeMode,
+                theme_preset: themePreset,
                 display_density: displayDensity,
               });
               setSavedPrefs(true);

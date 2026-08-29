@@ -1,6 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getItem, setItem } from '@/lib/storage';
-import { theme as baseTheme, type Spacing, type Typography, type ColorPalette, type GlassColors } from '@/lib/theme';
+import {
+  theme as baseTheme,
+  resolveThemePreset,
+  type ThemePreset,
+  type ThemePresetColors,
+  type Spacing,
+  type Typography,
+  type ColorPalette,
+  type GlassColors,
+} from '@/lib/theme';
 import { getUserSettings } from '@/lib/settings';
 
 export type ThemeMode = 'dark' | 'light';
@@ -9,18 +18,22 @@ export type DisplayDensity = 'compact' | 'standard' | 'wide';
 interface AppThemeContextValue {
   mode: ThemeMode;
   density: DisplayDensity;
+  preset: ThemePreset;
   setMode: (m: ThemeMode) => void;
   setDensity: (d: DisplayDensity) => void;
-  /** Active color palette — either the dark or light ramp */
+  setPreset: (p: ThemePreset) => void;
+  /** Active color palette — either the dark or light ramp from the active preset */
   colors: ColorPalette;
-  /** Active glassmorphism colors — dark or light variant */
+  /** Active glassmorphism colors — dark or light variant from the active preset */
   glass: GlassColors;
   /** Spacing scale adjusted for density */
   spacing: Spacing;
   /** Typography scale adjusted for density */
   typography: Typography;
-  /** Full base theme for access to primary/accent/etc ramps */
+  /** Full base theme for access to shared ramps (success/warning/error/etc) */
   baseTheme: typeof baseTheme;
+  /** Active preset colors (primary/accent ramps, both palettes, glass, glow) */
+  presetColors: ThemePresetColors;
 }
 
 const AppThemeContext = createContext<AppThemeContextValue | null>(null);
@@ -41,9 +54,12 @@ function resolveDensity(d: DisplayDensity) {
   return { spacing: baseTheme.spacing, typography: baseTheme.typography };
 }
 
+const VALID_PRESETS: ThemePreset[] = ['cinematic-dark', 'studio-light', 'trendy-viral'];
+
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('dark');
   const [density, setDensityState] = useState<DisplayDensity>('standard');
+  const [preset, setPresetState] = useState<ThemePreset>('cinematic-dark');
 
   useEffect(() => {
     (async () => {
@@ -55,16 +71,24 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
         if (cachedDensity === 'compact' || cachedDensity === 'standard' || cachedDensity === 'wide') {
           setDensityState(cachedDensity);
         }
+
+        const cachedPreset = await getItem('theme_preset');
+        if (cachedPreset && VALID_PRESETS.includes(cachedPreset as ThemePreset)) {
+          setPresetState(cachedPreset as ThemePreset);
+        }
       } catch {}
 
       try {
         const s = await getUserSettings();
         const tm = (s?.theme_mode as ThemeMode) || 'dark';
         const dn = (s?.display_density as DisplayDensity) || 'standard';
+        const tp = (s?.theme_preset as ThemePreset) || 'cinematic-dark';
         setModeState(tm);
         setDensityState(dn);
+        if (VALID_PRESETS.includes(tp)) setPresetState(tp);
         await setItem('theme_mode', tm);
         await setItem('display_density', dn);
+        await setItem('theme_preset', tp);
       } catch {}
     })();
   }, []);
@@ -79,21 +103,31 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setItem('display_density', d);
   };
 
+  const setPreset = (p: ThemePreset) => {
+    setPresetState(p);
+    setItem('theme_preset', p);
+  };
+
   const { spacing, typography } = useMemo(() => resolveDensity(density), [density]);
+
+  const presetColors = useMemo(() => resolveThemePreset(preset), [preset]);
 
   const value = useMemo<AppThemeContextValue>(
     () => ({
       mode,
       density,
+      preset,
       setMode,
       setDensity,
-      colors: mode === 'light' ? baseTheme.colors.light : baseTheme.colors.dark,
-      glass: mode === 'light' ? baseTheme.glassLight : baseTheme.glass,
+      setPreset,
+      colors: mode === 'light' ? presetColors.light : presetColors.dark,
+      glass: mode === 'light' ? presetColors.glassLight : presetColors.glass,
       spacing,
       typography,
       baseTheme,
+      presetColors,
     }),
-    [mode, density, spacing, typography],
+    [mode, density, preset, spacing, typography, presetColors],
   );
 
   return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;

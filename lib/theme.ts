@@ -5,6 +5,25 @@ const _isWeb = Platform.OS === 'web';
 const _isLowEnd = isLowEndDevice();
 const _noGlow = { shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 };
 
+export type ThemePreset = 'cinematic-dark' | 'studio-light' | 'trendy-viral';
+
+export interface ColorRamp {
+  50: string; 100: string; 200: string; 300: string;
+  400: string; 500: string; 600: string; 700: string;
+  800: string; 900: string; 950?: string;
+}
+
+export interface ThemePresetColors {
+  primary: ColorRamp;
+  accent: ColorRamp;
+  dark: ColorPalette;
+  light: ColorPalette;
+  glass: typeof theme.glass;
+  glassLight: typeof theme.glassLight;
+  glowPrimary: typeof theme.shadows.glowPrimary;
+  glowAccent: typeof theme.shadows.glowAccent;
+}
+
 export const theme = {
   colors: {
     primary: {
@@ -206,6 +225,98 @@ export const theme = {
           highlight: '#eef3fb',
         },
 } as const;
+
+// ─── Theme Presets ─────────────────────────────────────────────
+// Each preset overrides primary/accent ramps, dark/light palettes,
+// glass colors, and glow shadows. Everything else (spacing, radius,
+// typography, success/warning/error ramps) is shared across presets.
+
+const presetCinematicDark: ThemePresetColors = {
+  primary: theme.colors.primary,
+  accent: theme.colors.accent,
+  dark: theme.colors.dark,
+  light: theme.colors.light,
+  glass: theme.glass,
+  glassLight: theme.glassLight,
+  glowPrimary: theme.shadows.glowPrimary,
+  glowAccent: theme.shadows.glowAccent,
+};
+
+const presetStudioLight: ThemePresetColors = {
+  primary: {
+    50: '#eef6ff', 100: '#d9ebff', 200: '#bcdcff', 300: '#8ec5ff',
+    400: '#5aa3ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+    800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
+  },
+  accent: {
+    50: '#ecfeff', 100: '#cff7fe', 200: '#a4eefc', 300: '#6de1f8',
+    400: '#22ccec', 500: '#06b3d4', 600: '#0892b2', 700: '#0d748f',
+    800: '#155e75', 900: '#164e63',
+  },
+  dark: {
+    bg: '#1a1a1a', surface: '#242424', surfaceLight: '#2e2e2e',
+    border: '#3a3a3a', text: '#f5f5f5', textDim: '#a0a0a0', textFaint: '#6b6b6b',
+  },
+  light: {
+    bg: '#fafafa', surface: '#ffffff', surfaceLight: '#f5f5f5',
+    border: '#e0e0e0', text: '#1a1a1a', textDim: '#555555', textFaint: '#999999',
+  },
+  glass: _isLowEnd
+    ? { surface: '#242424', surfaceLight: '#2e2e2e', border: '#3a3a3a', borderActive: '#3a5a7a', highlight: '#2e2e2e' }
+    : _isWeb
+      ? { surface: 'rgba(36,36,36,0.72)', surfaceLight: 'rgba(46,46,46,0.6)', border: 'rgba(255,255,255,0.08)', borderActive: 'rgba(90,163,255,0.25)', highlight: 'rgba(255,255,255,0.04)' }
+      : { surface: '#242424', surfaceLight: '#2e2e2e', border: '#3a3a3a', borderActive: '#3a5a7a', highlight: '#2e2e2e' },
+  glassLight: _isLowEnd
+    ? { surface: '#ffffff', surfaceLight: '#f5f5f5', border: '#e0e0e0', borderActive: '#a8c8e8', highlight: '#f5f5f5' }
+    : _isWeb
+      ? { surface: 'rgba(255,255,255,0.82)', surfaceLight: 'rgba(245,245,245,0.7)', border: 'rgba(26,26,26,0.08)', borderActive: 'rgba(59,130,246,0.25)', highlight: 'rgba(26,26,26,0.03)' }
+      : { surface: '#ffffff', surfaceLight: '#f5f5f5', border: '#e0e0e0', borderActive: '#a8c8e8', highlight: '#f5f5f5' },
+  glowPrimary: _isLowEnd ? _noGlow : { shadowColor: '#5aa3ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 0 },
+  glowAccent: _isLowEnd ? _noGlow : { shadowColor: '#22ccec', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 0 },
+};
+
+const presetTrendyViral: ThemePresetColors = {
+  primary: {
+    50: '#fdf2ff', 100: '#fce7ff', 200: '#fbcfff', 300: '#f8a8ff',
+    400: '#f472ff', 500: '#e02eff', 600: '#c01de0', 700: '#9d14b8',
+    800: '#7c1296', 900: '#5e0f74', 950: '#3e0a52',
+  },
+  accent: {
+    50: '#ecfaff', 100: '#cff5fe', 200: '#a4ebfd', 300: '#6dd9fa',
+    400: '#22c5f5', 500: '#06a8e0', 600: '#0888b8', 700: '#0d6e96',
+    800: '#155a7a', 900: '#164a66',
+  },
+  dark: {
+    bg: '#0d0a1a', surface: '#181225', surfaceLight: '#221a35',
+    border: '#2e2545', text: '#f0e6ff', textDim: '#9888b8', textFaint: '#6a5a8a',
+  },
+  light: {
+    bg: '#f8f5ff', surface: '#ffffff', surfaceLight: '#f3edff',
+    border: '#e0d6f0', text: '#1a0f2e', textDim: '#5a4a7a', textFaint: '#9a8aba',
+  },
+  glass: _isLowEnd
+    ? { surface: '#181225', surfaceLight: '#221a35', border: '#2e2545', borderActive: '#4a2a6b', highlight: '#221a35' }
+    : _isWeb
+      ? { surface: 'rgba(24,18,37,0.72)', surfaceLight: 'rgba(34,26,53,0.6)', border: 'rgba(255,255,255,0.08)', borderActive: 'rgba(244,114,255,0.25)', highlight: 'rgba(255,255,255,0.04)' }
+      : { surface: '#181225', surfaceLight: '#221a35', border: '#2e2545', borderActive: '#4a2a6b', highlight: '#221a35' },
+  glassLight: _isLowEnd
+    ? { surface: '#ffffff', surfaceLight: '#f3edff', border: '#e0d6f0', borderActive: '#c8a8e8', highlight: '#f3edff' }
+    : _isWeb
+      ? { surface: 'rgba(255,255,255,0.82)', surfaceLight: 'rgba(243,237,255,0.7)', border: 'rgba(26,15,46,0.08)', borderActive: 'rgba(224,46,255,0.25)', highlight: 'rgba(26,15,46,0.03)' }
+      : { surface: '#ffffff', surfaceLight: '#f3edff', border: '#e0d6f0', borderActive: '#c8a8e8', highlight: '#f3edff' },
+  glowPrimary: _isLowEnd ? _noGlow : { shadowColor: '#f472ff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 0 },
+  glowAccent: _isLowEnd ? _noGlow : { shadowColor: '#22c5f5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 0 },
+};
+
+export const themePresets: Record<ThemePreset, ThemePresetColors> = {
+  'cinematic-dark': presetCinematicDark,
+  'studio-light': presetStudioLight,
+  'trendy-viral': presetTrendyViral,
+};
+
+export function resolveThemePreset(preset: ThemePreset): ThemePresetColors {
+  return themePresets[preset] ?? presetCinematicDark;
+}
 
 export type ColorPalette = {
   bg: string; surface: string; surfaceLight: string; border: string;

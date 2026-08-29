@@ -10,7 +10,7 @@ export async function getUserSettings(): Promise<UserSettings | null> {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('id, coupang_partners_id, naver_shopping_id, toss_share_id, openai_api_key, logo_url, default_video_duration, default_tts_voice, tts_speed, tts_pitch, progress_style, auto_disclosure, brand_persona, mascot_enabled, mascot_style, capture_guide_mode, ui_performance, theme_mode, display_density, updated_at')
+    .select('id, coupang_partners_id, naver_shopping_id, toss_share_id, openai_api_key, logo_url, default_video_duration, default_tts_voice, tts_speed, tts_pitch, progress_style, auto_disclosure, brand_persona, mascot_enabled, mascot_style, capture_guide_mode, ui_performance, theme_mode, display_density, theme_preset, updated_at')
     .eq('id', SINGLETON_ID)
     .maybeSingle();
 
