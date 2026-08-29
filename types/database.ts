@@ -131,6 +131,7 @@ export interface UserSettings {
   ui_performance: string | null;
   theme_mode: string | null;
   display_density: string | null;
+  app_language: string | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

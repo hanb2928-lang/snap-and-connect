@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import type {
   BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
 import { theme } from '@/lib/theme';
+import { useI18n } from '@/hooks/useI18n';
 import {
   Camera,
   FolderOpen,
@@ -32,11 +33,11 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   analytics: BarChart3,
 };
 
-const TAB_LABELS: Record<string, string> = {
-  index: '카메라',
-  affiliate: '제휴쇼핑',
-  assets: '제작물',
-  analytics: '분석',
+const TAB_KEYS: Record<string, string> = {
+  index: 'tab.camera',
+  affiliate: 'tab.affiliate',
+  assets: 'tab.assets',
+  analytics: 'tab.analytics',
 };
 
 const TAB_WIDTH = 76;
@@ -45,13 +46,14 @@ const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 export type TabBadgeMap = Record<string, boolean>;
 
 const MORE_ITEMS = [
-  { key: 'guide', label: '사용설명서', icon: BookMarked, color: theme.colors.primary[400] },
-  { key: 'settings', label: '설정', icon: Settings, color: theme.colors.accent[400] },
+  { key: 'guide', labelKey: 'tab.guide', icon: BookMarked, color: theme.colors.primary[400] },
+  { key: 'settings', labelKey: 'tab.settings', icon: Settings, color: theme.colors.accent[400] },
 ];
 
 export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProps & { badges?: TabBadgeMap }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useI18n();
   const [moreOpen, setMoreOpen] = useState(false);
   const [popupScale] = useState(new Animated.Value(0));
 
@@ -82,7 +84,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
           {state.routes.map((route, index) => {
             const isFocused = state.index === index;
             const Icon = TAB_ICONS[route.name] || Settings;
-            const label = TAB_LABELS[route.name] || route.name;
+            const label = t(TAB_KEYS[route.name] || '', route.name);
             const hasBadge = badges?.[route.name] === true;
 
             const onPress = () => {
@@ -149,7 +151,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
               />
             </View>
             <Text style={[styles.tabLabel, moreOpen && styles.tabLabelActive]} numberOfLines={1}>
-              더보기
+              {t('tab.more', 'More')}
             </Text>
             {moreOpen && <View style={styles.activeBar} />}
           </TouchableOpacity>
@@ -169,9 +171,10 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
             ]}
           >
             <View style={styles.popupArrow} />
-            <Text style={styles.popupTitle}>더보기</Text>
+            <Text style={styles.popupTitle}>{t('tab.more', 'More')}</Text>
             {MORE_ITEMS.map((item) => {
               const ItemIcon = item.icon;
+              const itemLabel = t(item.labelKey, item.key);
               return (
                 <TouchableOpacity
                   key={item.key}
@@ -182,7 +185,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
                   <View style={[styles.popupItemIcon, { backgroundColor: item.color + '20' }]}>
                     <ItemIcon size={22} color={item.color} strokeWidth={2} />
                   </View>
-                  <Text style={styles.popupItemLabel}>{item.label}</Text>
+                  <Text style={styles.popupItemLabel}>{itemLabel}</Text>
                 </TouchableOpacity>
               );
             })}

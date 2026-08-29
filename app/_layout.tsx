@@ -19,6 +19,7 @@ import { theme } from '@/lib/theme';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AffiliateToastProvider } from '@/components/AffiliateToast';
+import { I18nProvider, useI18n } from '@/hooks/useI18n';
 import { AppThemeProvider } from '@/hooks/useAppTheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -39,6 +40,7 @@ function useSafeKeepAwake() {
 export default function RootLayout() {
   useFrameworkReady();
   useSafeKeepAwake();
+  const { t } = useI18n();
   const [ready, setReady] = useState<ReadyState>('loading');
   const startedRef = useRef(false);
 
@@ -93,13 +95,13 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.dark.bg, gap: theme.spacing.md }}>
         <ActivityIndicator size="large" color={theme.colors.primary[400]} />
-        <Text style={{ fontSize: 14, color: theme.colors.dark.textDim }}>앱을 시작하는 중...</Text>
+        <Text style={{ fontSize: 14, color: theme.colors.dark.textDim }}>{t('app.loading')}</Text>
       </View>
     );
   }
 
   if (ready === 'loading') {
-    return <LoadingScreen message="앱을 시작하는 중..." />;
+    return <LoadingScreen message={t('app.loading')} />;
   }
 
   if (ready === 'error') {
@@ -111,17 +113,17 @@ export default function RootLayout() {
       <ErrorBoundary>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.dark.bg, paddingHorizontal: 40, gap: 12 }}>
           <Text style={{ fontSize: 18, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.dark.text, marginBottom: 4 }}>
-            앱을 시작할 수 없어요
+            {t('app.error.title')}
           </Text>
           <Text style={{ fontSize: 14, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, textAlign: 'center', lineHeight: 22 }}>
-            인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요.
+            {t('app.error.desc')}
           </Text>
           <TouchableOpacity
             style={{ marginTop: 12, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 10, backgroundColor: theme.colors.primary[500] }}
             onPress={retryInit}
             activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 15, fontFamily: theme.typography.fontFamily.bold, color: '#fff' }}>다시 시도</Text>
+            <Text style={{ fontSize: 15, fontFamily: theme.typography.fontFamily.bold, color: '#fff' }}>{t('app.error.retry')}</Text>
           </TouchableOpacity>
         </View>
       </ErrorBoundary>
@@ -130,6 +132,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+      <I18nProvider>
       <AppThemeProvider>
         <AffiliateToastProvider>
           <SafeAreaProvider>
@@ -141,7 +144,7 @@ export default function RootLayout() {
                   name="guide"
                   options={{
                     headerShown: true,
-                    headerTitle: '사용설명서',
+                    headerTitle: t('guide.title'),
                     headerStyle: { backgroundColor: theme.colors.dark.surface },
                     headerTintColor: theme.colors.dark.text,
                     headerTitleStyle: { fontFamily: theme.typography.fontFamily.bold },
@@ -152,7 +155,7 @@ export default function RootLayout() {
                   name="settings"
                   options={{
                     headerShown: true,
-                    headerTitle: '설정',
+                    headerTitle: t('settings.title'),
                     headerStyle: { backgroundColor: theme.colors.dark.surface },
                     headerTintColor: theme.colors.dark.text,
                     headerTitleStyle: { fontFamily: theme.typography.fontFamily.bold },
@@ -167,6 +170,7 @@ export default function RootLayout() {
           </SafeAreaProvider>
         </AffiliateToastProvider>
       </AppThemeProvider>
+      </I18nProvider>
     </ErrorBoundary>
   );
 }

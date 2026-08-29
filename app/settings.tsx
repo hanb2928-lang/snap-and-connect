@@ -28,9 +28,12 @@ import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/li
 import { formatKRW } from '@/lib/dashboard';
 import { useMascotSettings, type MascotStyle } from '@/hooks/useMascotSettings';
 import { invalidateSettingsCache, updateUserSettings as persistUserSettings } from '@/lib/settings';
+import { useI18n } from '@/hooks/useI18n';
+import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/lib/i18n';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { t, language, setLanguage } = useI18n();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1231,6 +1234,31 @@ export default function SettingsScreen() {
             </>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* App Language Selector */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t('settings.appLanguage')}</Text>
+        <Text style={styles.sectionDesc}>{t('settings.appLanguageDesc')}</Text>
+        <View style={styles.langSelectorRow}>
+          {SUPPORTED_LANGUAGES.map((lang) => (
+            <TouchableOpacity
+              key={lang.code}
+              style={[styles.langChip, language === lang.code && styles.langChipActive]}
+              onPress={async () => {
+                await setLanguage(lang.code);
+                try {
+                  await updateUserSettings({ app_language: lang.code });
+                } catch {}
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langChipText, language === lang.code && styles.langChipTextActive]}>
+                {lang.nativeName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -2574,5 +2602,32 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.body,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  langSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: theme.spacing.sm,
+  },
+  langChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  langChipActive: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[500],
+  },
+  langChipText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  langChipTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
 });
