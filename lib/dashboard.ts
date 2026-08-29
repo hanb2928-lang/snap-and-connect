@@ -20,6 +20,25 @@ export interface FunnelStage {
   pct: number;
 }
 
+export interface SharePlatformStat {
+  platform: string;
+  label: string;
+  clicks: number;
+  conversions: number;
+  conversionRate: number;
+  pct: number;
+}
+
+export interface StyleInsight {
+  style: string;
+  label: string;
+  count: number;
+  totalClicks: number;
+  avgCtr: number;
+  recommendation: string;
+  isTopPerformer: boolean;
+}
+
 export interface DashboardSummary {
   totalScans: number;
   totalAssets: number;
@@ -33,6 +52,8 @@ export interface DashboardSummary {
   revenueByPlatform: { platform: string; amount: number; clicks: number }[];
   dailyClicks: { date: string; clicks: number }[];
   dailyRevenue: { date: string; amount: number }[];
+  sharePlatformPerformance: SharePlatformStat[];
+  styleInsights: StyleInsight[];
 }
 
 function emptyDashboard(): DashboardSummary {
@@ -49,6 +70,8 @@ function emptyDashboard(): DashboardSummary {
     revenueByPlatform: [],
     dailyClicks: [],
     dailyRevenue: [],
+    sharePlatformPerformance: [],
+    styleInsights: [],
   };
 }
 
@@ -58,14 +81,14 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
       supabase.from('scans').select('id, title, product_name, image_url, created_at, template_data', { count: 'exact' }).order('created_at', { ascending: false }).limit(200),
       supabase.from('saved_assets').select('scan_id, platform, affiliate_platform, created_at'),
       supabase.from('click_events').select('platform, clicked_at, scan_id').order('clicked_at', { ascending: false }).limit(500),
-      supabase.from('short_links').select('slug, scan_id, click_count, last_clicked_at, destination_url'),
+      supabase.from('short_links').select('slug, scan_id, click_count, last_clicked_at, destination_url, share_platform'),
       supabase.from('revenue_records').select('*').order('period_month', { ascending: false }),
     ]);
 
     const scans = (scansRes.data ?? []) as Array<Scan & { created_at: string }>;
   const assets = (assetsRes.data ?? []) as Array<SavedAsset>;
   const clickEvents = (clicksRes.data ?? []) as Array<{ platform: string; clicked_at: string; scan_id: string | null }>;
-  const links = (linksRes.data ?? []) as Array<{ slug: string; scan_id: string | null; click_count: number; last_clicked_at: string | null; destination_url: string }>;
+  const links = (linksRes.data ?? []) as Array<{ slug: string; scan_id: string | null; click_count: number; last_clicked_at: string | null; destination_url: string; share_platform: string | null }>;
   const revenues = (revenueRes.data ?? []) as RevenueRecord[];
 
   const totalScans = scansRes.count ?? scans.length;
@@ -199,6 +222,95 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   }
   const dailyRevenue = Array.from(dailyRevMap.entries()).map(([date, amount]) => ({ date, amount }));
 
+  // Share platform performance (YouTube Shorts, Instagram Reels, TikTok)
+  const SHARE_PLATFORM_LABELS: Record<string, string> = {
+    youtube_shorts: '유튜브 숏츠',
+    instagram_reels: '인스타그램 릴스',
+    tiktok: '틱톡',
+    youtube: '유튜브',
+    instagram: '인스타그램',
+  };
+  const sharePlatformMap = new Map<string, { clicks: number; conversions: number }>();
+  for (const l of links) {
+    if (l.share_platform && l.click_count > 0) {
+      const existing = sharePlatformMap.get(l.share_platform) || { clicks: 0, conversions: 0 };
+      existing.clicks += l.click_count;
+      sharePlatformMap.set(l.share_platform, existing);
+    }
+  }
+  for (const r of revenues) {
+    if (r.scan_id) {
+      const matchingLinks = links.filter(l => l.scan_id === r.scan_id && l.share_platform);
+      for (const ml of matchingLinks) {
+        const existing = sharePlatformMap.get(ml.share_platform!) || { clicks: 0, conversions: 0 };
+        existing.conversions += 1;
+        sharePlatformMap.set(ml.share_platform!, existing);
+      }
+    }
+  }
+  const totalShareClicks = Array.from(sharePlatformMap.values()).reduce((s, v) => s + v.clicks, 0);
+  const sharePlatformPerformance: SharePlatformStat[] = Array.from(sharePlatformMap.entries())
+    .map(([platform, v]) => ({
+      platform,
+      label: SHARE_PLATFORM_LABELS[platform] || platform,
+      clicks: v.clicks,
+      conversions: v.conversions,
+      conversionRate: v.clicks > 0 ? (v.conversions / v.clicks) * 100 : 0,
+      pct: totalShareClicks > 0 ? (v.clicks / totalShareClicks) * 100 : 0,
+    }))
+    .sort((a, b) => b.clicks - a.clicks);
+
+  // Style insights from scans.template_data
+  const STYLE_LABELS: Record<string, string> = {
+    instatoon: '인스타툰',
+    b_grade: 'B급 짤방',
+    gourmet: '미식툰',
+    daily: '일상툰',
+    romance: '로맨스툰',
+    action: '액션툰',
+  };
+  const styleMap = new Map<string, { count: number; totalClicks: number }>();
+  for (const s of scans) {
+    const td = s.template_data as unknown as Record<string, unknown>;
+    const style = (td?.style as string) || (td?.comicStyle as string) || s.template_data?.category || '';
+    if (!style) continue;
+    const clickData = scanClickMap.get(s.id) || { clicks: 0, lastClicked: null };
+    const existing = styleMap.get(style) || { count: 0, totalClicks: 0 };
+    existing.count += 1;
+    existing.totalClicks += clickData.clicks;
+    styleMap.set(style, existing);
+  }
+  const styleEntries = Array.from(styleMap.entries());
+  const maxStyleCtr = Math.max(...styleEntries.map(([, v]) => v.count > 0 ? v.totalClicks / v.count : 0), 0);
+  const styleInsights: StyleInsight[] = styleEntries
+    .map(([style, v]) => {
+      const avgCtr = v.count > 0 ? (v.totalClicks / v.count) * 100 : 0;
+      const isTop = maxStyleCtr > 0 && (v.totalClicks / v.count) === maxStyleCtr && v.totalClicks > 0;
+      let recommendation = '';
+      if (isTop) {
+        recommendation = `이 스타일이 클릭률 ${avgCtr.toFixed(0)}%로 가장 높습니다. 이 스타일로 추가 콘텐츠를 제작하세요.`;
+      } else if (avgCtr > 0) {
+        const topStyle = styleEntries.find(([, sv]) => sv.count > 0 && (sv.totalClicks / sv.count) === maxStyleCtr && sv.totalClicks > 0);
+        if (topStyle) {
+          const topLabel = STYLE_LABELS[topStyle[0]] || topStyle[0];
+          const diff = maxStyleCtr > 0 ? ((maxStyleCtr - avgCtr / 100) / (maxStyleCtr)) * 100 : 0;
+          recommendation = `${topLabel} 스타일이 클릭률 ${diff.toFixed(0)}% 더 높습니다. ${topLabel} 스타일을 시도해보세요.`;
+        }
+      } else {
+        recommendation = '아직 클릭 데이터가 부족합니다. 콘텐츠를 공유하고 데이터를 모아보세요.';
+      }
+      return {
+        style,
+        label: STYLE_LABELS[style] || style,
+        count: v.count,
+        totalClicks: v.totalClicks,
+        avgCtr,
+        recommendation,
+        isTopPerformer: isTop,
+      };
+    })
+    .sort((a, b) => b.avgCtr - a.avgCtr);
+
   if (totalScans === 0 && totalAssets === 0 && totalClicks === 0 && totalRevenue === 0) {
     return emptyDashboard();
   }
@@ -216,6 +328,8 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
       revenueByPlatform,
       dailyClicks,
       dailyRevenue,
+      sharePlatformPerformance,
+      styleInsights,
     };
   } catch (err) {
     throw new Error(err instanceof Error ? err.message : '성과 데이터를 불러오는 중 오류가 발생했어요');

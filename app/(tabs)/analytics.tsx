@@ -29,6 +29,11 @@ import {
   Sparkles,
   RefreshCw,
   WifiOff,
+  Youtube,
+  Instagram,
+  Music2,
+  Lightbulb,
+  Award,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -37,6 +42,8 @@ import {
   formatKRW,
   formatClickTime,
   type DashboardSummary,
+  type SharePlatformStat,
+  type StyleInsight,
 } from '@/lib/dashboard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -49,6 +56,18 @@ const PLATFORM_META: Record<string, { label: string; icon: typeof ShoppingBag; c
   Toss: { label: '토스', icon: Send, color: '#0064FF' },
   기타: { label: '기타', icon: BarChart3, color: '#8B5CF6' },
 };
+
+const SHARE_PLATFORM_META: Record<string, { label: string; icon: typeof Youtube; color: string }> = {
+  youtube_shorts: { label: '유튜브 숏츠', icon: Youtube, color: '#FF0000' },
+  instagram_reels: { label: '인스타그램 릴스', icon: Instagram, color: '#E1306C' },
+  tiktok: { label: '틱톡', icon: Music2, color: '#000000' },
+  youtube: { label: '유튜브', icon: Youtube, color: '#FF0000' },
+  instagram: { label: '인스타그램', icon: Instagram, color: '#E1306C' },
+};
+
+function getSharePlatformMeta(key: string) {
+  return SHARE_PLATFORM_META[key] || { label: key, icon: BarChart3, color: '#8B5CF6' };
+}
 
 function getPlatformMeta(key: string) {
   return PLATFORM_META[key] || PLATFORM_META['기타'];
@@ -369,6 +388,78 @@ export default function AnalyticsScreen() {
                     </View>
                   );
                 })}
+              </View>
+            </View>
+          )}
+
+          {/* Share platform performance */}
+          {d.sharePlatformPerformance.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <TrendingUp size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.sectionLabel}>공유 플랫폼별 성과</Text>
+              </View>
+              <View style={styles.breakdownCard}>
+                {d.sharePlatformPerformance.map((item, i) => {
+                  const meta = getSharePlatformMeta(item.platform);
+                  const Icon = meta.icon;
+                  const maxClicks = Math.max(...d.sharePlatformPerformance.map(s => s.clicks), 1);
+                  const barPct = (item.clicks / maxClicks) * 100;
+                  return (
+                    <View key={i} style={styles.breakdownRow}>
+                      <View style={[styles.breakdownIcon, { backgroundColor: meta.color + '20' }]}>
+                        <Icon size={14} color={meta.color} strokeWidth={2} />
+                      </View>
+                      <View style={styles.breakdownInfo}>
+                        <View style={styles.breakdownHeader}>
+                          <Text style={styles.breakdownLabel}>{meta.label}</Text>
+                          <Text style={styles.breakdownAmount}>{item.clicks}클릭</Text>
+                        </View>
+                        <View style={styles.breakdownBarTrack}>
+                          <View style={[styles.breakdownBarFill, { width: `${barPct}%`, backgroundColor: meta.color }]} />
+                        </View>
+                        <View style={styles.sharePlatformStatsRow}>
+                          <Text style={styles.breakdownClicks}>전환 {item.conversions}건</Text>
+                          <Text style={styles.breakdownClicks}>전환율 {item.conversionRate.toFixed(1)}%</Text>
+                          <Text style={styles.breakdownClicks}>점유율 {item.pct.toFixed(0)}%</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* AI Style Insights */}
+          {d.styleInsights.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.sectionLabel}>AI 마케팅 인사이트</Text>
+              </View>
+              <View style={styles.insightCard}>
+                {d.styleInsights.map((insight, i) => (
+                  <View key={i} style={[styles.insightRow, insight.isTopPerformer && styles.insightRowTop]}>
+                    <View style={styles.insightHeader}>
+                      <View style={styles.insightLabelWrap}>
+                        {insight.isTopPerformer ? (
+                          <Award size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+                        ) : (
+                          <Sparkles size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                        )}
+                        <Text style={[styles.insightLabel, insight.isTopPerformer && styles.insightLabelTop]}>
+                          {insight.label}
+                        </Text>
+                      </View>
+                      <Text style={styles.insightCtr}>{insight.avgCtr.toFixed(0)}% CTR</Text>
+                    </View>
+                    <Text style={styles.insightMeta}>
+                      {insight.count}개 콘텐츠 · {insight.totalClicks}클릭
+                    </Text>
+                    <Text style={styles.insightRecommendation}>{insight.recommendation}</Text>
+                  </View>
+                ))}
               </View>
             </View>
           )}
@@ -750,6 +841,63 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     marginTop: 3,
+  },
+  sharePlatformStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 3,
+  },
+  insightCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  insightRow: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    gap: 4,
+  },
+  insightRowTop: {
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.warning[500] + '30',
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  insightLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  insightLabel: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  insightLabelTop: {
+    color: theme.colors.warning[400],
+  },
+  insightCtr: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[400],
+  },
+  insightMeta: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  insightRecommendation: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
   },
   topCard: {
     backgroundColor: theme.colors.dark.surface,
