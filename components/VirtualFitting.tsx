@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64'
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import * as ImagePicker from 'expo-image-picker';
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
+
+const FITTING_TIMEOUT_MS = 150_000;
 
 type FittingStep = 'idle' | 'product-ready' | 'model-ready' | 'processing' | 'done' | 'error';
 
@@ -43,7 +45,6 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
   const [bodyType, setBodyType] = useState<string>('standard');
   const [pose, setPose] = useState<string>('front');
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePickProduct = useCallback(async () => {
     setError(null);
@@ -109,6 +110,9 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
     setError(null);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FITTING_TIMEOUT_MS);
+
       const response = await fetch(`${supabaseUrl}/functions/v1/virtual-fitting`, {
         method: 'POST',
         headers: {
@@ -121,7 +125,10 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           bodyType,
           pose,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({ error: '가상 피팅 생성에 실패했습니다.' }));

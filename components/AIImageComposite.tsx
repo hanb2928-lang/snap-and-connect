@@ -16,7 +16,6 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForApi } from '@/lib/imageEdit';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
-import { uploadImage } from '@/lib/analysis';
 
 type CompositeMode = 'background' | 'lighting';
 type LightingPreset = 'studio' | 'natural' | 'sunset' | 'cozy' | 'retail' | 'clean';
@@ -104,8 +103,6 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
       setResultImage(null);
 
       try {
-        await uploadImage(sourceImage, 'image/jpeg');
-
         let result: string | null = null;
 
         if (Platform.OS === 'web') {
@@ -124,7 +121,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
             );
           }
         } else {
-          result = sourceImage;
+          throw new Error('모바일 앱에서는 조명 합성 기능이 곧 지원될 예정입니다. 웹에서 이용해주세요.');
         }
 
         if (!result) throw new Error('합성 결과를 생성하지 못했습니다.');
