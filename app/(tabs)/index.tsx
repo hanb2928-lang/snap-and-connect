@@ -54,6 +54,7 @@ import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { VirtualFitting } from '@/components/VirtualFitting';
 import { AIImageComposite } from '@/components/AIImageComposite';
+import { PromptImageGenerator } from '@/components/PromptImageGenerator';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -971,6 +972,17 @@ export default function CameraScreen() {
           stepNumber={4}
         >
           <AIImageComposite />
+        </VerticalSectionCard>
+
+        <VerticalSectionCard
+          icon={<Wand2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
+          title="5. 프롬프트 AI 이미지 생성"
+          desc="문장을 입력하면 AI가 새로운 이미지를 자동 생성"
+          iconBg={theme.colors.primary[500] + '18'}
+          accentColor={theme.colors.primary[300]}
+          stepNumber={5}
+        >
+          <PromptImageGenerator />
         </VerticalSectionCard>
 
         <TouchableOpacity
