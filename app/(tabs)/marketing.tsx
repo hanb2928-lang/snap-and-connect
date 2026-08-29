@@ -12,28 +12,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import {
-  Megaphone,
-  TrendingUp,
-  Zap,
-  Link2,
-  Flame,
-  Check,
-  Lightbulb,
-  Timer,
-  QrCode,
-  Shuffle,
-  ShoppingBag,
-  Users,
-  Sparkles,
-  ArrowRight,
-  Film,
-  Dna,
-  Tag,
-  Globe,
-  Smartphone,
-  Layout,
-} from 'lucide-react-native';
+import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -49,7 +28,8 @@ import { LinkInBioCard } from '@/components/LinkInBioCard';
 import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
 import { validateAffiliateUrl } from '@/lib/affiliate';
 import { extractProductMeta } from '@/lib/analysis';
-import { PLATFORM_SPECS, getPlatformSpec, type PlatformKey } from '@/lib/platformSpecs';
+import { getPlatformSpec } from '@/lib/platformSpecs';
+import { fetchEnabledPlatforms, type ManagedPlatform } from '@/lib/platformManager';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -110,7 +90,8 @@ export default function MarketingScreen() {
   const [activeStep, setActiveStep] = useState<PipelineStep>(1);
 
   // Step 1: Platform selection state
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(null);
+  const [availablePlatforms, setAvailablePlatforms] = useState<ManagedPlatform[]>([]);
+  const [selectedPlatform, setSelectedPlatform] = useState<ManagedPlatform | null>(null);
 
   // Step 2: Product input & hook state
   const [affiliateUrl, setAffiliateUrl] = useState('');
@@ -190,6 +171,17 @@ export default function MarketingScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const platforms = await fetchEnabledPlatforms();
+        setAvailablePlatforms(platforms);
+      } catch {
+        setAvailablePlatforms([]);
+      }
+    })();
+  }, []);
+
   const handleRefresh = () => {
     setRefreshing(true);
     load();
@@ -208,8 +200,8 @@ export default function MarketingScreen() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handlePlatformSelect = (key: PlatformKey) => {
-    setSelectedPlatform(key);
+  const handlePlatformSelect = (spec: ManagedPlatform) => {
+    setSelectedPlatform(spec);
     setActiveStep(2);
     scrollToSection('viral');
   };
@@ -388,13 +380,13 @@ export default function MarketingScreen() {
               </View>
 
               <View style={styles.platformGrid}>
-                {PLATFORM_SPECS.map((spec) => {
-                  const selected = selectedPlatform === spec.key;
+                {availablePlatforms.map((spec) => {
+                  const selected = selectedPlatform?.key === spec.key;
                   return (
                     <TouchableOpacity
                       key={spec.key}
                       style={[styles.platformCard, selected && { borderColor: spec.color, backgroundColor: spec.color + '12' }]}
-                      onPress={() => handlePlatformSelect(spec.key)}
+                      onPress={() => handlePlatformSelect(spec)}
                       activeOpacity={0.7}
                     >
                       <View style={[styles.platformIconBox, { backgroundColor: spec.color + '20' }]}>
@@ -414,7 +406,7 @@ export default function MarketingScreen() {
 
               {/* Safe Zone Preview */}
               {selectedPlatform && (() => {
-                const spec = getPlatformSpec(selectedPlatform)!;
+                const spec = selectedPlatform;
                 const previewH = 160;
                 const previewW = previewH * (spec.width / spec.height);
                 const scale = previewH / spec.height;
@@ -469,7 +461,7 @@ export default function MarketingScreen() {
                   <Text style={styles.phaseTitle}>맞춤 템플릿 &amp; 3초 훅 선택</Text>
                   <Text style={styles.phaseDesc}>
                     {selectedPlatform
-                      ? `${getPlatformSpec(selectedPlatform)?.label} · ${getPlatformSpec(selectedPlatform)?.ratio} 비율에 맞춘 템플릿`
+                      ? `${selectedPlatform.label} · ${selectedPlatform.ratio} 비율에 맞춘 템플릿`
                       : '1단계에서 플랫폼을 먼저 선택하세요'}
                   </Text>
                 </View>
@@ -801,7 +793,7 @@ export default function MarketingScreen() {
 
               <View style={styles.renderSummaryCard}>
                 {selectedPlatform && (() => {
-                  const spec = getPlatformSpec(selectedPlatform)!;
+                  const spec = selectedPlatform;
                   return (
                     <>
                       <View style={styles.renderSummaryRow}>

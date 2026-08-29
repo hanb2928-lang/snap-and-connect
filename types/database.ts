@@ -136,6 +136,23 @@ export interface UserSettings {
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';
 
+export interface CustomPlatform {
+  id: string;
+  key: string;
+  label: string;
+  ratio: string;
+  width: number;
+  height: number;
+  color: string;
+  safe_zone_top: number;
+  safe_zone_bottom: number;
+  safe_zone_sides: number;
+  is_enabled: boolean;
+  is_builtin: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface TemplateRegistryEntry {
   id: string;
   category: string;

@@ -34,6 +34,14 @@ import { useMascotSettings, type MascotStyle } from '@/hooks/useMascotSettings';
 import { invalidateSettingsCache, updateUserSettings as persistUserSettings } from '@/lib/settings';
 import { useI18n } from '@/hooks/useI18n';
 import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/lib/i18n';
+import {
+  fetchManagedPlatforms,
+  togglePlatformEnabled,
+  addCustomPlatform,
+  deleteCustomPlatform,
+  AVAILABLE_RATIOS,
+  type ManagedPlatform,
+} from '@/lib/platformManager';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -90,6 +98,12 @@ export default function SettingsScreen() {
   const [restoring, setRestoring] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialLinkInput, setTutorialLinkInput] = useState('');
+  const [managedPlatforms, setManagedPlatforms] = useState<ManagedPlatform[]>([]);
+  const [platformsLoading, setPlatformsLoading] = useState(true);
+  const [showAddPlatform, setShowAddPlatform] = useState(false);
+  const [newPlatformName, setNewPlatformName] = useState('');
+  const [newPlatformRatio, setNewPlatformRatio] = useState<string>('9:16');
+  const [addingPlatform, setAddingPlatform] = useState(false);
   const router = useRouter();
 
   const loadSettings = useCallback(async () => {
@@ -133,6 +147,19 @@ export default function SettingsScreen() {
     loadRevenues();
   }, [loadSettings, loadRevenues]);
 
+  const loadPlatforms = useCallback(async () => {
+    setPlatformsLoading(true);
+    try {
+      const data = await fetchManagedPlatforms();
+      setManagedPlatforms(data);
+    } catch {
+      setManagedPlatforms([]);
+    }
+    setPlatformsLoading(false);
+  }, []);
+
+  useEffect(() => { loadPlatforms(); }, [loadPlatforms]);
+
   const loadCredits = useCallback(async () => {
     try {
       const [bal, hist] = await Promise.all([getCreditBalance(), getCreditHistory(10)]);
@@ -158,6 +185,51 @@ export default function SettingsScreen() {
       Alert.alert('복원 실패', '구매 내역 복원 중 오류가 발생했습니다.');
     }
     setRestoring(false);
+  };
+
+  const handleTogglePlatform = async (id: string, enabled: boolean) => {
+    try {
+      await togglePlatformEnabled(id, enabled);
+      setManagedPlatforms((prev) => prev.map((p) => p.id === id ? { ...p, isEnabled: enabled } : p));
+    } catch {
+      Alert.alert('오류', '플랫폼 설정 변경에 실패했습니다.');
+    }
+  };
+
+  const handleAddPlatform = async () => {
+    if (!newPlatformName.trim()) {
+      Alert.alert('입력 필요', '플랫폼 이름을 입력해주세요.');
+      return;
+    }
+    setAddingPlatform(true);
+    try {
+      await addCustomPlatform({ label: newPlatformName.trim(), ratio: newPlatformRatio });
+      setNewPlatformName('');
+      setNewPlatformRatio('9:16');
+      setShowAddPlatform(false);
+      await loadPlatforms();
+    } catch {
+      Alert.alert('오류', '플랫폼 추가에 실패했습니다.');
+    }
+    setAddingPlatform(false);
+  };
+
+  const handleDeletePlatform = (id: string) => {
+    Alert.alert('삭제', '이 커스텀 플랫폼을 삭제하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteCustomPlatform(id);
+            await loadPlatforms();
+          } catch {
+            Alert.alert('오류', '삭제에 실패했습니다.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleSaveIds = async () => {
@@ -687,6 +759,112 @@ export default function SettingsScreen() {
             </>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* Marketing Platform Management */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>마케팅 플랫폼 관리</Text>
+        <Text style={styles.sectionDesc}>
+          마케팅 탭에서 영상을 만들 때 선택할 SNS 플랫폼을 켜고 끄거나, 커스텀 플랫폼을 추가할 수 있습니다.
+        </Text>
+
+        {platformsLoading ? (
+          <ActivityIndicator size="small" color={theme.colors.primary[400]} style={{ marginVertical: 16 }} />
+        ) : (
+          <View style={styles.card}>
+            {managedPlatforms.map((p, idx) => (
+              <View key={p.id} style={[styles.platformMgmtRow, idx > 0 && styles.platformMgmtRowBorder]}>
+                <View style={[styles.platformMgmtIcon, { backgroundColor: p.color + '20' }]}>
+                  <Smartphone size={18} color={p.color} strokeWidth={2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.platformMgmtLabel}>{p.label}</Text>
+                  <Text style={styles.platformMgmtMeta}>{p.ratio} · {p.width}×{p.height}px{p.isBuiltin ? '' : ' · 커스텀'}</Text>
+                </View>
+                {!p.isBuiltin && (
+                  <TouchableOpacity
+                    style={styles.platformMgmtDelete}
+                    onPress={() => handleDeletePlatform(p.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={() => handleTogglePlatform(p.id, !p.isEnabled)}
+                  activeOpacity={0.7}
+                  hitSlop={12}
+                >
+                  <View style={[styles.toggleSwitch, p.isEnabled && styles.toggleSwitchActive]}>
+                    <View style={[styles.toggleKnob, p.isEnabled && styles.toggleKnobActive]} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {showAddPlatform ? (
+          <View style={styles.card}>
+            <Text style={styles.idInputLabel}>플랫폼 이름</Text>
+            <TextInput
+              style={styles.idInput}
+              value={newPlatformName}
+              onChangeText={setNewPlatformName}
+              placeholder="예: 나의 블로그, 카카오채널 등"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              maxLength={20}
+            />
+            <View style={{ height: 12 }} />
+            <Text style={styles.idInputLabel}>화면 비율</Text>
+            <View style={styles.platformPickerRow}>
+              {AVAILABLE_RATIOS.map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.platformChip, newPlatformRatio === r && styles.platformChipActive]}
+                  onPress={() => setNewPlatformRatio(r)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.platformChipText, newPlatformRatio === r && styles.platformChipTextActive]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.addPlatformActions}>
+              <TouchableOpacity
+                style={[styles.addPlatformCancelBtn]}
+                onPress={() => { setShowAddPlatform(false); setNewPlatformName(''); }}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.addPlatformCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveIdButton, { flex: 1 }, addingPlatform && { opacity: 0.5 }]}
+                onPress={handleAddPlatform}
+                disabled={addingPlatform}
+                activeOpacity={0.8}
+              >
+                {addingPlatform ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Check size={18} color="#fff" strokeWidth={2} />
+                    <Text style={styles.saveIdButtonText}>추가</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.addPlatformBtn}
+            onPress={() => setShowAddPlatform(true)}
+            activeOpacity={0.8}
+          >
+            <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.addPlatformBtnText}>커스텀 플랫폼 추가</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -2734,5 +2912,73 @@ const styles = StyleSheet.create({
   langChipTextActive: {
     color: '#fff',
     fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  platformMgmtRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  platformMgmtRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+  },
+  platformMgmtIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  platformMgmtLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  platformMgmtMeta: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  platformMgmtDelete: {
+    padding: 6,
+  },
+  addPlatformBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+    borderStyle: 'dashed',
+  },
+  addPlatformBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  addPlatformActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  addPlatformCancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  addPlatformCancelText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
 });
