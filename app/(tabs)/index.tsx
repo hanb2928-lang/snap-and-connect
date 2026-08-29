@@ -10,6 +10,7 @@ import {
   Animated as RNAnimated,
   ScrollView,
   Image,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -102,8 +103,48 @@ export default function CameraScreen() {
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
   const [angleGuideVisible, setAngleGuideVisible] = useState(false);
+  const [activeSection, setActiveSection] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionLayouts = useRef<Array<{ y: number; height: number }>>([]);
+  const isScrollingTo = useRef(false);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
+
+  const QUICK_NAV_ITEMS: { label: string; icon: React.ReactNode; color: string }[] = [
+    { label: '촬영', icon: <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[400] },
+    { label: '갤러리', icon: <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
+    { label: '피팅', icon: <Shirt size={14} color={theme.colors.accent[400]} strokeWidth={2} />, color: theme.colors.accent[400] },
+    { label: '합성', icon: <Lightbulb size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
+    { label: '생성', icon: <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />, color: theme.colors.primary[300] },
+    { label: '마케팅', icon: <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />, color: theme.colors.warning[400] },
+  ];
+
+  const handleSectionLayout = useCallback((index: number) => (e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    sectionLayouts.current[index] = { y, height };
+  }, []);
+
+  const handleScrollToSection = useCallback((index: number) => {
+    const layout = sectionLayouts.current[index];
+    if (!layout || !scrollRef.current) return;
+    isScrollingTo.current = true;
+    scrollRef.current.scrollTo({ y: layout.y - 60, animated: true });
+    setActiveSection(index);
+    setTimeout(() => { isScrollingTo.current = false; }, 500);
+  }, []);
+
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    if (isScrollingTo.current) return;
+    const y = event.nativeEvent.contentOffset.y + 100;
+    let current = 0;
+    for (let i = 0; i < sectionLayouts.current.length; i++) {
+      const layout = sectionLayouts.current[i];
+      if (!layout) continue;
+      if (y >= layout.y) current = i;
+      else break;
+    }
+    setActiveSection(current);
+  }, []);
   const pinchActive = useSharedValue(false);
   const zoomShared = useSharedValue(0);
   const updateZoom = useCallback((newZoom: number) => {
@@ -556,22 +597,45 @@ export default function CameraScreen() {
       )}
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={[
           styles.verticalScroll,
-          { paddingTop: safeTop + theme.spacing.sm, paddingBottom: tabBarHeight + theme.spacing.lg },
+          { paddingTop: safeTop + 52 + theme.spacing.sm, paddingBottom: tabBarHeight + theme.spacing.lg },
         ]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!arMode}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        stickyHeaderIndices={[1]}
       >
-        <View style={styles.verticalHeader}>
+        <View style={styles.verticalHeader} onLayout={handleSectionLayout(0)}>
           <Text style={styles.verticalTitle}>{t('camera.heroTitle')}</Text>
           <Text style={styles.verticalSubtitle}>
             아래 순서대로 따라 하시면 됩니다. 각 단계를 탭하여 진행하세요.
           </Text>
         </View>
 
-        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }}>
+        <View style={styles.quickNavSticky}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickNavScroll}
+          >
+            {QUICK_NAV_ITEMS.map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.quickNavPill, activeSection === i && styles.quickNavPillActive]}
+                onPress={() => handleScrollToSection(i)}
+                activeOpacity={0.7}
+              >
+                {item.icon}
+                <Text style={[styles.quickNavPillText, activeSection === i && styles.quickNavPillTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={{ alignSelf: 'center', marginBottom: theme.spacing.md }} onLayout={handleSectionLayout(1)}>
           <StepIndicator activeStep={1} />
         </View>
 
@@ -584,6 +648,7 @@ export default function CameraScreen() {
           <View style={styles.phaseDividerLine} />
         </View>
 
+        <View onLayout={handleSectionLayout(2)}>
         <VerticalSectionCard
           icon={<Camera size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
           title="1. 사진 촬영"
@@ -932,6 +997,9 @@ export default function CameraScreen() {
           )}
         </VerticalSectionCard>
 
+        </View>
+
+        <View onLayout={handleSectionLayout(3)}>
         <VerticalSectionCard
           icon={<ImageIcon size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
           title="2. 갤러리에서 불러오기"
@@ -961,6 +1029,8 @@ export default function CameraScreen() {
           </View>
         </VerticalSectionCard>
 
+        </View>
+
         <View style={styles.phaseDivider}>
           <View style={styles.phaseDividerLine} />
           <View style={styles.phaseDividerBadge}>
@@ -970,6 +1040,7 @@ export default function CameraScreen() {
           <View style={styles.phaseDividerLine} />
         </View>
 
+        <View onLayout={handleSectionLayout(4)}>
         <VerticalSectionCard
           icon={<Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
           title="3. AI 가상 피팅"
@@ -981,6 +1052,9 @@ export default function CameraScreen() {
           <VirtualFitting />
         </VerticalSectionCard>
 
+        </View>
+
+        <View onLayout={handleSectionLayout(5)}>
         <VerticalSectionCard
           icon={<Lightbulb size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
           title="4. AI 이미지 합성"
@@ -992,6 +1066,9 @@ export default function CameraScreen() {
           <AIImageComposite />
         </VerticalSectionCard>
 
+        </View>
+
+        <View onLayout={handleSectionLayout(6)}>
         <VerticalSectionCard
           icon={<Wand2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
           title="5. 프롬프트 AI 이미지 생성"
@@ -1012,6 +1089,9 @@ export default function CameraScreen() {
           <View style={styles.phaseDividerLine} />
         </View>
 
+        </View>
+
+        <View onLayout={handleSectionLayout(7)}>
         <TouchableOpacity
           style={styles.marketingCtaButtonLarge}
           onPress={() => {
@@ -1038,6 +1118,7 @@ export default function CameraScreen() {
           </View>
           <ArrowRight size={24} color={theme.colors.warning[400]} strokeWidth={2.2} />
         </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.guideBtnInline}
@@ -2697,6 +2778,40 @@ const styles = StyleSheet.create({
   verticalScroll: {
     paddingHorizontal: theme.spacing.lg,
     gap: 0,
+  },
+  quickNavSticky: {
+    backgroundColor: theme.colors.dark.bg,
+    paddingVertical: 6,
+    paddingHorizontal: theme.spacing.lg,
+    marginHorizontal: -theme.spacing.lg,
+  },
+  quickNavScroll: {
+    gap: 6,
+    alignItems: 'center',
+  },
+  quickNavPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  quickNavPillActive: {
+    backgroundColor: theme.colors.primary[500] + '22',
+    borderColor: theme.colors.primary[400] + '80',
+  },
+  quickNavPillText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  quickNavPillTextActive: {
+    color: theme.colors.primary[300],
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   verticalHeader: {
     alignItems: 'center',
