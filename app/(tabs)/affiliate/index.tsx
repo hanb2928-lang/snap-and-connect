@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -32,6 +32,7 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
+import { setItem } from '@/lib/storage';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
@@ -1372,6 +1373,23 @@ export default function AffiliateScreen() {
           )}
         </VerticalSectionCard>
         </View>
+
+        <TouchableOpacity
+          style={styles.marketingCtaButton}
+          onPress={() => { setItem('marketing_handoff', 'true'); router.push('/marketing' as never); }}
+          activeOpacity={0.85}
+        >
+          <View style={styles.marketingCtaIcon}>
+            <Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.2} />
+          </View>
+          <View style={styles.marketingCtaTextWrap}>
+            <Text style={styles.marketingCtaTitle}>이 소재로 마케팅 숏폼 만들기</Text>
+            <Text style={styles.marketingCtaDesc}>
+              훅 선택 · 템플릿 · 카피 · TTS까지 한 번에
+            </Text>
+          </View>
+          <ArrowRight size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
+        </TouchableOpacity>
 
         {/* Global Localization — multilingual caption & TTS translation */}
         {(contentText || productMeta?.productName) && (
@@ -2880,5 +2898,39 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textFaint,
     lineHeight: 14,
     marginTop: 2,
+  },
+  marketingCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    gap: 14,
+    borderWidth: 2,
+    borderColor: theme.colors.warning[400] + '40',
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  marketingCtaIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '25',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  marketingCtaTextWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  marketingCtaTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  marketingCtaDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
 });

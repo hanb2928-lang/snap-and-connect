@@ -24,6 +24,9 @@ import {
   Users,
   Rocket,
   ArrowRight,
+  Flame,
+  Check,
+  Lightbulb,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -32,6 +35,7 @@ import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { fetchDashboardSummary, type DashboardSummary } from '@/lib/affiliateDashboard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { friendlyError } from '@/lib/errors';
+import { getItem, setItem } from '@/lib/storage';
 
 interface MarketingTool {
   key: string;
@@ -42,6 +46,18 @@ interface MarketingTool {
   route?: string;
   externalUrl?: string;
 }
+
+const HOOK_TYPES = [
+  { key: 'curiosity', label: '호기심 유발', desc: '이거 모르면 손해? 3초 멈춤 보장', icon: Lightbulb, color: theme.colors.warning[400] },
+  { key: 'contrarian', label: '역발상', desc: '다들 이렇게 하는데, 난 반대로', icon: Zap, color: theme.colors.accent[400] },
+  { key: 'emotional', label: '감정 자극', desc: '이걸 알고 나니 눈물이...', icon: Flame, color: theme.colors.primary[400] },
+];
+
+const TEMPLATE_TYPES = [
+  { key: 'shortform', label: '숏폼 영상', desc: '릴스·쇼츠·틱톡 세로형', icon: Film, color: theme.colors.primary[400] },
+  { key: 'comic', label: '웹툰 만화', desc: '4컷 스토리텔링 만화', icon: Palette, color: theme.colors.accent[400] },
+  { key: 'variants', label: 'A/B 변형', desc: '정보·유머·감성 3가지 동시', icon: Sparkles, color: theme.colors.warning[400] },
+];
 
 const MARKETING_TOOLS: MarketingTool[] = [
   {
@@ -145,6 +161,19 @@ export default function MarketingScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [handoffMode, setHandoffMode] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const flag = await getItem('marketing_handoff');
+      if (flag === 'true') {
+        setHandoffMode(true);
+        await setItem('marketing_handoff', 'false');
+      }
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,6 +205,10 @@ export default function MarketingScreen() {
     } else if (tool.route) {
       router.push(tool.route as never);
     }
+  };
+
+  const handleStartGeneration = () => {
+    router.push('/affiliate' as never);
   };
 
   const totalRevenue = summary?.totalRevenue ?? 0;
@@ -210,6 +243,110 @@ export default function MarketingScreen() {
           <ErrorRetryBanner message={loadError} onRetry={load} />
         ) : (
           <>
+            {/* Handoff Hero — shown when arriving from camera/affiliate */}
+            {handoffMode && (
+              <View style={styles.handoffHero}>
+                <View style={styles.handoffHeroIcon}>
+                  <Flame size={28} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                </View>
+                <Text style={styles.handoffHeroTitle}>
+                  소재가 준비되었습니다!
+                </Text>
+                <Text style={styles.handoffHeroDesc}>
+                  훅과 템플릿을 선택하고 마케팅 숏폼을 완성하세요
+                </Text>
+              </View>
+            )}
+
+            {/* Hook Selection */}
+            <Text style={styles.sectionTitle}>1. 훅 선택 — 3초 후킹 오프닝</Text>
+            <View style={styles.selectGrid}>
+              {HOOK_TYPES.map((hook) => {
+                const Icon = hook.icon;
+                const selected = selectedHook === hook.key;
+                return (
+                  <TouchableOpacity
+                    key={hook.key}
+                    style={[styles.selectCard, selected && styles.selectCardActive]}
+                    onPress={() => setSelectedHook(hook.key)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.selectIcon, { backgroundColor: hook.color + '20' }]}>
+                      <Icon size={18} color={hook.color} strokeWidth={2.2} />
+                    </View>
+                    <View style={styles.selectInfo}>
+                      <Text style={styles.selectLabel}>{hook.label}</Text>
+                      <Text style={styles.selectDesc} numberOfLines={2}>{hook.desc}</Text>
+                    </View>
+                    {selected && (
+                      <View style={styles.selectCheck}>
+                        <Check size={14} color="#fff" strokeWidth={2.5} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Template Selection */}
+            <Text style={styles.sectionTitle}>2. 템플릿 선택</Text>
+            <View style={styles.selectGrid}>
+              {TEMPLATE_TYPES.map((tmpl) => {
+                const Icon = tmpl.icon;
+                const selected = selectedTemplate === tmpl.key;
+                return (
+                  <TouchableOpacity
+                    key={tmpl.key}
+                    style={[styles.selectCard, selected && styles.selectCardActive]}
+                    onPress={() => setSelectedTemplate(tmpl.key)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.selectIcon, { backgroundColor: tmpl.color + '20' }]}>
+                      <Icon size={18} color={tmpl.color} strokeWidth={2.2} />
+                    </View>
+                    <View style={styles.selectInfo}>
+                      <Text style={styles.selectLabel}>{tmpl.label}</Text>
+                      <Text style={styles.selectDesc} numberOfLines={2}>{tmpl.desc}</Text>
+                    </View>
+                    {selected && (
+                      <View style={styles.selectCheck}>
+                        <Check size={14} color="#fff" strokeWidth={2.5} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Generate Button */}
+            <TouchableOpacity
+              style={[
+                styles.generateBtn,
+                (!selectedHook || !selectedTemplate) && styles.generateBtnDisabled,
+              ]}
+              onPress={handleStartGeneration}
+              disabled={!selectedHook || !selectedTemplate}
+              activeOpacity={0.85}
+            >
+              <Sparkles size={20} color={(!selectedHook || !selectedTemplate) ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2.2} />
+              <Text
+                style={[
+                  styles.generateBtnText,
+                  (!selectedHook || !selectedTemplate) && styles.generateBtnTextDisabled,
+                ]}
+              >
+                {selectedHook && selectedTemplate
+                  ? '마케팅 콘텐츠 생성 시작'
+                  : '훅과 템플릿을 선택해주세요'}
+              </Text>
+              {selectedHook && selectedTemplate && (
+                <ArrowRight size={18} color="#fff" strokeWidth={2.2} />
+              )}
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.divider} />
+
             {/* Quick Stats */}
             <View style={styles.statsRow}>
               <View style={styles.statPill}>
@@ -361,6 +498,118 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
   },
+  handoffHero: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '30',
+    gap: 8,
+  },
+  handoffHeroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.warning[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  handoffHeroTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  handoffHeroDesc: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: 10,
+    marginTop: theme.spacing.sm,
+  },
+  selectGrid: {
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  selectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 12,
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  selectCardActive: {
+    borderColor: theme.colors.primary[400],
+    backgroundColor: theme.colors.primary[500] + '12',
+  },
+  selectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  selectLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  selectDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  selectCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary[400],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.lg,
+    paddingVertical: 16,
+    marginBottom: theme.spacing.md,
+  },
+  generateBtnDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  generateBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  generateBtnTextDisabled: {
+    color: theme.colors.dark.textFaint,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+    marginVertical: theme.spacing.sm,
+  },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -386,13 +635,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-    marginBottom: 10,
-    marginTop: theme.spacing.sm,
   },
   toolGrid: {
     gap: 8,

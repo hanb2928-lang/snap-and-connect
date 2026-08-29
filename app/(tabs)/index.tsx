@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useI18n } from '@/hooks/useI18n';
-import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Palette, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Share2, Lightbulb, Sun, Aperture, ShoppingBag } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, RotateCcw, Zap, ZapOff, ScanLine, Layers, Wand as Wand2, Grid3x3, Check, Sparkles, X, Play, Film, CircleAlert, LayoutTemplate, Lightbulb, Sun, Aperture, Flame, ArrowRight } from 'lucide-react-native';
 import { ARComicCamera } from '@/components/ARComicCamera';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { MobileVideoImport } from '@/components/MobileVideoImport';
@@ -90,7 +90,6 @@ export default function CameraScreen() {
   const progressWidth = useSharedValue(0);
   const [preferredStyle, setPreferredStyle] = useState<PlatformKey>('shortform');
   const [templateMode, setTemplateMode] = useState<'manual' | 'auto'>('auto');
-  const [stylePickerVisible, setStylePickerVisible] = useState(false);
   const [showOnboardingCapture, setShowOnboardingCapture] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [arMode, setArMode] = useState(false);
@@ -800,7 +799,7 @@ export default function CameraScreen() {
           {/* AR mode toggle inside camera step */}
           <TouchableOpacity
             style={[styles.verticalSingleBtn, { marginBottom: theme.spacing.sm }]}
-            onPress={() => { setArMode(true); setMediaPickerVisible(false); setStylePickerVisible(false); }}
+            onPress={() => { setArMode(true); setMediaPickerVisible(false); }}
             activeOpacity={0.8}
           >
             <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
@@ -950,114 +949,22 @@ export default function CameraScreen() {
           </View>
         </VerticalSectionCard>
 
-        <VerticalSectionCard
-          icon={<Palette size={20} color={theme.colors.warning[400]} strokeWidth={2} />}
-          title="3. 스타일 선택 및 편집"
-          desc="AI 자동 추천 또는 원하는 스타일을 골라보세요. 분석 없이 직접 편집할 수도 있어요."
-          iconBg={theme.colors.warning[500] + '18'}
-          accentColor={theme.colors.warning[400]}
-          stepNumber={3}
+        <TouchableOpacity
+          style={styles.marketingCtaButton}
+          onPress={() => { setItem('marketing_handoff', 'true'); router.push('/marketing' as never); }}
+          activeOpacity={0.85}
         >
-          <View style={styles.templateModeRow}>
-            <TouchableOpacity
-              style={[styles.templateModePill, templateMode === 'manual' && styles.templateModePillActive]}
-              onPress={() => handleTemplateModeChange('manual')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.templateModePillText, templateMode === 'manual' && styles.templateModePillTextActive]}>
-                수동 선택
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.templateModePill, templateMode === 'auto' && styles.templateModePillActive]}
-              onPress={() => handleTemplateModeChange('auto')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.templateModePillText, templateMode === 'auto' && styles.templateModePillTextActive]}>
-                자동 추천
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.marketingCtaIcon}>
+            <Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.2} />
           </View>
-
-          {templateMode === 'manual' ? (
-            <View style={styles.styleListInline}>
-              {STYLE_PRESETS.map((preset) => (
-                <TouchableOpacity
-                  key={preset.key}
-                  style={[styles.styleOption, preferredStyle === preset.key && styles.styleOptionActive]}
-                  onPress={() => handleStyleChange(preset.key)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.styleOptionTextWrap}>
-                    <Text style={[styles.styleOptionLabel, preferredStyle === preset.key && styles.styleOptionLabelActive]}>
-                      {preset.label}
-                    </Text>
-                    <Text style={styles.styleOptionDesc}>{preset.desc}</Text>
-                  </View>
-                  {preferredStyle === preset.key && (
-                    <Check size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.autoTemplateInfo}>
-              <Sparkles size={24} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.autoTemplateDescSmall}>
-                AI가 사진을 분석하여 가장 어울리는 스타일을 자동으로 선택합니다.
-              </Text>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.verticalSingleBtn, { marginTop: theme.spacing.sm }]}
-            onPress={handleTemplateOnly}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <Wand2 size={18} color={theme.colors.success[400]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>AI 분석 없이 직접 편집하기</Text>
-          </TouchableOpacity>
-        </VerticalSectionCard>
-
-        <VerticalSectionCard
-          icon={<ShoppingBag size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
-          title="4. 제휴 쇼핑 링크 연결"
-          desc="쿠팡, 네이버, 토스 등 제휴 링크를 붙여넣어 수수료를 추적하세요."
-          iconBg={theme.colors.primary[500] + '18'}
-          accentColor={theme.colors.primary[300]}
-          stepNumber={4}
-        >
-          <TouchableOpacity
-            style={styles.verticalSingleBtn}
-            onPress={() => router.push('/affiliate' as never)}
-            activeOpacity={0.7}
-          >
-            <ShoppingBag size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>제휴 링크 관리하기</Text>
-          </TouchableOpacity>
-          <Text style={[styles.captureHint, { marginTop: theme.spacing.xs }]}>
-            분석 완료 후 결과 페이지에서도 제휴 링크를 바로 추가할 수 있어요.
-          </Text>
-        </VerticalSectionCard>
-
-        <VerticalSectionCard
-          icon={<Share2 size={20} color={theme.colors.primary[300]} strokeWidth={2} />}
-          title="5. 업로드 미리보기 및 공유"
-          desc="최종 결과를 미리보기로 확인하고 마지막으로 수정한 뒤 SNS에 업로드하세요."
-          iconBg={theme.colors.primary[500] + '18'}
-          accentColor={theme.colors.primary[300]}
-          stepNumber={5}
-        >
-          <TouchableOpacity
-            style={styles.verticalSingleBtn}
-            onPress={() => router.push('/affiliate' as never)}
-            activeOpacity={0.7}
-          >
-            <Share2 size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.verticalSingleBtnText}>업로드 미리보기 / 공유하기</Text>
-          </TouchableOpacity>
-        </VerticalSectionCard>
+          <View style={styles.marketingCtaTextWrap}>
+            <Text style={styles.marketingCtaTitle}>이 소재로 마케팅 숏폼 만들기</Text>
+            <Text style={styles.marketingCtaDesc}>
+              훅 선택 · 템플릿 · 카피 · TTS까지 한 번에
+            </Text>
+          </View>
+          <ArrowRight size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.guideBtnInline}
@@ -3002,6 +2909,40 @@ const styles = StyleSheet.create({
   guideBtnText: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  marketingCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    gap: 14,
+    borderWidth: 2,
+    borderColor: theme.colors.warning[400] + '40',
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  marketingCtaIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '25',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  marketingCtaTextWrap: {
+    flex: 1,
+    gap: 3,
+  },
+  marketingCtaTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  marketingCtaDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
   },
 });
