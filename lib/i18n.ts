@@ -303,6 +303,9 @@ const ko: TranslationDict = {
   'settings.sandboxBadge': 'Sandbox',
   'settings.autoPublishApplied': '자동 발행 설정이 저장되었습니다',
   'settings.brandPersonaSaved': '브랜드 페르소나가 저장되었습니다',
+  'common.networkError': '네트워크 상태를 확인해 주세요',
+  'common.retry': '재시도',
+  'common.retryDesc': '요청 중 네트워크 오류가 발생했습니다. 연결 상태를 확인하고 다시 시도해주세요.',
 };
 
 const en: TranslationDict = {
@@ -572,6 +575,9 @@ const en: TranslationDict = {
   'settings.sandboxBadge': 'Sandbox',
   'settings.autoPublishApplied': 'Auto-publish settings saved',
   'settings.brandPersonaSaved': 'Brand persona saved',
+  'common.networkError': 'Please check your network connection',
+  'common.retry': 'Retry',
+  'common.retryDesc': 'A network error occurred during the request. Please check your connection and try again.',
 };
 
 const ja: TranslationDict = {

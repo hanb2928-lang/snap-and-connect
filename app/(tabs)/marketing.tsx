@@ -94,7 +94,7 @@ export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -332,7 +332,7 @@ export default function MarketingScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <View style={styles.headerIconRow}>
+        <View style={[styles.headerIconRow, isRTL && styles.headerIconRowRTL]}>
           <View style={styles.headerIconBox}>
             <Megaphone size={22} color={theme.colors.primary[300]} strokeWidth={2.5} />
           </View>
@@ -1101,6 +1101,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  headerIconRowRTL: {
+    flexDirection: 'row-reverse',
+  },
   headerIconBox: {
     width: 44,
     height: 44,
@@ -1141,7 +1144,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
-    marginRight: 6,
   },
   quickNavIcon: {
     width: 28,

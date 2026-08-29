@@ -16,6 +16,7 @@ import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64'
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import * as ImagePicker from 'expo-image-picker';
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
+import { useI18n } from '@/hooks/useI18n';
 
 const FITTING_TIMEOUT_MS = 150_000;
 
@@ -38,6 +39,7 @@ interface VirtualFittingProps {
 }
 
 export function VirtualFitting({ onResult }: VirtualFittingProps) {
+  const { t } = useI18n();
   const [step, setStep] = useState<FittingStep>('idle');
   const [productImage, setProductImage] = useState<string | null>(null);
   const [modelImage, setModelImage] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
         if (images.length === 0) return;
         const compressed = await prepareImageForApi(
           buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType),
-          1280,
+          1080,
           0.7,
         );
         setProductImage(cleanBase64(compressed));
@@ -66,7 +68,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           quality: 0.7,
         });
         if (result.canceled || !result.assets?.[0]?.uri) return;
-        const { base64 } = await compressImageToBase64(result.assets[0].uri, 1280, 0.7);
+        const { base64 } = await compressImageToBase64(result.assets[0].uri, 1080, 0.7);
         setProductImage(base64);
         setStep('product-ready');
       }
@@ -83,7 +85,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
         if (images.length === 0) return;
         const compressed = await prepareImageForApi(
           buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType),
-          1280,
+          1080,
           0.7,
         );
         setModelImage(cleanBase64(compressed));
@@ -95,7 +97,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           quality: 0.7,
         });
         if (result.canceled || !result.assets?.[0]?.uri) return;
-        const { base64 } = await compressImageToBase64(result.assets[0].uri, 1280, 0.7);
+        const { base64 } = await compressImageToBase64(result.assets[0].uri, 1080, 0.7);
         setModelImage(base64);
         setStep('model-ready');
       }
@@ -148,10 +150,11 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
         onResult(data.image, data.mimeType ?? 'image/png');
       }
     } catch (err) {
-      setError(friendlyError(err, '가상 피팅 생성에 실패했습니다. 다시 시도해주세요.'));
+      const isNetworkError = err instanceof Error && (err.name === 'AbortError' || /network|fetch|abort/i.test(err.message));
+      setError(isNetworkError ? t('common.networkError') : friendlyError(err, t('common.processingError')));
       setStep('error');
     }
-  }, [productImage, modelImage, bodyType, pose, onResult]);
+  }, [productImage, modelImage, bodyType, pose, onResult, t]);
 
   const handleReset = useCallback(() => {
     setStep('idle');
@@ -355,11 +358,21 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
         </View>
       )}
 
-      {/* Error */}
+      {/* Error with Retry */}
       {error && (
         <View style={styles.errorBanner}>
           <AlertCircle size={14} color={theme.colors.error[400]} strokeWidth={2} />
           <Text style={styles.errorText}>{error}</Text>
+          {step === 'error' && (
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={handleGenerate}
+              activeOpacity={0.7}
+            >
+              <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.retryBtnText}>{t('common.retry')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -586,6 +599,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     lineHeight: 16,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.error[500] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '40',
+  },
+  retryBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.error[400],
   },
   infoNote: {
     flexDirection: 'row',

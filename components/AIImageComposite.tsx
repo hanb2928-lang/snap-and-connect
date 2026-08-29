@@ -76,7 +76,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         if (images.length === 0) return;
         const compressed = await prepareImageForApi(
           buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType),
-          1280,
+          1080,
           0.7,
         );
         setSourceImage(cleanBase64(compressed));
@@ -88,7 +88,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
           quality: 0.7,
         });
         if (result.canceled || !result.assets?.[0]?.uri) return;
-        const compressed = await prepareImageForApi(result.assets[0].uri, 1280, 0.7);
+        const compressed = await prepareImageForApi(result.assets[0].uri, 1080, 0.7);
         setSourceImage(cleanBase64(compressed));
         setStep('source-ready');
       }
