@@ -98,7 +98,9 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon } from 'lucide-react-native';
+import { LightingContextStudio } from '@/components/LightingContextStudio';
+import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -988,6 +990,36 @@ export default function ResultScreen() {
               preloadedVariant={selectedVariant}
             />
             </View>
+          ),
+        },
+        {
+          key: 'lightingStudio',
+          label: '조명 & 배경 스튜디오',
+          description: '제품 원본은 그대로, 배경과 조명만 AI로 다채롭게 변경',
+          category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <SunIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          render: () => (
+            <LightingContextStudio
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              productName={activeProductName || scan.product_name || ''}
+              onUseImage={(dataUrl) => { setCaptureImageUrl(dataUrl); }}
+            />
+          ),
+        },
+        {
+          key: 'motionZoom',
+          label: '2.5D 모션 줌 & 팬',
+          description: '원본 1장으로 줌/팬/틸트 시네마틱 숏폼 영상 생성',
+          category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <FilmZoomIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <MotionZoomVideo
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              productName={activeProductName || scan.product_name || ''}
+              fileName={`motion-zoom-${scan.id}`}
+            />
           ),
         },
       ],

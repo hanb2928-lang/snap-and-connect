@@ -50,6 +50,7 @@ import { ImageCropModal } from '@/components/ImageCropModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { VerticalSectionCard } from '@/components/VerticalSectionCard';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
+import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import type { PlatformKey, AnalysisResult } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -97,6 +98,7 @@ export default function CameraScreen() {
   const [workflowGuideVisible, setWorkflowGuideVisible] = useState(false);
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
+  const [angleGuideVisible, setAngleGuideVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchActive = useSharedValue(false);
@@ -827,6 +829,13 @@ export default function CameraScreen() {
           </View>
 
           {recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
+            <TouchableOpacity style={styles.smartGuideBtn} onPress={() => setAngleGuideVisible(true)} activeOpacity={0.7}>
+              <Camera size={15} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.smartGuideBtnText}>스마트 3초 가이드로 찍기</Text>
+            </TouchableOpacity>
+          )}
+
+          {recognitionMode === 'multi' && multiShots.length === 0 && !processing && (
             <View style={styles.angleGuideInline}>
               {[
                 { num: '1', label: '정면' },
@@ -1126,6 +1135,18 @@ export default function CameraScreen() {
         visible={creditModalVisible}
         onClose={() => setCreditModalVisible(false)}
       />
+
+      <MultiAngleCaptureGuide
+        visible={angleGuideVisible}
+        onClose={() => setAngleGuideVisible(false)}
+        onComplete={(shots: AngleShot[]) => {
+          setAngleGuideVisible(false);
+          if (shots.length > 0) {
+            const base64Shots = shots.map((s) => s.base64!).filter(Boolean) as string[];
+            setMultiShots(base64Shots);
+          }
+        }}
+      />
     </View>
   );
 }
@@ -1145,6 +1166,7 @@ function WebUploadScreen() {
   const [cropState, setCropState] = useState<{ base64: string; mimeType: string } | null>(null);
   const [showMultiTip, setShowMultiTip] = useState(true);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
+  const [angleGuideVisible, setAngleGuideVisible] = useState(false);
   const fadeAnim = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
@@ -1470,6 +1492,13 @@ function WebUploadScreen() {
         </View>
 
         {recognitionMode === 'multi' && multiShots.length === 0 && (
+          <TouchableOpacity style={styles.smartGuideBtn} onPress={() => setAngleGuideVisible(true)} activeOpacity={0.7}>
+            <Camera size={15} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.smartGuideBtnText}>스마트 3초 가이드로 찍기</Text>
+          </TouchableOpacity>
+        )}
+
+        {recognitionMode === 'multi' && multiShots.length === 0 && (
           <View style={styles.angleGuideBox}>
             <Text style={styles.angleGuideTitle}>촬영 가이드</Text>
             <View style={styles.angleGuideGrid}>
@@ -1608,6 +1637,18 @@ function WebUploadScreen() {
       <CreditPurchaseModal
         visible={creditModalVisible}
         onClose={() => setCreditModalVisible(false)}
+      />
+
+      <MultiAngleCaptureGuide
+        visible={angleGuideVisible}
+        onClose={() => setAngleGuideVisible(false)}
+        onComplete={(shots: AngleShot[]) => {
+          setAngleGuideVisible(false);
+          if (shots.length > 0) {
+            const base64Shots = shots.map((s) => s.base64!).filter(Boolean) as string[];
+            setMultiShots(base64Shots);
+          }
+        }}
       />
     </View>
   );
@@ -2895,6 +2936,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: theme.spacing.sm,
+  },
+  smartGuideBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+    marginBottom: theme.spacing.sm,
+  },
+  smartGuideBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   angleGuideItemInline: {
     alignItems: 'center',
