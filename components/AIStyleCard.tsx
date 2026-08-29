@@ -63,6 +63,18 @@ export function AIStyleCard({
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const autoAppliedRef = useRef(false);
+  const appliedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current);
+    };
+  }, []);
+
+  const triggerAppliedReset = () => {
+    if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current);
+    appliedTimerRef.current = setTimeout(() => setApplied(false), 3000);
+  };
 
   const load = useCallback(async () => {
     if (!productName && !productCategory) {
@@ -99,7 +111,7 @@ export function AIStyleCard({
       autoAppliedRef.current = true;
       onApply(recommendation);
       setApplied(true);
-      setTimeout(() => setApplied(false), 3000);
+      triggerAppliedReset();
     }
   }, [recommendation, onApply]);
 
@@ -107,7 +119,7 @@ export function AIStyleCard({
     if (!recommendation) return;
     onApply(recommendation);
     setApplied(true);
-    setTimeout(() => setApplied(false), 3000);
+    triggerAppliedReset();
   };
 
   const handleApplyAlternative = (cardStyle: string) => {
@@ -116,7 +128,7 @@ export function AIStyleCard({
     onApply(updated);
     setRecommendation(updated);
     setApplied(true);
-    setTimeout(() => setApplied(false), 3000);
+    triggerAppliedReset();
   };
 
   if (loading) {
