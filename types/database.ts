@@ -133,6 +133,13 @@ export interface UserSettings {
   display_density: string | null;
   theme_preset: string | null;
   app_language: string | null;
+  default_caption_tone: string | null;
+  fixed_hook_phrase: string | null;
+  affiliate_priority_mapping: boolean | null;
+  auto_publish_reels: boolean | null;
+  auto_publish_tiktok: boolean | null;
+  auto_publish_shorts: boolean | null;
+  auto_publish_sandbox_mode: boolean | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

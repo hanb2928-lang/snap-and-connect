@@ -22,6 +22,7 @@ import { fetchDashboardSummary, type DashboardSummary } from '@/lib/affiliateDas
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
+import { getUserSettings } from '@/lib/settings';
 import { ViralProductFeed } from '@/components/ViralProductFeed';
 import { TrendMatchCard } from '@/components/TrendMatchCard';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
@@ -198,6 +199,28 @@ export default function MarketingScreen() {
   useEffect(() => {
     (async () => {
       try {
+        const settings = await getUserSettings();
+        if (settings?.default_caption_tone) {
+          const toneMap: Record<string, string> = {
+            casual: 'hook',
+            professional: 'info',
+            emotional: 'emotional',
+            humorous: 'hook',
+          };
+          setCaptionTone(toneMap[settings.default_caption_tone] || 'hook');
+        }
+        if (settings?.fixed_hook_phrase) {
+          setSelectedHook('custom');
+        }
+      } catch {
+        // settings load failure is non-fatal — keep preset defaults
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
         const platforms = await fetchEnabledPlatforms();
         setAvailablePlatforms(platforms);
       } catch {
@@ -278,6 +301,22 @@ export default function MarketingScreen() {
       await setItem('marketing_video_length', videoLength);
       await setItem('marketing_caption_tone', captionTone);
       await setItem('marketing_bgm_mood', bgmMood);
+      try {
+        const settings = await getUserSettings();
+        if (settings?.brand_persona) {
+          await setItem('marketing_brand_persona', settings.brand_persona);
+        }
+        if (settings?.fixed_hook_phrase) {
+          await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
+        }
+        if (settings?.affiliate_priority_mapping) {
+          await setItem('marketing_affiliate_priority', 'true');
+        } else {
+          await setItem('marketing_affiliate_priority', 'false');
+        }
+      } catch {
+        // non-fatal
+      }
     })();
     if (productMeta?.productName || selectedProduct) {
       router.push('/affiliate' as never);

@@ -14,7 +14,8 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck } from 'lucide-react-native';
+import { SectionCard } from '@/components/SectionCard';
 import { theme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import type { ThemePreset } from '@/lib/theme';
@@ -101,6 +102,17 @@ export default function SettingsScreen() {
   const [brandPersona, setBrandPersona] = useState('');
   const [savingPersona, setSavingPersona] = useState(false);
   const [savedPersona, setSavedPersona] = useState(false);
+  const [defaultCaptionTone, setDefaultCaptionTone] = useState<string>('casual');
+  const [fixedHookPhrase, setFixedHookPhrase] = useState('');
+  const [affiliatePriority, setAffiliatePriority] = useState(false);
+  const [autoPublishReels, setAutoPublishReels] = useState(false);
+  const [autoPublishTiktok, setAutoPublishTiktok] = useState(false);
+  const [autoPublishShorts, setAutoPublishShorts] = useState(false);
+  const [sandboxMode, setSandboxMode] = useState(true);
+  const [savingBrandSection, setSavingBrandSection] = useState(false);
+  const [savedBrandSection, setSavedBrandSection] = useState(false);
+  const [savingAutoPublish, setSavingAutoPublish] = useState(false);
+  const [savedAutoPublish, setSavedAutoPublish] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'business'>('pro');
   const [showTokenPacks, setShowTokenPacks] = useState(false);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
@@ -152,6 +164,13 @@ export default function SettingsScreen() {
       if (tp === 'studio-light') { setThemeMode('light'); }
       else if (tp === 'cinematic-dark' || tp === 'trendy-viral') { setThemeMode('dark'); }
       setBrandPersona(data?.brand_persona || '');
+      setDefaultCaptionTone(data?.default_caption_tone || 'casual');
+      setFixedHookPhrase(data?.fixed_hook_phrase || '');
+      setAffiliatePriority(data?.affiliate_priority_mapping ?? false);
+      setAutoPublishReels(data?.auto_publish_reels ?? false);
+      setAutoPublishTiktok(data?.auto_publish_tiktok ?? false);
+      setAutoPublishShorts(data?.auto_publish_shorts ?? false);
+      setSandboxMode(data?.auto_publish_sandbox_mode ?? true);
     } catch {
       setSettings(null);
     } finally {
@@ -1788,62 +1807,232 @@ export default function SettingsScreen() {
       </Modal>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>브랜드 톤앤매너 (페르소나)</Text>
-        <Text style={styles.sectionDesc}>
-          우리 매장/브랜드만의 말투와 분위기를 설정하면, AI가 생성하는 모든 카피에 이 톤앤매너가 자동으로 반영됩니다. 비워두면 기본 톤(친근한 존댓말)으로 생성됩니다.
-        </Text>
-        <View style={styles.card}>
-          <View style={styles.idInputRow}>
-            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.accent[400] + '20' }]}>
-              <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
-            </View>
-            <View style={styles.idInputBody}>
-              <Text style={styles.idInputLabel}>브랜드 톤앤매너</Text>
-              <TextInput
-                style={[styles.idInput, { minHeight: 80, textAlignVertical: 'top' }]}
-                value={brandPersona}
-                onChangeText={setBrandPersona}
-                placeholder="예: 친근하고 발랄한 2030 화장품 브랜드, 반말 톤, 이모지 적극 활용, 가격보다 감성 어필 우선"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoCorrect={false}
-                multiline
-                maxLength={500}
-              />
-              <Text style={styles.charCount}>{brandPersona.length}/500</Text>
-            </View>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={[styles.saveIdButton, savedPersona && styles.saveIdButtonDone]}
-          onPress={async () => {
-            setSavingPersona(true);
-            setSavedPersona(false);
-            try {
-              await updateUserSettings({ brand_persona: brandPersona.trim() || null });
-              setSavedPersona(true);
-              setTimeout(() => setSavedPersona(false), 2500);
-            } catch (err) {
-              Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
-            }
-            setSavingPersona(false);
-          }}
-          disabled={savingPersona}
-          activeOpacity={0.8}
+        <SectionCard
+          title={t('settings.brandPersonaSection')}
+          subtitle={t('settings.brandPersonaSectionDesc')}
+          icon={<Sparkles size={20} color={theme.colors.accent[400]} strokeWidth={2} />}
+          defaultExpanded
         >
-          {savingPersona ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : savedPersona ? (
-            <>
-              <Check size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.saveIdButtonText}>저장됨</Text>
-            </>
-          ) : (
-            <>
-              <Check size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.saveIdButtonText}>톤앤매너 저장</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          {/* Brand persona text */}
+          <Text style={styles.accordionLabel}>{t('settings.brandPersona')}</Text>
+          <Text style={styles.accordionDesc}>{t('settings.brandPersonaDesc')}</Text>
+          <TextInput
+            style={[styles.idInput, { minHeight: 70, textAlignVertical: 'top', marginTop: 8 }]}
+            value={brandPersona}
+            onChangeText={setBrandPersona}
+            placeholder={t('settings.brandPersonaPlaceholder')}
+            placeholderTextColor={theme.colors.dark.textFaint}
+            autoCorrect={false}
+            multiline
+            maxLength={500}
+          />
+          <Text style={styles.charCount}>{brandPersona.length}/500</Text>
+
+          {/* Default caption tone */}
+          <View style={styles.accordionSpacer} />
+          <Text style={styles.accordionLabel}>{t('settings.defaultCaptionTone')}</Text>
+          <Text style={styles.accordionDesc}>{t('settings.defaultCaptionToneDesc')}</Text>
+          <View style={styles.toneChipRow}>
+            {([
+              { key: 'casual', label: t('settings.captionToneCasual') },
+              { key: 'professional', label: t('settings.captionToneProfessional') },
+              { key: 'emotional', label: t('settings.captionToneEmotional') },
+              { key: 'humorous', label: t('settings.captionToneHumorous') },
+            ] as const).map((tone) => (
+              <TouchableOpacity
+                key={tone.key}
+                style={[styles.toneChip, defaultCaptionTone === tone.key && styles.toneChipActive]}
+                onPress={() => setDefaultCaptionTone(tone.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.toneChipText, defaultCaptionTone === tone.key && styles.toneChipTextActive]}>
+                  {tone.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Fixed 3s hook phrase */}
+          <View style={styles.accordionSpacer} />
+          <Text style={styles.accordionLabel}>{t('settings.fixedHookPhrase')}</Text>
+          <Text style={styles.accordionDesc}>{t('settings.fixedHookPhraseDesc')}</Text>
+          <TextInput
+            style={[styles.idInput, { marginTop: 8 }]}
+            value={fixedHookPhrase}
+            onChangeText={setFixedHookPhrase}
+            placeholder={t('settings.fixedHookPhrasePlaceholder')}
+            placeholderTextColor={theme.colors.dark.textFaint}
+            autoCorrect={false}
+            maxLength={100}
+          />
+
+          {/* Watermark status */}
+          <View style={styles.accordionSpacer} />
+          <Text style={styles.accordionLabel}>{t('settings.watermarkLogo')}</Text>
+          <Text style={styles.accordionDesc}>{t('settings.watermarkLogoDesc')}</Text>
+          <View style={styles.watermarkStatusRow}>
+            {logoUrl ? (
+              <>
+                <Check size={16} color={theme.colors.success[400]} strokeWidth={2} />
+                <Text style={styles.watermarkStatusActive}>{t('settings.connected')}</Text>
+              </>
+            ) : (
+              <>
+                <Stamp size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                <Text style={styles.watermarkStatusInactive}>{t('settings.notSet')}</Text>
+              </>
+            )}
+          </View>
+
+          {/* Save button */}
+          <TouchableOpacity
+            style={[styles.saveIdButton, savedBrandSection && styles.saveIdButtonDone]}
+            onPress={async () => {
+              setSavingBrandSection(true);
+              setSavedBrandSection(false);
+              try {
+                await updateUserSettings({
+                  brand_persona: brandPersona.trim() || null,
+                  default_caption_tone: defaultCaptionTone,
+                  fixed_hook_phrase: fixedHookPhrase.trim() || null,
+                });
+                setSavedBrandSection(true);
+                setTimeout(() => setSavedBrandSection(false), 2500);
+              } catch (err) {
+                Alert.alert(t('common.error'), err instanceof Error ? err.message : String(err));
+              }
+              setSavingBrandSection(false);
+            }}
+            disabled={savingBrandSection}
+            activeOpacity={0.8}
+          >
+            {savingBrandSection ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : savedBrandSection ? (
+              <>
+                <Check size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.saveIdButtonText}>{t('settings.brandPersonaSaved')}</Text>
+              </>
+            ) : (
+              <>
+                <Check size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.saveIdButtonText}>{t('common.save')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </SectionCard>
+
+        <SectionCard
+          title={t('settings.smartAffiliateSection')}
+          subtitle={t('settings.smartAffiliateSectionDesc')}
+          icon={<Megaphone size={20} color={theme.colors.primary[400]} strokeWidth={2} />}
+          badge={sandboxMode ? t('settings.sandboxBadge') : undefined}
+        >
+          {/* Commission priority mapping */}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.toggleLabel}>{t('settings.affiliatePriority')}</Text>
+              <Text style={styles.toggleDesc}>{t('settings.affiliatePriorityDesc')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setAffiliatePriority(!affiliatePriority)} activeOpacity={0.7} hitSlop={12}>
+              <View style={[styles.toggleSwitch, affiliatePriority && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, affiliatePriority && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.toggleDivider} />
+
+          {/* Auto-publish toggles */}
+          <Text style={styles.accordionLabel}>{t('settings.smartAffiliateSection')}</Text>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.toggleLabel}>{t('settings.autoPublishReels')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setAutoPublishReels(!autoPublishReels)} activeOpacity={0.7} hitSlop={12}>
+              <View style={[styles.toggleSwitch, autoPublishReels && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, autoPublishReels && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.toggleLabel}>{t('settings.autoPublishTiktok')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setAutoPublishTiktok(!autoPublishTiktok)} activeOpacity={0.7} hitSlop={12}>
+              <View style={[styles.toggleSwitch, autoPublishTiktok && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, autoPublishTiktok && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleBody}>
+              <Text style={styles.toggleLabel}>{t('settings.autoPublishShorts')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setAutoPublishShorts(!autoPublishShorts)} activeOpacity={0.7} hitSlop={12}>
+              <View style={[styles.toggleSwitch, autoPublishShorts && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, autoPublishShorts && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.toggleDivider} />
+
+          {/* Sandbox mode */}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleBody}>
+              <View style={styles.toggleLabelRow}>
+                <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
+                <Text style={styles.toggleLabel}>{t('settings.sandboxMode')}</Text>
+              </View>
+              <Text style={styles.toggleDesc}>{t('settings.sandboxModeDesc')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSandboxMode(!sandboxMode)} activeOpacity={0.7} hitSlop={12}>
+              <View style={[styles.toggleSwitch, sandboxMode && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, sandboxMode && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Save button */}
+          <TouchableOpacity
+            style={[styles.saveIdButton, savedAutoPublish && styles.saveIdButtonDone]}
+            onPress={async () => {
+              setSavingAutoPublish(true);
+              setSavedAutoPublish(false);
+              try {
+                await updateUserSettings({
+                  affiliate_priority_mapping: affiliatePriority,
+                  auto_publish_reels: autoPublishReels,
+                  auto_publish_tiktok: autoPublishTiktok,
+                  auto_publish_shorts: autoPublishShorts,
+                  auto_publish_sandbox_mode: sandboxMode,
+                });
+                setSavedAutoPublish(true);
+                setTimeout(() => setSavedAutoPublish(false), 2500);
+              } catch (err) {
+                Alert.alert(t('common.error'), err instanceof Error ? err.message : String(err));
+              }
+              setSavingAutoPublish(false);
+            }}
+            disabled={savingAutoPublish}
+            activeOpacity={0.8}
+          >
+            {savingAutoPublish ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : savedAutoPublish ? (
+              <>
+                <Check size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.saveIdButtonText}>{t('settings.autoPublishApplied')}</Text>
+              </>
+            ) : (
+              <>
+                <Check size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.saveIdButtonText}>{t('common.save')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </SectionCard>
       </View>
 
       <View style={styles.section}>
@@ -3393,5 +3582,88 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     marginTop: 4,
+  },
+  accordionLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  accordionDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  accordionSpacer: {
+    height: 16,
+  },
+  toneChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  toneChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  toneChipActive: {
+    backgroundColor: theme.colors.primary[600] + '15',
+    borderColor: theme.colors.primary[500],
+  },
+  toneChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  toneChipTextActive: {
+    color: theme.colors.primary[400],
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  watermarkStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  watermarkStatusActive: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  watermarkStatusInactive: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textFaint,
+  },
+  toggleBody: {
+    flex: 1,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  toggleLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  toggleDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 3,
+    lineHeight: 15,
+  },
+  toggleDivider: {
+    height: 1,
+    backgroundColor: theme.colors.dark.border,
+    marginVertical: 8,
   },
 });

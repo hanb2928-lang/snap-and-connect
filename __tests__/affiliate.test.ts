@@ -50,6 +50,13 @@ const fullSettings: UserSettings = {
   display_density: null,
   theme_preset: null,
   app_language: null,
+  default_caption_tone: null,
+  fixed_hook_phrase: null,
+  affiliate_priority_mapping: null,
+  auto_publish_reels: null,
+  auto_publish_tiktok: null,
+  auto_publish_shorts: null,
+  auto_publish_sandbox_mode: null,
 };
 
 describe('isCoupangUrl', () => {
