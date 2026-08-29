@@ -1834,6 +1834,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
     justifyContent: 'center',
     alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: theme.spacing.sm,
     ...theme.shadows.glowPrimary,
   },
   captureButtonRing: {
@@ -2414,7 +2416,7 @@ const styles = StyleSheet.create({
   },
   cameraPreviewWrap: {
     width: '100%',
-    aspectRatio: 0.75,
+    aspectRatio: 1,
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
     backgroundColor: '#000',
