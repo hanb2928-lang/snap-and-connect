@@ -2,6 +2,8 @@ import { getDisclosureForPlatforms } from '@/lib/disclosure';
 
 export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter';
 
+export type DisclosurePlacement = 'body' | 'comment';
+
 export interface PlatformDeepLink {
   appUrl: string;
   webUrl: string;
@@ -41,47 +43,62 @@ export function getDeepLink(key: UploadPlatformKey): PlatformDeepLink {
 }
 
 export interface PlatformCaptionTemplate {
-  prefix: string;
-  suffix: string;
   hashtagSet: string[];
   captionStyle: string;
+  titleMaxLen: number;
+  bodyHint: string;
+  titleHint: string;
 }
 
 const CAPTION_TEMPLATES: Record<UploadPlatformKey, PlatformCaptionTemplate> = {
   instagram: {
-    prefix: '',
-    suffix: '',
-    hashtagSet: ['#협찬', '#제휴마케팅', '#광고', '#제품협찬', '#리뷰'],
-    captionStyle: '감성 캡션 상단 + 제휴 해시태그 최상단 배치',
+    hashtagSet: ['#협찬', '#제휴마케팅', '#쿠팡파트너스', '#광고', '#제품협찬', '#리뷰'],
+    captionStyle: '본문 감성 문구 + 하단 최적화 해시태그 + 프로필 링크 안내',
+    titleMaxLen: 125,
+    titleHint: '첫 줄 후킹 문장 (125자 이내)',
+    bodyHint: '감성 캡션 본문',
   },
   blog: {
-    prefix: '',
-    suffix: '',
-    hashtagSet: ['#제휴마케팅', '#광고'],
+    hashtagSet: ['#제휴마케팅', '#광고', '#블로그리뷰'],
     captionStyle: '제목 중심의 간결한 문구 + 댓글용 단축 링크 별도 제공',
+    titleMaxLen: 100,
+    titleHint: '블로그 제목 (100자 이내)',
+    bodyHint: '본문 내용',
   },
   tiktok: {
-    prefix: '',
-    suffix: '',
-    hashtagSet: ['#제휴', '#광고', '#tiktokmademebuyit', '#오늘의장바구니'],
-    captionStyle: 'Z세대 맞춤 짧은 원라이너 대사 + 트렌드 해시태그 조합',
+    hashtagSet: ['#제휴', '#광고', '#tiktokmademebuyit', '#오늘의장바구니', '#추천', '#광고포함'],
+    captionStyle: '트렌드 맞춤 원라이너 캡션 + 추천 알고리즘 타겟팅 태그',
+    titleMaxLen: 100,
+    titleHint: '원라이너 캡션 (100자 이내)',
+    bodyHint: '추가 설명 (선택)',
   },
   youtube: {
-    prefix: '',
-    suffix: '',
-    hashtagSet: ['#쇼츠', '#제휴마케팅', '#광고', '#Shorts'],
-    captionStyle: '제목 위주의 짧고 명확한 문구 + 댓글용 단축 링크 별도 제공',
+    hashtagSet: ['#쇼츠', '#제휴마케팅', '#광고', '#Shorts', '#숏츠'],
+    captionStyle: '제목(100자 이내) + 본문 단축링크 + 댓글용 공정위 문구 양식',
+    titleMaxLen: 100,
+    titleHint: '숏츠 제목 (100자 이내)',
+    bodyHint: '본문 설명 (단축 링크 포함)',
   },
   twitter: {
-    prefix: '',
-    suffix: '',
-    hashtagSet: ['#광고', '#제휴'],
+    hashtagSet: ['#광고', '#제휴', '#제휴마케팅'],
     captionStyle: '간결한 한 줄 요약 + 단축 링크 + 공정위 문구',
+    titleMaxLen: 280,
+    titleHint: '트윗 본문 (280자 이내)',
+    bodyHint: '추가 내용 (선택)',
   },
 };
 
 export function getCaptionTemplate(key: UploadPlatformKey): PlatformCaptionTemplate {
   return CAPTION_TEMPLATES[key];
+}
+
+export interface BuiltCaption {
+  title: string;
+  body: string;
+  hashtags: string;
+  fullText: string;
+  commentDisclosure: string;
+  commentText: string;
 }
 
 export function buildPlatformCaption(
@@ -90,43 +107,57 @@ export function buildPlatformCaption(
   affiliateUrl: string,
   disclosurePlatforms: string[],
   autoDisclosure: boolean,
-): { caption: string; hashtags: string; fullText: string } {
+  disclosurePlacement: DisclosurePlacement = 'body',
+): BuiltCaption {
   const tmpl = getCaptionTemplate(key);
   const disclosure = getDisclosureForPlatforms(disclosurePlatforms, autoDisclosure);
-
   const baseCaption = contentText.trim() || '마케팅 문구를 입력하면 여기에 표시됩니다.';
   const hashtags = tmpl.hashtagSet.join(' ');
+  const trimmedUrl = affiliateUrl.trim();
+  const disclosureInBody = disclosurePlacement === 'body';
 
-  let caption: string;
+  let title: string;
+  let body: string;
   let fullText: string;
 
   switch (key) {
     case 'instagram':
-      caption = `${disclosure ? disclosure + '\n\n' : ''}${baseCaption}\n\n${affiliateUrl.trim() ? affiliateUrl.trim() : ''}`;
-      fullText = `${caption}\n\n${hashtags}`;
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}${trimmedUrl ? '\n\n' + trimmedUrl : ''}`;
+      fullText = `${body}\n\n.\n.\n.\n${hashtags}`;
       break;
     case 'blog':
-      caption = `${baseCaption}`;
-      fullText = `${disclosure ? disclosure + '\n\n' : ''}${caption}${affiliateUrl.trim() ? '\n\n단축 링크: ' + affiliateUrl.trim() : ''}${hashtags ? '\n\n' + hashtags : ''}`;
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}${trimmedUrl ? '\n\n단축 링크: ' + trimmedUrl : ''}`;
+      fullText = `${title}\n\n${body}${hashtags ? '\n\n' + hashtags : ''}`;
       break;
     case 'tiktok':
-      caption = `${baseCaption}${affiliateUrl.trim() ? '\n' + affiliateUrl.trim() : ''}`;
-      fullText = `${disclosure ? disclosure + '\n' : ''}${caption}\n${hashtags}`;
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${baseCaption}${trimmedUrl ? '\n' + trimmedUrl : ''}`;
+      fullText = `${disclosureInBody && disclosure ? disclosure + '\n' : ''}${body}\n${hashtags}`;
       break;
     case 'youtube':
-      caption = baseCaption;
-      fullText = `${disclosure ? disclosure + '\n\n' : ''}${caption}${affiliateUrl.trim() ? '\n\n댓글용 단축 링크: ' + affiliateUrl.trim() : ''}${hashtags ? '\n\n' + hashtags : ''}`;
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${baseCaption}${trimmedUrl ? '\n\n단축 링크: ' + trimmedUrl : ''}`;
+      fullText = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${body}${hashtags ? '\n\n' + hashtags : ''}`;
       break;
     case 'twitter':
-      caption = `${baseCaption}${affiliateUrl.trim() ? ' ' + affiliateUrl.trim() : ''}`;
-      fullText = `${disclosure ? disclosure + '\n' : ''}${caption} ${hashtags}`;
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${baseCaption}${trimmedUrl ? ' ' + trimmedUrl : ''}`;
+      fullText = `${disclosureInBody && disclosure ? disclosure + '\n' : ''}${body} ${hashtags}`;
       break;
     default:
-      caption = baseCaption;
-      fullText = `${disclosure ? disclosure + '\n\n' : ''}${caption}`;
+      title = baseCaption;
+      body = baseCaption;
+      fullText = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}`;
   }
 
-  return { caption, hashtags, fullText };
+  const commentDisclosure = !disclosureInBody ? disclosure : '';
+  const commentText = commentDisclosure
+    ? `${commentDisclosure}${trimmedUrl ? '\n\n단축 링크: ' + trimmedUrl : ''}`
+    : '';
+
+  return { title, body, hashtags, fullText, commentDisclosure, commentText };
 }
 
 export function getCaptionStyleDescription(key: UploadPlatformKey): string {

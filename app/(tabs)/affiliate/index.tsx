@@ -67,7 +67,8 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
-import { getDeepLink, getCaptionTemplate, buildPlatformCaption, getCaptionStyleDescription, type UploadPlatformKey } from '@/lib/platformUpload';
+import { getDeepLink, getCaptionTemplate, buildPlatformCaption, getCaptionStyleDescription, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
+import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
 const PLATFORMS = [
@@ -183,6 +184,10 @@ export default function AffiliateScreen() {
   const [autoDisclosure, setAutoDisclosure] = useState(true);
   const [previewUpload, setPreviewUpload] = useState<UploadPreviewData | null>(null);
   const [deepLinkFeedback, setDeepLinkFeedback] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [disclosurePlacement, setDisclosurePlacement] = useState<DisclosurePlacement>('body');
+  const [showUploadConfirm, setShowUploadConfirm] = useState<string | null>(null);
+  const [pendingUploadPlatform, setPendingUploadPlatform] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -422,6 +427,49 @@ export default function AffiliateScreen() {
     });
   };
 
+  const handleOneTapCopyAndOpen = async (key: string) => {
+    const built = buildPlatformCaption(
+      key as UploadPlatformKey,
+      contentText,
+      affiliateUrl,
+      selectedPlatform ? [selectedPlatform] : [],
+      autoDisclosure,
+      disclosurePlacement,
+    );
+    const script = built.fullText;
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(script);
+      } else {
+        const { default: Clipboard } = await import('expo-clipboard');
+        await Clipboard.setStringAsync(script);
+      }
+      setCopyFeedback(key);
+      setTimeout(() => setCopyFeedback(null), 2000);
+    } catch {
+      // clipboard failed
+    }
+    setPendingUploadPlatform(key);
+    setShowUploadConfirm(key);
+    setTimeout(() => {
+      handleOpenDeepLink(key);
+    }, 300);
+  };
+
+  const handleConfirmUploadComplete = () => {
+    if (!showUploadConfirm) return;
+    setUploadedPlatforms((prev) => new Set(prev).add(showUploadConfirm));
+    setUploadPlatform(showUploadConfirm);
+    setShowUploadConfirm(null);
+    setPendingUploadPlatform(null);
+    markCompleted('upload');
+  };
+
+  const handleCancelUploadConfirm = () => {
+    setShowUploadConfirm(null);
+    setPendingUploadPlatform(null);
+  };
+
   const handleMarkUploaded = (key: string) => {
     setUploadedPlatforms((prev) => new Set(prev).add(key));
     setUploadPlatform(key);
@@ -436,8 +484,9 @@ export default function AffiliateScreen() {
       affiliateUrl,
       selectedPlatform ? [selectedPlatform] : [],
       autoDisclosure,
+      disclosurePlacement,
     );
-  }, [uploadPlatform, contentText, affiliateUrl, selectedPlatform, autoDisclosure]);
+  }, [uploadPlatform, contentText, affiliateUrl, selectedPlatform, autoDisclosure, disclosurePlacement]);
 
   const imagePreviewUri = useMemo(
     () => selectedImage
@@ -1096,9 +1145,9 @@ export default function AffiliateScreen() {
             <View style={styles.disclosureToggleInfo}>
               <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <View style={styles.disclosureToggleTextWrap}>
-                <Text style={styles.disclosureToggleTitle}>공정위 문구 캡션 자동 추가</Text>
+                <Text style={styles.disclosureToggleTitle}>공정위 문구 자동 추가</Text>
                 <Text style={styles.disclosureToggleDesc}>
-                  업로드 시 캡션 최상단에 제휴 문구가 자동으로 들어갑니다. 이미지 내부에는 표시되지 않습니다.
+                  업로드 시 제휴 문구가 자동으로 포함됩니다. 위치는 아래에서 선택하세요.
                 </Text>
               </View>
             </View>
@@ -1107,17 +1156,48 @@ export default function AffiliateScreen() {
             </View>
           </TouchableOpacity>
 
+          {/* Disclosure placement selector */}
+          {autoDisclosure && (
+            <View style={styles.disclosurePlacementRow}>
+              <TouchableOpacity
+                style={[styles.placementBtn, disclosurePlacement === 'body' && styles.placementBtnActive]}
+                onPress={() => setDisclosurePlacement('body')}
+                activeOpacity={0.7}
+              >
+                <FileText size={12} color={disclosurePlacement === 'body' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.placementBtnText, disclosurePlacement === 'body' && styles.placementBtnTextActive]}>본문에 포함</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.placementBtn, disclosurePlacement === 'comment' && styles.placementBtnActive]}
+                onPress={() => setDisclosurePlacement('comment')}
+                activeOpacity={0.7}
+              >
+                <MessageSquare size={12} color={disclosurePlacement === 'comment' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={[styles.placementBtnText, disclosurePlacement === 'comment' && styles.placementBtnTextActive]}>댓글로 복사</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Caption preview with disclosure */}
           {autoDisclosure && disclosureText && (contentText || affiliateUrl).trim() && (
             <View style={styles.captionPreviewBox}>
               <Text style={styles.captionPreviewLabel}>기본 캡션 미리보기</Text>
-              <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
+              {disclosurePlacement === 'body' && (
+                <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
+              )}
               <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
               <Text style={styles.captionPreviewContent}>
                 {contentText || '마케팅 문구를 입력하면 여기에 표시됩니다.'}
               </Text>
               {affiliateUrl.trim() && (
                 <Text style={styles.captionPreviewLink}>{affiliateUrl.trim()}</Text>
+              )}
+              {disclosurePlacement === 'comment' && (
+                <>
+                  <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
+                  <Text style={styles.captionPreviewLabel}>댓글용 공정위 문구 (별도 복사)</Text>
+                  <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
+                </>
               )}
             </View>
           )}
@@ -1129,6 +1209,14 @@ export default function AffiliateScreen() {
               const isActive = uploadPlatform === p.key;
               const dl = getDeepLink(p.key as UploadPlatformKey);
               const tmpl = getCaptionTemplate(p.key as UploadPlatformKey);
+              const built = buildPlatformCaption(
+                p.key as UploadPlatformKey,
+                contentText,
+                affiliateUrl,
+                selectedPlatform ? [selectedPlatform] : [],
+                autoDisclosure,
+                disclosurePlacement,
+              );
               return (
                 <View key={p.key} style={[styles.uploadCardWrap, isActive && { borderColor: p.color }]}>
                   <TouchableOpacity
@@ -1150,6 +1238,22 @@ export default function AffiliateScreen() {
                     )}
                   </TouchableOpacity>
 
+                  {/* One-Tap Copy & Open — copies full script to clipboard then opens the app */}
+                  <TouchableOpacity
+                    style={[styles.oneTapBtn, { backgroundColor: p.color + '15', borderColor: p.color + '60' }]}
+                    onPress={() => handleOneTapCopyAndOpen(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    {copyFeedback === p.key ? (
+                      <Check size={12} color={p.color} strokeWidth={2.5} />
+                    ) : (
+                      <Copy size={12} color={p.color} strokeWidth={2} />
+                    )}
+                    <Text style={[styles.oneTapBtnText, { color: p.color }]}>
+                      {copyFeedback === p.key ? '복사 완료! 앱 열기...' : '원탭 복사 & 앱 열기'}
+                    </Text>
+                  </TouchableOpacity>
+
                   {/* Deep link button — opens the platform app directly */}
                   <TouchableOpacity
                     style={[styles.deepLinkBtn, { borderColor: p.color + '40' }]}
@@ -1169,6 +1273,29 @@ export default function AffiliateScreen() {
                   <Text style={styles.platformHashtags} numberOfLines={1}>
                     {tmpl.hashtagSet.join(' ')}
                   </Text>
+
+                  {/* Comment disclosure copy button — only when placement is 'comment' */}
+                  {disclosurePlacement === 'comment' && built.commentText && (
+                    <TouchableOpacity
+                      style={styles.commentCopyBtn}
+                      onPress={async () => {
+                        try {
+                          if (Platform.OS === 'web') {
+                            await navigator.clipboard.writeText(built.commentText);
+                          } else {
+                            const { default: Clipboard } = await import('expo-clipboard');
+                            await Clipboard.setStringAsync(built.commentText);
+                          }
+                        } catch {
+                          // clipboard failed
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <MessageSquare size={10} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.commentCopyText}>댓글용 문구 복사</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Mark as uploaded — manual tracking */}
                   {!isUploaded && (
@@ -1199,6 +1326,15 @@ export default function AffiliateScreen() {
               <Text style={styles.platformCaptionText}>
                 {platformCaptionData.fullText}
               </Text>
+              {platformCaptionData.commentText && (
+                <>
+                  <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
+                  <Text style={styles.platformCaptionPreviewLabel}>댓글용 공정위 문구</Text>
+                  <Text style={styles.platformCaptionText}>
+                    {platformCaptionData.commentText}
+                  </Text>
+                </>
+              )}
             </View>
           )}
 
@@ -1291,6 +1427,38 @@ export default function AffiliateScreen() {
         onConfirm={handleConfirmUpload}
         onClose={() => setPreviewUpload(null)}
       />
+
+      {/* Upload completion confirm popup — shown after returning from platform app */}
+      {showUploadConfirm && (
+        <View style={styles.uploadConfirmOverlay}>
+          <View style={styles.uploadConfirmModal}>
+            <View style={styles.uploadConfirmIcon}>
+              <Check size={28} color={theme.colors.success[400]} strokeWidth={2} />
+            </View>
+            <Text style={styles.uploadConfirmTitle}>업로드를 완료하셨나요?</Text>
+            <Text style={styles.uploadConfirmDesc}>
+              {UPLOAD_PLATFORMS.find((p) => p.key === showUploadConfirm)?.label}에 업로드를 마치셨다면 '완료'를 눌러 발행 상태를 기록하세요. 클릭 수와 제휴 전환 수수료가 자동으로 추적됩니다.
+            </Text>
+            <View style={styles.uploadConfirmBtnRow}>
+              <TouchableOpacity
+                style={styles.uploadConfirmCancelBtn}
+                onPress={handleCancelUploadConfirm}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.uploadConfirmCancelText}>아직이에요</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.uploadConfirmDoneBtn}
+                onPress={handleConfirmUploadComplete}
+                activeOpacity={0.7}
+              >
+                <Check size={14} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.uploadConfirmDoneText}>업로드 완료</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -2398,6 +2566,136 @@ const styles = StyleSheet.create({
   uploadCardWrap: {
     width: '48%',
     gap: 4,
+  },
+  oneTapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    marginTop: 4,
+  },
+  oneTapBtnText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  disclosurePlacementRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  placementBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  placementBtnActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[500],
+  },
+  placementBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  placementBtnTextActive: {
+    color: '#fff',
+  },
+  commentCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 5,
+    marginTop: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  commentCopyText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  uploadConfirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  uploadConfirmModal: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg + 4,
+    marginHorizontal: theme.spacing.lg + 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  uploadConfirmIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: theme.colors.success[500] + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  uploadConfirmTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: 6,
+  },
+  uploadConfirmDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: theme.spacing.md,
+  },
+  uploadConfirmBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  uploadConfirmCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  uploadConfirmCancelText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  uploadConfirmDoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  uploadConfirmDoneText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   deepLinkBtn: {
     flexDirection: 'row',
