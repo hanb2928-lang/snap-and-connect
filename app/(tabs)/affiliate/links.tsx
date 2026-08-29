@@ -28,6 +28,7 @@ import { theme } from '@/lib/theme';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { fetchLinkBookmarks, addLinkBookmark, deleteLinkBookmark } from '@/lib/linkBookmarks';
+import { validateAffiliateUrl } from '@/lib/affiliate';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { friendlyError } from '@/lib/errors';
@@ -105,8 +106,19 @@ export default function LinksScreen() {
     }
   };
 
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlWarning, setUrlWarning] = useState<string | null>(null);
+
   const handleSave = async () => {
     if (!label.trim() || !url.trim()) return;
+    const validation = validateAffiliateUrl(url);
+    if (!validation.valid) {
+      setUrlError(validation.error);
+      setUrlWarning(null);
+      return;
+    }
+    setUrlError(null);
+    setUrlWarning(validation.warning);
     setSaving(true);
     try {
       const result = await addLinkBookmark(label.trim(), url.trim(), platform);
@@ -263,13 +275,20 @@ export default function LinksScreen() {
             <TextInput
               style={styles.input}
               value={url}
-              onChangeText={setUrl}
+              onChangeText={(text) => { setUrl(text); setUrlError(null); setUrlWarning(null); }}
               placeholder="https://..."
               placeholderTextColor={theme.colors.dark.textFaint}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
             />
+
+            {urlError && (
+              <Text style={styles.urlErrorText}>{urlError}</Text>
+            )}
+            {urlWarning && !urlError && (
+              <Text style={styles.urlWarningText}>{urlWarning}</Text>
+            )}
 
             <Text style={styles.inputLabel}>플랫폼</Text>
             <View style={styles.platformRow}>
@@ -545,6 +564,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  urlErrorText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    marginTop: 4,
+    marginBottom: 4,
+    lineHeight: 15,
+  },
+  urlWarningText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    marginTop: 4,
+    marginBottom: 4,
+    lineHeight: 15,
   },
   qrContainer: {
     alignItems: 'center',

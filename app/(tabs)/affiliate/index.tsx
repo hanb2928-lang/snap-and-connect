@@ -10,40 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import {
-  ShoppingBag,
-  Send,
-  Globe,
-  ShoppingBasket,
-  Hop as Home,
-  Ticket,
-  TreePalm as Palmtree,
-  Store,
-  ExternalLink,
-  Settings as SettingsIcon,
-  TrendingUp,
-  Link2,
-  Copy,
-  Check,
-  Camera,
-  Image as ImageIcon,
-  Film,
-  Sparkles,
-  FileText,
-  Hash,
-  Type,
-  Youtube,
-  ChevronDown,
-  ChevronUp,
-  Loader,
-  Plus,
-  X,
-  ScanSearch,
-  Palette,
-  Share2,
-  ShieldCheck,
-  Shirt,
-} from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, Shirt, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -65,6 +32,7 @@ import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
+import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
@@ -311,8 +279,18 @@ export default function AffiliateScreen() {
   };
 
   // Step 1: Save affiliate link and extract product metadata
+  const [urlWarning, setUrlWarning] = useState<string | null>(null);
+
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
+    const validation = validateAffiliateUrl(affiliateUrl);
+    if (!validation.valid) {
+      setExtractError(validation.error);
+      setUrlWarning(null);
+      return;
+    }
+    setAffiliateUrl(validation.normalizedUrl);
+    setUrlWarning(validation.warning);
     setExtracting(true);
     setExtractError(null);
     try {
@@ -717,6 +695,9 @@ export default function AffiliateScreen() {
                 else if (lower.includes('oliveyoung')) setSelectedPlatform('OliveYoung');
                 else if (lower.includes('ohou')) setSelectedPlatform('TodayHouse');
                 else if (lower.includes('kurly')) setSelectedPlatform('Kurly');
+                else if (isAmazonUrl(url)) setSelectedPlatform('Amazon');
+                else if (isAliExpressUrl(url)) setSelectedPlatform('AliExpress');
+                else if (isShopeeUrl(url)) setSelectedPlatform('Shopee');
               }
             }}
             currentUrl={affiliateUrl}
@@ -774,6 +755,13 @@ export default function AffiliateScreen() {
           {extractError && (
             <View style={styles.extractErrorBox}>
               <Text style={styles.extractErrorText}>{extractError}</Text>
+            </View>
+          )}
+
+          {urlWarning && !extractError && (
+            <View style={styles.urlWarningBox}>
+              <AlertTriangle size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.urlWarningText}>{urlWarning}</Text>
             </View>
           )}
 
@@ -2100,6 +2088,25 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     lineHeight: 17,
+  },
+  urlWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.warning[400] + '60',
+  },
+  urlWarningText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    lineHeight: 15,
   },
   productMetaCard: {
     flexDirection: 'row',
