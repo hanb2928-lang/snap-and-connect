@@ -169,6 +169,7 @@ export default function AffiliateScreen() {
   // Step 3: Content
   const [simpleMode, setSimpleMode] = useState(true);
   const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+  const [lastScanId, setLastScanId] = useState<string | null>(null);
   const [contentText, setContentText] = useState('');
   const [contentType, setContentType] = useState<string>('copy');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('shortform');
@@ -360,6 +361,7 @@ export default function AffiliateScreen() {
       }
       markCompleted('analyze');
       setAiRecommendation('웹툰형 만화');
+      setLastScanId(scanId);
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
@@ -953,6 +955,19 @@ export default function AffiliateScreen() {
                 초보자 모드: AI 추천 스타일로 바로 제작할 수 있습니다. 더 많은 옵션을 보려면 '고급 설정'을 선택하세요.
               </Text>
             </View>
+          )}
+
+          {/* Comic short-form creation button */}
+          {lastScanId && completedSteps.has('analyze') && (
+            <TouchableOpacity
+              style={styles.comicShortBtn}
+              onPress={() => router.push({ pathname: '/result/[id]', params: { id: lastScanId } })}
+              activeOpacity={0.85}
+            >
+              <Palette size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.comicShortBtnText}>만화 숏폼 만들기</Text>
+              <ChevronDown size={16} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+            </TouchableOpacity>
           )}
 
           <TextInput
@@ -1951,6 +1966,23 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.warning[500],
+  },
+  comicShortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.elevated,
+  },
+  comicShortBtnText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   contentSaveBtnText: {
     fontSize: 14,
