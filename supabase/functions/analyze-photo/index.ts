@@ -68,9 +68,31 @@ interface LocalStoreContext {
   neighborhoodTag: string;
 }
 
+interface VisualSearchMatch {
+  platform: string;
+  productName: string;
+  price: string;
+  url: string;
+  similarityScore: number;
+  imageHint: string;
+}
+
+interface O2OCurationItem {
+  type: string;
+  label: string;
+  reason: string;
+  platform: string;
+  productName: string;
+  price: string;
+  url: string;
+}
+
 interface HybridMapping {
   localStoreContext: LocalStoreContext | null;
   affiliateMatch: { platform: string; productName: string; price: string; url: string } | null;
+  visualSearchMatches: VisualSearchMatch[];
+  o2oCuration: O2OCurationItem[];
+  verifiedBadge: { verified: boolean; label: string; description: string };
   combinedHook: string;
   combinedCaption: string;
   qrCouponText: string;
@@ -273,10 +295,13 @@ async function analyzeWithOpenAI(
     "HYBRID MAPPING (CRITICAL):\n" +
     "If localStoreContext.isLocalStore is true, ALSO generate a hybridMapping object:\n" +
     "  - localStoreContext: same as above\n" +
-    "  - affiliateMatch: if the detected items can be matched to an online affiliate product (e.g. a kitchen tool on the menu can be bought online), include { platform: 'Coupang' or 'Naver', productName, price, url: 'https://brandconnect.naver.com/about/creator' }. If no good match, set to null.\n" +
-    "  - combinedHook: a hook that combines the local store angle with the affiliate opportunity (e.g. '이 동네 숨은 맛집 + 집에서도 같은 맛?')\n" +
-    "  - combinedCaption: a 2-3 line caption combining the local store promo and the affiliate product link naturally\n" +
-    "  - qrCouponText: a short QR coupon banner text for the video ending credit (e.g. 'QR 스캔시 10% 할인쿠폰 + 온라인 주문 링크')\n" +
+    "  - affiliateMatch: the single best direct affiliate product match { platform: 'Coupang' or 'Naver', productName, price, url: 'https://brandconnect.naver.com/about/creator' }. If no direct match, set to null.\n" +
+    "  - visualSearchMatches: array of 3-4 objects representing visual similarity matches from online platforms. Each: { platform: 'Coupang' or 'Naver' or 'AliExpress', productName, price, url: 'https://brandconnect.naver.com/about/creator', similarityScore: 0-100 (estimated % match based on color, shape, packaging), imageHint: short Korean description of what visual feature matched (e.g. '원형 우드 디자인, 따뜻한 갈색 톤') }. Sort by similarityScore descending. These should be REAL product types that exist on these platforms, matched by visual characteristics.\n" +
+    "  - o2oCuration: array of 0-3 O2O curation items. Use when the exact menu item has no identical manufactured product (e.g. kimchi stew, handmade cake). Instead of the main dish, suggest RELATED purchasable items: { type: 'sauce'|'kit'|'goods'|'interior'|'ingredient'|'tool'|'other', label: short Korean name, reason: Korean explanation of why this connects (e.g. '이 식당에서 사용하는 특제 소스를 집에서도 직접 만들 수 있습니다'), platform: 'Coupang' or 'Naver', productName, price, url: 'https://brandconnect.naver.com/about/creator' }.\n" +
+    "  - verifiedBadge: { verified: true, label: '동네 사장님이 직접 인증한 실물 픽', description: '지금 이 동네 실제 매장에서 쓰고 있는 물건입니다' }. Always set verified=true when isLocalStore is true.\n" +
+    "  - combinedHook: a hook combining the local store angle with the affiliate opportunity (e.g. '이 동네 숨은 맛집 + 집에서도 같은 맛?')\n" +
+    "  - combinedCaption: 2-3 line caption combining the local store promo and the affiliate product link naturally\n" +
+    "  - qrCouponText: short QR coupon banner text for the video ending credit (e.g. 'QR 스캔시 10% 할인쿠폰 + 온라인 주문 링크')\n" +
     "If the photo is NOT a local store scene, set localStoreContext to null and hybridMapping to null.\n" +
     "Return ONLY valid JSON, no markdown." +
     styleHint;
@@ -652,6 +677,36 @@ function normalizeHybridMapping(raw: unknown): HybridMapping | null {
   const ctx = normalizeLocalStoreContext(obj.localStoreContext);
   if (!ctx) return null;
   const am = obj.affiliateMatch as Record<string, unknown> | null;
+  const rawVsm = Array.isArray(obj.visualSearchMatches) ? obj.visualSearchMatches : [];
+  const visualSearchMatches: VisualSearchMatch[] = rawVsm.slice(0, 4).map((m: Record<string, unknown>) => ({
+    platform: String(m.platform || "Coupang"),
+    productName: String(m.productName || ""),
+    price: String(m.price || ""),
+    url: String(m.url || "https://brandconnect.naver.com/about/creator"),
+    similarityScore: Number(m.similarityScore) || 0,
+    imageHint: String(m.imageHint || ""),
+  }));
+
+  const rawO2o = Array.isArray(obj.o2oCuration) ? obj.o2oCuration : [];
+  const o2oCuration: O2OCurationItem[] = rawO2o.slice(0, 3).map((m: Record<string, unknown>) => ({
+    type: String(m.type || "other"),
+    label: String(m.label || ""),
+    reason: String(m.reason || ""),
+    platform: String(m.platform || "Coupang"),
+    productName: String(m.productName || ""),
+    price: String(m.price || ""),
+    url: String(m.url || "https://brandconnect.naver.com/about/creator"),
+  }));
+
+  const rawBadge = obj.verifiedBadge as Record<string, unknown> | null;
+  const verifiedBadge = rawBadge && typeof rawBadge === "object"
+    ? {
+        verified: rawBadge.verified === true,
+        label: String(rawBadge.label || "동네 사장님이 직접 인증한 실물 픽"),
+        description: String(rawBadge.description || "지금 이 동네 실제 매장에서 쓰고 있는 물건입니다"),
+      }
+    : { verified: true, label: "동네 사장님이 직접 인증한 실물 픽", description: "지금 이 동네 실제 매장에서 쓰고 있는 물건입니다" };
+
   return {
     localStoreContext: ctx,
     affiliateMatch: am && typeof am === "object" ? {
@@ -660,6 +715,9 @@ function normalizeHybridMapping(raw: unknown): HybridMapping | null {
       price: String(am.price || ""),
       url: String(am.url || "https://brandconnect.naver.com/about/creator"),
     } : null,
+    visualSearchMatches,
+    o2oCuration,
+    verifiedBadge,
     combinedHook: String(obj.combinedHook || ""),
     combinedCaption: String(obj.combinedCaption || ""),
     qrCouponText: String(obj.qrCouponText || "QR 스캔시 할인쿠폰 + 온라인 주문 링크"),

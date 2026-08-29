@@ -69,6 +69,25 @@ export interface LocalStoreContext {
   neighborhoodTag: string;
 }
 
+export interface VisualSearchMatch {
+  platform: string;
+  productName: string;
+  price: string;
+  url: string;
+  similarityScore: number;
+  imageHint: string;
+}
+
+export interface O2OCurationItem {
+  type: 'sauce' | 'kit' | 'goods' | 'interior' | 'ingredient' | 'tool' | 'other';
+  label: string;
+  reason: string;
+  platform: string;
+  productName: string;
+  price: string;
+  url: string;
+}
+
 export interface HybridMapping {
   localStoreContext: LocalStoreContext | null;
   affiliateMatch: {
@@ -77,6 +96,13 @@ export interface HybridMapping {
     price: string;
     url: string;
   } | null;
+  visualSearchMatches: VisualSearchMatch[];
+  o2oCuration: O2OCurationItem[];
+  verifiedBadge: {
+    verified: boolean;
+    label: string;
+    description: string;
+  };
   combinedHook: string;
   combinedCaption: string;
   qrCouponText: string;
