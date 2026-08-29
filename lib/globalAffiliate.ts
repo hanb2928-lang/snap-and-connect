@@ -90,34 +90,36 @@ export function generateGlobalAffiliateLink(
   settings: UserSettings | null,
 ): string {
   if (!productUrl) return '';
+  const trimmed = productUrl.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return '';
 
   switch (platformKey) {
     case 'Amazon':
       // Amazon associates tag appended to URL
       const amazonTag = (settings as any)?.amazon_associate_tag as string | undefined;
       if (amazonTag) {
-        const sep = productUrl.includes('?') ? '&' : '?';
-        return `${productUrl}${sep}tag=${encodeURIComponent(amazonTag)}`;
+        const sep = trimmed.includes('?') ? '&' : '?';
+        return `${trimmed}${sep}tag=${encodeURIComponent(amazonTag)}`;
       }
-      return productUrl;
+      return trimmed;
     case 'AliExpress':
       // AliExpress affiliate — append AFF tracking param if available
       const aliAffId = (settings as any)?.aliexpress_aff_id as string | undefined;
       if (aliAffId) {
-        const sep = productUrl.includes('?') ? '&' : '?';
-        return `${productUrl}${sep}aff_short_key=${encodeURIComponent(aliAffId)}`;
+        const sep = trimmed.includes('?') ? '&' : '?';
+        return `${trimmed}${sep}aff_short_key=${encodeURIComponent(aliAffId)}`;
       }
-      return productUrl;
+      return trimmed;
     case 'Shopee':
       // Shopee affiliate — append aff_id param
       const shopeeAffId = (settings as any)?.shopee_aff_id as string | undefined;
       if (shopeeAffId) {
-        const sep = productUrl.includes('?') ? '&' : '?';
-        return `${productUrl}${sep}aff_id=${encodeURIComponent(shopeeAffId)}`;
+        const sep = trimmed.includes('?') ? '&' : '?';
+        return `${trimmed}${sep}aff_id=${encodeURIComponent(shopeeAffId)}`;
       }
-      return productUrl;
+      return trimmed;
     default:
-      return productUrl;
+      return trimmed;
   }
 }
 

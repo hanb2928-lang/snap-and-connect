@@ -14,6 +14,7 @@ import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, BATCH_TTS_FUNCTION_URL, supaba
 import { TARGET_LANGUAGES } from '@/lib/globalAffiliate';
 import { getMultilingualVoice } from '@/lib/ttsVoices';
 import { getLocalizedDisclosure } from '@/lib/disclosure';
+import type { DisclosurePlacement } from '@/lib/platformUpload';
 
 interface LocalizedContent {
   language: string;
@@ -149,7 +150,8 @@ export function GlobalLocalizer({
     if (loc.hashtags && loc.hashtags.length > 0) {
       parts.push(loc.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' '));
     }
-    if (loc.disclosureText) parts.push(loc.disclosureText);
+    const disclosurePlacement: DisclosurePlacement = loc.affiliatePlatform?.toLowerCase().includes('youtube') ? 'comment' : 'body';
+    if (loc.disclosureText && disclosurePlacement === 'body') parts.push(loc.disclosureText);
     const fullText = parts.join('\n\n');
     try {
       if (Platform.OS === 'web') {
@@ -415,7 +417,7 @@ export function GlobalLocalizer({
                 activeOpacity={0.7}
               >
                 <View style={styles.langCardHeaderLeft}>
-                  <Text style={styles.langCardLang}>{loc.language}</Text>
+                  <Text style={styles.langCardLang} numberOfLines={1}>{loc.language}</Text>
                   <View style={styles.platformBadge}>
                     <ShoppingBag size={9} color={theme.colors.primary[300]} strokeWidth={2} />
                     <Text style={styles.platformText}>{loc.affiliatePlatform}</Text>
@@ -762,6 +764,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    flexWrap: 'wrap',
   },
   langCardLang: {
     fontSize: theme.typography.body,
@@ -776,11 +780,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: theme.radius.sm,
+    maxWidth: 140,
   },
   platformText: {
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
+    flexShrink: 1,
   },
   langCardBody: {
     paddingHorizontal: theme.spacing.md,

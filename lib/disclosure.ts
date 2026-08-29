@@ -76,6 +76,16 @@ const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
     short: '알리익스프레스 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
     full: '이 포스팅은 알리익스프레스 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
   },
+  Amazon: {
+    platform: 'Amazon',
+    short: '아마존 어소시에이트 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
+    full: '이 포스팅은 아마존 어소시에이트 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
+  },
+  Shopee: {
+    platform: 'Shopee',
+    short: '쇼피 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
+    full: '이 포스팅은 쇼피 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
+  },
   MyRealTrip: {
     platform: 'MyRealTrip',
     short: '마이리얼트립 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
