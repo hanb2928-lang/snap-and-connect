@@ -131,3 +131,34 @@ export function buildCaptionWithDisclosure(
   if (!disclosure) return caption;
   return `${disclosure}\n\n${caption}`;
 }
+
+export interface LocalizedDisclosure {
+  languageCode: string;
+  label: string;
+  text: string;
+  regulation: string;
+}
+
+const LOCALIZED_DISCLOSURES: LocalizedDisclosure[] = [
+  { languageCode: 'ko', label: '한국', text: '이 포스팅은 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.', regulation: '공정위' },
+  { languageCode: 'en', label: 'USA', text: '*This post contains affiliate links. I may earn a commission from purchases made through these links.', regulation: 'FTC' },
+  { languageCode: 'ja', label: '日本', text: '※本ページにはプロモーションが含まれています。', regulation: 'ステマ規制' },
+  { languageCode: 'zh', label: '中国', text: '※本页面包含推广内容。', regulation: '广告法' },
+  { languageCode: 'es', label: 'LATAM', text: '*Esta publicación contiene enlaces de afiliados. Puede recibir una comisión por las compras realizadas a través de estos enlaces.', regulation: 'FTC-style' },
+  { languageCode: 'vi', label: 'Việt Nam', text: '*Bài viết này có chứa liên kết tiếp thị liên kết.', regulation: 'Bộ Công Thương' },
+  { languageCode: 'th', label: 'ประเทศไทย', text: '*โพสต์นี้มีลิงก์พันธมิตร', regulation: 'OCPB' },
+  { languageCode: 'id', label: 'Indonesia', text: '*Postingan ini mengandung tautan afiliasi.', regulation: 'KPPU' },
+  { languageCode: 'pt', label: 'Brasil', text: '*Este post contém links de afiliados. Posso receber uma comissão por compras feitas através destes links.', regulation: 'CONAR' },
+  { languageCode: 'fr', label: 'France', text: '*Ce post contient des liens d\'affiliation. Je peux percevoir une commission pour les achats effectués via ces liens.', regulation: 'DGCCRF' },
+  { languageCode: 'de', label: 'Deutschland', text: '*Dieser Beitrag enthält Affiliate-Links. Ich kann eine Provision für über diese Links getätigte Einkäufe erhalten.', regulation: 'TMG' },
+  { languageCode: 'ar', label: 'العربية', text: '*تتضمن هذه المشاركة روابط تابعة. قد أتلقى عمولة عن المشتريات التي تتم عبر هذه الروابط.', regulation: 'FTC-style' },
+  { languageCode: 'hi', label: 'भारत', text: '*इस पोस्ट में एफिलिएट लिंक शामिल हैं। इन लिंक से खरीदारी पर मुझे कमीशन मिल सकता है।', regulation: 'ASCI' },
+];
+
+export function getLocalizedDisclosure(langCode: string): LocalizedDisclosure | null {
+  return LOCALIZED_DISCLOSURES.find((d) => d.languageCode === langCode) ?? null;
+}
+
+export function getAllLocalizedDisclosures(): LocalizedDisclosure[] {
+  return LOCALIZED_DISCLOSURES;
+}

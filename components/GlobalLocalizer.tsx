@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 
-import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause, Copy, Globe as Globe2 } from 'lucide-react-native';
+import { Globe, Zap, CircleAlert as AlertCircle, Volume2, Check, ShoppingBag, ChevronDown, ChevronUp, Info, Play, Pause, Copy, Globe as Globe2, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { LOCALIZE_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { TARGET_LANGUAGES } from '@/lib/globalAffiliate';
@@ -25,6 +25,10 @@ interface LocalizedContent {
   ttsVoice: string;
   affiliatePlatform: string;
   affiliateUrl: string;
+  disclosureText?: string;
+  disclosureRegulation?: string;
+  personaTone?: string;
+  localizedHashtags?: string[];
 }
 
 interface GlobalLocalizerProps {
@@ -317,6 +321,14 @@ export function GlobalLocalizer({
 
               {expandedLang === loc.languageCode && (
                 <View style={styles.langCardBody}>
+                  {/* Persona tone badge */}
+                  {loc.personaTone ? (
+                    <View style={styles.personaRow}>
+                      <Sparkles size={10} color={theme.colors.warning[400]} strokeWidth={2} />
+                      <Text style={styles.personaText}>{loc.personaTone}</Text>
+                    </View>
+                  ) : null}
+
                   <View style={styles.fieldBox}>
                     <View style={styles.fieldHeader}>
                       <Text style={styles.fieldLabel}>후킹</Text>
@@ -365,10 +377,50 @@ export function GlobalLocalizer({
                     </View>
                     <Text style={styles.fieldValue}>{loc.caption}</Text>
                   </View>
+
+                  {/* AI-translated hashtags */}
                   <View style={styles.fieldBox}>
-                    <Text style={styles.fieldLabel}>해시태그</Text>
-                    <Text style={styles.fieldValue}>{loc.hashtags.map(h => `#${h}`).join(' ')}</Text>
+                    <Text style={styles.fieldLabel}>해시태그 (AI 현지화)</Text>
+                    <Text style={styles.fieldValue}>{loc.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}</Text>
                   </View>
+
+                  {/* Country-specific recommended hashtags */}
+                  {loc.localizedHashtags && loc.localizedHashtags.length > 0 && (
+                    <View style={styles.fieldBox}>
+                      <Text style={styles.fieldLabel}>현지 추천 해시태그</Text>
+                      <Text style={styles.recommendedHashtags}>{loc.localizedHashtags.join(' ')}</Text>
+                    </View>
+                  )}
+
+                  {/* Localized disclosure */}
+                  {loc.disclosureText ? (
+                    <View style={styles.disclosureBox}>
+                      <View style={styles.disclosureHeader}>
+                        <ShieldCheck size={10} color={theme.colors.success[400]} strokeWidth={2} />
+                        <Text style={styles.disclosureLabel}>대가성 표기 ({loc.disclosureRegulation || '규제'})</Text>
+                        <TouchableOpacity
+                          style={styles.fieldCopyBtn}
+                          onPress={async () => {
+                            try {
+                              if (Platform.OS === 'web') {
+                                await navigator.clipboard.writeText(loc.disclosureText!);
+                              }
+                            } catch {}
+                            setCopiedField(`${loc.languageCode}-disclosure`);
+                            setTimeout(() => setCopiedField(null), 2000);
+                          }}
+                        >
+                          {copiedField === `${loc.languageCode}-disclosure` ? (
+                            <Check size={10} color={theme.colors.success[400]} strokeWidth={2.5} />
+                          ) : (
+                            <Copy size={10} color={theme.colors.dark.textDim} strokeWidth={2} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.disclosureText}>{loc.disclosureText}</Text>
+                    </View>
+                  ) : null}
+
                   <View style={styles.ttsRow}>
                     <TouchableOpacity
                       style={styles.ttsButton}
@@ -727,5 +779,55 @@ const styles = StyleSheet.create({
   },
   fieldCopyBtn: {
     padding: 2,
+  },
+  personaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+    backgroundColor: theme.colors.warning[500] + '12',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  personaText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    lineHeight: 14,
+  },
+  recommendedHashtags: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[300],
+    lineHeight: 16,
+  },
+  disclosureBox: {
+    backgroundColor: theme.colors.success[500] + '10',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.success[500] + '25',
+  },
+  disclosureHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  disclosureLabel: {
+    flex: 1,
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  disclosureText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    lineHeight: 15,
   },
 });
