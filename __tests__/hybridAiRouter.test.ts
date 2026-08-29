@@ -42,10 +42,10 @@ describe('hybridAiRouter', () => {
   });
 
   describe('routeModel', () => {
-    it('returns gpt-4o for complex', () => {
+    it('returns gpt-4o-mini for complex (pinned for cost)', () => {
       const route = routeModel('complex');
-      expect(route.model).toBe('gpt-4o');
-      expect(route.estimatedCostSavings).toBe(0);
+      expect(route.model).toBe('gpt-4o-mini');
+      expect(route.estimatedCostSavings).toBe(0.95);
     });
 
     it('returns gpt-4o-mini for simple', () => {
@@ -61,9 +61,9 @@ describe('hybridAiRouter', () => {
       expect(route.model).toBe('gpt-4o-mini');
     });
 
-    it('picks gpt-4o for complex tasks', () => {
+    it('picks gpt-4o-mini for complex tasks (pinned for cost)', () => {
       const route = pickModel('localize', 'a'.repeat(600));
-      expect(route.model).toBe('gpt-4o');
+      expect(route.model).toBe('gpt-4o-mini');
     });
   });
 

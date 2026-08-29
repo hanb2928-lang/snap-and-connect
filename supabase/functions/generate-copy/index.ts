@@ -17,21 +17,18 @@ function stripJsonFence(s: string): string {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-// ─── Hybrid AI Model Router ────────────────────────────────────────────
-// Routes simple tasks (short copy, basic hashtags) to gpt-4o-mini (95% cheaper)
-// and complex tasks (long creative copy, brand persona) to gpt-4o.
+// ─── AI Model Router ────────────────────────────────────────────────────
+// All tasks pinned to gpt-4o-mini for maximum cost savings (~95% cheaper than gpt-4o).
+// Complexity classification retained for token-limit and cache-key purposes only.
 function classifyCopyComplexity(data: CopyRequest): 'simple' | 'complex' {
-  // Brand persona and local store info require nuanced tone → complex
   if (data.brandPersona && data.brandPersona.trim().length > 50) return 'complex';
   if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) return 'complex';
-  // Long input with many advantages → complex
   if (data.productAdvantages.length >= 5) return 'complex';
-  // 'all' mode generates 3 types → keep on mini for cost
   return 'simple';
 }
 
-function pickModel(complexity: 'simple' | 'complex'): string {
-  return complexity === 'complex' ? 'gpt-4o' : 'gpt-4o-mini';
+function pickModel(_complexity: 'simple' | 'complex'): string {
+  return 'gpt-4o-mini';
 }
 
 // ─── Content Cache ─────────────────────────────────────────────────────

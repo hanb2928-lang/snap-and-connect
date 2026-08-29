@@ -1,12 +1,8 @@
 /**
- * Hybrid AI Model Router — routes requests to the cheapest model
- * that can handle the complexity, reducing API costs by up to 95%.
+ * Hybrid AI Model Router — all tasks pinned to gpt-4o-mini for maximum cost savings.
  *
- * Tier 1 (simple): gpt-4o-mini — keyword extraction, hashtags, simple captions
- * Tier 2 (complex): gpt-4o — nuanced localization, comic scenarios, creative writing
- *
- * The router hashes the input to detect if it's "simple" vs "complex"
- * and picks the model accordingly.
+ * Complexity classification is retained for cache-key granularity and token limits,
+ * but every task routes to gpt-4o-mini (~95% cheaper than gpt-4o).
  */
 
 export type AiComplexity = 'simple' | 'complex';
@@ -75,12 +71,14 @@ export function classifyComplexity(
 }
 
 export function routeModel(complexity: AiComplexity): ModelRoute {
+  // All tasks pinned to gpt-4o-mini for maximum cost efficiency.
+  // Complexity is still tracked for token-limit and cache-key purposes.
   if (complexity === 'complex') {
     return {
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       complexity: 'complex',
       maxTokens: 2000,
-      estimatedCostSavings: 0,
+      estimatedCostSavings: 0.95,
     };
   }
 
