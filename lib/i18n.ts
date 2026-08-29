@@ -306,6 +306,16 @@ const ko: TranslationDict = {
   'common.networkError': '네트워크 상태를 확인해 주세요',
   'common.retry': '재시도',
   'common.retryDesc': '요청 중 네트워크 오류가 발생했습니다. 연결 상태를 확인하고 다시 시도해주세요.',
+  'marketing.advancedOptions': '세부 옵션',
+  'marketing.advancedOptionsDesc': '영상 길이, 자막 톤, BGM 등 세부 설정',
+  'marketing.quickTweak': '퀵 트윅',
+  'marketing.quickTweakDesc': '렌더링 완료 후 미리보기에서 즉시 조율',
+  'marketing.tweakCaption': '자막 수정',
+  'marketing.tweakBgm': 'BGM 교체',
+  'marketing.tweakWatermark': '워터마크',
+  'marketing.tweakWatermarkOn': '켜기',
+  'marketing.tweakWatermarkOff': '끄기',
+  'marketing.tweakApplied': '적용되었습니다',
 };
 
 const en: TranslationDict = {
@@ -578,6 +588,16 @@ const en: TranslationDict = {
   'common.networkError': 'Please check your network connection',
   'common.retry': 'Retry',
   'common.retryDesc': 'A network error occurred during the request. Please check your connection and try again.',
+  'marketing.advancedOptions': 'Advanced Options',
+  'marketing.advancedOptionsDesc': 'Video length, caption tone, BGM and other settings',
+  'marketing.quickTweak': 'Quick Tweak',
+  'marketing.quickTweakDesc': 'Instantly adjust after render preview',
+  'marketing.tweakCaption': 'Edit Caption',
+  'marketing.tweakBgm': 'Change BGM',
+  'marketing.tweakWatermark': 'Watermark',
+  'marketing.tweakWatermarkOn': 'On',
+  'marketing.tweakWatermarkOff': 'Off',
+  'marketing.tweakApplied': 'Applied',
 };
 
 const ja: TranslationDict = {

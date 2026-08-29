@@ -12,7 +12,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout, Clock, Type, Music } from 'lucide-react-native';
+import { Megaphone, TrendingUp, Zap, Link2, Flame, Check, Lightbulb, Timer, QrCode, Shuffle, ShoppingBag, Users, Sparkles, ArrowRight, Film, Dna, Tag, Globe, Smartphone, LayoutGrid as Layout, Clock, Type, Music, ChevronDown, Settings, CreditCard as Edit3, Stamp } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -108,6 +108,9 @@ export default function MarketingScreen() {
   const [countdownSeconds, setCountdownSeconds] = useState(3600);
   const [qrValue, setQrValue] = useState('https://example.com/your-link');
   const [activeStep, setActiveStep] = useState<PipelineStep>(1);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [tweakToast, setTweakToast] = useState<string | null>(null);
 
   // Video style presets
   const [videoLength, setVideoLength] = useState<string>('7s');
@@ -296,11 +299,17 @@ export default function MarketingScreen() {
     scrollToSection('render');
   };
 
+  const fireTweakToast = useCallback((msg: string) => {
+    setTweakToast(msg);
+    setTimeout(() => setTweakToast(null), 2000);
+  }, []);
+
   const handleStartGeneration = () => {
     (async () => {
       await setItem('marketing_video_length', videoLength);
       await setItem('marketing_caption_tone', captionTone);
       await setItem('marketing_bgm_mood', bgmMood);
+      await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
       try {
         const settings = await getUserSettings();
         if (settings?.brand_persona) {
@@ -712,93 +721,111 @@ export default function MarketingScreen() {
                 })}
               </View>
 
-              {/* 2a-2: Video Style Presets */}
+              {/* 2a-2: Video Style Presets — Collapsible Advanced Options */}
               <View style={styles.presetSection}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderLeft}>
-                    <Film size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
-                    <Text style={styles.sectionTitleText}>{t('marketing.presetTitle')}</Text>
+                <TouchableOpacity
+                  style={styles.advancedToggle}
+                  onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.advancedToggleLeft}>
+                    <View style={styles.advancedToggleIcon}>
+                      <Settings size={16} color={theme.colors.primary[400]} strokeWidth={2} />
+                    </View>
+                    <View>
+                      <Text style={styles.advancedToggleTitle}>{t('marketing.advancedOptions')}</Text>
+                      <Text style={styles.advancedToggleDesc}>{t('marketing.advancedOptionsDesc')}</Text>
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.sectionDesc}>{t('marketing.presetDesc')}</Text>
+                  <ChevronDown
+                    size={20}
+                    color={theme.colors.dark.textDim}
+                    strokeWidth={2}
+                    style={{ transform: [{ rotate: showAdvancedOptions ? '180deg' : '0deg' }] }}
+                  />
+                </TouchableOpacity>
 
-                {/* Video Length */}
-                <View style={styles.presetGroup}>
-                  <View style={styles.presetLabelRow}>
-                    <Clock size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={styles.presetLabel}>{t('marketing.presetLength')}</Text>
-                  </View>
-                  <View style={styles.chipRow}>
-                    {VIDEO_LENGTH_PRESETS.map((preset) => {
-                      const Icon = preset.icon;
-                      const selected = videoLength === preset.key;
-                      return (
-                        <TouchableOpacity
-                          key={preset.key}
-                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
-                          onPress={() => setVideoLength(preset.key)}
-                          activeOpacity={0.7}
-                        >
-                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
-                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
+                {showAdvancedOptions && (
+                  <>
+                    {/* Video Length */}
+                    <View style={styles.presetGroup}>
+                      <View style={styles.presetLabelRow}>
+                        <Clock size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                        <Text style={styles.presetLabel}>{t('marketing.presetLength')}</Text>
+                      </View>
+                      <View style={styles.chipRow}>
+                        {VIDEO_LENGTH_PRESETS.map((preset) => {
+                          const Icon = preset.icon;
+                          const selected = videoLength === preset.key;
+                          return (
+                            <TouchableOpacity
+                              key={preset.key}
+                              style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                              onPress={() => setVideoLength(preset.key)}
+                              activeOpacity={0.7}
+                            >
+                              <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                              <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                              <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
 
-                {/* Caption Tone */}
-                <View style={styles.presetGroup}>
-                  <View style={styles.presetLabelRow}>
-                    <Type size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                    <Text style={styles.presetLabel}>{t('marketing.presetTone')}</Text>
-                  </View>
-                  <View style={styles.chipRow}>
-                    {CAPTION_TONE_PRESETS.map((preset) => {
-                      const Icon = preset.icon;
-                      const selected = captionTone === preset.key;
-                      return (
-                        <TouchableOpacity
-                          key={preset.key}
-                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
-                          onPress={() => setCaptionTone(preset.key)}
-                          activeOpacity={0.7}
-                        >
-                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
-                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
+                    {/* Caption Tone */}
+                    <View style={styles.presetGroup}>
+                      <View style={styles.presetLabelRow}>
+                        <Type size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                        <Text style={styles.presetLabel}>{t('marketing.presetTone')}</Text>
+                      </View>
+                      <View style={styles.chipRow}>
+                        {CAPTION_TONE_PRESETS.map((preset) => {
+                          const Icon = preset.icon;
+                          const selected = captionTone === preset.key;
+                          return (
+                            <TouchableOpacity
+                              key={preset.key}
+                              style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                              onPress={() => setCaptionTone(preset.key)}
+                              activeOpacity={0.7}
+                            >
+                              <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                              <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                              <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
 
-                {/* BGM Mood */}
-                <View style={styles.presetGroup}>
-                  <View style={styles.presetLabelRow}>
-                    <Music size={14} color={theme.colors.primary[400]} strokeWidth={2} />
-                    <Text style={styles.presetLabel}>{t('marketing.presetBgm')}</Text>
-                  </View>
-                  <View style={styles.chipRow}>
-                    {BGM_MOOD_PRESETS.map((preset) => {
-                      const Icon = preset.icon;
-                      const selected = bgmMood === preset.key;
-                      return (
-                        <TouchableOpacity
-                          key={preset.key}
-                          style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
-                          onPress={() => setBgmMood(preset.key)}
-                          activeOpacity={0.7}
-                        >
-                          <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
-                          <Text style={styles.chipPillDesc}>{preset.desc}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
+                    {/* BGM Mood */}
+                    <View style={styles.presetGroup}>
+                      <View style={styles.presetLabelRow}>
+                        <Music size={14} color={theme.colors.primary[400]} strokeWidth={2} />
+                        <Text style={styles.presetLabel}>{t('marketing.presetBgm')}</Text>
+                      </View>
+                      <View style={styles.chipRow}>
+                        {BGM_MOOD_PRESETS.map((preset) => {
+                          const Icon = preset.icon;
+                          const selected = bgmMood === preset.key;
+                          return (
+                            <TouchableOpacity
+                              key={preset.key}
+                              style={[styles.chipPill, selected && { borderColor: preset.color, backgroundColor: preset.color + '15' }]}
+                              onPress={() => setBgmMood(preset.key)}
+                              activeOpacity={0.7}
+                            >
+                              <Icon size={14} color={selected ? preset.color : theme.colors.dark.textDim} strokeWidth={2} />
+                              <Text style={[styles.chipPillLabel, selected && { color: preset.color }]}>{preset.label}</Text>
+                              <Text style={styles.chipPillDesc}>{preset.desc}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </>
+                )}
               </View>
 
               {/* 2b: A/B Persona Tones */}
@@ -1016,9 +1043,61 @@ export default function MarketingScreen() {
                   </View>
                 </View>
               </View>
-            </View>
 
-            {/* All Marketing Tools */}
+              {/* Quick-Tweak Bar — instant adjustments after render */}
+              {selectedPlatform && selectedProduct && (
+                <View style={styles.quickTweakBar}>
+                  <Text style={styles.quickTweakTitle}>{t('marketing.quickTweak')}</Text>
+                  <View style={styles.quickTweakRow}>
+                    <TouchableOpacity
+                      style={styles.quickTweakBtn}
+                      onPress={() => {
+                        setShowAdvancedOptions(true);
+                        scrollToSection('hook');
+                        fireTweakToast(t('marketing.tweakCaption'));
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Edit3 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                      <Text style={styles.quickTweakBtnText}>{t('marketing.tweakCaption')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickTweakBtn}
+                      onPress={() => {
+                        setShowAdvancedOptions(true);
+                        scrollToSection('hook');
+                        fireTweakToast(t('marketing.tweakBgm'));
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Music size={16} color={theme.colors.primary[400]} strokeWidth={2} />
+                      <Text style={styles.quickTweakBtnText}>{t('marketing.tweakBgm')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.quickTweakBtn, watermarkEnabled && styles.quickTweakBtnActive]}
+                      onPress={() => {
+                        setWatermarkEnabled(!watermarkEnabled);
+                        fireTweakToast(`${t('marketing.tweakWatermark')} ${watermarkEnabled ? t('marketing.tweakWatermarkOff') : t('marketing.tweakWatermarkOn')}`);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Stamp size={16} color={watermarkEnabled ? theme.colors.success[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={[styles.quickTweakBtnText, watermarkEnabled && styles.quickTweakBtnTextActive]}>
+                        {t('marketing.tweakWatermark')} {watermarkEnabled ? t('marketing.tweakWatermarkOn') : t('marketing.tweakWatermarkOff')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Tweak toast */}
+              {tweakToast && (
+                <View style={styles.tweakToast}>
+                  <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  <Text style={styles.tweakToastText}>{tweakToast}</Text>
+                </View>
+              )}
+            </View>
             <View style={styles.divider} />
             <Text style={styles.toolsSectionTitle}>{t('marketing.allTools')}</Text>
             <View style={styles.toolGrid}>
@@ -1977,5 +2056,102 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  advancedToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  advancedToggleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  advancedToggleTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  advancedToggleDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  quickTweakBar: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    padding: 14,
+    marginBottom: theme.spacing.md,
+    gap: 10,
+  },
+  quickTweakTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  quickTweakRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickTweakBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  quickTweakBtnActive: {
+    borderColor: theme.colors.success[400],
+    backgroundColor: theme.colors.success[500] + '12',
+  },
+  quickTweakBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  quickTweakBtnTextActive: {
+    color: theme.colors.success[400],
+  },
+  tweakToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.success[500] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+    marginBottom: theme.spacing.md,
+    alignSelf: 'center',
+  },
+  tweakToastText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
 });
