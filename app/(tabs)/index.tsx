@@ -41,6 +41,7 @@ import { OnboardingTooltip } from '@/components/OnboardingTooltip';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { RecentWorkButton } from '@/components/RecentWorkButton';
 import { WorkflowGuide } from '@/components/WorkflowGuide';
+import { ViralProductFeed } from '@/components/ViralProductFeed';
 import { StepIndicator } from '@/components/StepIndicator';
 import { ProgressOverlay } from '@/components/ProgressOverlay';
 import { QueueStatusBadge } from '@/components/QueueStatusBadge';
@@ -1364,6 +1365,10 @@ function WebUploadScreen() {
             1번부터 4번까지 순서대로 따라 하시면 됩니다. 각 단계를 탭하면 해당 화면으로 이동합니다.
           </Text>
           <WorkflowGuide />
+        </View>
+
+        <View style={{ marginBottom: theme.spacing.lg }}>
+          <ViralProductFeed />
         </View>
 
         <View style={styles.webModeGuideContainer}>

@@ -49,6 +49,9 @@ import {
   type StyleInsight,
 } from '@/lib/dashboard';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { QuestCard } from '@/components/QuestCard';
+import { TierBadge } from '@/components/TierBadge';
+import { LeaderboardCard } from '@/components/LeaderboardCard';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useI18n } from '@/hooks/useI18n';
@@ -705,6 +708,21 @@ export default function AnalyticsScreen() {
           )}
         </>
       )}
+
+      {/* Tier Badge */}
+      <View style={styles.section}>
+        <TierBadge />
+      </View>
+
+      {/* Daily Quests */}
+      <View style={styles.section}>
+        <QuestCard />
+      </View>
+
+      {/* Leaderboard */}
+      <View style={styles.section}>
+        <LeaderboardCard />
+      </View>
 
       <Text style={styles.footer}>새로고침하여 최신 데이터를 불러올 수 있습니다</Text>
     </ScrollView>
