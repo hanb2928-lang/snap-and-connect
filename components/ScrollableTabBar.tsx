@@ -17,7 +17,7 @@ import { theme } from '@/lib/theme';
 import { useI18n } from '@/hooks/useI18n';
 import {
   Camera,
-  FolderOpen,
+  Folder,
   Zap,
   BookMarked,
   Settings,
@@ -28,7 +28,7 @@ import {
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
   marketing: Zap,
-  assets: FolderOpen,
+  assets: Folder,
 };
 
 const TAB_KEYS: Record<string, string> = {
