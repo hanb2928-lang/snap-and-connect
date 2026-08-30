@@ -37,7 +37,7 @@ import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { VoiceCommandFloatingButton } from '@/components/VoiceCommandFloatingButton';
-import { WeatherBanner } from '@/components/WeatherBanner';
+import { TriggerBanner } from '@/components/TriggerBanner';
 import type { ParsedVoiceCommand } from '@/hooks/useVoiceCommand';
 
 const CAPTURE_TIMEOUT_MS = 15000;
@@ -508,8 +508,8 @@ export default function CameraScreen() {
         <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
       </View>
 
-      {/* Weather Emergency Banner */}
-      <WeatherBanner />
+      {/* Unified Trigger Banner (Weather + Inventory + Breaktime alerts) */}
+      <TriggerBanner />
 
       {/* Camera Preview — fills most of screen */}
       <View style={styles.cameraPreviewWrap}>
