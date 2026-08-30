@@ -577,6 +577,20 @@ export default function CameraScreen() {
         : {};
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
+    if (isWebPlatform()) {
+      try {
+        const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '웹 캡처');
+        if (images.length === 0) return null;
+        const compressed = await withTimeout(
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          PICK_TIMEOUT_MS,
+          '이미지 압축',
+        );
+        return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
+      } catch {
+        return null;
+      }
+    }
     if (!cameraRef.current || !cameraReady) return null;
     try {
       const photo = await withTimeout(
@@ -731,6 +745,11 @@ export default function CameraScreen() {
         onToggleManualPrompt={() => setManualPromptOpen((v) => !v)}
         onClearImage={() => { setSelectedImage(null); setFunnelStage('idle'); setSelectedHook(null); setCustomPrompt(''); }}
         onDismissFunnel={() => { setFunnelStage('idle'); setSelectedImage(null); setSelectedHook(null); setCustomPrompt(''); }}
+        multiAngleVisible={multiAngleVisible}
+        onMultiAngleClose={() => setMultiAngleVisible(false)}
+        onMultiAngleComplete={handleMultiAngleComplete}
+        onMultiAnglePick={handleMultiAnglePick}
+        onMultiAngleCapture={handleMultiAngleCapture}
       />
     );
   }
@@ -1201,6 +1220,11 @@ interface WebCameraScreenProps {
   onToggleManualPrompt: () => void;
   onClearImage: () => void;
   onDismissFunnel: () => void;
+  multiAngleVisible: boolean;
+  onMultiAngleClose: () => void;
+  onMultiAngleComplete: (shots: AngleShot[]) => void;
+  onMultiAnglePick: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
+  onMultiAngleCapture: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
 }
 
 function WebCameraScreen({
@@ -1240,6 +1264,11 @@ function WebCameraScreen({
   onToggleManualPrompt,
   onClearImage,
   onDismissFunnel,
+  multiAngleVisible,
+  onMultiAngleClose,
+  onMultiAngleComplete,
+  onMultiAnglePick,
+  onMultiAngleCapture,
 }: WebCameraScreenProps) {
   const moodOverlayColor =
     moodFilter === 'warm' ? 'rgba(255, 180, 80, 0.12)' :
@@ -1473,6 +1502,14 @@ function WebCameraScreen({
           />
         </Animated.View>
       )}
+
+      <MultiAngleCaptureGuide
+        visible={multiAngleVisible}
+        onClose={onMultiAngleClose}
+        onComplete={onMultiAngleComplete}
+        onPickImage={onMultiAnglePick}
+        onCaptureImage={onMultiAngleCapture}
+      />
     </View>
   );
 }
