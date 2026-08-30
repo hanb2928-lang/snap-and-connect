@@ -345,8 +345,10 @@ export function WebCameraView({
                       idx === 0 && styles.modeToggleBtnFirst,
                       idx === MODE_META.length - 1 && styles.modeToggleBtnLast,
                       isActiveMode && styles.modeToggleBtnActive,
+                      autoSaving && styles.modeToggleBtnDisabled,
                     ]}
                     onPress={() => onCaptureModeChange(mode.key)}
+                    disabled={autoSaving}
                     activeOpacity={0.7}
                   >
                     <Icon size={15} color={isActiveMode ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
@@ -575,6 +577,9 @@ const styles = StyleSheet.create({
   },
   modeToggleBtnActive: {
     backgroundColor: theme.colors.primary[600],
+  },
+  modeToggleBtnDisabled: {
+    opacity: 0.4,
   },
   modeToggleText: {
     fontSize: 13,

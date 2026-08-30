@@ -65,19 +65,26 @@ export function MultiAngleCaptureGuide({
     (angleId: string, base64: string, mimeType: string) => {
       const guideIndex = ANGLE_GUIDES.findIndex((g) => g.id === angleId);
       const guide = ANGLE_GUIDES[guideIndex];
-      const dataUrl = `data:${mimeType};base64,${base64}`;
-      setShots((prev) => ({
-        ...prev,
-        [angleId]: {
+      setShots((prev) => {
+        const next = { ...prev };
+        // Free the previous data URL if replacing an existing shot
+        const prevShot = next[angleId];
+        if (prevShot?.dataUrl) {
+          // Allow GC to reclaim the old string
+          prevShot.dataUrl = undefined;
+          prevShot.base64 = undefined;
+        }
+        next[angleId] = {
           id: angleId,
           orderIndex: guideIndex,
           label: guide.label,
           hint: guide.hint,
           base64,
-          dataUrl,
+          dataUrl: `data:${mimeType};base64,${base64}`,
           mimeType,
-        },
-      }));
+        };
+        return next;
+      });
     },
     [],
   );

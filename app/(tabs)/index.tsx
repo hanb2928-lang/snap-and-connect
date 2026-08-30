@@ -102,6 +102,7 @@ export default function CameraScreen() {
   const [customPrompt, setCustomPrompt] = useState('');
   const fadeAnim = useSharedValue(0);
   const progressWidth = useSharedValue(0);
+  const genIdRef = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,6 +178,7 @@ export default function CameraScreen() {
 
     // oneclick mode: capture + auto-save in one step, skip funnel
     if (captureMode === 'oneclick') {
+      const genId = genIdRef.current;
       setAutoSaving(true);
       setAutoSaveToast(null);
       startAutoSaveAnimation();
@@ -191,6 +193,7 @@ export default function CameraScreen() {
           CAPTURE_TIMEOUT_MS,
           '사진 촬영',
         );
+        if (genIdRef.current !== genId) return; // mode changed mid-capture
         if (!photo?.base64) throw new Error('Failed to capture image data');
         const cleanB64 = cleanBase64(photo.base64);
         const compressedDataUrl = await withTimeout(
@@ -198,7 +201,7 @@ export default function CameraScreen() {
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || genIdRef.current !== genId) return;
         const compressedB64 = cleanBase64(compressedDataUrl);
         const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
         setError(null);
@@ -208,15 +211,18 @@ export default function CameraScreen() {
           ANALYSIS_TIMEOUT_MS,
           'AI 자동 분석',
         );
+        if (genIdRef.current !== genId) return; // mode changed during AI analysis
         setAutoSaveToast('숏폼 영상이 보관함에 자동 저장되었습니다!');
         setTimeout(() => setAutoSaveToast(null), 3500);
         router.push({ pathname: '/result/[id]', params: { id: scanId } });
       } catch (err) {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || genIdRef.current !== genId) return;
         setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
       } finally {
-        stopAutoSaveAnimation();
-        setAutoSaving(false);
+        if (genIdRef.current === genId) {
+          stopAutoSaveAnimation();
+          setAutoSaving(false);
+        }
       }
       return;
     }
@@ -318,6 +324,7 @@ export default function CameraScreen() {
   };
 
   const processImage = async (base64: string, mimeType: string) => {
+    const genId = genIdRef.current;
     let progressTimer: ReturnType<typeof setInterval> | null = null;
     try {
       setProgressStep(1);
@@ -340,6 +347,7 @@ export default function CameraScreen() {
         'AI 분석',
       );
 
+      if (genIdRef.current !== genId) return; // mode changed during analysis
       if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
       setProgressStep(2);
@@ -353,7 +361,7 @@ export default function CameraScreen() {
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       if (progressTimer) clearInterval(progressTimer);
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || genIdRef.current !== genId) return;
       setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
       if (progressTimer) clearInterval(progressTimer);
@@ -422,6 +430,10 @@ export default function CameraScreen() {
 
   const handleCaptureModeChange = (mode: CaptureModeType) => {
     if (mode === captureMode) return;
+    // Invalidate any in-flight async operations from the previous mode
+    genIdRef.current += 1;
+    setAutoSaving(false);
+    stopAutoSaveAnimation();
     setCaptureMode(mode);
     // Reset all capture-related state to prevent mode-to-mode state leak
     setSelectedImage(null);
@@ -556,6 +568,7 @@ export default function CameraScreen() {
   const handleWebCapture = async (base64: string, mimeType: string) => {
     // oneclick mode: auto-save to 보관함 in background, show toast, skip funnel
     if (captureMode === 'oneclick') {
+      const genId = genIdRef.current;
       setAutoSaving(true);
       setAutoSaveToast(null);
       startAutoSaveAnimation();
@@ -565,14 +578,18 @@ export default function CameraScreen() {
           ANALYSIS_TIMEOUT_MS,
           'AI 자동 분석',
         );
+        if (genIdRef.current !== genId) return; // mode changed during analysis
         setAutoSaveToast('숏폼 영상이 보관함에 자동 저장되었습니다!');
         setTimeout(() => setAutoSaveToast(null), 3500);
         router.push({ pathname: '/result/[id]', params: { id: scanId } });
       } catch (err) {
+        if (genIdRef.current !== genId) return;
         setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
       } finally {
-        stopAutoSaveAnimation();
-        setAutoSaving(false);
+        if (genIdRef.current === genId) {
+          stopAutoSaveAnimation();
+          setAutoSaving(false);
+        }
       }
       return;
     }
@@ -742,24 +759,27 @@ export default function CameraScreen() {
         <View style={styles.modeSegmentWrap}>
           <View style={styles.modeSegment}>
             <TouchableOpacity
-              style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive]}
+              style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('oneclick')}
+              disabled={processing || autoSaving}
               activeOpacity={0.7}
             >
               <Zap size={13} color={captureMode === 'oneclick' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'oneclick' && styles.modeSegmentTextActive]}>원클릭</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive]}
+              style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('single')}
+              disabled={processing || autoSaving}
               activeOpacity={0.7}
             >
               <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>1장</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive]}
+              style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('multi')}
+              disabled={processing || autoSaving}
               activeOpacity={0.7}
             >
               <Layers size={13} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
@@ -1531,6 +1551,9 @@ const styles = StyleSheet.create({
   },
   modeSegmentBtnActive: {
     backgroundColor: theme.colors.primary[600],
+  },
+  modeSegmentBtnDisabled: {
+    opacity: 0.4,
   },
   modeSegmentText: {
     fontSize: 12,
