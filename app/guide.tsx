@@ -14,7 +14,9 @@ import {
   Image as ImageIcon, Scissors, Type, Stamp, Share2, Lightbulb, Smartphone,
   Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, ShoppingBag,
   Wand as Wand2, Target, Users, Layers, Store, Video, Shuffle, TrendingUp,
-  History, BookMarked,
+  History, BookMarked, CalendarClock, CloudRain, Package, QrCode, Link,
+  CreditCard, Trophy, ShieldCheck, FileCheck, Megaphone, ImagePlus,
+  ScanLine, Grid3x3, Wallet,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -28,7 +30,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   LayoutTemplate, BookOpen, PenLine, ImageIcon, Scissors, Type, Share2,
   Lightbulb, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt,
   Wand2, Target, Users, Layers, Store, Video, Shuffle, TrendingUp,
-  MessageSquare, Bug,
+  MessageSquare, Bug, CalendarClock, CloudRain, Package, QrCode, Link,
+  CreditCard, Trophy, ShieldCheck, FileCheck, Megaphone, ImagePlus,
+  ScanLine, Grid3x3, Wallet, Stamp,
 };
 
 function getIcon(key: string): LucideIcon {
@@ -115,6 +119,19 @@ export default function GuideScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{c.tabsTitle}</Text>
+        <Text style={styles.sectionDesc}>{c.tabsDesc}</Text>
+        <View style={styles.card}>
+          {c.tabsItems.map((item, i) => (
+            <View key={`t-${i}`}>
+              {i > 0 && <Divider />}
+              <FeatureRow item={item} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>{c.usageTitle}</Text>
         <Text style={styles.sectionDesc}>
           {c.usageDesc}
@@ -139,6 +156,51 @@ export default function GuideScreen() {
               <View key={`f-${si}-${ii}`}>
                 {ii > 0 && <Divider />}
                 <FeatureRow item={item} />
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{c.automationTitle}</Text>
+        <Text style={styles.sectionDesc}>{c.automationDesc}</Text>
+        <View style={styles.card}>
+          {c.automationSections.flatMap((s, si) =>
+            s.items.map((item, ii) => (
+              <View key={`a-${si}-${ii}`}>
+                {ii > 0 && <Divider />}
+                <UsageGuide item={item} />
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{c.monetizationTitle}</Text>
+        <Text style={styles.sectionDesc}>{c.monetizationDesc}</Text>
+        <View style={styles.card}>
+          {c.monetizationSections.flatMap((s, si) =>
+            s.items.map((item, ii) => (
+              <View key={`m-${si}-${ii}`}>
+                {ii > 0 && <Divider />}
+                <UsageGuide item={item} />
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{c.growthTitle}</Text>
+        <Text style={styles.sectionDesc}>{c.growthDesc}</Text>
+        <View style={styles.card}>
+          {c.growthSections.flatMap((s, si) =>
+            s.items.map((item, ii) => (
+              <View key={`g-${si}-${ii}`}>
+                {ii > 0 && <Divider />}
+                <UsageGuide item={item} />
               </View>
             ))
           )}
