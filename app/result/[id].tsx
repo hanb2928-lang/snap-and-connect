@@ -47,6 +47,10 @@ import { generateAffiliateLinks } from '@/lib/affiliate';
 import { detectAffiliatePlatform } from '@/lib/affiliateLinkSmart';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import { Share as RNShare } from 'react-native';
 import type { Scan, UserSettings, AffiliateLink, CustomAffiliateLink, DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 import { TemplateCard, STICKER_POSITIONS, TEXT_POSITIONS } from '@/components/TemplateCard';
 import type { StickerPosition, TextPosition } from '@/components/TemplateCard';
@@ -560,6 +564,56 @@ export default function ResultScreen() {
       }
     } catch {
       // clipboard copy failed silently
+    }
+  };
+
+  const handleSaveAndShare = async () => {
+    try {
+      const uri = await captureRef(cardRef, {
+        format: 'png',
+        quality: 1,
+        fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
+      });
+
+      if (Platform.OS === 'web') {
+        // On web: download the image, copy text, and open share modal
+        const a = document.createElement('a');
+        a.href = uri;
+        a.download = `snap-connect-${scan?.id ?? 'card'}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(captionWithLink);
+        }
+        setCaptionCopied(true);
+        setTimeout(() => setCaptionCopied(false), 2000);
+      } else {
+        // On native: save to gallery then open share sheet
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          const asset = await MediaLibrary.createAssetAsync(uri);
+          try {
+            await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
+          } catch {
+            // Album creation can fail on scoped storage; the asset is already saved.
+          }
+        }
+        try {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/png',
+            dialogTitle: '공유하기',
+          });
+        } catch {
+          await RNShare.share({
+            message: captionWithLink,
+          });
+        }
+      }
+    } catch {
+      // Fallback: just copy text
+      handleCopyCaption();
     }
   };
 
@@ -1676,7 +1730,7 @@ export default function ResultScreen() {
               handleSaveCustomLink(url, label, selectedProductIndex);
             }
           }}
-          onSaveAndShare={handleCopyCaption}
+          onSaveAndShare={handleSaveAndShare}
         />
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
