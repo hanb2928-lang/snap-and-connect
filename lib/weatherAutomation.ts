@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 export interface WeatherAlertSettings {
   id: number;
@@ -187,7 +187,6 @@ export async function fetchLiveWeather(
   coldThreshold?: number,
   hotThreshold?: number,
 ): Promise<WeatherData> {
-  const { supabaseUrl, supabaseAnonKey } = await import('@/lib/supabase');
   const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
   if (coldThreshold !== undefined) params.set('cold', String(coldThreshold));
   if (hotThreshold !== undefined) params.set('hot', String(hotThreshold));

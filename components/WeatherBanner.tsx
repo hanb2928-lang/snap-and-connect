@@ -43,7 +43,8 @@ interface BannerData {
 export function WeatherBanner() {
   const router = useRouter();
   const [banner, setBanner] = useState<BannerData | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const dismissedRef = useRef(false);
+  const lastAlertTypeRef = useRef<string | null>(null);
   const slideAnim = useRef(new Animated.Value(-200)).current;
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCheckRef = useRef(0);
@@ -71,15 +72,21 @@ export function WeatherBanner() {
         ? 'snow'
         : weather.is_raining
           ? 'rain'
-          : weather.is_cold
+          : weather.temperature <= settings.cold_snap_threshold
             ? 'cold'
-            : weather.is_hot
+            : weather.temperature >= settings.heat_wave_threshold
               ? 'hot'
               : 'clear';
 
       const alertData = determineWeatherAlert(weather, settings);
 
-      if (alertData && !dismissed) {
+      // Reset dismissed when a new alert type appears
+      if (alertData && alertData.type !== lastAlertTypeRef.current) {
+        dismissedRef.current = false;
+        lastAlertTypeRef.current = alertData.type;
+      }
+
+      if (alertData && !dismissedRef.current) {
         // Check for existing unread alert of same type in last 2h
         const alerts = await fetchWeatherAlerts(5);
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -135,7 +142,7 @@ export function WeatherBanner() {
     } catch {
       // Weather fetch failed — show nothing
     }
-  }, [dismissed, slideAnim]);
+  }, [slideAnim]);
 
   useEffect(() => {
     checkWeather();
@@ -146,7 +153,7 @@ export function WeatherBanner() {
   }, [checkWeather]);
 
   const handleDismiss = () => {
-    setDismissed(true);
+    dismissedRef.current = true;
     Animated.timing(slideAnim, {
       toValue: -200,
       duration: 300,
