@@ -531,6 +531,15 @@ export default function SettingsScreen() {
           <Play size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.tutorialBtnText}>{t('settings.tutorialStart')}</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.guideLinkBtn}
+          onPress={() => router.push('/guide' as never)}
+          activeOpacity={0.8}
+        >
+          <BookOpen size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+          <Text style={styles.guideLinkBtnText}>사용설명서 보기</Text>
+          <ChevronRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </TouchableOpacity>
       </View>
 
       {/* Tutorial Modal */}
@@ -3399,6 +3408,22 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  guideLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    marginTop: 10,
+  },
+  guideLinkBtnText: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
   },
   tutorialModalContent: {
     width: '100%',
