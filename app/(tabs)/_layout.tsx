@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { Platform, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { ScrollableTabBar, type TabBadgeMap } from '@/components/ScrollableTabBar';
-import { fetchActiveSchedules } from '@/lib/warmup';
+import type { TabBadgeMap } from '@/components/ScrollableTabBar';
+
+const ScrollableTabBar = lazy(() =>
+  import('@/components/ScrollableTabBar').then((m) => ({ default: m.ScrollableTabBar })),
+);
 
 export default function TabLayout() {
   const [badges, setBadges] = useState<TabBadgeMap>({});
@@ -11,6 +14,7 @@ export default function TabLayout() {
     let cancelled = false;
     const checkBadges = async () => {
       try {
+        const { fetchActiveSchedules } = await import('@/lib/warmup');
         const schedules = await fetchActiveSchedules();
         const hasPending = schedules.some((s) =>
           s.tasks.some((t) => t.status === 'pending')
@@ -50,7 +54,11 @@ export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="index"
-      tabBar={(props) => <ScrollableTabBar {...props} badges={badges} />}
+      tabBar={(props) => (
+        <Suspense fallback={<View style={{ height: 0 }} />}>
+          <ScrollableTabBar {...props} badges={badges} />
+        </Suspense>
+      )}
       screenOptions={screenOptions}
     >
       <Tabs.Screen name="index" />

@@ -74,8 +74,8 @@ export function WebCameraView({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: face,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
         audio: false,
       });
@@ -99,7 +99,12 @@ export function WebCameraView({
 
   useEffect(() => {
     if (isActive && !previewBase64) {
-      startStream(facing);
+      // Defer getUserMedia slightly so the UI paints first, avoiding jank on initial mount
+      const id = setTimeout(() => startStream(facing), 100);
+      return () => {
+        clearTimeout(id);
+        stopStream();
+      };
     }
     return () => {
       stopStream();
