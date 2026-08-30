@@ -125,6 +125,9 @@ export function WeatherAlertAgent() {
       return;
     }
 
+    // Reset debounce so first check runs immediately after settings change
+    lastCheckRef.current = 0;
+
     const checkWeather = async () => {
       const now = Date.now();
       // Debounce: don't check more than once per 10 minutes

@@ -56,7 +56,7 @@ export function WeatherBanner() {
 
     try {
       const settings = await getWeatherAlertSettings();
-      if (!settings?.enabled || !settings.store_latitude || !settings.store_longitude) {
+      if (!settings?.store_latitude || !settings.store_longitude) {
         setBanner(null);
         return;
       }
@@ -78,7 +78,8 @@ export function WeatherBanner() {
               ? 'hot'
               : 'clear';
 
-      const alertData = determineWeatherAlert(weather, settings);
+      // Only determine/create alerts when enabled
+      const alertData = settings.enabled ? determineWeatherAlert(weather, settings) : null;
 
       // Reset dismissed when a new alert type appears
       if (alertData && alertData.type !== lastAlertTypeRef.current) {

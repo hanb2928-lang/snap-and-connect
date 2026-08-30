@@ -108,6 +108,9 @@ export function InventoryAlertAgent() {
       return;
     }
 
+    // Reset throttle so first check runs immediately after settings change
+    lastAlertCheckRef.current = 0;
+
     const checkAndTrigger = async () => {
       const now = new Date();
       const nowMs = now.getTime();
