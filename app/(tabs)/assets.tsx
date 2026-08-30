@@ -16,7 +16,8 @@ import {
   ScrollView,
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store } from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3 } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
@@ -77,6 +78,7 @@ const PERSONA_TONES = [
 type SortMode = 'date' | 'views' | 'title' | 'pinned';
 
 export default function AssetsScreen() {
+  const router = useRouter();
   const tabBarHeight = useTabBarHeight();
   const safeTop = useSafeTop();
   const { t } = useI18n();
@@ -332,10 +334,30 @@ export default function AssetsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: safeTop + 12 }]}>
-        <Text style={styles.headerTitle}>{t('assets.title')}</Text>
-        <Text style={styles.headerSubtext}>
-          완성된 마케팅 자산을 배포하고 리믹스하세요 · {assets.length}개 저장됨
-        </Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitle}>{t('assets.title')}</Text>
+            <Text style={styles.headerSubtext}>
+              완성된 마케팅 자산을 배포하고 리믹스하세요 · {assets.length}개 저장됨
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push('/(tabs)/analytics' as never)}
+              activeOpacity={0.7}
+            >
+              <BarChart3 size={20} color={theme.colors.success[400]} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push('/settings' as never)}
+              activeOpacity={0.7}
+            >
+              <Settings size={20} color={theme.colors.dark.text} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* 3 Action Track Cards */}
@@ -933,6 +955,10 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: theme.spacing.lg, paddingTop: 12, paddingBottom: theme.spacing.sm },
   headerTitle: { fontSize: theme.typography.title, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.dark.text },
   headerSubtext: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginTop: 4 },
+  headerTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  headerTextWrap: { flex: 1 },
+  headerActions: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  headerActionBtn: { width: 40, height: 40, borderRadius: theme.radius.full, backgroundColor: theme.colors.dark.surface, justifyContent: 'center', alignItems: 'center' },
   trackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   trackCard: { width: '48.5%', backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.lg, borderWidth: 1.5, borderColor: theme.colors.dark.border, padding: theme.spacing.md, gap: 6 },
   trackIconWrap: { width: 64, height: 64, borderRadius: theme.radius.lg, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
