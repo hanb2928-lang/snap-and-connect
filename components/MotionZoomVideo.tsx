@@ -48,6 +48,7 @@ export function MotionZoomVideo({
   const [selectedMotion, setSelectedMotion] = useState<MotionPreset>('zoom-in');
   const [generating, setGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoMime, setVideoMime] = useState<string>('video/webm');
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [visualParams, setVisualParams] = useState<VisualRandomizationParams | null>(null);
@@ -139,10 +140,27 @@ export function MotionZoomVideo({
       if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
       canvasRef.current = canvas;
 
-      // Set up MediaRecorder
+      // Set up MediaRecorder with codec fallback
       const stream = canvas.captureStream(FPS);
-      const mimeType = 'video/webm;codecs=vp9';
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
+      const codecCandidates = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4;codecs=h264',
+        'video/mp4',
+      ];
+      let mimeType = '';
+      for (const candidate of codecCandidates) {
+        try {
+          if ((window as unknown as { MediaRecorder: typeof MediaRecorder }).MediaRecorder.isTypeSupported(candidate)) {
+            mimeType = candidate;
+            break;
+          }
+        } catch {
+          // continue to next candidate
+        }
+      }
+      if (!mimeType) {
         throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다');
       }
       const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
@@ -231,9 +249,10 @@ export function MotionZoomVideo({
 
       await done;
 
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      const blob = new Blob(chunksRef.current, { type: mimeType });
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
+      setVideoMime(mimeType);
       if (onVideoReady) onVideoReady(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : '영상 생성 실패');
@@ -246,12 +265,13 @@ export function MotionZoomVideo({
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;
     if (Platform.OS === 'web') {
+      const ext = videoMime.includes('mp4') ? 'mp4' : 'webm';
       const a = document.createElement('a');
       a.href = videoUrl;
-      a.download = `${fileName || productName || 'motion-zoom'}.webm`;
+      a.download = `${fileName || productName || 'motion-zoom'}.${ext}`;
       a.click();
     }
-  }, [videoUrl, fileName, productName]);
+  }, [videoUrl, videoMime, fileName, productName]);
 
   if (Platform.OS !== 'web') {
     return (

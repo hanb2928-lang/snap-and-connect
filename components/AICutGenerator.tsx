@@ -13,7 +13,7 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import * as ImagePicker from 'expo-image-picker';
 import { prepareImageForApi } from '@/lib/imageEdit';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
-import { uploadImage } from '@/lib/analysis';
+import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 type CutStep = 'idle' | 'source-ready' | 'processing' | 'done' | 'error';
 
@@ -40,6 +40,38 @@ interface CutSegment {
 interface AICutGeneratorProps {
   sourceImage?: string | null;
   onResult?: (segments: CutSegment[]) => void;
+}
+
+function generateFallbackCuts(
+  totalDuration: number,
+  cutDuration: number,
+  beatSync: string,
+): CutSegment[] {
+  let effectiveCut = cutDuration;
+  if (beatSync === 'macro') effectiveCut = cutDuration * 1.5;
+  else if (beatSync === 'off') effectiveCut = totalDuration / 8;
+
+  const cutCount = Math.floor(totalDuration / effectiveCut);
+  const labels: Record<CutSegment['type'], string> = {
+    highlight: '하이라이트',
+    transition: '전환',
+    detail: '디테일',
+  };
+  const segments: CutSegment[] = [];
+  for (let i = 0; i < cutCount; i++) {
+    const start = i * effectiveCut;
+    const end = Math.min(start + effectiveCut, totalDuration);
+    const type: CutSegment['type'] =
+      i % 3 === 0 ? 'highlight' : i % 3 === 1 ? 'transition' : 'detail';
+    segments.push({
+      index: i,
+      startTime: Number(start.toFixed(2)),
+      endTime: Number(end.toFixed(2)),
+      type,
+      label: labels[type],
+    });
+  }
+  return segments;
 }
 
 export function AICutGenerator({ sourceImage, onResult }: AICutGeneratorProps) {
@@ -90,44 +122,57 @@ export function AICutGenerator({ sourceImage, onResult }: AICutGeneratorProps) {
     setError(null);
 
     try {
-      await uploadImage(uploadedImage, 'image/jpeg');
-
       const preset = TEMPO_PRESETS.find((t) => t.key === tempo)!;
-      const totalDuration = 15;
-      const cutCount = Math.floor(totalDuration / preset.cutDuration);
-      const generated: CutSegment[] = [];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      for (let i = 0; i < cutCount; i++) {
-        const start = i * preset.cutDuration;
-        const end = Math.min(start + preset.cutDuration, totalDuration);
-        const type: CutSegment['type'] =
-          i % 3 === 0 ? 'highlight' : i % 3 === 1 ? 'transition' : 'detail';
-        const labels: Record<CutSegment['type'], string> = {
-          highlight: '하이라이트',
-          transition: '전환',
-          detail: '디테일',
-        };
-        generated.push({
-          index: i,
-          startTime: start,
-          endTime: end,
-          type,
-          label: labels[type],
-        });
+      const resp = await fetch(`${supabaseUrl}/functions/v1/generate-virtual-cuts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          tempo: preset.key,
+          beatSync,
+          totalDuration: 15,
+          cutDuration: preset.cutDuration,
+          productInfo: { name: 'product', category: 'general' },
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error(`AI 컷 분할 실패 (${resp.status}): ${errText}`);
       }
 
-      setSegments(generated);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+
+      const generated: CutSegment[] = Array.isArray(data.segments)
+        ? data.segments
+        : generateFallbackCuts(15, preset.cutDuration, beatSync);
+
       if (!mountedRef.current) return;
+      setSegments(generated);
       setStep('done');
       if (onResult) {
         onResult(generated);
       }
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(friendlyError(err, '컷 분할 생성에 실패했습니다.'));
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('요청 시간이 초과되었습니다. 다시 시도해주세요.');
+      } else {
+        setError(friendlyError(err, '컷 분할 생성에 실패했습니다.'));
+      }
       setStep('error');
     }
-  }, [uploadedImage, tempo, onResult]);
+  }, [uploadedImage, tempo, beatSync, onResult]);
 
   const handleReset = useCallback(() => {
     setStep('idle');
@@ -139,12 +184,9 @@ export function AICutGenerator({ sourceImage, onResult }: AICutGeneratorProps) {
   const formatTime = (seconds: number) => {
     const s = seconds.toFixed(1);
     return `${s}s`;
-  };
-
-  return (
+  };  return (
     <View style={styles.container}>
-      {/* Source Upload */}
-      {!uploadedImage && step === 'idle' && (
+      {/* Source Upload */}      {!uploadedImage && step === 'idle' && (
         <TouchableOpacity style={styles.sourceUpload} onPress={handlePickSource} activeOpacity={0.7}>
           <View style={styles.sourceUploadIcon}>
             <Upload size={24} color={theme.colors.primary[400]} strokeWidth={2} />

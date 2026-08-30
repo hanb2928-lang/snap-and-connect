@@ -101,7 +101,7 @@ import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
@@ -111,6 +111,8 @@ import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
 import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
+import { AICutGenerator } from '@/components/AICutGenerator';
+import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1031,6 +1033,34 @@ export default function ResultScreen() {
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
               productName={activeProductName || scan.product_name || ''}
               fileName={`motion-zoom-${scan.id}`}
+            />
+          ),
+        },
+        {
+          key: 'aiCut',
+          label: 'AI 컷 분할',
+          description: 'AI가 소스를 분석하여 템포에 맞춘 하이라이트/전환/디테일 컷 자동 분할',
+          category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <ScissorsIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <AICutGenerator
+              sourceImage={captureImageUrl || scan.edited_image_url || scan.image_url}
+            />
+          ),
+        },
+        {
+          key: 'videoImport',
+          label: '내 영상 임포트 & 자동 편집',
+          description: '사용자 영상/이미지를 불러와 자막 오버레이, AI 카피, 하이라이트 자동 추출',
+          category: 'template',
+          modes: ['single', 'multi', 'template'] as ScanMode[],
+          icon: <UploadIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          render: () => (
+            <VideoImportGenerator
+              affiliatePlatforms={affiliatePlatforms}
+              shortUrl={shortUrl || ''}
+              onClose={() => {}}
             />
           ),
         },

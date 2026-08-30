@@ -782,7 +782,6 @@ function buildComicScriptBody(params: ComicBuildParams): string {
           var audioDest=audioCtx.createMediaStreamDestination();
           var sourceNode=audioCtx.createMediaElementSource(narrationAudio);
           sourceNode.connect(audioDest);
-          sourceNode.connect(audioCtx.destination);
           audioStream=audioDest.stream;
           audioConnected=true;
         }catch(e){audioConnected=false;}
