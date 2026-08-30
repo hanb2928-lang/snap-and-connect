@@ -135,6 +135,7 @@ export default function SettingsScreen() {
   const [newAffId, setNewAffId] = useState('');
   const [newAffParam, setNewAffParam] = useState('');
   const [addingAffiliate, setAddingAffiliate] = useState(false);
+  const [pendingCustomPlatforms, setPendingCustomPlatforms] = useState<{ name: string; id: string }[]>([]);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const router = useRouter();
 
@@ -297,6 +298,16 @@ export default function SettingsScreen() {
         naver_shopping_id: naverId || null,
         toss_share_id: tossId || null,
       });
+      for (const cp of pendingCustomPlatforms) {
+        if (cp.name.trim()) {
+          await addCustomAffiliatePlatform({
+            label: cp.name.trim(),
+            partnersId: cp.id.trim(),
+            trackingParam: '',
+          });
+        }
+      }
+      setPendingCustomPlatforms([]);
       setSavedIds(true);
       setTimeout(() => setSavedIds(false), 2500);
       await loadAffiliatePlatforms();
@@ -854,6 +865,67 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           </View>
+
+          {pendingCustomPlatforms.length > 0 && (
+            <View style={styles.customAffDividerWrap}>
+              <Divider />
+              <Text style={styles.customAffSectionLabel}>수동 추가 제휴 플랫폼</Text>
+            </View>
+          )}
+
+          {pendingCustomPlatforms.map((cp, idx) => (
+            <View key={`pending-aff-${idx}`}>
+              <View style={styles.idInputRow}>
+                <View style={[styles.idIconWrap, { backgroundColor: theme.colors.primary[400] + '20' }]}>
+                  <Text style={[styles.idIconText, { color: theme.colors.primary[400], fontSize: 11 }]}>
+                    {cp.name.trim().charAt(0).toUpperCase() || '+'}
+                  </Text>
+                </View>
+                <View style={styles.idInputBody}>
+                  <TextInput
+                    style={styles.idInput}
+                    value={cp.name}
+                    onChangeText={(text) => setPendingCustomPlatforms((prev) =>
+                      prev.map((p, i) => i === idx ? { ...p, name: text } : p)
+                    )}
+                    placeholder="플랫폼 이름 (예: 알리익스프레스)"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    maxLength={20}
+                  />
+                  <View style={{ height: 8 }} />
+                  <TextInput
+                    style={styles.idInput}
+                    value={cp.id}
+                    onChangeText={(text) => setPendingCustomPlatforms((prev) =>
+                      prev.map((p, i) => i === idx ? { ...p, id: text } : p)
+                    )}
+                    placeholder="파트너스 ID / 코드"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={styles.customAffDeleteBtn}
+                  onPress={() => setPendingCustomPlatforms((prev) => prev.filter((_, i) => i !== idx))}
+                  activeOpacity={0.7}
+                  hitSlop={12}
+                >
+                  <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              {idx < pendingCustomPlatforms.length - 1 && <Divider />}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.customAffAddBtn}
+            onPress={() => setPendingCustomPlatforms((prev) => [...prev, { name: '', id: '' }])}
+            activeOpacity={0.8}
+          >
+            <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.customAffAddBtnText}>제휴 플랫폼 수동 추가</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -2511,6 +2583,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#0064FF',
+  },
+  customAffDividerWrap: {
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  customAffSectionLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    marginTop: theme.spacing.sm,
+    letterSpacing: 0.5,
+  },
+  customAffDeleteBtn: {
+    padding: theme.spacing.sm,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  customAffAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    borderStyle: 'dashed',
+    marginTop: theme.spacing.md,
+  },
+  customAffAddBtnText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   saveIdButton: {
     flexDirection: 'row',
