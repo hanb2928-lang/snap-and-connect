@@ -90,6 +90,7 @@ export default function SettingsScreen() {
   const [ttsPitch, setTtsPitch] = useState(0);
   const [progressStyle, setProgressStyle] = useState<'circular' | 'baby-run' | 'status-bar'>('circular');
   const [autoDisclosure, setAutoDisclosure] = useState(true);
+  const [cleanFootage, setCleanFootage] = useState(false);
   const [captureGuideMode, setCaptureGuideMode] = useState<'beginner' | 'pro'>('beginner');
   const [uiPerformance, setUiPerformance] = useState<'high' | 'lite'>('high');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
@@ -154,6 +155,7 @@ export default function SettingsScreen() {
       setTtsPitch(data?.tts_pitch ?? 0);
       setProgressStyle((data?.progress_style as 'circular' | 'baby-run' | 'status-bar') || 'circular');
       setAutoDisclosure(data?.auto_disclosure ?? true);
+      setCleanFootage(data?.clean_footage_enabled ?? false);
       setCaptureGuideMode((data?.capture_guide_mode as 'beginner' | 'pro') || 'beginner');
       setUiPerformance((data?.ui_performance as 'high' | 'lite') || 'high');
       setThemeMode((data?.theme_mode as 'dark' | 'light') || 'dark');
@@ -1497,6 +1499,22 @@ export default function SettingsScreen() {
               </View>
             </TouchableOpacity>
           </View>
+          <Divider />
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.featureTitle}>클린 영상 추출 (자막/훅 없음)</Text>
+              <Text style={styles.featureDesc}>자막·후킹문구가 없는 순수 원본 영상만 생성합니다. 유튜브 쇼츠 사운드 중심 콘텐츠, 네이버 플레이스 동영상 탭, 외부 편집 툴용으로 적합합니다</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setCleanFootage(!cleanFootage)}
+              activeOpacity={0.7}
+              hitSlop={12}
+            >
+              <View style={[styles.toggleSwitch, cleanFootage && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, cleanFootage && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
         <TouchableOpacity
           style={[styles.saveIdButton, savedDefaults && styles.saveIdButtonDone]}
@@ -1511,6 +1529,7 @@ export default function SettingsScreen() {
                 tts_pitch: ttsPitch,
                 progress_style: progressStyle,
                 auto_disclosure: autoDisclosure,
+                clean_footage_enabled: cleanFootage,
               });
               setSavedDefaults(true);
               setTimeout(() => setSavedDefaults(false), 2500);

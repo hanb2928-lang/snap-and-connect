@@ -190,6 +190,7 @@ export interface UserSettings {
   auto_publish_tiktok: boolean | null;
   auto_publish_shorts: boolean | null;
   auto_publish_sandbox_mode: boolean | null;
+  clean_footage_enabled: boolean | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';

@@ -154,6 +154,7 @@ export default function ResultScreen() {
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
   const [scrollToCommerce, setScrollToCommerce] = useState(false);
   const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
+  const [cleanMode, setCleanMode] = useState(false);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -187,6 +188,7 @@ export default function ResultScreen() {
         setLocalStoreInfo((scanResult.data as Scan).local_store_info ?? null);
       }
       if (mountedRef.current) setSettings(settingsResult);
+      setCleanMode(!!settingsResult?.clean_footage_enabled);
     } catch (err) {
       if (mountedRef.current) setError(friendlyError(err, '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
@@ -868,6 +870,23 @@ export default function ResultScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {/* Clean footage toggle */}
+                <View style={styles.cleanModeRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cleanModeTitle}>클린 영상 (자막/훅 없음)</Text>
+                    <Text style={styles.cleanModeDesc}>텍스트 오버레이 없이 순수 원본 비주얼만 추출</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setCleanMode((v) => !v)}
+                    activeOpacity={0.7}
+                    hitSlop={12}
+                  >
+                    <View style={[styles.cleanModeSwitch, cleanMode && styles.cleanModeSwitchActive]}>
+                      <View style={[styles.cleanModeKnob, cleanMode && styles.cleanModeKnobActive]} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.templateWrap}>
                 <TemplateCard
@@ -884,6 +903,7 @@ export default function ResultScreen() {
                   stickerSize={stickerSize}
                   overlayOpacity={overlayOpacity ?? undefined}
                   textPosition={textPosition}
+                  cleanMode={cleanMode}
                 />
               </View>
             </View>
@@ -2726,5 +2746,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: theme.spacing.sm,
+  },
+  cleanModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: theme.spacing.sm,
+  },
+  cleanModeTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  cleanModeDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  cleanModeSwitch: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  cleanModeSwitchActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  cleanModeKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.dark.text,
+  },
+  cleanModeKnobActive: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
   },
 });

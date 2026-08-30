@@ -40,6 +40,7 @@ interface TemplateCardProps {
   overlayOpacity?: number;
   textPosition?: TextPosition;
   onHookChange?: (hook: string) => void;
+  cleanMode?: boolean;
 }
 
 type StickerPosition = 'top-left' | 'top-right';
@@ -113,7 +114,7 @@ function getVariant(td: TemplateData | null | undefined, platform: PlatformKey):
 const HOOK_FONT_SIZE = 26;
 
 export const TemplateCard = forwardRef<View, TemplateCardProps>(
-  ({ imageUrl, templateData, title, platform = 'shortform', shortUrl = '', overlayOpacity, textPosition = 'bottom', onHookChange }, ref) => {
+  ({ imageUrl, templateData, title, platform = 'shortform', shortUrl = '', overlayOpacity, textPosition = 'bottom', onHookChange, cleanMode = false }, ref) => {
     const variant = getVariant(templateData, platform);
     const [editingHook, setEditingHook] = useState(false);
     const [hookText, setHookText] = useState(variant.hook);
@@ -143,7 +144,7 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
     const aspect = imgAspect ?? fallbackAspect;
     const cardHeight = Math.round(CARD_WIDTH / aspect);
 
-    const overlayBase = 0.35;
+    const overlayBase = cleanMode ? 0 : 0.35;
     const effectiveOpacity = overlayOpacity != null ? overlayOpacity : overlayBase;
     const overlayColor = `rgba(10, 15, 30, ${effectiveOpacity})`;
 
@@ -159,17 +160,21 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
         <View style={[styles.overlay, { backgroundColor: overlayColor }]} />
 
         <View style={[styles.content, { justifyContent: contentJustify, paddingTop: textPosition === 'top' ? theme.spacing.lg : 0 }]}>
-          <EditableHook
-            hook={hook}
-            editing={editingHook}
-            hookText={hookText}
-            style={styles.hookText}
-            numberOfLines={3}
-            onStartEdit={() => { setHookText(variant.hook); setEditingHook(true); }}
-            onChangeText={setHookText}
-            onConfirm={() => { setEditingHook(false); onHookChange?.(hookText); }}
-          />
-          {editingHook && <Text style={styles.hookEditHint}>터치해서 문구 수정</Text>}
+          {!cleanMode && (
+            <>
+              <EditableHook
+                hook={hook}
+                editing={editingHook}
+                hookText={hookText}
+                style={styles.hookText}
+                numberOfLines={3}
+                onStartEdit={() => { setHookText(variant.hook); setEditingHook(true); }}
+                onChangeText={setHookText}
+                onConfirm={() => { setEditingHook(false); onHookChange?.(hookText); }}
+              />
+              {editingHook && <Text style={styles.hookEditHint}>터치해서 문구 수정</Text>}
+            </>
+          )}
         </View>
       </View>
     );
