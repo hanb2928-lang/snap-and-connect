@@ -290,7 +290,7 @@ export default function MarketingScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>숏폼 제작</Text>
-              <Text style={styles.headerSub}>매장 사진 한 장 → 10초 만에 손님 부르는 숏폼</Text>
+              <Text style={styles.headerSub}>매장 사진 한 장으로 홍보 영상 만들기</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -426,9 +426,9 @@ export default function MarketingScreen() {
         <View style={styles.voiceSection}>
           <View style={styles.voiceHeader}>
             <Mic size={18} color={theme.colors.accent[400]} strokeWidth={2.5} />
-            <Text style={styles.voiceTitle}>사장님 육성 녹음 / AI 보이스 훅</Text>
+            <Text style={styles.voiceTitle}>내 목소리 얹기</Text>
           </View>
-          <Text style={styles.voiceDesc}>3초만 한마디하면 AI가 잡음 제거 + BGM 믹싱으로 프로급 숏폼으로 만들어드려요</Text>
+          <Text style={styles.voiceDesc}>짧게 한마디하면 AI가 잡음 제거 + BGM 믹싱으로 프로급 숏폼을 만들어드려요</Text>
 
           {voice.error && (
             <View style={styles.voiceErrorBox}>
@@ -453,7 +453,7 @@ export default function MarketingScreen() {
               ) : (
                 <>
                   <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                  <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>3초 녹음 시작</Text>
+                  <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>녹음 시작</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -495,7 +495,7 @@ export default function MarketingScreen() {
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.generateBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
+          <Text style={styles.generateBtnText}>홍보 만들기 시작</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>

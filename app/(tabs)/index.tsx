@@ -533,7 +533,7 @@ export default function CameraScreen() {
         <View style={styles.captureTip}>
           <Info size={14} color={theme.colors.primary[300]} strokeWidth={2} />
           <Text style={styles.captureTipText}>
-            단품 클로즈업 + 측면/디테일 컷을 함께 올리면 AI 분석 정확도가 2배 높아져요!
+            단품 사진 + 측면/디테일 컷을 함께 올리면 분석 정확도가 높아져요!
           </Text>
         </View>
 
@@ -575,7 +575,7 @@ export default function CameraScreen() {
               {hasImage ? (
                 <>
                   <Flame size={26} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.captureBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
+                  <Text style={styles.captureBtnText}>홍보 만들기 시작</Text>
                   <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
                 </>
               ) : (
@@ -703,9 +703,9 @@ function WebSimpleScreen({
           <View style={styles.webHeroIcon}>
             <Sparkles size={40} color={theme.colors.primary[400]} strokeWidth={1.8} />
           </View>
-          <Text style={styles.webHeroTitle}>10초 만에 매장 홍보 숏폼 만들기</Text>
+          <Text style={styles.webHeroTitle}>매장 홍보 숏폼 만들기</Text>
           <Text style={styles.webHeroSub}>
-            매장 사진을 올리면 AI가 분석해서 동네 손님을 부르는 숏폼을 자동으로 만들어드려요
+            사진 한 장으로 매장 홍보 숏폼을 만들어요
           </Text>
         </View>
 
@@ -713,7 +713,7 @@ function WebSimpleScreen({
         <View style={styles.webCaptureTip}>
           <Info size={16} color={theme.colors.primary[300]} strokeWidth={2} />
           <Text style={styles.webCaptureTipText}>
-            단품 클로즈업 + 측면/디테일 컷을 함께 올리면 AI 분석 정확도가 2배 높아져요!
+            단품 사진 + 측면/디테일 컷을 함께 올리면 분석 정확도가 높아져요!
           </Text>
         </View>
 
@@ -757,7 +757,7 @@ function WebSimpleScreen({
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.webGenerateBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
+          <Text style={styles.webGenerateBtnText}>홍보 만들기 시작</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
 
