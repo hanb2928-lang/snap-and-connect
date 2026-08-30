@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
@@ -83,6 +84,8 @@ export default function CameraScreen() {
   const isMountedRef = useRef(true);
   const voiceCommandInProgressRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
+  const autoSaveStepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoSavePulse = useSharedValue(1);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [flash, setFlash] = useState<'on' | 'off' | 'auto'>('off');
@@ -103,7 +106,6 @@ export default function CameraScreen() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
   const [autoSaveStep, setAutoSaveStep] = useState(1);
-  const autoSavePulse = useSharedValue(1);
   const [moodFilter, setMoodFilter] = useState<'none' | 'warm' | 'fresh'>('none');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
@@ -115,6 +117,29 @@ export default function CameraScreen() {
   const progressWidth = useSharedValue(0);
   const genIdRef = useRef(0);
 
+  // Auto-save step animation: cycle 1→2→3 every 800ms, pulse the icon
+  const startAutoSaveAnimation = useCallback(() => {
+    setAutoSaveStep(1);
+    autoSavePulse.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 600 }),
+        withTiming(1, { duration: 600 }),
+      ),
+      -1,
+      false,
+    );
+    autoSaveStepTimer.current = setInterval(() => {
+      setAutoSaveStep((s) => (s >= 3 ? 3 : s + 1));
+    }, 800);
+  }, [autoSavePulse]);
+  const stopAutoSaveAnimation = useCallback(() => {
+    if (autoSaveStepTimer.current) {
+      clearInterval(autoSaveStepTimer.current);
+      autoSaveStepTimer.current = null;
+    }
+    autoSavePulse.value = 1;
+  }, [autoSavePulse]);
+
   useFocusEffect(
     useCallback(() => {
       isMountedRef.current = true;
@@ -124,8 +149,14 @@ export default function CameraScreen() {
         setIsActive(false);
         setCameraReady(false);
         setProcessing(false);
+        setAutoSaving(false);
+        genIdRef.current += 1;
+        stopAutoSaveAnimation();
+        cancelAnimation(progressWidth);
+        cancelAnimation(fadeAnim);
+        cancelAnimation(autoSavePulse);
       };
-    }, []),
+    }, [stopAutoSaveAnimation, progressWidth, fadeAnim, autoSavePulse]),
   );
 
   useEffect(() => {
@@ -150,30 +181,6 @@ export default function CameraScreen() {
     fadeAnim.value = withTiming(1, { duration: 300 });
   }, [fadeAnim]);
 
-  // Auto-save step animation: cycle 1→2→3 every 800ms, pulse the icon
-  const autoSaveStepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startAutoSaveAnimation = useCallback(() => {
-    setAutoSaveStep(1);
-    autoSavePulse.value = withRepeat(
-      withSequence(
-        withTiming(1.15, { duration: 600 }),
-        withTiming(1, { duration: 600 }),
-      ),
-      -1,
-      false,
-    );
-    autoSaveStepTimer.current = setInterval(() => {
-      setAutoSaveStep((s) => (s >= 3 ? 3 : s + 1));
-    }, 800);
-  }, [autoSavePulse]);
-  const stopAutoSaveAnimation = useCallback(() => {
-    if (autoSaveStepTimer.current) {
-      clearInterval(autoSaveStepTimer.current);
-      autoSaveStepTimer.current = null;
-    }
-    autoSavePulse.value = 1;
-  }, [autoSavePulse]);
-
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
   }));
@@ -194,6 +201,8 @@ export default function CameraScreen() {
         return;
       }
       const genId = genIdRef.current;
+      let retryB64: string | null = null;
+      let retryMime: string | null = null;
       setAutoSaving(true);
       setAutoSaveToast(null);
       startAutoSaveAnimation();
@@ -219,6 +228,8 @@ export default function CameraScreen() {
         if (!isMountedRef.current || genIdRef.current !== genId) return;
         const compressedB64 = cleanBase64(compressedDataUrl);
         const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
+        retryB64 = compressedB64;
+        retryMime = compressedMime;
         setError(null);
 
         const { scanId } = await withTimeout(
@@ -232,7 +243,16 @@ export default function CameraScreen() {
         router.push({ pathname: '/result/[id]', params: { id: scanId } });
       } catch (err) {
         if (!isMountedRef.current || genIdRef.current !== genId) return;
-        setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        const isTimeout = err instanceof Error && (err.message.includes('시간 초과') || err.message.includes('timeout'));
+        if (isTimeout && retryB64) {
+          try {
+            await setItem('pending_retry_image', retryB64);
+            await setItem('pending_retry_mime', retryMime || 'image/jpeg');
+          } catch { /* ignore */ }
+          setError('네트워크 연결이 원활하지 않습니다. 사진을 임시 저장했습니다. 연결이 복구되면 다시 시도해 주세요.');
+        } else {
+          setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        }
       } finally {
         if (genIdRef.current === genId) {
           stopAutoSaveAnimation();
@@ -381,7 +401,16 @@ export default function CameraScreen() {
     } catch (err) {
       if (progressTimer) clearInterval(progressTimer);
       if (!isMountedRef.current || genIdRef.current !== genId) return;
-      setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
+      const isTimeout = err instanceof Error && (err.message.includes('시간 초과') || err.message.includes('timeout'));
+      if (isTimeout) {
+        try {
+          await setItem('pending_retry_image', base64);
+          await setItem('pending_retry_mime', mimeType);
+        } catch { /* ignore */ }
+        setError('네트워크 연결이 원활하지 않습니다. 사진을 임시 저장했습니다. 연결이 복구되면 다시 시도해 주세요.');
+      } else {
+        setError(friendlyError(err, '분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
+      }
     } finally {
       if (progressTimer) clearInterval(progressTimer);
       if (isMountedRef.current) setProcessing(false);
@@ -607,7 +636,16 @@ export default function CameraScreen() {
         router.push({ pathname: '/result/[id]', params: { id: scanId } });
       } catch (err) {
         if (genIdRef.current !== genId) return;
-        setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        const isTimeout = err instanceof Error && (err.message.includes('시간 초과') || err.message.includes('timeout'));
+        if (isTimeout) {
+          try {
+            await setItem('pending_retry_image', base64);
+            await setItem('pending_retry_mime', mimeType);
+          } catch { /* ignore */ }
+          setError('네트워크 연결이 원활하지 않습니다. 사진을 임시 저장했습니다. 연결이 복구되면 다시 시도해 주세요.');
+        } else {
+          setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        }
       } finally {
         if (genIdRef.current === genId) {
           stopAutoSaveAnimation();

@@ -126,13 +126,23 @@ export function MultiAngleCaptureGuide({
       return { ...shot, orderIndex: idx };
     }).filter(Boolean) as AngleShot[];
     onComplete(ordered);
+    // Explicitly release data URL references for GC before clearing
+    for (const key of Object.keys(shots)) {
+      shots[key].dataUrl = undefined;
+      shots[key].base64 = undefined;
+    }
     setShots({});
   }, [shots, onComplete]);
 
   const handleClose = useCallback(() => {
+    // Release data URL references before clearing to avoid lingering blob memory
+    for (const key of Object.keys(shots)) {
+      shots[key].dataUrl = undefined;
+      shots[key].base64 = undefined;
+    }
     setShots({});
     onClose();
-  }, [onClose]);
+  }, [shots, onClose]);
 
   return (
     <Modal visible={visible} transparent animationType="slide">
