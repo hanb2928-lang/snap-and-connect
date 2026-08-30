@@ -54,6 +54,19 @@ import { validateAffiliateUrl } from '@/lib/affiliate';
 import { extractProductMeta } from '@/lib/analysis';
 import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 
+const MAX_PROMPT_LENGTH = 200;
+const MAX_STORE_INPUT_LENGTH = 80;
+
+// Strip HTML/script tags, control chars, and dangerous angle brackets to prevent
+// rendering breakage and JSON parse errors on the AI server.
+function sanitizeTextInput(raw: string, maxLength: number): string {
+  const stripped = raw
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '') // HTML/script tags
+    .replace(/[<>]/g, '') // remaining angle brackets
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // control chars
+  return stripped.slice(0, maxLength);
+}
+
 const VIDEO_LENGTH_PRESETS = [
   { key: '7s', label: '7초 폭발 바이럴', desc: '틱톡·릴스 최적', icon: Zap, color: theme.colors.warning[400], seconds: 7 },
   { key: '15s', label: '15초 리뷰형', desc: '유튜브 숏츠 최적', icon: Film, color: theme.colors.primary[400], seconds: 15 },
@@ -435,7 +448,7 @@ export default function MarketingScreen() {
             <TextInput
               style={styles.textInput}
               value={storeName}
-              onChangeText={setStoreName}
+              onChangeText={(t) => setStoreName(sanitizeTextInput(t, MAX_STORE_INPUT_LENGTH))}
               placeholder="예: 한승식당, 카페 블룸, 킹스버거"
               placeholderTextColor={theme.colors.dark.textFaint}
             />
@@ -446,7 +459,7 @@ export default function MarketingScreen() {
             <TextInput
               style={styles.textInput}
               value={signatureMenu}
-              onChangeText={setSignatureMenu}
+              onChangeText={(t) => setSignatureMenu(sanitizeTextInput(t, MAX_STORE_INPUT_LENGTH))}
               placeholder="예: 명란 아보카도 비빔밥, 수제망고주스"
               placeholderTextColor={theme.colors.dark.textFaint}
             />
@@ -457,7 +470,7 @@ export default function MarketingScreen() {
             <TextInput
               style={[styles.textInput, { minHeight: 70 }]}
               value={promoText}
-              onChangeText={setPromoText}
+              onChangeText={(t) => setPromoText(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
               placeholder="예: 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료"
               placeholderTextColor={theme.colors.dark.textFaint}
               multiline
@@ -532,7 +545,7 @@ export default function MarketingScreen() {
               <TextInput
                 style={styles.manualInput}
                 value={customPrompt}
-                onChangeText={setCustomPrompt}
+                onChangeText={(t) => setCustomPrompt(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
                 placeholder="예: 매콤한 아보카도 명란 비빔밥, 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료 제공"
                 placeholderTextColor={theme.colors.dark.textFaint}
                 multiline

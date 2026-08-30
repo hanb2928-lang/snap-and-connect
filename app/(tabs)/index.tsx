@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
+import { isOnline } from '@/hooks/useNetworkStatus';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
@@ -178,6 +179,10 @@ export default function CameraScreen() {
 
     // oneclick mode: capture + auto-save in one step, skip funnel
     if (captureMode === 'oneclick') {
+      if (!isOnline()) {
+        setError('네트워크 연결을 확인해주세요. 인터넷이 연결되지 않아 AI 분석을 시작할 수 없습니다.');
+        return;
+      }
       const genId = genIdRef.current;
       setAutoSaving(true);
       setAutoSaveToast(null);
@@ -324,6 +329,10 @@ export default function CameraScreen() {
   };
 
   const processImage = async (base64: string, mimeType: string) => {
+    if (!isOnline()) {
+      setError('네트워크 연결을 확인해주세요. 인터넷이 연결되지 않아 AI 분석을 시작할 수 없습니다.');
+      return;
+    }
     const genId = genIdRef.current;
     let progressTimer: ReturnType<typeof setInterval> | null = null;
     try {
@@ -568,6 +577,10 @@ export default function CameraScreen() {
   const handleWebCapture = async (base64: string, mimeType: string) => {
     // oneclick mode: auto-save to 보관함 in background, show toast, skip funnel
     if (captureMode === 'oneclick') {
+      if (!isOnline()) {
+        setError('네트워크 연결을 확인해주세요. 인터넷이 연결되지 않아 AI 분석을 시작할 수 없습니다.');
+        return;
+      }
       const genId = genIdRef.current;
       setAutoSaving(true);
       setAutoSaveToast(null);

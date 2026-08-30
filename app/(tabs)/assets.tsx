@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
 import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { theme } from '@/lib/theme';
@@ -144,6 +144,30 @@ export default function AssetsScreen() {
   }, []);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
+
+  // Garbage collection: on screen focus, filter out assets whose file_url
+  // is expired or invalid (e.g. blob: URIs from a previous session that no longer exist).
+  useFocusEffect(
+    useCallback(() => {
+      setAssets((prev) => {
+        const valid = prev.filter((a) => {
+          if (!a.file_url) return false;
+          // blob: and file:// URIs don't survive app restarts on web
+          if (Platform.OS === 'web' && a.file_url.startsWith('blob:')) return false;
+          // Supabase storage URLs are persistent — keep them
+          if (a.file_url.startsWith('http')) return true;
+          // On native, cache-directory URIs may be evicted by the OS
+          if (Platform.OS !== 'web' && a.file_url.startsWith('file://')) {
+            // Keep for now — FileSystem.getInfoAsync would be ideal but is async;
+            // the download handler will surface a clear error if the file is gone
+            return true;
+          }
+          return true;
+        });
+        return valid.length !== prev.length ? valid : prev;
+      });
+    }, []),
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
