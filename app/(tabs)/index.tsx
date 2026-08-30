@@ -36,6 +36,8 @@ import { ImageCropModal } from '@/components/ImageCropModal';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
+import { VoiceCommandFloatingButton } from '@/components/VoiceCommandFloatingButton';
+import type { ParsedVoiceCommand } from '@/hooks/useVoiceCommand';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -327,6 +329,13 @@ export default function CameraScreen() {
       setMultiAngleShots([]);
     }
   };
+
+  const handleVoiceCommand = useCallback(async (cmd: ParsedVoiceCommand) => {
+    await setItem('marketing_voice_command_prompt', cmd.promptText);
+    await setItem('marketing_voice_command_intent', cmd.intent || '');
+    await setItem('marketing_voice_command_active', 'true');
+    router.push('/(tabs)/marketing' as never);
+  }, [router]);
 
   const moodOverlayColor =
     moodFilter === 'warm' ? 'rgba(255, 180, 80, 0.12)' :
@@ -677,6 +686,9 @@ export default function CameraScreen() {
         visible={creditModalVisible}
         onClose={() => setCreditModalVisible(false)}
       />
+
+      {/* Hands-free voice command */}
+      <VoiceCommandFloatingButton onCommand={handleVoiceCommand} />
 
       {/* AI Instant Analysis Funnel */}
       {funnelStage !== 'idle' && selectedImage && (

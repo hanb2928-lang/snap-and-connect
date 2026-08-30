@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   UIManager,
   ViewStyle,
+  Alert,
 } from 'react-native';
 import {
   Flame,
@@ -39,7 +40,7 @@ import {
   Play,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
@@ -153,6 +154,54 @@ export default function MarketingScreen() {
       } catch {}
     })();
   }, []);
+
+  const voiceCommandHandledRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (voiceCommandHandledRef.current) return;
+      (async () => {
+        try {
+          const active = await getItem('marketing_voice_command_active');
+          if (active !== 'true') return;
+
+          const promptText = await getItem('marketing_voice_command_prompt');
+          const intent = await getItem('marketing_voice_command_intent');
+
+          await setItem('marketing_voice_command_active', 'false');
+          voiceCommandHandledRef.current = true;
+
+          if (promptText && promptText.trim()) {
+            setCustomPrompt(promptText.trim());
+            setManualPromptOpen(true);
+
+            const intentHookMap: Record<string, string> = {
+              closing: 'limited',
+              new_menu: 'new_menu',
+              discount: 'new_menu',
+              service: 'combo',
+              best_seller: 'best_seller',
+            };
+            if (intent && intentHookMap[intent]) {
+              setSelectedHook(intentHookMap[intent]);
+            }
+
+            // Auto-fill store name / promo from the voice text if empty
+            const savedStore = await getItem('marketing_store_name');
+            if (!savedStore) {
+              setPromoText(promptText.trim());
+            }
+
+            // Auto-trigger generation after a short delay for visual feedback
+            setTimeout(() => {
+              lastActionRef.current = 0;
+              handleStartGeneration();
+            }, 1200);
+          }
+        } catch {}
+      })();
+    }, []),
+  );
 
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
