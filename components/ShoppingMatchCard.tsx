@@ -87,6 +87,22 @@ export function ShoppingMatchCard({
   const [warning, setWarning] = useState<string | null>(null);
   const { showAffiliateToast } = useAffiliateToast();
 
+  const handleOpen = (url: string) => {
+    showAffiliateToast(url);
+  };
+
+  const getPlatformColor = (platform: string): string => {
+    const meta = PLATFORM_META.find((p) => p.key === platform);
+    return meta?.color || theme.colors.primary[400];
+  };
+
+  const getPlatformIcon = (platform: AffiliatePlatformKey) => {
+    const meta = PLATFORM_META.find((p) => p.key === platform);
+    if (!meta) return <ShoppingBag size={18} color="#fff" strokeWidth={2} />;
+    const Icon = meta.icon;
+    return <Icon size={18} color="#fff" strokeWidth={2} />;
+  };
+
   useEffect(() => {
     setExpanded(!!customAffiliateLinks.find((l) => l.productIndex === selectedProductIndex));
   }, [selectedProductIndex, customAffiliateLinks]);
@@ -191,22 +207,6 @@ export function ShoppingMatchCard({
       </View>
     );
   }
-
-  const handleOpen = (url: string) => {
-    showAffiliateToast(url);
-  };
-
-  const getPlatformColor = (platform: string): string => {
-    const meta = PLATFORM_META.find((p) => p.key === platform);
-    return meta?.color || theme.colors.primary[400];
-  };
-
-  const getPlatformIcon = (platform: AffiliatePlatformKey) => {
-    const meta = PLATFORM_META.find((p) => p.key === platform);
-    if (!meta) return <ShoppingBag size={18} color="#fff" strokeWidth={2} />;
-    const Icon = meta.icon;
-    return <Icon size={18} color="#fff" strokeWidth={2} />;
-  };
 
   const customLinkForProduct = customAffiliateLinks.find(
     (l) => l.productIndex === selectedProductIndex,

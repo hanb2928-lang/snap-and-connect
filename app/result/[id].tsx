@@ -452,6 +452,7 @@ export default function ResultScreen() {
 
   const handleSaveCustomLink = async (url: string, label: string, productIndex: number): Promise<{ success: boolean; error?: string }> => {
     if (!scan) return { success: false, error: '스캔 정보를 찾을 수 없어요' };
+    if (!url || !url.trim()) return { success: false, error: '링크 URL을 입력해주세요' };
     setSavingLink(true);
     const detectedPlatform = detectAffiliatePlatform(url);
     const updated = customAffiliateLinks.filter((l) => l.productIndex !== productIndex);
@@ -1722,6 +1723,8 @@ export default function ResultScreen() {
           onAffiliateChange={(url, label) => {
             if (scan && url) {
               handleSaveCustomLink(url, label, selectedProductIndex);
+            } else if (scan && !url) {
+              handleRemoveCustomLink(selectedProductIndex);
             }
           }}
           onSaveAndShare={handleSaveAndShare}
