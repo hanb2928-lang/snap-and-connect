@@ -46,7 +46,7 @@ import type { ParsedVoiceCommand } from '@/hooks/useVoiceCommand';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
-const ANALYSIS_TIMEOUT_MS = 120000;
+const ANALYSIS_TIMEOUT_MS = 45000;
 
 const INSTANT_HOOKS = [
   { key: 'new_menu', label: '오늘 우리 동네 신메뉴 특가!', icon: Store, color: theme.colors.warning[400] },
@@ -62,6 +62,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
     timer = setTimeout(() => reject(new Error(`${label} (시간 초과)`)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+const MAX_PROMPT_LENGTH = 200;
+
+function sanitizeTextInput(raw: string, maxLength: number): string {
+  return raw
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .slice(0, maxLength);
 }
 
 export default function CameraScreen() {
@@ -1059,7 +1069,7 @@ export default function CameraScreen() {
                     placeholder="예: 숯불돈까스 9천원, 매일 오픈런"
                     placeholderTextColor={theme.colors.dark.textFaint}
                     value={customPrompt}
-                    onChangeText={setCustomPrompt}
+                    onChangeText={(t) => setCustomPrompt(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
                     multiline
                     maxLength={200}
                   />
@@ -1293,7 +1303,7 @@ function WebCameraScreen({
                   placeholder="예: 숯불돈까스 9천원, 매일 오픈런"
                   placeholderTextColor={theme.colors.dark.textFaint}
                   value={customPrompt}
-                  onChangeText={onCustomPromptChange}
+                  onChangeText={(t) => onCustomPromptChange(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
                   multiline
                   maxLength={200}
                 />

@@ -123,8 +123,12 @@ export function WebCameraView({
     setCapturing(true);
     try {
       const video = videoRef.current;
-      const w = video.videoWidth || 1080;
-      const h = video.videoHeight || 1920;
+      const rawW = video.videoWidth || 1080;
+      const rawH = video.videoHeight || 1920;
+      const maxDim = 1080;
+      const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
+      const w = Math.round(rawW * scale);
+      const h = Math.round(rawH * scale);
       const canvas = canvasRef.current ?? document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;

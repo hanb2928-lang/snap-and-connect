@@ -57,6 +57,7 @@ export function MultiAngleCaptureGuide({
   const [shots, setShots] = useState<Record<string, AngleShot>>({});
   const [currentAngle, setCurrentAngle] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const pickLockRef = useRef(false);
 
   const completedCount = Object.keys(shots).length;
   const allDone = completedCount >= ANGLE_GUIDES.length;
@@ -92,6 +93,8 @@ export function MultiAngleCaptureGuide({
   const handlePickFromGallery = useCallback(
     async (angleId: string) => {
       if (!onPickImage) return;
+      if (pickLockRef.current) return;
+      pickLockRef.current = true;
       setProcessing(true);
       try {
         const result = await onPickImage(angleId);
@@ -102,6 +105,7 @@ export function MultiAngleCaptureGuide({
         // ignore
       }
       setProcessing(false);
+      setTimeout(() => { pickLockRef.current = false; }, 500);
     },
     [onPickImage, handleAddShot],
   );

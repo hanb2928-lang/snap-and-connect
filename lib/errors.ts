@@ -9,8 +9,8 @@ export function friendlyError(err: unknown, fallback: string): string {
   if (lower.includes('network') || lower.includes('failed to fetch') || (lower.includes('fetch') && lower.includes('error'))) {
     return '인터넷 연결을 확인해주세요. 네트워크가 일시적으로 불안정합니다.';
   }
-  if (lower.includes('timeout') || lower.includes('timed out')) {
-    return '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.';
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('시간 초과')) {
+    return '네트워크 지연으로 분석이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.';
   }
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('api key')) {
     return 'AI 분석 서비스 인증에 실패했습니다. 설정에서 API 키를 확인해주세요.';
