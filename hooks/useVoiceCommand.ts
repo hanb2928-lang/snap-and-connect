@@ -43,8 +43,12 @@ function findWakeWord(text: string): string | null {
   return null;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function stripWakeWord(text: string, wakeWord: string): string {
-  return text.replace(new RegExp(wakeWord, 'gi'), '').trim();
+  return text.replace(new RegExp(escapeRegExp(wakeWord), 'gi'), '').trim();
 }
 
 interface SpeechRecognitionResult {
@@ -92,6 +96,7 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
   const shouldListenRef = useRef(false);
   const onCommandRef = useRef(onCommand);
   const lastCommandTimeRef = useRef(0);
+  const restartAttemptsRef = useRef(0);
 
   useEffect(() => {
     onCommandRef.current = onCommand;
@@ -99,7 +104,7 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
 
   const handleResult = useCallback((event: SpeechRecognitionEventLike) => {
     let fullText = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
+    for (let i = 0; i < event.results.length; i++) {
       fullText += event.results[i][0].transcript;
     }
     const trimmed = fullText.trim();
@@ -150,13 +155,23 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
     recognition.onerror = handleError;
 
     recognition.onend = () => {
-      if (shouldListenRef.current) {
+      if (!shouldListenRef.current) return;
+      restartAttemptsRef.current += 1;
+      if (restartAttemptsRef.current > 10) {
+        shouldListenRef.current = false;
+        setState('error');
+        setError('음성 인식이 계속 중단됩니다. 마이크 버튼을 다시 눌러주세요.');
+        return;
+      }
+      const delay = Math.min(1000 * Math.pow(1.5, restartAttemptsRef.current - 1), 8000);
+      setTimeout(() => {
+        if (!shouldListenRef.current) return;
         try {
           recognition.start();
         } catch {
           // start() throws if already starting — ignore
         }
-      }
+      }, delay);
     };
 
     return recognition;
@@ -179,9 +194,11 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
     setError(null);
     setPartialTranscript('');
     shouldListenRef.current = true;
+    restartAttemptsRef.current = 0;
 
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.onend = null;
         recognitionRef.current.abort();
       } catch {}
     }
@@ -193,10 +210,12 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
       recognitionRef.current.start();
       setState('listening');
     } catch {
-      // start() throws if already started — try abort then start
       try {
         const rec = recognitionRef.current;
-        if (rec) rec.abort();
+        if (rec) {
+          rec.onend = null;
+          rec.abort();
+        }
         const newRec = createRecognition();
         if (!newRec) throw new Error('no recognition');
         recognitionRef.current = newRec;
@@ -213,6 +232,7 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
     shouldListenRef.current = false;
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.onend = null;
         recognitionRef.current.abort();
       } catch {}
       recognitionRef.current = null;
@@ -226,6 +246,7 @@ export function useVoiceCommand(onCommand: (cmd: ParsedVoiceCommand) => void) {
       shouldListenRef.current = false;
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onend = null;
           recognitionRef.current.abort();
         } catch {}
       }

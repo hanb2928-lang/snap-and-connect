@@ -18,6 +18,12 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
   const autoStartedRef = useRef(false);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const onCommandRef = useRef(onCommand);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     onCommandRef.current = onCommand;
@@ -25,10 +31,13 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
 
   const handleCommandWithFlash = useCallback((cmd: ParsedVoiceCommand) => {
     setJustWoke(true);
-    Animated.sequence([
+    const anim = Animated.sequence([
       Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.timing(pulseAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-    ]).start(() => setJustWoke(false));
+    ]);
+    anim.start(() => {
+      if (isMountedRef.current) setJustWoke(false);
+    });
     onCommandRef.current(cmd);
   }, [pulseAnim]);
 
@@ -41,13 +50,18 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
       setItem('voice_always_on', 'false');
     } else {
       voice.start();
-      setActive(true);
-      setItem('voice_always_on', 'true');
+      // Only persist always-on if start didn't immediately error
+      if (voice.state !== 'error') {
+        setActive(true);
+        setItem('voice_always_on', 'true');
+      }
     }
   }, [active, voice]);
 
   useEffect(() => {
-    if (voice.state === 'error') {
+    if (voice.state === 'listening') {
+      setActive(true);
+    } else if (voice.state === 'error') {
       setActive(false);
     }
   }, [voice.state]);
@@ -60,11 +74,13 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
       if (Platform.OS !== 'web') return;
       try {
         const alwaysOn = await getItem('voice_always_on');
-        // Default to always-on. If user explicitly turned it off, respect that.
         if (alwaysOn !== 'false') {
+          if (!isMountedRef.current) return;
           voice.start();
-          setActive(true);
-          await setItem('voice_always_on', 'true');
+          if (isMountedRef.current && voice.state !== 'error') {
+            setActive(true);
+            await setItem('voice_always_on', 'true');
+          }
         }
       } catch {}
     })();

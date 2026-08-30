@@ -105,6 +105,15 @@ export default function MarketingScreen() {
   const [voicePlaying, setVoicePlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   // Affiliate sub-setting state (hidden in advanced modal)
   const [affiliateOpen, setAffiliateOpen] = useState(false);
   const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
@@ -156,6 +165,8 @@ export default function MarketingScreen() {
   }, []);
 
   const voiceCommandHandledRef = useRef(false);
+  const voiceAutoGenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingVoiceGenRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,7 +188,6 @@ export default function MarketingScreen() {
             setCustomPrompt(promptText.trim());
             setManualPromptOpen(true);
 
-            // Load auto-captured photo from voice command if available
             const capturedImage = await getItem('marketing_voice_captured_image');
             const capturedMime = await getItem('marketing_voice_captured_mime');
             if (capturedImage) {
@@ -198,26 +208,37 @@ export default function MarketingScreen() {
               setSelectedHook(intentHookMap[intent]);
             }
 
-            // Auto-fill store name / promo from the voice text if empty
             const savedStore = await getItem('marketing_store_name');
             if (!savedStore) {
               setPromoText(promptText.trim());
             }
 
-            // Auto-trigger generation after a short delay for visual feedback
-            setTimeout(() => {
-              lastActionRef.current = 0;
-              handleStartGeneration();
-            }, 1200);
+            pendingVoiceGenRef.current = true;
           }
         } catch {}
       })();
       return () => {
         cancelled = true;
         voiceCommandHandledRef.current = false;
+        if (voiceAutoGenTimerRef.current) {
+          clearTimeout(voiceAutoGenTimerRef.current);
+          voiceAutoGenTimerRef.current = null;
+        }
+        pendingVoiceGenRef.current = false;
       };
     }, []),
   );
+
+  useEffect(() => {
+    if (!pendingVoiceGenRef.current) return;
+    if (!customPrompt.trim()) return;
+    pendingVoiceGenRef.current = false;
+    voiceAutoGenTimerRef.current = setTimeout(() => {
+      voiceAutoGenTimerRef.current = null;
+      lastActionRef.current = 0;
+      handleStartGeneration();
+    }, 1200);
+  }, [customPrompt, selectedHook]);
 
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
@@ -281,7 +302,7 @@ export default function MarketingScreen() {
       } else {
         audioRef.current.src = voiceDataUrl;
       }
-      audioRef.current.play();
+      audioRef.current.play().catch(() => setVoicePlaying(false));
       setVoicePlaying(true);
     }
   };

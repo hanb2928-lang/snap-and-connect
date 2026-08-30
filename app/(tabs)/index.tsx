@@ -67,6 +67,7 @@ export default function CameraScreen() {
   const safeInsets = useSafeAreaInsets();
   const bottomInset = Math.max(safeInsets.bottom, 0);
   const isMountedRef = useRef(true);
+  const voiceCommandInProgressRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
@@ -341,9 +342,14 @@ export default function CameraScreen() {
   };
 
   const handleVoiceCommand = useCallback(async (cmd: ParsedVoiceCommand) => {
+    // Prevent re-entry during async capture+navigate
+    if (voiceCommandInProgressRef.current) return;
+    voiceCommandInProgressRef.current = true;
+
     // Save voice command data first so marketing screen can pick it up
     await setItem('marketing_voice_command_prompt', cmd.promptText);
     await setItem('marketing_voice_command_intent', cmd.intent || '');
+    await setItem('marketing_voice_command_active', 'true');
 
     // If camera is ready and no image selected yet, auto-capture a photo hands-free
     if (cameraRef.current && cameraReady && !selectedImage && !previewCapture && !processing) {
@@ -374,13 +380,11 @@ export default function CameraScreen() {
         if (!isMountedRef.current) return;
         const compressedB64 = cleanBase64(compressedDataUrl);
         const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
-        setSelectedImage(compressedB64);
-        setSelectedImageMime(compressedMime);
-        setProcessing(false);
 
         // Save captured image so marketing screen can use it
         await setItem('marketing_voice_captured_image', compressedB64);
         await setItem('marketing_voice_captured_mime', compressedMime);
+        setProcessing(false);
       } catch {
         if (!isMountedRef.current) return;
         setProcessing(false);
@@ -388,8 +392,18 @@ export default function CameraScreen() {
       }
     }
 
-    await setItem('marketing_voice_command_active', 'true');
+    // Clear camera tab state before navigating (marketing owns the image via storage)
+    setSelectedImage(null);
+    setSelectedImageMime('image/jpeg');
+    setPreviewCapture(null);
+    setFunnelStage('idle');
+    setSelectedHook(null);
+    setCustomPrompt('');
+    setMultiAngleShots([]);
+    setCaptureMode('single');
+
     router.push('/(tabs)/marketing' as never);
+    voiceCommandInProgressRef.current = false;
   }, [router, cameraReady, selectedImage, previewCapture, processing, progressWidth, fadeAnim, fadeIn]);
 
   const moodOverlayColor =

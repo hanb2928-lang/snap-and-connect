@@ -21,6 +21,9 @@ export function useVoiceRecording(): MediaRecorderLike {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const durationRef = useRef(0);
+  const stoppingRef = useRef(false);
+  const pendingStopRef = useRef<((v: string | null) => void) | null>(null);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -31,8 +34,14 @@ export function useVoiceRecording(): MediaRecorderLike {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
     mediaRecorderRef.current = null;
     chunksRef.current = [];
+    stoppingRef.current = false;
+    pendingStopRef.current = null;
+    durationRef.current = 0;
   }, []);
 
   useEffect(() => {
@@ -42,6 +51,7 @@ export function useVoiceRecording(): MediaRecorderLike {
   const start = useCallback(async () => {
     setError(null);
     setDuration(0);
+    durationRef.current = 0;
 
     if (Platform.OS !== 'web') {
       setError('이 기기에서는 음성 녹음을 지원하지 않습니다.');
@@ -55,6 +65,12 @@ export function useVoiceRecording(): MediaRecorderLike {
       return;
     }
 
+    // Stop any existing recording before starting a new one
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+      cleanup();
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -65,6 +81,7 @@ export function useVoiceRecording(): MediaRecorderLike {
 
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
+      stoppingRef.current = false;
 
       recorder.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -75,13 +92,13 @@ export function useVoiceRecording(): MediaRecorderLike {
       setState('recording');
 
       timerRef.current = setInterval(() => {
-        setDuration((d) => {
-          if (d >= MAX_DURATION_SEC) {
-            recorder.stop();
-            return d;
-          }
-          return d + 1;
-        });
+        if (durationRef.current >= MAX_DURATION_SEC) {
+          if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+          try { recorder.stop(); } catch {}
+          return;
+        }
+        durationRef.current += 1;
+        setDuration(durationRef.current);
       }, 1000);
     } catch {
       setError('마이크 권한을 허용해주세요.');
@@ -97,6 +114,15 @@ export function useVoiceRecording(): MediaRecorderLike {
       return null;
     }
 
+    // If a stop is already in progress, return the existing promise
+    if (stoppingRef.current) {
+      return new Promise<string | null>((resolve) => {
+        pendingStopRef.current = resolve;
+      });
+    }
+
+    stoppingRef.current = true;
+
     return new Promise<string | null>((resolve) => {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
@@ -106,17 +132,35 @@ export function useVoiceRecording(): MediaRecorderLike {
           cleanup();
           setState('stopped');
           resolve(dataUrl);
+          if (pendingStopRef.current) {
+            pendingStopRef.current(dataUrl);
+            pendingStopRef.current = null;
+          }
         };
         reader.onerror = () => {
           cleanup();
           setState('error');
           setError('녹음 파일을 읽지 못했습니다.');
           resolve(null);
+          if (pendingStopRef.current) {
+            pendingStopRef.current(null);
+            pendingStopRef.current = null;
+          }
         };
         reader.readAsDataURL(blob);
       };
 
-      recorder.stop();
+      try {
+        recorder.stop();
+      } catch {
+        cleanup();
+        setState('idle');
+        resolve(null);
+        if (pendingStopRef.current) {
+          pendingStopRef.current(null);
+          pendingStopRef.current = null;
+        }
+      }
     });
   }, [cleanup]);
 
