@@ -38,6 +38,7 @@ import {
   Square,
   Trash2,
   Play,
+  Save,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -90,6 +91,7 @@ export default function MarketingScreen() {
   const [storeName, setStoreName] = useState('');
   const [signatureMenu, setSignatureMenu] = useState('');
   const [promoText, setPromoText] = useState('');
+  const [storeSaved, setStoreSaved] = useState(false);
   const [videoLength, setVideoLength] = useState('7s');
   const [captionTone, setCaptionTone] = useState('hook');
   const [bgmMood, setBgmMood] = useState('pop');
@@ -377,6 +379,16 @@ export default function MarketingScreen() {
     }
   };
 
+  const handleSaveStoreInfo = async () => {
+    try {
+      await setItem('marketing_store_name', storeName.trim());
+      await setItem('marketing_signature_menu', signatureMenu.trim());
+      await setItem('marketing_promo_text', promoText.trim());
+      setStoreSaved(true);
+      setTimeout(() => setStoreSaved(false), 2000);
+    } catch {}
+  };
+
   const canGenerate = storeName.trim().length > 0 || signatureMenu.trim().length > 0;
 
   return (
@@ -451,6 +463,21 @@ export default function MarketingScreen() {
               textAlignVertical="top"
             />
           </View>
+
+          <TouchableOpacity
+            style={[styles.storeSaveBtn, storeSaved && styles.storeSaveBtnDone]}
+            onPress={handleSaveStoreInfo}
+            activeOpacity={0.8}
+          >
+            {storeSaved ? (
+              <Check size={16} color="#fff" strokeWidth={2.5} />
+            ) : (
+              <Save size={16} color="#fff" strokeWidth={2.5} />
+            )}
+            <Text style={styles.storeSaveBtnText}>
+              {storeSaved ? '저장됨' : '매장 정보 저장'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* AI Store Promo Hook Chips */}
@@ -923,6 +950,25 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
+  },
+  storeSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    marginTop: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  storeSaveBtnDone: {
+    backgroundColor: theme.colors.success[500],
+  },
+  storeSaveBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   inputGroup: {
     gap: 6,
