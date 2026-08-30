@@ -18,6 +18,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 export type AngleShot = {
   id: string;
+  orderIndex: number;
   label: string;
   hint: string;
   base64?: string;
@@ -62,12 +63,14 @@ export function MultiAngleCaptureGuide({
 
   const handleAddShot = useCallback(
     (angleId: string, base64: string, mimeType: string) => {
-      const guide = ANGLE_GUIDES.find((g) => g.id === angleId)!;
+      const guideIndex = ANGLE_GUIDES.findIndex((g) => g.id === angleId);
+      const guide = ANGLE_GUIDES[guideIndex];
       const dataUrl = `data:${mimeType};base64,${base64}`;
       setShots((prev) => ({
         ...prev,
         [angleId]: {
           id: angleId,
+          orderIndex: guideIndex,
           label: guide.label,
           hint: guide.hint,
           base64,
@@ -105,7 +108,12 @@ export function MultiAngleCaptureGuide({
   }, []);
 
   const handleComplete = useCallback(() => {
-    const ordered = ANGLE_GUIDES.map((g) => shots[g.id]).filter(Boolean) as AngleShot[];
+    // Always emit shots in fixed ANGLE_GUIDES order (front → side → detail)
+    const ordered = ANGLE_GUIDES.map((g, idx) => {
+      const shot = shots[g.id];
+      if (!shot) return null;
+      return { ...shot, orderIndex: idx };
+    }).filter(Boolean) as AngleShot[];
     onComplete(ordered);
     setShots({});
   }, [shots, onComplete]);
@@ -168,6 +176,9 @@ export function MultiAngleCaptureGuide({
                   {shot?.dataUrl ? (
                     <View style={styles.shotPreview}>
                       <RNImage source={{ uri: shot.dataUrl }} style={styles.shotImage} resizeMode="cover" />
+                      <View style={styles.shotIndexBadge}>
+                        <Text style={styles.shotIndexText}>{String(idx + 1).padStart(2, '0')}</Text>
+                      </View>
                       <View style={styles.shotActions}>
                         <TouchableOpacity
                           style={styles.retakeBtn}
@@ -359,6 +370,20 @@ const styles = StyleSheet.create({
   shotPreview: {
     borderRadius: theme.radius.md,
     overflow: 'hidden',
+  },
+  shotIndexBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  shotIndexText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   shotImage: {
     width: '100%',

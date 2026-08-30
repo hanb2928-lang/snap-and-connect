@@ -331,7 +331,9 @@ export default function CameraScreen() {
         );
       }, 3000);
 
-      const additionalB64s = multiAngleShots.slice(1).map((s) => s.base64).filter(Boolean) as string[];
+      // Sort by orderIndex to guarantee front=main, rest=additional
+      const sortedShots = [...multiAngleShots].sort((a, b) => a.orderIndex - b.orderIndex);
+      const additionalB64s = sortedShots.slice(1).map((s) => s.base64).filter(Boolean) as string[];
       const { scanId } = await withTimeout(
         startAsyncAnalysis(base64, mimeType, additionalB64s.length > 0 ? 'multi' : 'single', additionalB64s),
         ANALYSIS_TIMEOUT_MS,
@@ -404,11 +406,13 @@ export default function CameraScreen() {
   };
 
   const handleMultiAngleComplete = (shots: AngleShot[]) => {
-    setMultiAngleShots(shots);
+    // Sort by orderIndex to guarantee front (0) → side (1) → detail (2) ordering
+    const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
+    setMultiAngleShots(sorted);
     setMultiAngleVisible(false);
-    if (shots[0]?.base64) {
-      setSelectedImage(shots[0].base64);
-      setSelectedImageMime(shots[0].mimeType || 'image/jpeg');
+    if (sorted[0]?.base64) {
+      setSelectedImage(sorted[0].base64);
+      setSelectedImageMime(sorted[0].mimeType || 'image/jpeg');
       setSelectedHook(null);
       setCustomPrompt('');
       setManualPromptOpen(false);
