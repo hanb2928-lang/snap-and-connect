@@ -92,47 +92,51 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
 
   return (
     <>
-      {/* Top-center voice wake word indicator */}
-      {active && (
-        <View
+      {/* Always-visible top-center voice wake word capsule */}
+      <View
+        style={[
+          styles.topIndicator,
+          { top: insets.top + 48 },
+          isListening && styles.topIndicatorActive,
+          justWoke && styles.topIndicatorWoke,
+          voice.state === 'error' && styles.topIndicatorError,
+        ]}
+        pointerEvents="none"
+      >
+        {isListening ? (
+          <Waves size={12} color={theme.colors.error[400]} strokeWidth={2.5} />
+        ) : voice.state === 'error' ? (
+          <MicOff size={12} color={theme.colors.error[400]} strokeWidth={2.5} />
+        ) : (
+          <Ear size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
+        )}
+        <Text
           style={[
-            styles.topIndicator,
-            { top: insets.top + 6 },
-            isListening && styles.topIndicatorActive,
-            justWoke && styles.topIndicatorWoke,
+            styles.topIndicatorText,
+            isListening && styles.topIndicatorTextActive,
+            voice.state === 'error' && styles.topIndicatorTextError,
           ]}
-          pointerEvents="none"
+          numberOfLines={1}
         >
-          {isListening ? (
-            <Waves size={12} color={theme.colors.error[400]} strokeWidth={2.5} />
-          ) : (
-            <Ear size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
-          )}
-          <Text
-            style={[
-              styles.topIndicatorText,
-              isListening && styles.topIndicatorTextActive,
-            ]}
-            numberOfLines={1}
-          >
-            {isListening
-              ? voice.partialTranscript || '"숏커넥트야"라고 말해보세요'
-              : '음성 제어 대기 중 · "숏커넥트야"'}
-          </Text>
-          {isListening && (
-            <View style={styles.topIndicatorDots}>
-              <View style={[styles.topDot, styles.topDot1]} />
-              <View style={[styles.topDot, styles.topDot2]} />
-              <View style={[styles.topDot, styles.topDot3]} />
-            </View>
-          )}
-        </View>
-      )}
+          {isListening
+            ? voice.partialTranscript || '"숏커넥트야"라고 말해보세요'
+            : voice.state === 'error'
+              ? (voice.error || '음성 인식 오류')
+              : '음성 대기 중 · "숏커넥트야"라고 말하세요'}
+        </Text>
+        {isListening && (
+          <View style={styles.topIndicatorDots}>
+            <View style={[styles.topDot, styles.topDot1]} />
+            <View style={[styles.topDot, styles.topDot2]} />
+            <View style={[styles.topDot, styles.topDot3]} />
+          </View>
+        )}
+      </View>
 
       <View
         style={[
           styles.container,
-          { top: insets.top + 56 },
+          { top: insets.top + 88 },
         ]}
       >
         {/* Always-on ear indicator */}
@@ -264,17 +268,17 @@ const styles = StyleSheet.create({
   topIndicator: {
     position: 'absolute',
     left: '50%',
-    transform: [{ translateX: -100 }],
+    transform: [{ translateX: -120 }],
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(10, 15, 30, 0.65)',
+    gap: 6,
+    backgroundColor: 'rgba(10, 15, 30, 0.7)',
     borderRadius: theme.radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    width: 200,
+    borderColor: 'rgba(255,255,255,0.1)',
+    width: 240,
     zIndex: 28,
   },
   topIndicatorActive: {
@@ -285,9 +289,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(40, 80, 180, 0.3)',
     borderColor: theme.colors.primary[400] + '40',
   },
+  topIndicatorError: {
+    backgroundColor: 'rgba(180, 30, 30, 0.25)',
+    borderColor: theme.colors.error[400] + '30',
+  },
+  topIndicatorTextError: {
+    color: theme.colors.error[400],
+  },
   topIndicatorText: {
     flex: 1,
-    fontSize: 10,
+    fontSize: 10.5,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.success[400],
   },
