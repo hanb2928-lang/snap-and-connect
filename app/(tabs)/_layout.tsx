@@ -49,6 +49,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       tabBar={(props) => <ScrollableTabBar {...props} badges={badges} />}
       screenOptions={screenOptions}
     >

@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers, Sun, Droplet } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -68,6 +68,8 @@ export default function CameraScreen() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [multiAngleVisible, setMultiAngleVisible] = useState(false);
   const [multiAngleShots, setMultiAngleShots] = useState<AngleShot[]>([]);
+  const [captureMode, setCaptureMode] = useState<'single' | 'multi'>('single');
+  const [moodFilter, setMoodFilter] = useState<'none' | 'warm' | 'fresh'>('none');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
   const fadeAnim = useSharedValue(0);
@@ -267,6 +269,28 @@ export default function CameraScreen() {
     }
   };
 
+  const handleCaptureModeToggle = () => {
+    if (captureMode === 'single') {
+      setCaptureMode('multi');
+      setMultiAngleVisible(true);
+    } else {
+      setCaptureMode('single');
+      setMultiAngleShots([]);
+    }
+  };
+
+  const moodOverlayColor =
+    moodFilter === 'warm' ? 'rgba(255, 180, 80, 0.12)' :
+    moodFilter === 'fresh' ? 'rgba(100, 200, 220, 0.12)' :
+    'transparent';
+
+  const moodOverlayStyle: { tintColor?: string } =
+    moodFilter === 'warm'
+      ? { tintColor: 'rgba(255,180,80,0.08)' }
+      : moodFilter === 'fresh'
+        ? { tintColor: 'rgba(100,200,220,0.08)' }
+        : {};
+
   const handleMultiAnglePick = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
       try {
@@ -312,6 +336,10 @@ export default function CameraScreen() {
         selectedImage={selectedImage}
         selectedImageMime={selectedImageMime}
         multiAngleCount={multiAngleShots.length}
+        captureMode={captureMode}
+        moodFilter={moodFilter}
+        onCaptureModeToggle={handleCaptureModeToggle}
+        onMoodFilterChange={setMoodFilter}
         onPickImage={handlePickImage}
         onGenerate={handleGenerate}
         onMultiAnglePress={() => setMultiAngleVisible(true)}
@@ -420,10 +448,68 @@ export default function CameraScreen() {
           </View>
         </View>
 
+        {/* Capture mode toggle + mood filter */}
+        <View style={styles.cameraExtraControls}>
+          <View style={styles.captureModeToggle}>
+            <TouchableOpacity
+              style={[styles.captureModeBtn, captureMode === 'single' && styles.captureModeBtnActive]}
+              onPress={() => { setCaptureMode('single'); setMultiAngleShots([]); }}
+              activeOpacity={0.7}
+            >
+              <Camera size={14} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.captureModeText, captureMode === 'single' && styles.captureModeTextActive]}>1장 빠른 촬영</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.captureModeBtn, captureMode === 'multi' && styles.captureModeBtnActive]}
+              onPress={handleCaptureModeToggle}
+              activeOpacity={0.7}
+            >
+              <Layers size={14} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.captureModeText, captureMode === 'multi' && styles.captureModeTextActive]}>다각도 연사</Text>
+              {multiAngleShots.length > 0 && (
+                <View style={styles.captureModeBadge}>
+                  <Text style={styles.captureModeBadgeText}>{multiAngleShots.length}장</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.moodFilterRow}>
+            <TouchableOpacity
+              style={[styles.moodChip, moodFilter === 'none' && styles.moodChipActive]}
+              onPress={() => setMoodFilter('none')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.moodChipText, moodFilter === 'none' && styles.moodChipTextActive]}>원본</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.moodChip, moodFilter === 'warm' && styles.moodChipActiveWarm]}
+              onPress={() => setMoodFilter(moodFilter === 'warm' ? 'none' : 'warm')}
+              activeOpacity={0.7}
+            >
+              <Sun size={12} color={moodFilter === 'warm' ? '#fff' : theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={[styles.moodChipText, moodFilter === 'warm' && styles.moodChipTextActive]}>따뜻한 카페</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.moodChip, moodFilter === 'fresh' && styles.moodChipActiveFresh]}
+              onPress={() => setMoodFilter(moodFilter === 'fresh' ? 'none' : 'fresh')}
+              activeOpacity={0.7}
+            >
+              <Droplet size={12} color={moodFilter === 'fresh' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={[styles.moodChipText, moodFilter === 'fresh' && styles.moodChipTextActive]}>청량 푸드</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Mood filter overlay */}
+        {moodFilter !== 'none' && (
+          <View style={[styles.moodOverlay, { backgroundColor: moodOverlayColor }]} pointerEvents="none" />
+        )}
+
         {/* Selected image preview overlay */}
         {selectedImage && (
           <View style={styles.selectedImageOverlay}>
-            <Image source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }} style={styles.selectedImage} resizeMode="cover" />
+            <Image source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }} style={[styles.selectedImage, moodOverlayStyle]} resizeMode="cover" />
             <TouchableOpacity
               style={styles.clearImageBtn}
               onPress={() => setSelectedImage(null)}
@@ -553,6 +639,10 @@ interface WebSimpleScreenProps {
   selectedImage: string | null;
   selectedImageMime: string;
   multiAngleCount: number;
+  captureMode: 'single' | 'multi';
+  moodFilter: 'none' | 'warm' | 'fresh';
+  onCaptureModeToggle: () => void;
+  onMoodFilterChange: (m: 'none' | 'warm' | 'fresh') => void;
   onPickImage: () => void;
   onGenerate: () => void;
   onMultiAnglePress: () => void;
@@ -574,6 +664,10 @@ function WebSimpleScreen({
   selectedImage,
   selectedImageMime,
   multiAngleCount,
+  captureMode,
+  moodFilter,
+  onCaptureModeToggle,
+  onMoodFilterChange,
   onPickImage,
   onGenerate,
   onMultiAnglePress,
@@ -626,7 +720,15 @@ function WebSimpleScreen({
         {/* Selected image preview */}
         {selectedImage && (
           <View style={styles.webImagePreview}>
-            <Image source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }} style={styles.webPreviewImg} resizeMode="contain" />
+            <Image
+              source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }}
+              style={[
+                styles.webPreviewImg,
+                moodFilter === 'warm' && { tintColor: 'rgba(255,180,80,0.1)' },
+                moodFilter === 'fresh' && { tintColor: 'rgba(100,200,220,0.1)' },
+              ]}
+              resizeMode="contain"
+            />
           </View>
         )}
 
@@ -932,6 +1034,103 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
+  },
+  cameraExtraControls: {
+    position: 'absolute',
+    top: 112,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+    gap: 8,
+  },
+  captureModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 15, 30, 0.5)',
+    borderRadius: theme.radius.full,
+    padding: 4,
+    gap: 4,
+  },
+  captureModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+  },
+  captureModeBtnActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  captureModeText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  captureModeTextActive: {
+    color: '#fff',
+  },
+  captureModeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  captureModeBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  moodFilterRow: {
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: 'rgba(10, 15, 30, 0.5)',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  moodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+  },
+  moodChipActive: {
+    backgroundColor: theme.colors.dark.surface,
+  },
+  moodChipActiveWarm: {
+    backgroundColor: theme.colors.warning[500],
+  },
+  moodChipActiveFresh: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  moodChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  moodChipTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  moodOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+  },
+  // Web capture mode + mood styles
+  webCaptureModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 4,
+    marginBottom: theme.spacing.sm,
+  },
+  webMoodFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.md,
   },
   // Web styles
   webTopBar: {

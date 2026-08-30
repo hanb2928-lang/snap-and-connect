@@ -32,6 +32,10 @@ import {
   PenLine,
   ChevronDown,
   ChevronUp,
+  Mic,
+  Square,
+  Trash2,
+  Play,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -44,6 +48,7 @@ import { HotDealPickerModal } from '@/components/HotDealPickerModal';
 import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
 import { validateAffiliateUrl } from '@/lib/affiliate';
 import { extractProductMeta } from '@/lib/analysis';
+import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 
 const VIDEO_LENGTH_PRESETS = [
   { key: '7s', label: '7초 폭발 바이럴', desc: '틱톡·릴스 최적', icon: Zap, color: theme.colors.warning[400], seconds: 7 },
@@ -80,6 +85,10 @@ export default function MarketingScreen() {
   const [manualPromptOpen, setManualPromptOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const lastActionRef = useRef(0);
+  const voice = useVoiceRecording();
+  const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
+  const [voicePlaying, setVoicePlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Affiliate sub-setting state (hidden in advanced modal)
   const [affiliateOpen, setAffiliateOpen] = useState(false);
@@ -171,6 +180,42 @@ export default function MarketingScreen() {
     });
   };
 
+  const handleVoiceRecord = async () => {
+    if (voice.state === 'recording') {
+      const dataUrl = await voice.stop();
+      if (dataUrl) setVoiceDataUrl(dataUrl);
+    } else {
+      setVoiceDataUrl(null);
+      await voice.start();
+    }
+  };
+
+  const handleVoicePlay = () => {
+    if (!voiceDataUrl) return;
+    if (voicePlaying) {
+      audioRef.current?.pause();
+      setVoicePlaying(false);
+    } else {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(voiceDataUrl);
+        audioRef.current.onended = () => setVoicePlaying(false);
+      } else {
+        audioRef.current.src = voiceDataUrl;
+      }
+      audioRef.current.play();
+      setVoicePlaying(true);
+    }
+  };
+
+  const handleVoiceDelete = () => {
+    setVoiceDataUrl(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setVoicePlaying(false);
+  };
+
   const handleStartGeneration = async () => {
     const now = Date.now();
     if (now - lastActionRef.current < 800) return;
@@ -210,6 +255,12 @@ export default function MarketingScreen() {
         await setItem('marketing_affiliate_priority', 'true');
       } else {
         await setItem('marketing_affiliate_priority', 'false');
+      }
+      // Pass voice recording if provided
+      if (voiceDataUrl) {
+        await setItem('marketing_voice_recording', voiceDataUrl);
+      } else {
+        await setItem('marketing_voice_recording', '');
       }
       router.push('/' as never);
     } catch {
@@ -367,6 +418,59 @@ export default function MarketingScreen() {
                   ? '✓ 입력하신 문구가 AI 생성에 반영됩니다'
                   : 'AI가 놓친 가격·할인·강조 내용을 직접 넣으세요'}
               </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Voice Recording Section */}
+        <View style={styles.voiceSection}>
+          <View style={styles.voiceHeader}>
+            <Mic size={18} color={theme.colors.accent[400]} strokeWidth={2.5} />
+            <Text style={styles.voiceTitle}>사장님 육성 녹음 / AI 보이스 훅</Text>
+          </View>
+          <Text style={styles.voiceDesc}>3초만 한마디하면 AI가 잡음 제거 + BGM 믹싱으로 프로급 숏폼으로 만들어드려요</Text>
+
+          {voice.error && (
+            <View style={styles.voiceErrorBox}>
+              <Text style={styles.voiceErrorText}>{voice.error}</Text>
+            </View>
+          )}
+
+          {!voiceDataUrl ? (
+            <TouchableOpacity
+              style={[
+                styles.voiceRecordBtn,
+                voice.state === 'recording' && styles.voiceRecordBtnActive,
+              ]}
+              onPress={handleVoiceRecord}
+              activeOpacity={0.8}
+            >
+              {voice.state === 'recording' ? (
+                <>
+                  <Square size={20} color="#fff" fill="#fff" strokeWidth={2} />
+                  <Text style={styles.voiceRecordBtnText}>녹음 중... {voice.duration}초</Text>
+                </>
+              ) : (
+                <>
+                  <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                  <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>3초 녹음 시작</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.voicePlayerRow}>
+              <TouchableOpacity style={styles.voicePlayBtn} onPress={handleVoicePlay} activeOpacity={0.7}>
+                {voicePlaying ? (
+                  <Square size={16} color="#fff" fill="#fff" strokeWidth={2} />
+                ) : (
+                  <Play size={16} color="#fff" fill="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.voicePlayBtnText}>{voicePlaying ? '일시정지' : '재생'}</Text>
+              </TouchableOpacity>
+              <Text style={styles.voiceRecordedLabel}>녹음 완료! AI 보이스에 활용됩니다</Text>
+              <TouchableOpacity style={styles.voiceDeleteBtn} onPress={handleVoiceDelete} activeOpacity={0.7}>
+                <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -815,6 +919,95 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  voiceSection: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '30',
+    gap: 8,
+  },
+  voiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  voiceDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  voiceErrorBox: {
+    backgroundColor: theme.colors.error[500] + '18',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  voiceErrorText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+  },
+  voiceRecordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.accent[500] + '15',
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+  },
+  voiceRecordBtnActive: {
+    backgroundColor: theme.colors.error[500],
+    borderColor: theme.colors.error[500],
+  },
+  voiceRecordBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  voicePlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  voicePlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  voicePlayBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  voiceRecordedLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.success[400],
+  },
+  voiceDeleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.error[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   readySummary: {
     flexDirection: 'row',
