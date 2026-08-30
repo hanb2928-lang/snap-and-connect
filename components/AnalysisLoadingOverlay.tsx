@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, AppState, type AppStateStatus } from 'react-native';
 import Svg, { Circle, Path, Ellipse } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -153,6 +153,22 @@ export function AnalysisLoadingOverlay({
     }
     prevStep.current = step;
   }, [step, sparkleOpacity, sparkleRotate]);
+
+  // Pause infinite animations when app goes to background to prevent CPU drain
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        cancelAnimation(bodyBob);
+        cancelAnimation(armLeft);
+        cancelAnimation(armRight);
+        cancelAnimation(legLeft);
+        cancelAnimation(legRight);
+        cancelAnimation(headBob);
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => { sub.remove(); };
+  }, [bodyBob, armLeft, armRight, legLeft, legRight, headBob]);
 
   useEffect(() => {
     return () => {

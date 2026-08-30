@@ -130,6 +130,7 @@ export function WebCameraView({
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('canvas 미지원');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       if (facing === 'user') {
         ctx.translate(w, 0);
         ctx.scale(-1, 1);

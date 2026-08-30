@@ -582,6 +582,10 @@ export default function AssetsScreen() {
           contentContainerStyle={[styles.listContent, { paddingBottom: tabBarHeight + 24 }]}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={true}
           renderItem={({ item }) => {
             const statusMeta = STATUS_META[item.upload_status || 'not_uploaded'];
             const StatusIcon = statusMeta.icon;

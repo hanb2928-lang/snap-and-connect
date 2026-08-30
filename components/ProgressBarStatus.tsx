@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, type DimensionValue } from 'react-native';
+import { View, Text, StyleSheet, AppState, type AppStateStatus, type DimensionValue } from 'react-native';
 import Svg, { Circle, Path, Ellipse, Defs, RadialGradient, Stop, LinearGradient } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -106,6 +106,18 @@ export function ProgressBarStatus({ progressSV, step, text }: ProgressBarStatusP
     }
     prevStep.current = step;
   }, [step, isComplete, bubbleOpacity, bubbleScale, mouthOpen]);
+
+  // Pause infinite animations when app goes to background to prevent CPU drain
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        cancelAnimation(bodyBob);
+        cancelAnimation(eyeScale);
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => { sub.remove(); };
+  }, [bodyBob, eyeScale]);
 
   useEffect(() => {
     return () => {
