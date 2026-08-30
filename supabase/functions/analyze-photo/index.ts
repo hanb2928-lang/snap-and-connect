@@ -320,7 +320,7 @@ async function analyzeWithOpenAI(
     { type: "image_url", image_url: { url: imageDataUrl, detail: isSingle ? "low" : "high" } },
   ];
 
-  return callOpenAIWithRetry(systemPrompt, userContent, apiKey, isSingle ? 1600 : 3200);
+  return callOpenAIWithRetry(systemPrompt, userContent, apiKey, isSingle ? 1200 : 3200);
 }
 
 async function analyzeMultiShotWithOpenAI(

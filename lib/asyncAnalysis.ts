@@ -65,20 +65,9 @@ export async function startAsyncAnalysis(
   preferredStyle?: string,
 ): Promise<AsyncAnalysisResult> {
   const fileName = `scan-${Date.now()}`;
-  const imageUrl = await uploadImage(base64, mimeType);
   const imageHash = hashImage(base64);
 
-  const additionalUrls: string[] = [];
-  for (const b64 of additionalBase64Images) {
-    try {
-      const url = await uploadImage(b64, 'image/jpeg');
-      additionalUrls.push(url);
-    } catch {
-      // individual angle upload failure shouldn't block
-    }
-  }
-
-  // Check cache
+  // Check cache BEFORE uploading to skip storage entirely on a hit
   const cacheResult = await withSupabaseTimeout(
     () => Promise.resolve(supabase
       .from('analysis_cache')
@@ -90,14 +79,28 @@ export async function startAsyncAnalysis(
   const cached = cacheResult.data as { analysis_result: unknown } | null;
 
   if (cached?.analysis_result) {
-    // Cache hit — create scan with full analysis data immediately
+    // Cache hit — upload image for the scan record, then create scan with full data
+    const imageUrl = await uploadImage(base64, mimeType);
     const analysis = cached.analysis_result as unknown as AnalysisResult;
-    const scanId = await createScanWithAnalysis(imageUrl, analysis, additionalUrls, mode, imageHash);
+    const scanId = await createScanWithAnalysis(imageUrl, analysis, [], mode, imageHash);
 
     // Bump hit count (fire-and-forget)
     supabase.rpc('increment_analysis_cache_hit', { p_hash: imageHash }).then(() => {}, () => {});
 
     return { scanId, jobId: '', cached: true };
+  }
+
+  // Cache miss — upload image and additional angles
+  const imageUrl = await uploadImage(base64, mimeType);
+
+  const additionalUrls: string[] = [];
+  for (const b64 of additionalBase64Images) {
+    try {
+      const url = await uploadImage(b64, 'image/jpeg');
+      additionalUrls.push(url);
+    } catch {
+      // individual angle upload failure shouldn't block
+    }
   }
 
   // Cache miss — enqueue job and create pending scan

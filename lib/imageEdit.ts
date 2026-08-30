@@ -248,7 +248,7 @@ export async function prepareImageForApi(
       const ctx = canvas.getContext('2d');
       if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/jpeg', quality);
+      return canvas.toDataURL('image/webp', quality);
     } catch {
       return normalizedDataUrl;
     }
