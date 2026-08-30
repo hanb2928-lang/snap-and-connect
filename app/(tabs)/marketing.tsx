@@ -175,6 +175,16 @@ export default function MarketingScreen() {
             setCustomPrompt(promptText.trim());
             setManualPromptOpen(true);
 
+            // Load auto-captured photo from voice command if available
+            const capturedImage = await getItem('marketing_voice_captured_image');
+            const capturedMime = await getItem('marketing_voice_captured_mime');
+            if (capturedImage) {
+              await setItem('marketing_voice_image', capturedImage);
+              await setItem('marketing_voice_image_mime', capturedMime || 'image/jpeg');
+              await setItem('marketing_voice_captured_image', '');
+              await setItem('marketing_voice_captured_mime', '');
+            }
+
             const intentHookMap: Record<string, string> = {
               closing: 'limited',
               new_menu: 'new_menu',
@@ -324,6 +334,13 @@ export default function MarketingScreen() {
         await setItem('marketing_voice_recording', voiceDataUrl);
       } else {
         await setItem('marketing_voice_recording', '');
+      }
+      // Pass auto-captured photo from voice command if available
+      const voiceImage = await getItem('marketing_voice_image');
+      const voiceImageMime = await getItem('marketing_voice_image_mime');
+      if (voiceImage) {
+        await setItem('marketing_selected_image', voiceImage);
+        await setItem('marketing_selected_image_mime', voiceImageMime || 'image/jpeg');
       }
       router.push('/' as never);
     } catch {
