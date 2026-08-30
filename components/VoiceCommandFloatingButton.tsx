@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform, Animated } from 'react-native';
-import { Mic, MicOff, X, Radio, Sparkles, Ear } from 'lucide-react-native';
+import { Mic, MicOff, X, Radio, Sparkles, Ear, Waves } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVoiceCommand, type ParsedVoiceCommand } from '@/hooks/useVoiceCommand';
@@ -76,6 +76,43 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
 
   return (
     <>
+      {/* Top-center voice wake word indicator */}
+      {active && (
+        <View
+          style={[
+            styles.topIndicator,
+            { top: insets.top + 6 },
+            isListening && styles.topIndicatorActive,
+            justWoke && styles.topIndicatorWoke,
+          ]}
+          pointerEvents="none"
+        >
+          {isListening ? (
+            <Waves size={12} color={theme.colors.error[400]} strokeWidth={2.5} />
+          ) : (
+            <Ear size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
+          )}
+          <Text
+            style={[
+              styles.topIndicatorText,
+              isListening && styles.topIndicatorTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            {isListening
+              ? voice.partialTranscript || '"숏커넥트야"라고 말해보세요'
+              : '음성 제어 대기 중 · "숏커넥트야"'}
+          </Text>
+          {isListening && (
+            <View style={styles.topIndicatorDots}>
+              <View style={[styles.topDot, styles.topDot1]} />
+              <View style={[styles.topDot, styles.topDot2]} />
+              <View style={[styles.topDot, styles.topDot3]} />
+            </View>
+          )}
+        </View>
+      )}
+
       <View
         style={[
           styles.container,
@@ -208,6 +245,53 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
 }
 
 const styles = StyleSheet.create({
+  topIndicator: {
+    position: 'absolute',
+    left: '50%',
+    transform: [{ translateX: -100 }],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(10, 15, 30, 0.65)',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    width: 200,
+    zIndex: 28,
+  },
+  topIndicatorActive: {
+    backgroundColor: 'rgba(180, 30, 30, 0.3)',
+    borderColor: theme.colors.error[400] + '40',
+  },
+  topIndicatorWoke: {
+    backgroundColor: 'rgba(40, 80, 180, 0.3)',
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  topIndicatorText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  topIndicatorTextActive: {
+    color: theme.colors.error[400],
+  },
+  topIndicatorDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  topDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.error[400],
+  },
+  topDot1: { opacity: 1 },
+  topDot2: { opacity: 0.6 },
+  topDot3: { opacity: 0.3 },
   container: {
     position: 'absolute',
     right: theme.spacing.md,
