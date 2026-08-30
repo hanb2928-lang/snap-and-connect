@@ -367,10 +367,11 @@ type ComicBuildParams = {
   mbtiCommentary: MbtiCommentary[];
   emotionOverlay?: boolean;
   localStoreInfo?: LocalStoreInfo | null;
+  genId?: number;
 };
 
 function buildComicScriptBody(params: ComicBuildParams): string {
-  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null } = params;
+  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null, genId = 0 } = params;
   const hashtagStr = hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
 
   const mood = MOOD_TEMPLATES[moodTemplate] || MOOD_TEMPLATES['energetic-popart'];
@@ -411,6 +412,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var emotionOverlay=${emotionOverlay};
   var localStoreInfo=${JSON.stringify(localStoreInfo)};
   var imageUrl=${JSON.stringify(imageUrl)};
+  var genId=${genId};
   var panelEmotions=${JSON.stringify(panels.map(p => p.emotion || ''))};
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
   var emotionColors={'\uACE0\uBBFC':'#FFD600','\uB188\uB78C':'#FF6B6B','\uD589\uBCF5':'#10B981','\uD655\uC2E0':'#3B82F6','\uC124\uB808':'#EC4899','\uC2AC\uD544':'#6366F1','\uBD84\uB178':'#F59E0B','\uB3C4\uC804':'#EF4444','\uD589\uB3D9':'#8B5CF6','\uC9C0\uB8CC':'#64748B','\uC218\uB2E4':'#06B6D4','\uAC10\uB3D9':'#F43F5E'};
@@ -613,22 +615,49 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   }
 
   function drawSpeechBubble(ctx,x,y,w,h,r,text,font,color,fillColor,textColor){
+    var fontSizeMatch=font.match(/(\d+)px/);
+    var baseFontSize=fontSizeMatch?parseInt(fontSizeMatch[1],10):26;
+    var fontBase=font.replace(/(\d+)px/,baseFontSize+'px');
+    var padding=24;
+    var lineH=Math.round(baseFontSize*1.15);
+    var maxW=w-padding*2;
+    var fontSize=baseFontSize;
+    var bubbleH=h;
+    for(var fs=baseFontSize;fs>=12;fs--){
+      fontSize=fs;
+      lineH=Math.round(fs*1.15);
+      ctx.font=fontBase.replace(/(\d+)px/,fs+'px');
+      var chars=Array.from(text);
+      var line='';
+      var lineCount=1;
+      for(var ci=0;ci<chars.length;ci++){
+        var ch=chars[ci];
+        if(ch==='\n'){line='';lineCount++;continue;}
+        var tl=line+ch;
+        if(ctx.measureText(tl).width>maxW&&line!==''){line=ch;lineCount++;}
+        else{line=tl;}
+      }
+      var neededH=lineCount*lineH+padding*2;
+      if(neededH<=h){break;}
+      bubbleH=neededH;
+    }
+    ctx.font=fontBase.replace(/(\d+)px/,fontSize+'px');
     ctx.fillStyle=fillColor||'rgba(255,255,255,0.96)';
     ctx.strokeStyle=color;
     ctx.lineWidth=5;
-    roundRect(ctx,x,y,w,h,r);
+    roundRect(ctx,x,y,w,bubbleH,r);
     ctx.fill();ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(x+w*0.3,y+h);
-    ctx.lineTo(x+w*0.45,y+h+30);
-    ctx.lineTo(x+w*0.5,y+h);
+    ctx.moveTo(x+w*0.3,y+bubbleH);
+    ctx.lineTo(x+w*0.45,y+bubbleH+30);
+    ctx.lineTo(x+w*0.5,y+bubbleH);
     ctx.closePath();
     ctx.fillStyle=fillColor||'rgba(255,255,255,0.96)';
     ctx.fill();
     ctx.strokeStyle=color;ctx.lineWidth=5;ctx.stroke();
     ctx.fillStyle=textColor||'#1a1a2e';
-    ctx.font=font;ctx.textBaseline='top';
-    drawTextLines(ctx,text,x+24,y+20,w-48,h-40,38);
+    ctx.textBaseline='top';
+    drawTextLines(ctx,text,x+padding,y+padding,w-padding*2,bubbleH-padding*2,lineH);
   }
 
   function drawSfxSticker(ctx,text,x,y,fontSize,color,rotation){
@@ -683,7 +712,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   ${getWebViewOverlayScript()}
 
   function postMsg(type,data){
-    var msg=JSON.stringify({type:type,data:data||{}});
+    var msg=JSON.stringify({type:type,genId:genId,data:data||{}});
     if(window.__comicPostMsg){window.__comicPostMsg(msg);}
     else if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg);}
     else if(window.parent&&window.parent!==window){window.parent.postMessage(msg,'*');}
@@ -1164,6 +1193,7 @@ export function ComicShortGenerator({
   const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webGenCleanupRef = useRef<(() => void) | null>(null);
+  const genIdRef = useRef(0);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
   const [webviewKey, setWebviewKey] = useState(0);
@@ -1233,6 +1263,7 @@ export function ComicShortGenerator({
   const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.genId !== undefined && msg.genId !== genIdRef.current) return;
       if (msg.type === 'progress') {
         if (stateRef.current !== 'generating') return;
         setProgress(msg.data.progress);
@@ -1328,6 +1359,8 @@ export function ComicShortGenerator({
 
   const handleGenerate = useCallback(async () => {
     if (state === 'generating') return;
+    genIdRef.current += 1;
+    const currentGenId = genIdRef.current;
     setState('generating');
     setProgress(0);
     setResultUri(null);
@@ -1535,6 +1568,7 @@ export function ComicShortGenerator({
         mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
         emotionOverlay,
         localStoreInfo,
+        genId: currentGenId,
       });
       runWebComicGeneration(scriptBody);
     } else {
