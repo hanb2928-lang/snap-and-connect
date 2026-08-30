@@ -180,26 +180,23 @@ export default function AffiliateScreen() {
   const totalRevenue = useMemo(() => revenue.reduce((sum, r) => sum + (r.amount || 0), 0), [revenue]);
 
   const markCompleted = (key: StepKey) => {
-    setCompletedSteps((prev) => {
-      const next = new Set(prev).add(key);
-      const idx = STEP_ORDER.indexOf(key);
-      if (idx < STEP_ORDER.length - 1) {
-        const nextStepNum = idx + 2;
-        setTimeout(() => {
-          const targetRef = stepRefs.current[nextStepNum];
-          if (targetRef && scrollRef.current) {
-            targetRef.measureLayout(
-              scrollRef.current as any,
-              (_x, y) => {
-                scrollRef.current?.scrollTo({ y: y - 20, animated: true });
-              },
-              () => {},
-            );
-          }
-        }, 300);
-      }
-      return next;
-    });
+    setCompletedSteps((prev) => new Set(prev).add(key));
+    const idx = STEP_ORDER.indexOf(key);
+    if (idx < STEP_ORDER.length - 1) {
+      const nextStepNum = idx + 2;
+      setTimeout(() => {
+        const targetRef = stepRefs.current[nextStepNum];
+        if (targetRef && scrollRef.current) {
+          targetRef.measureLayout(
+            scrollRef.current as any,
+            (_x, y) => {
+              scrollRef.current?.scrollTo({ y: y - 20, animated: true });
+            },
+            () => {},
+          );
+        }
+      }, 300);
+    }
   };
 
   const handleOpenUrl = (url: string) => {
@@ -287,8 +284,11 @@ export default function AffiliateScreen() {
     setUrlWarning(validation.warning);
     setExtracting(true);
     setExtractError(null);
+    setCompletedSteps(new Set());
+    setProductMeta(null);
+    setUploadedPlatforms(new Set());
     try {
-      const meta = await extractProductMeta(affiliateUrl.trim());
+      const meta = await extractProductMeta(validation.normalizedUrl);
       const newMeta = {
         productName: meta.productName || '',
         description: meta.description || '',
@@ -298,6 +298,7 @@ export default function AffiliateScreen() {
         brand: meta.brand || '',
       };
       setProductMeta(newMeta);
+      markCompleted('affiliate');
       // Auto-set product image as the analysis image
       if (newMeta.image) {
         try {
@@ -316,7 +317,6 @@ export default function AffiliateScreen() {
       setExtractError('상품 정보를 자동으로 가져오지 못했습니다. AI 분석은 계속 진행할 수 있습니다.');
     } finally {
       setExtracting(false);
-      markCompleted('affiliate');
     }
   };
 

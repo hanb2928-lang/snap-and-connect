@@ -47,9 +47,9 @@ function SubTabBar() {
               style={styles.pillItem}
               onPress={() => {
                 if (key === 'index') {
-                  router.push('/affiliate');
+                  router.replace('/affiliate');
                 } else {
-                  router.push(`/affiliate/${key}`);
+                  router.replace(`/affiliate/${key}`);
                 }
               }}
               activeOpacity={0.65}

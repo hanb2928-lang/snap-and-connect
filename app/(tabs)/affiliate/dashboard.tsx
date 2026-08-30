@@ -22,8 +22,8 @@ export default function DashboardScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(null);
     try {
       const data = await fetchDashboardSummary();
@@ -43,7 +43,7 @@ export default function DashboardScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    load();
+    load(true);
   };
 
   const maxMonthly = summary

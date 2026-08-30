@@ -95,7 +95,7 @@ export async function startAsyncAnalysis(
     const scanId = await createScanWithAnalysis(imageUrl, analysis, additionalUrls, mode, imageHash);
 
     // Bump hit count (fire-and-forget)
-    supabase.rpc('increment_analysis_cache_hit', { p_hash: imageHash }).then(() => {});
+    supabase.rpc('increment_analysis_cache_hit', { p_hash: imageHash }).then(() => {}, () => {});
 
     return { scanId, jobId: '', cached: true };
   }
@@ -318,7 +318,7 @@ export async function finalizeAnalysisFromJob(
     supabase.from('analysis_cache').upsert({
       image_hash: scan.image_hash,
       analysis_result: analysis as unknown as Record<string, unknown>,
-    }, { onConflict: 'image_hash' }).then(() => {});
+    }, { onConflict: 'image_hash' }).then(() => {}, () => {});
   }
 
   // Kick off TTS in background

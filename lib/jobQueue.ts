@@ -102,6 +102,7 @@ export async function waitForJob<T = Record<string, unknown>>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
         (payload) => {
+          if (!payload.new) return;
           const job = payload.new as RenderJob;
           if (job.status === 'done') {
             finish({ success: true, result: (job.result ?? {}) as T });

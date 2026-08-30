@@ -63,87 +63,100 @@ function getWeeklyPeriod(): { start: string; end: string } {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+function getPeriod(questType: QuestType): { start: string; end: string } {
+  return questType.startsWith('weekly') ? getWeeklyPeriod() : getDailyPeriod();
+}
+
 export async function getActiveQuests(): Promise<Quest[]> {
   try {
+    const now = new Date().toISOString();
     const { data: existing } = await supabase
       .from('daily_quests')
       .select('*')
       .eq('status', 'active')
-      .gte('period_end', new Date().toISOString())
+      .gte('period_end', now)
       .order('created_at', { ascending: true });
 
-    if (existing && existing.length > 0) {
-      return existing as Quest[];
+    const existingQuests = (existing as Quest[]) ?? [];
+
+    type QuestSeed = Omit<Quest, 'id'>;
+    const toCreate: QuestSeed[] = [];
+    for (const def of QUEST_DEFINITIONS) {
+      const period = getPeriod(def.quest_type);
+      const hasCurrent = existingQuests.some(
+        (q) => q.quest_type === def.quest_type && q.period_start === period.start,
+      );
+      if (!hasCurrent) {
+        toCreate.push({
+          ...def,
+          current_count: 0,
+          status: 'active' as const,
+          period_start: period.start,
+          period_end: period.end,
+        });
+      }
     }
 
-    // Generate new daily quests
-    const daily = getDailyPeriod();
-    const weekly = getWeeklyPeriod();
-    const newQuests = QUEST_DEFINITIONS.map((def) => {
-      const isWeekly = def.quest_type.startsWith('weekly');
-      const period = isWeekly ? weekly : daily;
-      return {
-        ...def,
-        current_count: 0,
-        status: 'active' as const,
-        period_start: period.start,
-        period_end: period.end,
-      };
-    });
+    if (toCreate.length === 0) {
+      return existingQuests;
+    }
 
     const { data: created, error } = await supabase
       .from('daily_quests')
-      .insert(newQuests)
+      .insert(toCreate)
       .select();
 
-    if (error || !created) return [];
-    return created as Quest[];
+    if (error || !created) return existingQuests;
+    return [...existingQuests, ...(created as Quest[])] as Quest[];
   } catch {
     return [];
   }
 }
 
 export async function incrementQuestProgress(questType: QuestType, amount: number = 1): Promise<void> {
-  try {
-    const { data: quest } = await supabase
-      .from('daily_quests')
-      .select('*')
-      .eq('quest_type', questType)
-      .eq('status', 'active')
-      .gte('period_end', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const { data: quest } = await supabase
+        .from('daily_quests')
+        .select('*')
+        .eq('quest_type', questType)
+        .eq('status', 'active')
+        .gte('period_end', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!quest) return;
+      if (!quest) return;
 
-    const newCount = Math.min(quest.current_count + amount, quest.target_count);
-    const newStatus = newCount >= quest.target_count ? 'completed' : 'active';
+      const newCount = Math.min(quest.current_count + amount, quest.target_count);
+      const newStatus = newCount >= quest.target_count ? 'completed' : 'active';
 
-    await supabase
-      .from('daily_quests')
-      .update({ current_count: newCount, status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', quest.id);
-  } catch {
-    // non-fatal
+      const { data: updated } = await supabase
+        .from('daily_quests')
+        .update({ current_count: newCount, status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', quest.id)
+        .eq('current_count', quest.current_count)
+        .select();
+
+      if (updated && updated.length > 0) return;
+    } catch {
+      return;
+    }
   }
 }
 
 export async function claimQuestReward(questId: string): Promise<number> {
   try {
-    const { data: quest } = await supabase
-      .from('daily_quests')
-      .select('*')
-      .eq('id', questId)
-      .maybeSingle();
-
-    if (!quest || quest.status !== 'completed') return 0;
-
-    await supabase
+    const { data: updated, error } = await supabase
       .from('daily_quests')
       .update({ status: 'claimed', updated_at: new Date().toISOString() })
-      .eq('id', questId);
+      .eq('id', questId)
+      .eq('status', 'completed')
+      .select();
 
+    if (error || !updated || updated.length === 0) return 0;
+
+    const quest = updated[0] as Quest;
     await addCredits(quest.reward_credits, 'bonus', `퀘스트 보상: ${quest.title}`);
     return quest.reward_credits;
   } catch {

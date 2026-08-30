@@ -257,8 +257,8 @@ export default function TrendingScreen() {
             url: product.link,
           }],
           affiliate_links: [{
-            platform: product.marketplace === 'coupang' ? 'Coupang' : 'BrandConnect',
-            label: product.marketplace === 'coupang' ? '쿠팡 파트너스' : '네이버 브랜드커넥트',
+            platform: product.marketplace === 'coupang' ? 'Coupang' : product.marketplace === 'toss' ? 'Toss' : 'BrandConnect',
+            label: product.marketplace === 'coupang' ? '쿠팡 파트너스' : product.marketplace === 'toss' ? '토스 쉐어' : '네이버 브랜드커넥트',
             url: product.link,
           }],
         })

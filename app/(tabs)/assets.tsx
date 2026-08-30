@@ -113,6 +113,7 @@ export default function AssetsScreen() {
   const [remixBgm, setRemixBgm] = useState<string | null>(null);
   const [remixing, setRemixing] = useState(false);
   const [remixDone, setRemixDone] = useState(false);
+  const remixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sortedAssets = useCallback(() => {
     const sorted = [...assets];
@@ -310,7 +311,8 @@ export default function AssetsScreen() {
     if (!remixHook && !remixBgm) return;
     setRemixing(true);
     setRemixDone(false);
-    setTimeout(() => {
+    if (remixTimerRef.current) clearTimeout(remixTimerRef.current);
+    remixTimerRef.current = setTimeout(() => {
       setRemixing(false);
       setRemixDone(true);
     }, 2000);
@@ -817,10 +819,10 @@ export default function AssetsScreen() {
       </Modal>
 
       {/* Remix Modal */}
-      <Modal visible={!!remixAsset} transparent animationType="fade" onRequestClose={() => { setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }}>
+      <Modal visible={!!remixAsset} transparent animationType="fade" onRequestClose={() => { if (remixTimerRef.current) clearTimeout(remixTimerRef.current); setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.remixModalContent}>
-            <TouchableOpacity style={styles.modalClose} onPress={() => { setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.modalClose} onPress={() => { if (remixTimerRef.current) clearTimeout(remixTimerRef.current); setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }} activeOpacity={0.7}>
               <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
             </TouchableOpacity>
             <View style={styles.remixHeader}>
@@ -836,7 +838,7 @@ export default function AssetsScreen() {
                 <CheckCircle2 size={32} color={theme.colors.success[400]} strokeWidth={2} />
                 <Text style={styles.remixDoneTitle}>리믹스 완료!</Text>
                 <Text style={styles.remixDoneDesc}>새 버전이 제작물에 추가되었습니다</Text>
-                <TouchableOpacity style={styles.remixDoneBtn} onPress={() => { setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.remixDoneBtn} onPress={() => { if (remixTimerRef.current) clearTimeout(remixTimerRef.current); setRemixAsset(null); setRemixDone(false); setRemixHook(null); setRemixBgm(null); }} activeOpacity={0.8}>
                   <Text style={styles.remixDoneBtnText}>확인</Text>
                 </TouchableOpacity>
               </View>

@@ -66,9 +66,8 @@ export async function getCreditBalance(): Promise<CreditBalance> {
     .eq('id', 1)
     .maybeSingle();
 
-  if (error || !data) {
-    return { balance: 0, total_purchased: 0, total_consumed: 0 };
-  }
+  if (error) throw new Error(`크레딧 잔액 조회 실패: ${error.message}`);
+  if (!data) return { balance: 0, total_purchased: 0, total_consumed: 0 };
   return data as CreditBalance;
 }
 
@@ -100,7 +99,8 @@ export async function deductCredits(
     }
     throw new Error(`크레딧 차감 실패: ${error.message}`);
   }
-  return data as number;
+  if (data == null) throw new Error('크레딧 차감 실패: 응답이 없습니다.');
+  return data;
 }
 
 export async function addCredits(
@@ -123,8 +123,12 @@ export async function addCredits(
 }
 
 export async function checkCredits(feature: CreditFeature): Promise<boolean> {
-  const { balance } = await getCreditBalance();
-  return balance >= CREDIT_COSTS[feature];
+  try {
+    const { balance } = await getCreditBalance();
+    return balance >= CREDIT_COSTS[feature];
+  } catch {
+    return false;
+  }
 }
 
 export function formatKRW(amount: number): string {

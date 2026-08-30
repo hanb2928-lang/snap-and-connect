@@ -13,8 +13,12 @@ export function CreditBalanceBadge({ onPress, compact = false }: CreditBalanceBa
   const [balance, setBalance] = useState<CreditBalance | null>(null);
 
   const loadBalance = useCallback(async () => {
-    const data = await getCreditBalance();
-    setBalance(data);
+    try {
+      const data = await getCreditBalance();
+      setBalance(data);
+    } catch {
+      // keep last known balance on transient error
+    }
   }, []);
 
   useEffect(() => {

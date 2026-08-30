@@ -96,13 +96,23 @@ export async function setItem(key: string, value: string): Promise<void> {
 
 function evictOldestCacheEntries(): void {
   if (webStorage) {
-    const keysToRemove: string[] = [];
+    const entries: { key: string; timestamp: number }[] = [];
     for (let i = 0; i < webStorage.length; i++) {
       const k = webStorage.key(i);
-      if (k && k.startsWith('cache:')) keysToRemove.push(k);
+      if (!k || !k.startsWith('cache:')) continue;
+      try {
+        const raw = webStorage.getItem(k);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        entries.push({ key: k, timestamp: parsed?.timestamp ?? 0 });
+      } catch {
+        entries.push({ key: k, timestamp: 0 });
+      }
     }
-    for (const k of keysToRemove) {
-      try { webStorage.removeItem(k); } catch {}
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    const toRemove = Math.max(1, Math.ceil(entries.length / 4));
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      try { webStorage.removeItem(entries[i].key); } catch {}
     }
   }
 }
@@ -112,8 +122,21 @@ async function evictOldestCacheEntriesNative(): Promise<void> {
   try {
     const allKeys = await nativeGetAllKeys();
     const cacheKeys = allKeys.filter((k) => k.startsWith('cache:'));
+    const entries: { key: string; timestamp: number }[] = [];
     for (const k of cacheKeys) {
-      try { await nativeRemoveItem(k); } catch {}
+      try {
+        const raw = await getItem(k);
+        if (!raw) { entries.push({ key: k, timestamp: 0 }); continue; }
+        const parsed = JSON.parse(raw);
+        entries.push({ key: k, timestamp: parsed?.timestamp ?? 0 });
+      } catch {
+        entries.push({ key: k, timestamp: 0 });
+      }
+    }
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    const toRemove = Math.max(1, Math.ceil(entries.length / 4));
+    for (let i = 0; i < toRemove && i < entries.length; i++) {
+      try { await nativeRemoveItem(entries[i].key); } catch {}
     }
   } catch {}
 }

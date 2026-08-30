@@ -98,17 +98,19 @@ export default function WarmupScreen() {
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
   }, []);
 
   const selectedScheduleIdRef = useRef<string | null>(null);
   selectedScheduleIdRef.current = selectedScheduleId;
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(null);
     try {
       const data = await fetchActiveSchedules();
@@ -135,7 +137,7 @@ export default function WarmupScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadData(true);
   };
 
   const handleCreate = useCallback(async () => {
@@ -161,7 +163,7 @@ export default function WarmupScreen() {
       setCreateError(null);
       setSelectedScheduleId(result.id);
       setCurrentSlideIndex(0);
-      loadData();
+      loadData(true);
     } catch {
       setCreateError('네트워크 오류로 생성에 실패했습니다');
     } finally {
@@ -176,7 +178,7 @@ export default function WarmupScreen() {
       showToast('작업 상태 변경에 실패했어요. 다시 시도해주세요.');
       return;
     }
-    loadData();
+    loadData(true);
   }, [loadData, showToast]);
 
   const handleSkipTask = useCallback(async (taskId: string) => {
@@ -185,7 +187,7 @@ export default function WarmupScreen() {
       showToast('작업 건너뛰기에 실패했어요. 다시 시도해주세요.');
       return;
     }
-    loadData();
+    loadData(true);
   }, [loadData, showToast]);
 
   const handlePauseSchedule = useCallback(async (scheduleId: string, currentStatus: string) => {
@@ -195,7 +197,7 @@ export default function WarmupScreen() {
       showToast('스케줄 상태 변경에 실패했어요. 다시 시도해주세요.');
       return;
     }
-    loadData();
+    loadData(true);
   }, [loadData, showToast]);
 
   const handleDeleteSchedule = useCallback(async (scheduleId: string) => {
@@ -205,7 +207,7 @@ export default function WarmupScreen() {
       return;
     }
     setSelectedScheduleId(null);
-    loadData();
+    loadData(true);
   }, [loadData, showToast]);
 
   const selectedSchedule = useMemo(
@@ -221,7 +223,8 @@ export default function WarmupScreen() {
       arr.push(t);
       map.set(t.day_number, arr);
     }
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([day, tasks]) => ({

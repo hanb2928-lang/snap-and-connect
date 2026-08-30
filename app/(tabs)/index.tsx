@@ -103,6 +103,7 @@ export default function CameraScreen() {
         isMountedRef.current = false;
         setIsActive(false);
         setCameraReady(false);
+        setProcessing(false);
       };
     }, []),
   );
@@ -136,6 +137,8 @@ export default function CameraScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady) return;
     setProcessing(true);
+    setProgressStep(0);
+    setProgressText('사진 촬영 중...');
     try {
       const photo = await withTimeout(
         cameraRef.current.takePictureAsync({
@@ -185,6 +188,8 @@ export default function CameraScreen() {
         setSelectedHook(null);
         setCustomPrompt('');
         setManualPromptOpen(false);
+        setMultiAngleShots([]);
+        setCaptureMode('single');
         setFunnelStage('analyzing');
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -217,6 +222,8 @@ export default function CameraScreen() {
       setSelectedHook(null);
       setCustomPrompt('');
       setManualPromptOpen(false);
+      setMultiAngleShots([]);
+      setCaptureMode('single');
       setFunnelStage('analyzing');
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -301,6 +308,8 @@ export default function CameraScreen() {
     setSelectedHook(null);
     setCustomPrompt('');
     setManualPromptOpen(false);
+    setMultiAngleShots([]);
+    setCaptureMode('single');
     setFunnelStage('analyzing');
   };
 
