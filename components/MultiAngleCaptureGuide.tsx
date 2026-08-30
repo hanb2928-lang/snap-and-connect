@@ -45,6 +45,8 @@ interface MultiAngleCaptureGuideProps {
   onComplete: (shots: AngleShot[]) => void;
   /** Pick from gallery instead of camera */
   onPickImage?: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
+  /** Capture from camera */
+  onCaptureImage?: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
 }
 
 export function MultiAngleCaptureGuide({
@@ -52,6 +54,7 @@ export function MultiAngleCaptureGuide({
   onClose,
   onComplete,
   onPickImage,
+  onCaptureImage,
 }: MultiAngleCaptureGuideProps) {
   const safeTop = useSafeTop();
   const [shots, setShots] = useState<Record<string, AngleShot>>({});
@@ -108,6 +111,26 @@ export function MultiAngleCaptureGuide({
       setTimeout(() => { pickLockRef.current = false; }, 500);
     },
     [onPickImage, handleAddShot],
+  );
+
+  const handleCaptureFromCamera = useCallback(
+    async (angleId: string) => {
+      if (!onCaptureImage) return;
+      if (pickLockRef.current) return;
+      pickLockRef.current = true;
+      setProcessing(true);
+      try {
+        const result = await onCaptureImage(angleId);
+        if (result) {
+          handleAddShot(angleId, result.base64, result.mimeType);
+        }
+      } catch {
+        // ignore
+      }
+      setProcessing(false);
+      setTimeout(() => { pickLockRef.current = false; }, 500);
+    },
+    [onCaptureImage, handleAddShot],
   );
 
   const handleRetake = useCallback((angleId: string) => {
@@ -205,6 +228,20 @@ export function MultiAngleCaptureGuide({
                     </View>
                   ) : (
                     <View style={styles.shotPlaceholder}>
+                      {onCaptureImage && (
+                        <TouchableOpacity
+                          style={styles.captureBtn}
+                          onPress={() => {
+                            setCurrentAngle(idx);
+                            handleCaptureFromCamera(guide.id);
+                          }}
+                          disabled={processing}
+                          activeOpacity={0.7}
+                        >
+                          <Camera size={18} color={theme.colors.dark.text} strokeWidth={2} />
+                          <Text style={styles.galleryBtnText}>촬영하기</Text>
+                        </TouchableOpacity>
+                      )}
                       {onPickImage && (
                         <TouchableOpacity
                           style={styles.galleryBtn}
@@ -420,7 +457,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   shotPlaceholder: {
-    height: 100,
+    minHeight: 100,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
@@ -429,6 +466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 12,
   },
   galleryBtn: {
     flexDirection: 'row',
@@ -438,6 +476,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surface,
+  },
+  captureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
   },
   galleryBtnText: {
     fontSize: 13,

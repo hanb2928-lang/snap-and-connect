@@ -576,6 +576,32 @@ export default function CameraScreen() {
         ? { tintColor: 'rgba(100,200,220,0.08)' }
         : {};
 
+  const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
+    if (!cameraRef.current || !cameraReady) return null;
+    try {
+      const photo = await withTimeout(
+        cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.7,
+          shutterSound: false,
+          ...({ mute: true } as Record<string, unknown>),
+        }) as Promise<{ base64?: string; uri: string }>,
+        CAPTURE_TIMEOUT_MS,
+        '다각도 촬영',
+      );
+      if (!photo?.base64) return null;
+      const cleanB64 = cleanBase64(photo.base64);
+      const compressedDataUrl = await withTimeout(
+        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
+      return { base64: cleanBase64(compressedDataUrl), mimeType: getMimeTypeFromDataUrl(compressedDataUrl) };
+    } catch {
+      return null;
+    }
+  };
+
   const handleMultiAnglePick = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
       try {
@@ -931,6 +957,7 @@ export default function CameraScreen() {
         onClose={() => setMultiAngleVisible(false)}
         onComplete={handleMultiAngleComplete}
         onPickImage={handleMultiAnglePick}
+        onCaptureImage={handleMultiAngleCapture}
       />
 
       {/* Auto-save toast (mobile) */}
