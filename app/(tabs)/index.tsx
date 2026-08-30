@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,7 +32,7 @@ import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { HotDealPickerModal } from '@/components/HotDealPickerModal';
+import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -66,7 +66,8 @@ export default function CameraScreen() {
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
+  const [multiAngleVisible, setMultiAngleVisible] = useState(false);
+  const [multiAngleShots, setMultiAngleShots] = useState<AngleShot[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
   const fadeAnim = useSharedValue(0);
@@ -199,8 +200,9 @@ export default function CameraScreen() {
         );
       }, 3000);
 
+      const additionalB64s = multiAngleShots.slice(1).map((s) => s.base64).filter(Boolean) as string[];
       const { scanId } = await withTimeout(
-        startAsyncAnalysis(base64, mimeType, 'single'),
+        startAsyncAnalysis(base64, mimeType, additionalB64s.length > 0 ? 'multi' : 'single', additionalB64s),
         ANALYSIS_TIMEOUT_MS,
         'AI 분석',
       );
@@ -256,10 +258,50 @@ export default function CameraScreen() {
     setPreviewCapture(null);
   };
 
-  const handleHotDealSelect = (product: { name: string; price: string; link: string; imageUrl?: string }) => {
-    setSelectedImage(null);
-    setHotDealModalVisible(false);
-    router.push('/marketing' as never);
+  const handleMultiAngleComplete = (shots: AngleShot[]) => {
+    setMultiAngleShots(shots);
+    setMultiAngleVisible(false);
+    if (shots[0]?.base64) {
+      setSelectedImage(shots[0].base64);
+      setSelectedImageMime(shots[0].mimeType || 'image/jpeg');
+    }
+  };
+
+  const handleMultiAnglePick = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
+    if (isWebPlatform()) {
+      try {
+        const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
+        if (images.length === 0) return null;
+        const compressed = await withTimeout(
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          PICK_TIMEOUT_MS,
+          '이미지 압축',
+        );
+        return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
+      } catch {
+        return null;
+      }
+    }
+    try {
+      const result = await withTimeout(
+        ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          base64: false,
+          quality: 0.7,
+        }),
+        PICK_TIMEOUT_MS,
+        '사진 선택',
+      );
+      if (result.canceled || !result.assets?.[0]?.uri) return null;
+      const { base64, mimeType } = await withTimeout(
+        compressImageToBase64(result.assets[0].uri, 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
+      return { base64, mimeType };
+    } catch {
+      return null;
+    }
   };
 
   const hasImage = selectedImage || previewCapture?.base64;
@@ -269,9 +311,10 @@ export default function CameraScreen() {
       <WebSimpleScreen
         selectedImage={selectedImage}
         selectedImageMime={selectedImageMime}
+        multiAngleCount={multiAngleShots.length}
         onPickImage={handlePickImage}
         onGenerate={handleGenerate}
-        onHotDealPress={() => setHotDealModalVisible(true)}
+        onMultiAnglePress={() => setMultiAngleVisible(true)}
         onSettingsPress={() => router.push('/settings' as never)}
         processing={processing}
         error={error}
@@ -400,15 +443,28 @@ export default function CameraScreen() {
           </View>
         )}
 
-        {/* Secondary: Hot Deal Shortcut */}
+        {/* Capture quality tip */}
+        <View style={styles.captureTip}>
+          <Info size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+          <Text style={styles.captureTipText}>
+            단품 클로즈업 + 측면/디테일 컷을 함께 올리면 AI 분석 정확도가 2배 높아져요!
+          </Text>
+        </View>
+
+        {/* Multi-angle shortcut */}
         <TouchableOpacity
-          style={styles.hotDealBtn}
-          onPress={() => setHotDealModalVisible(true)}
+          style={styles.multiAngleBtn}
+          onPress={() => setMultiAngleVisible(true)}
           activeOpacity={0.7}
         >
-          <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2.2} />
-          <Text style={styles.hotDealBtnText}>실시간 핫딜에서 가져오기</Text>
-          <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+          <Layers size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
+          <Text style={styles.multiAngleBtnText}>다각도 사진으로 정확도 높이기</Text>
+          {multiAngleShots.length > 0 && (
+            <View style={styles.multiAngleBadge}>
+              <Text style={styles.multiAngleBadgeText}>{multiAngleShots.length}장</Text>
+            </View>
+          )}
+          <ArrowRight size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
         </TouchableOpacity>
 
         {/* Two main buttons */}
@@ -433,7 +489,7 @@ export default function CameraScreen() {
               {hasImage ? (
                 <>
                   <Flame size={26} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.captureBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
+                  <Text style={styles.captureBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
                   <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
                 </>
               ) : (
@@ -464,11 +520,12 @@ export default function CameraScreen() {
         onComplete={() => setShowOnboardingModal(false)}
       />
 
-      {/* Hot Deal Picker */}
-      <HotDealPickerModal
-        visible={hotDealModalVisible}
-        onClose={() => setHotDealModalVisible(false)}
-        onSelect={handleHotDealSelect}
+      {/* Multi-Angle Capture Guide */}
+      <MultiAngleCaptureGuide
+        visible={multiAngleVisible}
+        onClose={() => setMultiAngleVisible(false)}
+        onComplete={handleMultiAngleComplete}
+        onPickImage={handleMultiAnglePick}
       />
 
       {/* Processing overlay */}
@@ -495,9 +552,10 @@ export default function CameraScreen() {
 interface WebSimpleScreenProps {
   selectedImage: string | null;
   selectedImageMime: string;
+  multiAngleCount: number;
   onPickImage: () => void;
   onGenerate: () => void;
-  onHotDealPress: () => void;
+  onMultiAnglePress: () => void;
   onSettingsPress: () => void;
   processing: boolean;
   error: string | null;
@@ -515,9 +573,10 @@ interface WebSimpleScreenProps {
 function WebSimpleScreen({
   selectedImage,
   selectedImageMime,
+  multiAngleCount,
   onPickImage,
   onGenerate,
-  onHotDealPress,
+  onMultiAnglePress,
   onSettingsPress,
   processing,
   error,
@@ -550,9 +609,17 @@ function WebSimpleScreen({
           <View style={styles.webHeroIcon}>
             <Sparkles size={40} color={theme.colors.primary[400]} strokeWidth={1.8} />
           </View>
-          <Text style={styles.webHeroTitle}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
+          <Text style={styles.webHeroTitle}>10초 만에 매장 홍보 숏폼 만들기</Text>
           <Text style={styles.webHeroSub}>
-            사진을 올리면 AI가 제품을 분석하고 동네 매장 홍보와 온라인 제휴 수익을 동시에 잡는 숏폼을 자동 생성합니다
+            매장 사진을 올리면 AI가 분석해서 동네 손님을 부르는 숏폼을 자동으로 만들어드려요
+          </Text>
+        </View>
+
+        {/* Capture quality tip */}
+        <View style={styles.webCaptureTip}>
+          <Info size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+          <Text style={styles.webCaptureTipText}>
+            단품 클로즈업 + 측면/디테일 컷을 함께 올리면 AI 분석 정확도가 2배 높아져요!
           </Text>
         </View>
 
@@ -563,11 +630,16 @@ function WebSimpleScreen({
           </View>
         )}
 
-        {/* Hot Deal Shortcut */}
-        <TouchableOpacity style={styles.hotDealBtn} onPress={onHotDealPress} activeOpacity={0.7}>
-          <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2.2} />
-          <Text style={styles.hotDealBtnText}>실시간 핫딜에서 가져오기</Text>
-          <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+        {/* Multi-angle shortcut */}
+        <TouchableOpacity style={styles.multiAngleBtn} onPress={onMultiAnglePress} activeOpacity={0.7}>
+          <Layers size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
+          <Text style={styles.multiAngleBtnText}>다각도 사진으로 정확도 높이기</Text>
+          {multiAngleCount > 0 && (
+            <View style={styles.multiAngleBadge}>
+              <Text style={styles.multiAngleBadgeText}>{multiAngleCount}장</Text>
+            </View>
+          )}
+          <ArrowRight size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
         </TouchableOpacity>
 
         {/* Main action buttons */}
@@ -583,7 +655,7 @@ function WebSimpleScreen({
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.webGenerateBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
+          <Text style={styles.webGenerateBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
 
@@ -769,22 +841,50 @@ const styles = StyleSheet.create({
     color: theme.colors.error[400],
     textAlign: 'center',
   },
-  hotDealBtn: {
+  captureTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: theme.spacing.sm,
+  },
+  captureTipText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[300],
+    lineHeight: 15,
+  },
+  multiAngleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: theme.colors.warning[500] + '12',
+    backgroundColor: theme.colors.accent[500] + '12',
     borderRadius: theme.radius.md,
     paddingVertical: 10,
     marginBottom: theme.spacing.sm,
     borderWidth: 1.5,
-    borderColor: theme.colors.warning[400] + '40',
+    borderColor: theme.colors.accent[400] + '40',
   },
-  hotDealBtnText: {
+  multiAngleBtnText: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.warning[400],
+    color: theme.colors.accent[400],
+  },
+  multiAngleBadge: {
+    backgroundColor: theme.colors.accent[500] + '30',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  multiAngleBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
   },
   mainBtnRow: {
     flexDirection: 'row',
@@ -866,6 +966,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
+  },
+  webCaptureTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: theme.spacing.md,
+  },
+  webCaptureTipText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[300],
+    lineHeight: 18,
   },
   webImagePreview: {
     borderRadius: theme.radius.lg,

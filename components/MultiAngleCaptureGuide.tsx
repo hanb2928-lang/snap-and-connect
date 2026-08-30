@@ -139,10 +139,10 @@ export function MultiAngleCaptureGuide({
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Intro */}
             <View style={styles.introBox}>
-              <Text style={styles.introTitle}>3초 만에 3장 스마트 촬영</Text>
+              <Text style={styles.introTitle}>정면 1장 + 측면/디테일 1장 = AI 분석 정확도 2배</Text>
               <Text style={styles.introDesc}>
-                AI가 억지로 다른 각도를 그리는 대신, 직접 촬영한 실물 사진으로 100% 신뢰도를 유지하세요.
-                앞면, 뒷면/측면, 디테일 3장만 있으면 모든 콘텐츠에 활용 가능합니다.
+                단품 사진은 배경 노이즈를 줄여 AI가 색상·질감·형태를 정확히 추출합니다.
+                다각도 사진을 함께 올리면 입체적 특성까지 파악해서 매칭 오류를 원천 차단합니다.
               </Text>
             </View>
 
