@@ -8,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
-  type ViewStyle,
 } from 'react-native';
 import { Pencil, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';

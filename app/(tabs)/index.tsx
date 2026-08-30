@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers, Sun, Droplet, PenLine, Check, ChevronDown, TrendingUp, Tag, Store } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Layers, Sun, Droplet, PenLine, Check, ChevronDown, TrendingUp, Tag, Store } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -141,6 +141,12 @@ export default function CameraScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
 
+    // multi mode: open multi-angle guide instead of single capture
+    if (captureMode === 'multi') {
+      setMultiAngleVisible(true);
+      return;
+    }
+
     // oneclick mode: capture + auto-save in one step, skip funnel
     if (captureMode === 'oneclick') {
       setAutoSaving(true);
@@ -185,7 +191,7 @@ export default function CameraScreen() {
       return;
     }
 
-    // single/multi: normal capture → preview
+    // single mode: normal capture → preview
     setProcessing(true);
     setProgressStep(0);
     setProgressText('사진 촬영 중...');
@@ -561,7 +567,6 @@ export default function CameraScreen() {
         progressWidth={progressWidth}
         fadeIn={fadeIn}
         overlayStyle={overlayStyle}
-        fadeAnim={fadeAnim}
         safeTop={safeTop}
         tabBarHeight={tabBarHeight}
         bottomInset={bottomInset}
@@ -1016,7 +1021,6 @@ interface WebCameraScreenProps {
   progressWidth: ReturnType<typeof useSharedValue<number>>;
   fadeIn: () => void;
   overlayStyle: ReturnType<typeof useAnimatedStyle>;
-  fadeAnim: ReturnType<typeof useSharedValue<number>>;
   safeTop: number;
   tabBarHeight: number;
   bottomInset: number;

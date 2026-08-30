@@ -1,8 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, ZapOff, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
-import { cleanBase64, buildDataUrl, getMimeTypeFromDataUrl } from '@/lib/base64';
+import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
+import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
 export type CaptureModeType = 'oneclick' | 'single' | 'multi';
