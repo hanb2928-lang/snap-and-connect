@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
@@ -18,6 +19,7 @@ interface WebCameraViewProps {
   onCaptureModeChange: (mode: CaptureModeType) => void;
   autoSaving: boolean;
   autoSaveToast: string | null;
+  autoSaveStep: number;
   onMultiAnglePress: () => void;
 }
 
@@ -40,6 +42,7 @@ export function WebCameraView({
   onCaptureModeChange,
   autoSaving,
   autoSaveToast,
+  autoSaveStep,
   onMultiAnglePress,
 }: WebCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -52,6 +55,7 @@ export function WebCameraView({
   const [capturing, setCapturing] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string>('image/jpeg');
+  const pulseScale = useSharedValue(1);
 
   const stopStream = useCallback(() => {
     if (streamRef.current) {
@@ -173,6 +177,21 @@ export function WebCameraView({
 
   const hasPreview = !!previewBase64;
 
+  useEffect(() => {
+    if (autoSaving) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 600 }),
+          withTiming(1, { duration: 600 }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      pulseScale.value = 1;
+    }
+  }, [autoSaving, pulseScale]);
+
   return (
     <View style={styles.container}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -191,9 +210,20 @@ export function WebCameraView({
       {autoSaving && !hasPreview && (
         <View style={styles.autoSavingWrap}>
           <View style={styles.autoSavingCard}>
-            <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
-            <Text style={styles.autoSavingTitle}>AI 자동 분석 중...</Text>
-            <Text style={styles.autoSavingSub}>촬영 완료! 숏폼을 만들어 보관함에 저장하고 있어요</Text>
+            <Animated.View style={{ transform: [{ scale: pulseScale }] }}>
+              <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
+            </Animated.View>
+            <Text style={styles.autoSavingTitle}>AI가 매뉴를 분석 중입니다</Text>
+            <View style={styles.autoSavingStepRow}>
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 1 && styles.autoSavingStepDotActive]} />
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 2 && styles.autoSavingStepDotActive]} />
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 3 && styles.autoSavingStepDotActive]} />
+            </View>
+            <Text style={styles.autoSavingSub}>
+              {autoSaveStep === 1 ? '사진 촬영 완료! 매뉴 인식 중...' :
+               autoSaveStep === 2 ? 'AI 비전 분석 중, 숏폼 생성 준비 중...' :
+               '보관함에 자동 저장 중, 거의 다 됐어요!'}
+            </Text>
           </View>
         </View>
       )}
@@ -623,6 +653,20 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  autoSavingStepRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 6,
+  },
+  autoSavingStepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  autoSavingStepDotActive: {
+    backgroundColor: theme.colors.primary[400],
   },
   // Toast
   toastWrap: {

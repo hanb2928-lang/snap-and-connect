@@ -21,6 +21,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
@@ -89,6 +91,8 @@ export default function CameraScreen() {
   const [captureMode, setCaptureMode] = useState<CaptureModeType>('oneclick');
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
+  const [autoSaveStep, setAutoSaveStep] = useState(1);
+  const autoSavePulse = useSharedValue(1);
   const [moodFilter, setMoodFilter] = useState<'none' | 'warm' | 'fresh'>('none');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
@@ -134,6 +138,30 @@ export default function CameraScreen() {
     fadeAnim.value = withTiming(1, { duration: 300 });
   }, [fadeAnim]);
 
+  // Auto-save step animation: cycle 1→2→3 every 800ms, pulse the icon
+  const autoSaveStepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startAutoSaveAnimation = useCallback(() => {
+    setAutoSaveStep(1);
+    autoSavePulse.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 600 }),
+        withTiming(1, { duration: 600 }),
+      ),
+      -1,
+      false,
+    );
+    autoSaveStepTimer.current = setInterval(() => {
+      setAutoSaveStep((s) => (s >= 3 ? 3 : s + 1));
+    }, 800);
+  }, [autoSavePulse]);
+  const stopAutoSaveAnimation = useCallback(() => {
+    if (autoSaveStepTimer.current) {
+      clearInterval(autoSaveStepTimer.current);
+      autoSaveStepTimer.current = null;
+    }
+    autoSavePulse.value = 1;
+  }, [autoSavePulse]);
+
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
   }));
@@ -151,6 +179,7 @@ export default function CameraScreen() {
     if (captureMode === 'oneclick') {
       setAutoSaving(true);
       setAutoSaveToast(null);
+      startAutoSaveAnimation();
       try {
         const photo = await withTimeout(
           cameraRef.current.takePictureAsync({
@@ -186,6 +215,7 @@ export default function CameraScreen() {
         if (!isMountedRef.current) return;
         setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
       } finally {
+        stopAutoSaveAnimation();
         setAutoSaving(false);
       }
       return;
@@ -514,6 +544,7 @@ export default function CameraScreen() {
     if (captureMode === 'oneclick') {
       setAutoSaving(true);
       setAutoSaveToast(null);
+      startAutoSaveAnimation();
       try {
         const { scanId } = await withTimeout(
           startAsyncAnalysis(base64, mimeType, 'single', []),
@@ -526,6 +557,7 @@ export default function CameraScreen() {
       } catch (err) {
         setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
       } finally {
+        stopAutoSaveAnimation();
         setAutoSaving(false);
       }
       return;
@@ -561,6 +593,7 @@ export default function CameraScreen() {
         processing={processing}
         autoSaving={autoSaving}
         autoSaveToast={autoSaveToast}
+        autoSaveStep={autoSaveStep}
         error={error}
         progressStep={progressStep}
         progressText={progressText}
@@ -819,9 +852,20 @@ export default function CameraScreen() {
       {autoSaving && (
         <View style={styles.autoSavingOverlay}>
           <View style={styles.autoSavingCard}>
-            <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
-            <Text style={styles.autoSavingTitle}>AI 자동 분석 중...</Text>
-            <Text style={styles.autoSavingSub}>촬영 완료! 숏폼을 만들어 보관함에 저장하고 있어요</Text>
+            <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
+              <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
+            </Animated.View>
+            <Text style={styles.autoSavingTitle}>AI가 메뉴를 분석 중입니다</Text>
+            <View style={styles.autoSavingStepRow}>
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 1 && styles.autoSavingStepDotActive]} />
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 2 && styles.autoSavingStepDotActive]} />
+              <View style={[styles.autoSavingStepDot, autoSaveStep >= 3 && styles.autoSavingStepDotActive]} />
+            </View>
+            <Text style={styles.autoSavingSub}>
+              {autoSaveStep === 1 ? '사진 촬영 완료! 메뉴 인식 중...' :
+               autoSaveStep === 2 ? 'AI 비전 분석 중, 숏폼 생성 준비 중...' :
+               '보관함에 자동 저장 중, 거의 다 됐어요!'}
+            </Text>
           </View>
         </View>
       )}
@@ -1015,6 +1059,7 @@ interface WebCameraScreenProps {
   processing: boolean;
   autoSaving: boolean;
   autoSaveToast: string | null;
+  autoSaveStep: number;
   error: string | null;
   progressStep: number;
   progressText: string;
@@ -1053,6 +1098,7 @@ function WebCameraScreen({
   processing,
   autoSaving,
   autoSaveToast,
+  autoSaveStep,
   error,
   progressStep,
   progressText,
@@ -1277,6 +1323,7 @@ function WebCameraScreen({
           onCaptureModeChange={onCaptureModeChange}
           autoSaving={autoSaving}
           autoSaveToast={autoSaveToast}
+          autoSaveStep={autoSaveStep}
           onMultiAnglePress={onMultiAnglePress}
         />
 
@@ -1584,6 +1631,20 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  autoSavingStepRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 6,
+  },
+  autoSavingStepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  autoSavingStepDotActive: {
+    backgroundColor: theme.colors.primary[400],
   },
   gridToggleBtn: {
     width: 52,
