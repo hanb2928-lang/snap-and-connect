@@ -228,7 +228,7 @@ export function WebCameraView({
           </View>
 
           {/* Bottom bar */}
-          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.lg }]}>
             {error && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorBannerText}>{error}</Text>
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     backgroundColor: 'rgba(5, 8, 18, 0.85)',
-    paddingTop: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
   },
   errorBanner: {
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
   },
   galleryThumb: {
     width: 52,
@@ -525,3 +525,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+
+export { WebCameraView }
