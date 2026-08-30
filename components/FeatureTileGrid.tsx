@@ -40,13 +40,15 @@ export type FeatureCategory = {
 type Props = {
   categories: FeatureCategory[];
   scanMode?: ScanMode;
+  focusTileKey?: string | null;
+  onFocusConsumed?: () => void;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = theme.spacing.sm;
 const CARD_MIN_WIDTH = Math.max(150, (SCREEN_WIDTH - theme.spacing.lg * 2 - CARD_GAP * 2) / 3);
 
-export function FeatureTileGrid({ categories, scanMode }: Props) {
+export function FeatureTileGrid({ categories, scanMode, focusTileKey, onFocusConsumed }: Props) {
   const [activeCategory, setActiveCategory] = useState(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const tabScrollRef = useRef<ScrollView>(null);
@@ -83,6 +85,20 @@ export function FeatureTileGrid({ categories, scanMode }: Props) {
       setExpandedKey(currentCategory.tiles[0].key);
     }
   }, [currentCategory]);
+
+  useEffect(() => {
+    if (!focusTileKey) return;
+    const catIndex = filteredCategories.findIndex((cat) =>
+      cat.tiles.some((t) => t.key === focusTileKey),
+    );
+    if (catIndex < 0) return;
+    if (catIndex !== activeCategory) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveCategory(catIndex);
+    }
+    setExpandedKey(focusTileKey);
+    onFocusConsumed?.();
+  }, [focusTileKey]);
 
   return (
     <View style={styles.wrap}>

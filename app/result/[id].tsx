@@ -156,7 +156,7 @@ export default function ResultScreen() {
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
-  const [scrollToCommerce, setScrollToCommerce] = useState(false);
+  const [focusTileKey, setFocusTileKey] = useState<string | null>(null);
   const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
   const [cleanMode, setCleanMode] = useState(false);
 
@@ -392,17 +392,11 @@ export default function ResultScreen() {
   }, [settings]);
 
   const handleConnectLink = useCallback(() => {
-    setScrollToCommerce(true);
+    setFocusTileKey('shoppingMatch');
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 2200, animated: true });
+    }, 350);
   }, []);
-
-  useEffect(() => {
-    if (scrollToCommerce) {
-      const targetY = (scrollViewRef.current as any)?._scrollOffset ?? 0;
-      const estimatedOffset = 1400;
-      scrollViewRef.current?.scrollTo({ y: Math.max(targetY, estimatedOffset), animated: true });
-      setScrollToCommerce(false);
-    }
-  }, [scrollToCommerce]);
 
   const handleDelete = async () => {
     if (!scan) return;
@@ -1966,7 +1960,7 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
-          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} />
+          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} />
 
           {detectedProducts.length > 1 && (
             <LazySection delayMs={250}>
