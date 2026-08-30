@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -50,6 +51,8 @@ export default function CameraScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
+  const safeInsets = useSafeAreaInsets();
+  const bottomInset = Math.max(safeInsets.bottom, 0);
   const isMountedRef = useRef(true);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -522,7 +525,7 @@ export default function CameraScreen() {
       </View>
 
       {/* Bottom Action Area */}
-      <View style={[styles.bottomAction, { paddingBottom: tabBarHeight + theme.spacing.sm }]}>
+      <View style={[styles.bottomAction, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
@@ -553,40 +556,37 @@ export default function CameraScreen() {
           <ArrowRight size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
         </TouchableOpacity>
 
-        {/* Two main buttons */}
-        <View style={styles.mainBtnRow}>
-          <TouchableOpacity
-            style={styles.galleryBtn}
-            onPress={handlePickImage}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <ImageIcon size={24} color={theme.colors.dark.text} strokeWidth={2} />
-            <Text style={styles.galleryBtnText}>사진 선택</Text>
-          </TouchableOpacity>
+        {/* Gallery button (secondary, full-width) */}
+        <TouchableOpacity
+          style={styles.galleryBtnFull}
+          onPress={handlePickImage}
+          disabled={processing}
+          activeOpacity={0.7}
+        >
+          <ImageIcon size={20} color={theme.colors.dark.text} strokeWidth={2} />
+          <Text style={styles.galleryBtnFullText}>사진 선택</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.captureBtn}
-            onPress={hasImage ? handleGenerate : handleCapture}
-            disabled={processing || (!hasImage && !cameraReady)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.captureBtnInner}>
-              {hasImage ? (
-                <>
-                  <Flame size={26} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.captureBtnText}>홍보 만들기 시작</Text>
-                  <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
-                </>
-              ) : (
-                <>
-                  <Camera size={28} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.captureBtnText}>사진 촬영</Text>
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
+        {/* Main capture/generate button (full-width, centered) */}
+        <TouchableOpacity
+          style={styles.captureBtnFull}
+          onPress={hasImage ? handleGenerate : handleCapture}
+          disabled={processing || (!hasImage && !cameraReady)}
+          activeOpacity={0.85}
+        >
+          {hasImage ? (
+            <>
+              <Flame size={26} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.captureBtnText}>홍보 만들기 시작</Text>
+              <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+            </>
+          ) : (
+            <>
+              <Camera size={28} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.captureBtnText}>사진 촬영</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Preview Modal */}
@@ -988,33 +988,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.accent[300],
   },
-  mainBtnRow: {
+  galleryBtnFull: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  galleryBtn: {
-    width: 100,
-    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderRadius: theme.radius.lg,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
+    marginBottom: theme.spacing.sm,
   },
-  galleryBtnText: {
-    fontSize: 11,
+  galleryBtnFullText: {
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
-  captureBtn: {
-    flex: 1,
-    borderRadius: theme.radius.lg,
-    overflow: 'hidden',
-  },
-  captureBtnInner: {
+  captureBtnFull: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
