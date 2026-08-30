@@ -7,6 +7,8 @@ import {
   Platform,
   ScrollView,
   Image,
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -14,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers, Sun, Droplet } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Info, Layers, Sun, Droplet, PenLine, Check, ChevronDown, TrendingUp, Tag, Store } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -38,6 +40,14 @@ import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleC
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
 const ANALYSIS_TIMEOUT_MS = 120000;
+
+const INSTANT_HOOKS = [
+  { key: 'new_menu', label: '오늘 우리 동네 신메뉴 특가!', icon: Store, color: theme.colors.warning[400] },
+  { key: 'limited', label: '재료 소진 전 마지막 기회', icon: Flame, color: theme.colors.error[400] },
+  { key: 'best_seller', label: '이 동네 1위 베스트셀러', icon: TrendingUp, color: theme.colors.primary[400] },
+  { key: 'seasonal', label: '계절 한정! 이맘때만 맛볼 수 있어요', icon: Tag, color: theme.colors.accent[400] },
+  { key: 'combo', label: '꿀조합 발견! 같이 시키면 최고', icon: Sparkles, color: theme.colors.success[400] },
+];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -75,6 +85,10 @@ export default function CameraScreen() {
   const [moodFilter, setMoodFilter] = useState<'none' | 'warm' | 'fresh'>('none');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
+  const [funnelStage, setFunnelStage] = useState<'idle' | 'analyzing' | 'selecting_hook'>('idle');
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
+  const [manualPromptOpen, setManualPromptOpen] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
   const fadeAnim = useSharedValue(0);
   const progressWidth = useSharedValue(0);
 
@@ -99,6 +113,14 @@ export default function CameraScreen() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (funnelStage !== 'analyzing') return;
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) setFunnelStage('selecting_hook');
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, [funnelStage]);
 
   const fadeIn = useCallback(() => {
     fadeAnim.value = withTiming(1, { duration: 300 });
@@ -157,6 +179,10 @@ export default function CameraScreen() {
         const compressedMime = getMimeTypeFromDataUrl(compressed);
         setSelectedImage(cleanBase64(compressed));
         setSelectedImageMime(compressedMime);
+        setSelectedHook(null);
+        setCustomPrompt('');
+        setManualPromptOpen(false);
+        setFunnelStage('analyzing');
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       }
@@ -185,6 +211,10 @@ export default function CameraScreen() {
       if (!isMountedRef.current) return;
       setSelectedImage(base64);
       setSelectedImageMime(mimeType);
+      setSelectedHook(null);
+      setCustomPrompt('');
+      setManualPromptOpen(false);
+      setFunnelStage('analyzing');
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -243,6 +273,13 @@ export default function CameraScreen() {
     const imageMime = selectedImage ? selectedImageMime : previewCapture?.mimeType;
     if (!imageBase64) return;
 
+    const hookToSave = customPrompt.trim() || selectedHook || '';
+    if (hookToSave) {
+      await setItem('marketing_selected_hook', hookToSave);
+    }
+    await setItem('marketing_custom_prompt', customPrompt.trim());
+
+    setFunnelStage('idle');
     setPreviewCapture(null);
     setProcessing(true);
     setError(null);
@@ -257,6 +294,10 @@ export default function CameraScreen() {
     setPreviewCapture(null);
     setSelectedImage(base64);
     setSelectedImageMime(mimeType);
+    setSelectedHook(null);
+    setCustomPrompt('');
+    setManualPromptOpen(false);
+    setFunnelStage('analyzing');
   };
 
   const handlePreviewRetake = () => {
@@ -269,6 +310,10 @@ export default function CameraScreen() {
     if (shots[0]?.base64) {
       setSelectedImage(shots[0].base64);
       setSelectedImageMime(shots[0].mimeType || 'image/jpeg');
+      setSelectedHook(null);
+      setCustomPrompt('');
+      setManualPromptOpen(false);
+      setFunnelStage('analyzing');
     }
   };
 
@@ -515,7 +560,7 @@ export default function CameraScreen() {
             <Image source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }} style={[styles.selectedImage, moodOverlayStyle]} resizeMode="cover" />
             <TouchableOpacity
               style={styles.clearImageBtn}
-              onPress={() => setSelectedImage(null)}
+              onPress={() => { setSelectedImage(null); setFunnelStage('idle'); setSelectedHook(null); setCustomPrompt(''); }}
               activeOpacity={0.7}
             >
               <X size={20} color="#fff" strokeWidth={2.5} />
@@ -631,6 +676,120 @@ export default function CameraScreen() {
         visible={creditModalVisible}
         onClose={() => setCreditModalVisible(false)}
       />
+
+      {/* AI Instant Analysis Funnel */}
+      {funnelStage !== 'idle' && selectedImage && (
+        <View style={styles.funnelOverlay}>
+          <View style={[styles.funnelTopBar, { paddingTop: safeTop + 8 }]}>
+            <TouchableOpacity
+              style={styles.funnelBackBtn}
+              onPress={() => { setFunnelStage('idle'); setSelectedImage(null); setSelectedHook(null); setCustomPrompt(''); }}
+              activeOpacity={0.7}
+            >
+              <X size={22} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <Text style={styles.funnelTitle}>AI 인스턴트 분석</Text>
+            <View style={{ width: 44 }} />
+          </View>
+
+          <View style={styles.funnelImageWrap}>
+            <Image
+              source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }}
+              style={styles.funnelImage}
+              resizeMode="cover"
+            />
+            <View style={styles.funnelImageDim} />
+          </View>
+
+          {funnelStage === 'analyzing' && (
+            <View style={styles.funnelAnalyzing}>
+              <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+              <Text style={styles.funnelAnalyzingTitle}>AI가 매장 메뉴와 분위기를 분석 중입니다...</Text>
+              <Text style={styles.funnelAnalyzingSub}>잠시만 기다려주세요</Text>
+            </View>
+          )}
+
+          {funnelStage === 'selecting_hook' && (
+            <ScrollView
+              style={styles.funnelScroll}
+              contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + theme.spacing.xl }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.funnelHookSection}>
+                <View style={styles.funnelSectionHeader}>
+                  <Sparkles size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+                  <Text style={styles.funnelSectionTitle}>AI 추천 훅 문구</Text>
+                </View>
+                <Text style={styles.funnelSectionDesc}>원하는 문구를 골라보세요</Text>
+
+                <View style={styles.funnelChipWrap}>
+                  {INSTANT_HOOKS.map((hook) => {
+                    const Icon = hook.icon;
+                    const isSelected = selectedHook === hook.label;
+                    return (
+                      <TouchableOpacity
+                        key={hook.key}
+                        style={[styles.funnelChip, isSelected && { backgroundColor: hook.color + '30', borderColor: hook.color }]}
+                        onPress={() => { setSelectedHook(isSelected ? null : hook.label); setCustomPrompt(''); }}
+                        activeOpacity={0.7}
+                      >
+                        <Icon size={16} color={hook.color} strokeWidth={2} />
+                        <Text style={[styles.funnelChipText, isSelected && { color: hook.color }]}>{hook.label}</Text>
+                        {isSelected && <Check size={16} color={hook.color} strokeWidth={2.5} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.funnelManualToggle}
+                onPress={() => setManualPromptOpen((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <PenLine size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.funnelManualToggleText}>직접 프롬프트/문구 입력하기</Text>
+                <ChevronDown
+                  size={18}
+                  color={theme.colors.dark.textDim}
+                  strokeWidth={2}
+                  style={{ transform: [{ rotate: manualPromptOpen ? '180deg' : '0deg' }] }}
+                />
+              </TouchableOpacity>
+
+              {manualPromptOpen && (
+                <View style={styles.funnelManualInput}>
+                  <TextInput
+                    style={styles.funnelTextInput}
+                    placeholder="예: 숯불돈까스 9천원, 매일 오픈런"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    value={customPrompt}
+                    onChangeText={setCustomPrompt}
+                    multiline
+                    maxLength={200}
+                  />
+                  {customPrompt.length > 0 && (
+                    <TouchableOpacity onPress={() => setCustomPrompt('')} activeOpacity={0.7} style={styles.funnelClearPrompt}>
+                      <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.funnelGenerateBtn, (!selectedHook && !customPrompt.trim()) && styles.funnelGenerateBtnDisabled]}
+                onPress={handleGenerate}
+                disabled={processing || (!selectedHook && !customPrompt.trim())}
+                activeOpacity={0.85}
+              >
+                <Flame size={24} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.funnelGenerateBtnText}>홍보 만들기 시작</Text>
+                <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -1015,6 +1174,165 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
   },
   captureBtnText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  funnelOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.dark.bg,
+    zIndex: 200,
+  },
+  funnelTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    zIndex: 10,
+  },
+  funnelBackBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'rgba(10, 15, 30, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  funnelTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  funnelImageWrap: {
+    width: '100%',
+    height: 200,
+    position: 'relative',
+    marginTop: theme.spacing.sm,
+  },
+  funnelImage: {
+    width: '100%',
+    height: '100%',
+  },
+  funnelImageDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 8, 18, 0.3)',
+  },
+  funnelAnalyzing: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.md,
+  },
+  funnelAnalyzingTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  funnelAnalyzingSub: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  funnelScroll: {
+    flex: 1,
+  },
+  funnelHookSection: {
+    marginTop: theme.spacing.lg,
+  },
+  funnelSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  funnelSectionTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  funnelSectionDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginBottom: theme.spacing.md,
+  },
+  funnelChipWrap: {
+    gap: 8,
+  },
+  funnelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  funnelChipText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  funnelManualToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.accent[500] + '12',
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+  },
+  funnelManualToggleText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  funnelManualInput: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  funnelTextInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 40,
+    maxHeight: 100,
+  },
+  funnelClearPrompt: {
+    padding: 4,
+  },
+  funnelGenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    backgroundColor: theme.colors.primary[600],
+    borderRadius: theme.radius.lg,
+    marginTop: theme.spacing.lg,
+  },
+  funnelGenerateBtnDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  funnelGenerateBtnText: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
