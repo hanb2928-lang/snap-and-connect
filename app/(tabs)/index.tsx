@@ -278,6 +278,7 @@ export default function CameraScreen() {
       await setItem('marketing_selected_hook', hookToSave);
     }
     await setItem('marketing_custom_prompt', customPrompt.trim());
+    await setItem('marketing_mood_filter', moodFilter);
 
     setFunnelStage('idle');
     setPreviewCapture(null);
@@ -739,6 +740,40 @@ export default function CameraScreen() {
                       </TouchableOpacity>
                     );
                   })}
+                </View>
+              </View>
+
+              {/* Mood filter chips */}
+              <View style={styles.funnelMoodSection}>
+                <View style={styles.funnelSectionHeader}>
+                  <Sun size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.funnelSectionTitle}>매장 분위기 보정</Text>
+                </View>
+                <Text style={styles.funnelSectionDesc}>어두운 조명이나 탁한 색감을 한 번에 보정하세요</Text>
+                <View style={styles.funnelMoodRow}>
+                  <TouchableOpacity
+                    style={[styles.funnelMoodChip, moodFilter === 'none' && styles.funnelMoodChipActive]}
+                    onPress={() => setMoodFilter('none')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.funnelMoodChipText, moodFilter === 'none' && styles.funnelMoodChipTextActive]}>원본</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.funnelMoodChip, moodFilter === 'warm' && styles.funnelMoodChipWarm]}
+                    onPress={() => setMoodFilter(moodFilter === 'warm' ? 'none' : 'warm')}
+                    activeOpacity={0.7}
+                  >
+                    <Sun size={14} color={moodFilter === 'warm' ? '#fff' : theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={[styles.funnelMoodChipText, moodFilter === 'warm' && styles.funnelMoodChipTextActive]}>온기 가득 카페 감성</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.funnelMoodChip, moodFilter === 'fresh' && styles.funnelMoodChipFresh]}
+                    onPress={() => setMoodFilter(moodFilter === 'fresh' ? 'none' : 'fresh')}
+                    activeOpacity={0.7}
+                  >
+                    <Droplet size={14} color={moodFilter === 'fresh' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+                    <Text style={[styles.funnelMoodChipText, moodFilter === 'fresh' && styles.funnelMoodChipTextActive]}>신선함 청량 푸드</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -1336,6 +1371,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  funnelMoodSection: {
+    marginTop: theme.spacing.lg,
+  },
+  funnelMoodRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: theme.spacing.sm,
+  },
+  funnelMoodChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.full,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  funnelMoodChipActive: {
+    backgroundColor: theme.colors.dark.surface,
+    borderColor: theme.colors.dark.text,
+  },
+  funnelMoodChipWarm: {
+    backgroundColor: theme.colors.warning[500],
+    borderColor: theme.colors.warning[400],
+  },
+  funnelMoodChipFresh: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[400],
+  },
+  funnelMoodChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  funnelMoodChipTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
   processingOverlay: {
     ...StyleSheet.absoluteFillObject,

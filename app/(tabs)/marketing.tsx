@@ -11,6 +11,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  ViewStyle,
 } from 'react-native';
 import {
   Flame,
@@ -66,6 +67,19 @@ const BGM_MOOD_PRESETS = [
   { key: 'lofi', label: '릴렉스 Lofi', desc: '감성 무드', icon: Music, color: theme.colors.primary[400] },
   { key: 'none', label: '자막 전용', desc: '음악 없음', icon: Type, color: theme.colors.dark.textFaint },
 ] as const;
+
+const WAVEFORM_BARS = Array.from({ length: 28 }, (_, i) => i);
+
+function getWaveformHeight(index: number, duration: number): number {
+  const seed = (index * 7 + duration * 13) % 10;
+  const base = 8 + (seed * 3);
+  return Math.min(base + (duration > 0 ? (index % 3) * 4 : 0), 40);
+}
+
+function getWaveformOpacity(index: number, duration: number): number {
+  const activeBars = Math.min(Math.floor(duration * 4), 28);
+  return index < activeBars ? 1 : 0.25;
+}
 
 export default function MarketingScreen() {
   const router = useRouter();
@@ -437,26 +451,41 @@ export default function MarketingScreen() {
           )}
 
           {!voiceDataUrl ? (
-            <TouchableOpacity
-              style={[
-                styles.voiceRecordBtn,
-                voice.state === 'recording' && styles.voiceRecordBtnActive,
-              ]}
-              onPress={handleVoiceRecord}
-              activeOpacity={0.8}
-            >
-              {voice.state === 'recording' ? (
-                <>
-                  <Square size={20} color="#fff" fill="#fff" strokeWidth={2} />
-                  <Text style={styles.voiceRecordBtnText}>녹음 중... {voice.duration}초</Text>
-                </>
-              ) : (
-                <>
-                  <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                  <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>녹음 시작</Text>
-                </>
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.voiceRecordBtn,
+                  voice.state === 'recording' && styles.voiceRecordBtnActive,
+                ]}
+                onPress={handleVoiceRecord}
+                activeOpacity={0.8}
+              >
+                {voice.state === 'recording' ? (
+                  <>
+                    <Square size={20} color="#fff" fill="#fff" strokeWidth={2} />
+                    <Text style={styles.voiceRecordBtnText}>녹음 중... {voice.duration}초</Text>
+                  </>
+                ) : (
+                  <>
+                    <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                    <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>녹음 시작</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {voice.state === 'recording' && (
+                <View style={styles.waveformContainer}>
+                  {WAVEFORM_BARS.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.waveformBar,
+                        { height: getWaveformHeight(i, voice.duration), opacity: getWaveformOpacity(i, voice.duration) } as ViewStyle,
+                      ]}
+                    />
+                  ))}
+                </View>
               )}
-            </TouchableOpacity>
+            </>
           ) : (
             <View style={styles.voicePlayerRow}>
               <TouchableOpacity style={styles.voicePlayBtn} onPress={handleVoicePlay} activeOpacity={0.7}>
@@ -975,6 +1004,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  waveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    height: 48,
+    marginTop: theme.spacing.sm,
+  },
+  waveformBar: {
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.accent[400],
   },
   voicePlayerRow: {
     flexDirection: 'row',
