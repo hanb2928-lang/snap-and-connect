@@ -13,6 +13,7 @@ import {
   UIManager,
   ViewStyle,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Flame,
@@ -875,6 +876,30 @@ export default function MarketingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Generating overlay — shown during save + handoff to camera */}
+      {generating && (
+        <View style={styles.generatingOverlay}>
+          <View style={styles.generatingCard}>
+            <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+            <Text style={styles.generatingTitle}>홍보 숏폼 생성 준비 중...</Text>
+            <Text style={styles.generatingSub}>매장 정보를 저장하고 AI 분석을 시작합니다</Text>
+            <View style={styles.generatingSteps}>
+              <View style={styles.generatingStepRow}>
+                <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+                <Text style={styles.generatingStepText}>매장 정보 저장</Text>
+              </View>
+              <View style={styles.generatingStepRow}>
+                <ActivityIndicator size={14} color={theme.colors.primary[400]} />
+                <Text style={styles.generatingStepTextActive}>AI 분석 준비 중</Text>
+              </View>
+              <View style={styles.generatingStepRowDim}>
+                <Text style={styles.generatingStepTextPending}>숏폼 렌더링 대기</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1484,5 +1509,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  generatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  generatingCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    width: '85%',
+    maxWidth: 320,
+    ...theme.shadows.elevated,
+  },
+  generatingTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginTop: theme.spacing.xs,
+  },
+  generatingSub: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  generatingSteps: {
+    marginTop: theme.spacing.md,
+    gap: 10,
+    alignSelf: 'stretch',
+  },
+  generatingStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  generatingStepRowDim: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 22,
+  },
+  generatingStepText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  generatingStepTextActive: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  generatingStepTextPending: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
   },
 });

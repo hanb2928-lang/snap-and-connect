@@ -321,8 +321,8 @@ export default function CameraScreen() {
     let progressTimer: ReturnType<typeof setInterval> | null = null;
     try {
       setProgressStep(1);
-      setProgressText('AI 분석 중...');
-      progressWidth.value = withTiming(0.35, { duration: 500 });
+      setProgressText('📸 매장 사진 비전 분석 중... (AI가 메뉴 및 공간 인식)');
+      progressWidth.value = withTiming(0.3, { duration: 500 });
 
       progressTimer = setInterval(() => {
         progressWidth.value = withTiming(
@@ -343,11 +343,11 @@ export default function CameraScreen() {
       if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
 
       setProgressStep(2);
-      setProgressText('결과 페이지로 이동 중...');
-      progressWidth.value = withTiming(0.9, { duration: 300 });
+      setProgressText('✨ 인싸 감성 훅 문구 및 템플릿 매칭 중...');
+      progressWidth.value = withTiming(0.7, { duration: 300 });
 
       setProgressStep(3);
-      setProgressText('완료!');
+      setProgressText('🚀 숏폼 영상 렌더링 및 보관함 저장 완료!');
       progressWidth.value = withTiming(1, { duration: 200 });
 
       router.push({ pathname: '/result/[id]', params: { id: scanId } });
@@ -383,7 +383,7 @@ export default function CameraScreen() {
     setProcessing(true);
     setError(null);
     setProgressStep(0);
-    setProgressText('AI 분석 준비 중...');
+    setProgressText('📸 매장 사진 비전 분석 중...');
     progressWidth.value = withTiming(0.1, { duration: 200 });
     fadeAnim.value = 0;
     await processImage(imageBase64, imageMime || 'image/jpeg');
@@ -881,7 +881,7 @@ export default function CameraScreen() {
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
-            stepLabels={['촬영', '분석', '저장']}
+            stepLabels={['비전 분석', '훅 매칭', '렌더링']}
           />
         </Animated.View>
       )}
@@ -1281,7 +1281,7 @@ function WebCameraScreen({
               progressSV={progressWidth}
               step={progressStep as 0 | 1 | 2 | 3}
               text={progressText}
-              stepLabels={['업로드', '분석', '저장']}
+              stepLabels={['업로드', '비전 분석', '렌더링']}
             />
           </Animated.View>
         )}
@@ -1351,7 +1351,7 @@ function WebCameraScreen({
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
-            stepLabels={['촬영', '분석', '저장']}
+            stepLabels={['비전 분석', '훅 매칭', '렌더링']}
           />
         </Animated.View>
       )}
