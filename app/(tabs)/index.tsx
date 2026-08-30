@@ -421,11 +421,21 @@ export default function CameraScreen() {
   };
 
   const handleCaptureModeChange = (mode: CaptureModeType) => {
+    if (mode === captureMode) return;
     setCaptureMode(mode);
+    // Reset all capture-related state to prevent mode-to-mode state leak
+    setSelectedImage(null);
+    setSelectedImageMime('image/jpeg');
+    setPreviewCapture(null);
+    setFunnelStage('idle');
+    setSelectedHook(null);
+    setCustomPrompt('');
+    setManualPromptOpen(false);
+    setMoodFilter('none');
+    setError(null);
+    setMultiAngleShots([]);
     if (mode === 'multi') {
       setMultiAngleVisible(true);
-    } else {
-      setMultiAngleShots([]);
     }
   };
 
@@ -733,7 +743,7 @@ export default function CameraScreen() {
           <View style={styles.modeSegment}>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive]}
-              onPress={() => { setCaptureMode('oneclick'); setMultiAngleShots([]); }}
+              onPress={() => handleCaptureModeChange('oneclick')}
               activeOpacity={0.7}
             >
               <Zap size={13} color={captureMode === 'oneclick' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
@@ -741,7 +751,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive]}
-              onPress={() => { setCaptureMode('single'); setMultiAngleShots([]); }}
+              onPress={() => handleCaptureModeChange('single')}
               activeOpacity={0.7}
             >
               <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
@@ -749,7 +759,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive]}
-              onPress={() => { setCaptureMode('multi'); setMultiAngleVisible(true); }}
+              onPress={() => handleCaptureModeChange('multi')}
               activeOpacity={0.7}
             >
               <Layers size={13} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />

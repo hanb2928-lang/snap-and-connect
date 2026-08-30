@@ -110,6 +110,14 @@ export function WebCameraView({
     return () => { stopStream(); };
   }, [stopStream]);
 
+  // Clear internal capture state when capture mode changes to prevent state leak
+  useEffect(() => {
+    setPreviewBase64(null);
+    setPreviewMime('image/jpeg');
+    setError(null);
+    setGridVisible(false);
+  }, [captureMode]);
+
   const captureFrame = useCallback(async (): Promise<string | null> => {
     if (!videoRef.current || !cameraReady) return null;
     setCapturing(true);
