@@ -35,7 +35,7 @@ import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { WebCameraView } from '@/components/WebCameraView';
+import { WebCameraView, type CaptureModeType } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { VoiceCommandFloatingButton } from '@/components/VoiceCommandFloatingButton';
 import { TriggerBanner } from '@/components/TriggerBanner';
@@ -86,7 +86,9 @@ export default function CameraScreen() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [multiAngleVisible, setMultiAngleVisible] = useState(false);
   const [multiAngleShots, setMultiAngleShots] = useState<AngleShot[]>([]);
-  const [captureMode, setCaptureMode] = useState<'single' | 'multi'>('single');
+  const [captureMode, setCaptureMode] = useState<CaptureModeType>('oneclick');
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
   const [moodFilter, setMoodFilter] = useState<'none' | 'warm' | 'fresh'>('none');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageMime, setSelectedImageMime] = useState<string>('image/jpeg');
@@ -137,7 +139,53 @@ export default function CameraScreen() {
   }));
 
   const handleCapture = async () => {
-    if (!cameraRef.current || processing || !cameraReady) return;
+    if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
+
+    // oneclick mode: capture + auto-save in one step, skip funnel
+    if (captureMode === 'oneclick') {
+      setAutoSaving(true);
+      setAutoSaveToast(null);
+      try {
+        const photo = await withTimeout(
+          cameraRef.current.takePictureAsync({
+            base64: true,
+            quality: 0.7,
+            shutterSound: false,
+            ...({ mute: true } as Record<string, unknown>),
+          }) as Promise<{ base64?: string; uri: string }>,
+          CAPTURE_TIMEOUT_MS,
+          '사진 촬영',
+        );
+        if (!photo?.base64) throw new Error('Failed to capture image data');
+        const cleanB64 = cleanBase64(photo.base64);
+        const compressedDataUrl = await withTimeout(
+          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+          PICK_TIMEOUT_MS,
+          '이미지 압축',
+        );
+        if (!isMountedRef.current) return;
+        const compressedB64 = cleanBase64(compressedDataUrl);
+        const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
+        setError(null);
+
+        const { scanId } = await withTimeout(
+          startAsyncAnalysis(compressedB64, compressedMime, 'single', []),
+          ANALYSIS_TIMEOUT_MS,
+          'AI 자동 분석',
+        );
+        setAutoSaveToast('숏폼 영상이 보관함에 자동 저장되었습니다!');
+        setTimeout(() => setAutoSaveToast(null), 3500);
+        router.push({ pathname: '/result/[id]', params: { id: scanId } });
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      } finally {
+        setAutoSaving(false);
+      }
+      return;
+    }
+
+    // single/multi: normal capture → preview
     setProcessing(true);
     setProgressStep(0);
     setProgressText('사진 촬영 중...');
@@ -332,12 +380,11 @@ export default function CameraScreen() {
     }
   };
 
-  const handleCaptureModeToggle = () => {
-    if (captureMode === 'single') {
-      setCaptureMode('multi');
+  const handleCaptureModeChange = (mode: CaptureModeType) => {
+    setCaptureMode(mode);
+    if (mode === 'multi') {
       setMultiAngleVisible(true);
     } else {
-      setCaptureMode('single');
       setMultiAngleShots([]);
     }
   };
@@ -457,13 +504,33 @@ export default function CameraScreen() {
   };
 
   const handleWebCapture = async (base64: string, mimeType: string) => {
+    // oneclick mode: auto-save to 보관함 in background, show toast, skip funnel
+    if (captureMode === 'oneclick') {
+      setAutoSaving(true);
+      setAutoSaveToast(null);
+      try {
+        const { scanId } = await withTimeout(
+          startAsyncAnalysis(base64, mimeType, 'single', []),
+          ANALYSIS_TIMEOUT_MS,
+          'AI 자동 분석',
+        );
+        setAutoSaveToast('숏폼 영상이 보관함에 자동 저장되었습니다!');
+        setTimeout(() => setAutoSaveToast(null), 3500);
+        router.push({ pathname: '/result/[id]', params: { id: scanId } });
+      } catch (err) {
+        setError(friendlyError(err, 'AI 자동 분석 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      } finally {
+        setAutoSaving(false);
+      }
+      return;
+    }
+    // single mode: go to funnel for hook selection
     setSelectedImage(base64);
     setSelectedImageMime(mimeType);
     setSelectedHook(null);
     setCustomPrompt('');
     setManualPromptOpen(false);
     setMultiAngleShots([]);
-    setCaptureMode('single');
     setFunnelStage('analyzing');
   };
 
@@ -477,7 +544,7 @@ export default function CameraScreen() {
         multiAngleCount={multiAngleShots.length}
         captureMode={captureMode}
         moodFilter={moodFilter}
-        onCaptureModeToggle={handleCaptureModeToggle}
+        onCaptureModeChange={handleCaptureModeChange}
         onMoodFilterChange={setMoodFilter}
         onPickImage={handlePickImage}
         onWebCapture={handleWebCapture}
@@ -486,6 +553,8 @@ export default function CameraScreen() {
         onSettingsPress={() => router.push('/settings' as never)}
         onCreditPress={() => setCreditModalVisible(true)}
         processing={processing}
+        autoSaving={autoSaving}
+        autoSaveToast={autoSaveToast}
         error={error}
         progressStep={progressStep}
         progressText={progressText}
@@ -617,9 +686,17 @@ export default function CameraScreen() {
           </View>
         )}
 
-        {/* Capture mode segment */}
+        {/* Capture mode segment — 3 modes */}
         <View style={styles.modeSegmentWrap}>
           <View style={styles.modeSegment}>
+            <TouchableOpacity
+              style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive]}
+              onPress={() => { setCaptureMode('oneclick'); setMultiAngleShots([]); }}
+              activeOpacity={0.7}
+            >
+              <Zap size={13} color={captureMode === 'oneclick' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.modeSegmentText, captureMode === 'oneclick' && styles.modeSegmentTextActive]}>원클릭</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive]}
               onPress={() => { setCaptureMode('single'); setMultiAngleShots([]); }}
@@ -630,7 +707,7 @@ export default function CameraScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive]}
-              onPress={handleCaptureModeToggle}
+              onPress={() => { setCaptureMode('multi'); setMultiAngleVisible(true); }}
               activeOpacity={0.7}
             >
               <Layers size={13} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
@@ -658,13 +735,21 @@ export default function CameraScreen() {
 
           {/* Shutter button (center) */}
           <TouchableOpacity
-            style={[styles.shutterBtn, hasImage && styles.shutterBtnGenerate, (!hasImage && !cameraReady) && styles.shutterBtnDisabled]}
+            style={[
+              styles.shutterBtn,
+              hasImage && styles.shutterBtnGenerate,
+              (!hasImage && !cameraReady) && styles.shutterBtnDisabled,
+              captureMode === 'oneclick' && !hasImage && styles.shutterBtnOneclickMobile,
+              (autoSaving || processing) && styles.shutterBtnCapturing,
+            ]}
             onPress={hasImage ? handleGenerate : handleCapture}
-            disabled={processing || (!hasImage && !cameraReady)}
+            disabled={processing || autoSaving || (!hasImage && !cameraReady)}
             activeOpacity={0.85}
           >
             {hasImage ? (
               <Flame size={28} color="#fff" strokeWidth={2.5} />
+            ) : captureMode === 'oneclick' ? (
+              <Zap size={30} color="#fff" strokeWidth={2.5} />
             ) : (
               <Camera size={30} color="#fff" strokeWidth={2.5} />
             )}
@@ -714,6 +799,27 @@ export default function CameraScreen() {
         onComplete={handleMultiAngleComplete}
         onPickImage={handleMultiAnglePick}
       />
+
+      {/* Auto-save toast (mobile) */}
+      {autoSaveToast && (
+        <View style={styles.autoSaveToastWrap}>
+          <View style={styles.autoSaveToastInner}>
+            <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <Text style={styles.autoSaveToastText}>{autoSaveToast}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Auto-saving overlay (mobile oneclick) */}
+      {autoSaving && (
+        <View style={styles.autoSavingOverlay}>
+          <View style={styles.autoSavingCard}>
+            <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
+            <Text style={styles.autoSavingTitle}>AI 자동 분석 중...</Text>
+            <Text style={styles.autoSavingSub}>촬영 완료! 숏폼을 만들어 보관함에 저장하고 있어요</Text>
+          </View>
+        </View>
+      )}
 
       {/* Processing overlay */}
       {processing && (
@@ -891,9 +997,9 @@ interface WebCameraScreenProps {
   selectedImage: string | null;
   selectedImageMime: string;
   multiAngleCount: number;
-  captureMode: 'single' | 'multi';
+  captureMode: CaptureModeType;
   moodFilter: 'none' | 'warm' | 'fresh';
-  onCaptureModeToggle: () => void;
+  onCaptureModeChange: (mode: CaptureModeType) => void;
   onMoodFilterChange: (m: 'none' | 'warm' | 'fresh') => void;
   onPickImage: () => void;
   onWebCapture: (base64: string, mimeType: string) => void;
@@ -902,6 +1008,8 @@ interface WebCameraScreenProps {
   onSettingsPress: () => void;
   onCreditPress: () => void;
   processing: boolean;
+  autoSaving: boolean;
+  autoSaveToast: string | null;
   error: string | null;
   progressStep: number;
   progressText: string;
@@ -930,7 +1038,7 @@ function WebCameraScreen({
   multiAngleCount,
   captureMode,
   moodFilter,
-  onCaptureModeToggle,
+  onCaptureModeChange,
   onMoodFilterChange,
   onPickImage,
   onWebCapture,
@@ -939,6 +1047,8 @@ function WebCameraScreen({
   onSettingsPress,
   onCreditPress,
   processing,
+  autoSaving,
+  autoSaveToast,
   error,
   progressStep,
   progressText,
@@ -1159,6 +1269,11 @@ function WebCameraScreen({
           safeTop={safeTop}
           tabBarHeight={tabBarHeight}
           bottomInset={bottomInset}
+          captureMode={captureMode}
+          onCaptureModeChange={onCaptureModeChange}
+          autoSaving={autoSaving}
+          autoSaveToast={autoSaveToast}
+          onMultiAnglePress={onMultiAnglePress}
         />
 
         {/* Mood filter overlay */}
@@ -1402,6 +1517,69 @@ const styles = StyleSheet.create({
   shutterBtnDisabled: {
     backgroundColor: theme.colors.dark.surfaceLight,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  shutterBtnCapturing: {
+    opacity: 0.6,
+  },
+  shutterBtnOneclickMobile: {
+    backgroundColor: theme.colors.warning[500],
+  },
+  // Auto-save toast (mobile)
+  autoSaveToastWrap: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 150,
+  },
+  autoSaveToastInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  autoSaveToastText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  // Auto-saving overlay (mobile oneclick)
+  autoSavingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(5, 8, 18, 0.7)',
+    zIndex: 140,
+  },
+  autoSavingCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    maxWidth: 320,
+  },
+  autoSavingTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  autoSavingSub: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   gridToggleBtn: {
     width: 52,

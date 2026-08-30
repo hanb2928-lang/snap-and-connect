@@ -1,9 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, ZapOff, X, Image as ImageIcon } from 'lucide-react-native';
+import { Camera, RotateCcw, Grid3x3, Zap, ZapOff, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
 import { cleanBase64, buildDataUrl, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
+
+export type CaptureModeType = 'oneclick' | 'single' | 'multi';
 
 interface WebCameraViewProps {
   onCapture: (base64: string, mimeType: string) => void;
@@ -12,9 +14,20 @@ interface WebCameraViewProps {
   safeTop: number;
   tabBarHeight: number;
   bottomInset: number;
+  captureMode: CaptureModeType;
+  onCaptureModeChange: (mode: CaptureModeType) => void;
+  autoSaving: boolean;
+  autoSaveToast: string | null;
+  onMultiAnglePress: () => void;
 }
 
 type Facing = 'user' | 'environment';
+
+const MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
+  { key: 'oneclick', label: '원클릭', icon: Zap, desc: '초간편 자동' },
+  { key: 'single', label: '1장', icon: Camera, desc: '단품 클로즈업' },
+  { key: 'multi', label: '다각도', icon: Layers, desc: '정밀 멀티컷' },
+];
 
 export function WebCameraView({
   onCapture,
@@ -23,6 +36,11 @@ export function WebCameraView({
   safeTop,
   tabBarHeight,
   bottomInset,
+  captureMode,
+  onCaptureModeChange,
+  autoSaving,
+  autoSaveToast,
+  onMultiAnglePress,
 }: WebCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -88,8 +106,8 @@ export function WebCameraView({
     return () => { stopStream(); };
   }, [stopStream]);
 
-  const handleCapture = useCallback(async () => {
-    if (!videoRef.current || !cameraReady || capturing) return;
+  const captureFrame = useCallback(async (): Promise<string | null> => {
+    if (!videoRef.current || !cameraReady) return null;
     setCapturing(true);
     try {
       const video = videoRef.current;
@@ -109,14 +127,34 @@ export function WebCameraView({
       const compressed = await prepareImageForApi(dataUrl, 1080, 0.7);
       const b64 = cleanBase64(compressed);
       const mime = getMimeTypeFromDataUrl(compressed);
-      setPreviewBase64(b64);
-      setPreviewMime(mime);
+      return `${mime}|${b64}`;
     } catch {
       setError('촬영에 실패했습니다. 다시 시도해주세요.');
+      return null;
     } finally {
       setCapturing(false);
     }
-  }, [cameraReady, capturing, facing]);
+  }, [cameraReady, facing]);
+
+  const handleCapture = useCallback(async () => {
+    if (!cameraReady || capturing || autoSaving) return;
+    if (captureMode === 'multi') {
+      // multi mode: delegate to multi-angle flow
+      onMultiAnglePress();
+      return;
+    }
+    const result = await captureFrame();
+    if (!result) return;
+    const [mime, b64] = result.split('|');
+    if (captureMode === 'oneclick') {
+      // oneclick: pass directly to auto-save, no preview
+      onCapture(b64, mime);
+    } else {
+      // single mode: show preview first
+      setPreviewBase64(b64);
+      setPreviewMime(mime);
+    }
+  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress]);
 
   const handleConfirm = useCallback(() => {
     if (previewBase64) {
@@ -138,6 +176,27 @@ export function WebCameraView({
   return (
     <View style={styles.container}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {/* Auto-save toast */}
+      {autoSaveToast && (
+        <View style={[styles.toastWrap, { bottom: tabBarHeight + bottomInset + 220 }]}>
+          <View style={styles.toastInner}>
+            <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <Text style={styles.toastText}>{autoSaveToast}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Auto-saving overlay */}
+      {autoSaving && !hasPreview && (
+        <View style={styles.autoSavingWrap}>
+          <View style={styles.autoSavingCard}>
+            <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
+            <Text style={styles.autoSavingTitle}>AI 자동 분석 중...</Text>
+            <Text style={styles.autoSavingSub}>촬영 완료! 숏폼을 만들어 보관함에 저장하고 있어요</Text>
+          </View>
+        </View>
+      )}
 
       {/* Preview overlay (after capture, before confirm) */}
       {hasPreview ? (
@@ -235,6 +294,32 @@ export function WebCameraView({
               </View>
             )}
 
+            {/* 3-mode capsule toggle (above shutter) */}
+            <View style={styles.modeToggleWrap}>
+              {MODE_META.map((mode, idx) => {
+                const Icon = mode.icon;
+                const isActiveMode = captureMode === mode.key;
+                return (
+                  <TouchableOpacity
+                    key={mode.key}
+                    style={[
+                      styles.modeToggleBtn,
+                      idx === 0 && styles.modeToggleBtnFirst,
+                      idx === MODE_META.length - 1 && styles.modeToggleBtnLast,
+                      isActiveMode && styles.modeToggleBtnActive,
+                    ]}
+                    onPress={() => onCaptureModeChange(mode.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon size={15} color={isActiveMode ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+                    <Text style={[styles.modeToggleText, isActiveMode && styles.modeToggleTextActive]}>
+                      {mode.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <View style={styles.bottomControlsRow}>
               {/* Gallery / file pick */}
               <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
@@ -243,12 +328,21 @@ export function WebCameraView({
 
               {/* Shutter */}
               <TouchableOpacity
-                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, capturing && styles.shutterBtnCapturing]}
+                style={[
+                  styles.shutterBtn,
+                  !cameraReady && styles.shutterBtnDisabled,
+                  (capturing || autoSaving) && styles.shutterBtnCapturing,
+                  captureMode === 'oneclick' && styles.shutterBtnOneclick,
+                ]}
                 onPress={handleCapture}
-                disabled={!cameraReady || capturing}
+                disabled={!cameraReady || capturing || autoSaving}
                 activeOpacity={0.85}
               >
-                <Camera size={30} color="#fff" strokeWidth={2.5} />
+                {captureMode === 'oneclick' ? (
+                  <Zap size={30} color="#fff" strokeWidth={2.5} />
+                ) : (
+                  <Camera size={30} color="#fff" strokeWidth={2.5} />
+                )}
               </TouchableOpacity>
 
               {/* Grid toggle */}
@@ -262,7 +356,11 @@ export function WebCameraView({
             </View>
 
             <Text style={styles.shutterHint}>
-              {capturing ? '촬영 중...' : '셔터 버튼을 눌러 촬영하세요'}
+              {autoSaving ? 'AI 자동 분석 중...' :
+               capturing ? '촬영 중...' :
+               captureMode === 'oneclick' ? '셔터 한 번이면 숏폼이 보관함에 자동 저장!' :
+               captureMode === 'single' ? '단품 사진을 클로즈업해서 촬영하세요' :
+               '여러 각도를 차례로 촬영하세요'}
             </Text>
           </View>
         </>
@@ -412,6 +510,42 @@ const styles = StyleSheet.create({
     color: theme.colors.error[400],
     textAlign: 'center',
   },
+  // 3-mode capsule toggle
+  modeToggleWrap: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 15, 30, 0.6)',
+    borderRadius: theme.radius.full,
+    padding: 3,
+    marginBottom: theme.spacing.sm,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: theme.radius.full,
+  },
+  modeToggleBtnFirst: {
+    borderTopLeftRadius: theme.radius.full,
+    borderBottomLeftRadius: theme.radius.full,
+  },
+  modeToggleBtnLast: {
+    borderTopRightRadius: theme.radius.full,
+    borderBottomRightRadius: theme.radius.full,
+  },
+  modeToggleBtnActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  modeToggleText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  modeToggleTextActive: {
+    color: '#fff',
+  },
   bottomControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -443,6 +577,9 @@ const styles = StyleSheet.create({
   shutterBtnCapturing: {
     opacity: 0.6,
   },
+  shutterBtnOneclick: {
+    backgroundColor: theme.colors.warning[500],
+  },
   gridToggleBtn: {
     width: 52,
     height: 52,
@@ -457,6 +594,62 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textAlign: 'center',
     marginTop: 4,
+  },
+  // Auto-saving overlay
+  autoSavingWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(5, 8, 18, 0.7)',
+    zIndex: 40,
+  },
+  autoSavingCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    maxWidth: 320,
+  },
+  autoSavingTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  autoSavingSub: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  // Toast
+  toastWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  toastInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   // Preview styles
   previewWrap: {
@@ -525,6 +718,3 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
-
-
-export { WebCameraView }
