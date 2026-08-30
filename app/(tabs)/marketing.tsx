@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
-  Image,
   Modal,
   LayoutAnimation,
   Platform,
@@ -34,6 +33,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react-native';
+import { Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
@@ -66,8 +66,24 @@ export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
   const tabBarHeight = useTabBarHeight();
-  const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
   const [advancedVisible, setAdvancedVisible] = useState(false);
+  const [storeName, setStoreName] = useState('');
+  const [signatureMenu, setSignatureMenu] = useState('');
+  const [promoText, setPromoText] = useState('');
+  const [videoLength, setVideoLength] = useState('7s');
+  const [captionTone, setCaptionTone] = useState('hook');
+  const [bgmMood, setBgmMood] = useState('pop');
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedHook, setSelectedHook] = useState<string | null>(null);
+  const [manualPromptOpen, setManualPromptOpen] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const lastActionRef = useRef(0);
+
+  // Affiliate sub-setting state (hidden in advanced modal)
+  const [affiliateOpen, setAffiliateOpen] = useState(false);
+  const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -79,17 +95,6 @@ export default function MarketingScreen() {
     platform: string;
     brand: string;
   } | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
-  const [videoLength, setVideoLength] = useState('7s');
-  const [captionTone, setCaptionTone] = useState('hook');
-  const [bgmMood, setBgmMood] = useState('pop');
-  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedHook, setSelectedHook] = useState<string | null>(null);
-  const [manualPromptOpen, setManualPromptOpen] = useState(false);
-  const [customPrompt, setCustomPrompt] = useState('');
-  const lastActionRef = useRef(0);
 
   const STORE_HOOK_CHIPS = [
     { key: 'new_menu', label: '오늘 우리 동네 신메뉴 특가!', icon: Store, color: theme.colors.warning[400] },
@@ -115,6 +120,13 @@ export default function MarketingScreen() {
         if (settings?.fixed_hook_phrase) {
           await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
         }
+        // Restore previously entered store info
+        const savedStoreName = await getItem('marketing_store_name');
+        const savedMenu = await getItem('marketing_signature_menu');
+        const savedPromo = await getItem('marketing_promo_text');
+        if (savedStoreName) setStoreName(savedStoreName);
+        if (savedMenu) setSignatureMenu(savedMenu);
+        if (savedPromo) setPromoText(savedPromo);
       } catch {}
     })();
   }, []);
@@ -139,7 +151,6 @@ export default function MarketingScreen() {
         platform: meta.platform || '',
         brand: meta.brand || '',
       });
-      setSelectedProduct(meta.productName || '선택된 상품');
     } catch {
       setProductMeta(null);
       setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 직접 입력하거나 다른 링크를 시도해주세요.');
@@ -149,7 +160,6 @@ export default function MarketingScreen() {
   };
 
   const handleHotDealSelect = (product: { name: string; price: string; link: string; imageUrl?: string }) => {
-    setSelectedProduct(product.name);
     setAffiliateUrl(product.link);
     setProductMeta({
       productName: product.name,
@@ -168,6 +178,9 @@ export default function MarketingScreen() {
 
     setGenerating(true);
     try {
+      await setItem('marketing_store_name', storeName.trim());
+      await setItem('marketing_signature_menu', signatureMenu.trim());
+      await setItem('marketing_promo_text', promoText.trim());
       await setItem('marketing_video_length', videoLength);
       await setItem('marketing_caption_tone', captionTone);
       await setItem('marketing_bgm_mood', bgmMood);
@@ -181,11 +194,6 @@ export default function MarketingScreen() {
         if (settings?.fixed_hook_phrase) {
           await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
         }
-        if (settings?.affiliate_priority_mapping) {
-          await setItem('marketing_affiliate_priority', 'true');
-        } else {
-          await setItem('marketing_affiliate_priority', 'false');
-        }
       } catch {}
       if (customPrompt.trim()) {
         await setItem('marketing_custom_prompt', customPrompt.trim());
@@ -196,6 +204,13 @@ export default function MarketingScreen() {
           await setItem('marketing_selected_hook', selectedHook);
         }
       }
+      // Pass affiliate link if provided in advanced settings
+      if (affiliateUrl.trim()) {
+        await setItem('marketing_affiliate_url', affiliateUrl.trim());
+        await setItem('marketing_affiliate_priority', 'true');
+      } else {
+        await setItem('marketing_affiliate_priority', 'false');
+      }
       router.push('/' as never);
     } catch {
       // navigation failure — reset so user can retry
@@ -204,7 +219,7 @@ export default function MarketingScreen() {
     }
   };
 
-  const canGenerate = selectedProduct || affiliateUrl.trim();
+  const canGenerate = storeName.trim().length > 0 || signatureMenu.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -224,7 +239,7 @@ export default function MarketingScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>숏폼 제작</Text>
-              <Text style={styles.headerSub}>사진 선택 → 3초 만에 AI 숏폼 완성</Text>
+              <Text style={styles.headerSub}>매장 사진 한 장 → 10초 만에 손님 부르는 숏폼</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -236,86 +251,48 @@ export default function MarketingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hot Deal Hub — Quick shortcut */}
-        <TouchableOpacity
-          style={styles.hotDealBtn}
-          onPress={() => setHotDealModalVisible(true)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.hotDealIcon}>
-            <Flame size={20} color={theme.colors.warning[400]} strokeWidth={2.2} />
+        {/* Store Info Input Section */}
+        <View style={styles.storeSection}>
+          <View style={styles.storeHeader}>
+            <Store size={18} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            <Text style={styles.storeTitle}>매장 홍보 정보</Text>
           </View>
-          <View style={styles.hotDealText}>
-            <Text style={styles.hotDealTitle}>실시간 핫딜에서 가져오기</Text>
-            <Text style={styles.hotDealSub}>쿠팡·네이버·토스 베스트셀러를 한 번에</Text>
+          <Text style={styles.storeDesc}>가게 이름과 대표 메뉴만 적어도 AI가 알아서 숏폼을 만들어드려요</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>매장 이름</Text>
+            <TextInput
+              style={styles.textInput}
+              value={storeName}
+              onChangeText={setStoreName}
+              placeholder="예: 한승식당, 카페 블룸, 킹스버거"
+              placeholderTextColor={theme.colors.dark.textFaint}
+            />
           </View>
-          <ArrowRight size={18} color={theme.colors.warning[400]} strokeWidth={2.5} />
-        </TouchableOpacity>
 
-        {/* URL Input Section */}
-        <View style={styles.urlSection}>
-          <View style={styles.urlHeader}>
-            <Link2 size={18} color={theme.colors.accent[400]} strokeWidth={2.5} />
-            <Text style={styles.urlTitle}>제휴 링크 입력</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>대표 메뉴 / 상품</Text>
+            <TextInput
+              style={styles.textInput}
+              value={signatureMenu}
+              onChangeText={setSignatureMenu}
+              placeholder="예: 명란 아보카도 비빔밥, 수제망고주스"
+              placeholderTextColor={theme.colors.dark.textFaint}
+            />
           </View>
-          <Text style={styles.urlDesc}>링크를 붙여넣으면 AI가 상품 정보를 자동으로 추출합니다</Text>
 
-          <ClipboardAffiliateBanner
-            onInsert={(url) => setAffiliateUrl(url)}
-            currentUrl={affiliateUrl}
-          />
-
-          <TextInput
-            style={styles.urlInput}
-            value={affiliateUrl}
-            onChangeText={setAffiliateUrl}
-            placeholder="제휴 링크 URL을 여기에 붙여넣으세요"
-            placeholderTextColor={theme.colors.dark.textFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            multiline
-          />
-
-          <TouchableOpacity
-            style={[styles.urlSubmitBtn, (!affiliateUrl.trim() || extracting) && styles.urlSubmitBtnDisabled]}
-            onPress={handleSaveAffiliate}
-            disabled={!affiliateUrl.trim() || extracting}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.urlSubmitBtnText}>
-              {extracting ? '상품 정보 추출 중...' : '링크에서 상품 정보 추출 →'}
-            </Text>
-            <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
-          </TouchableOpacity>
-
-          {extractError && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{extractError}</Text>
-            </View>
-          )}
-
-          {productMeta && (productMeta.productName || productMeta.price) && (
-            <View style={styles.productMetaCard}>
-              {productMeta.image ? (
-                <Image source={{ uri: productMeta.image }} style={styles.productMetaImage} resizeMode="cover" />
-              ) : null}
-              <View style={styles.productMetaInfo}>
-                {productMeta.productName ? (
-                  <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
-                ) : null}
-                {productMeta.price ? (
-                  <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
-                ) : null}
-                {productMeta.brand ? (
-                  <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
-                ) : null}
-              </View>
-              <View style={styles.productMetaCheck}>
-                <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
-              </View>
-            </View>
-          )}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>특가 / 홍보 멘트 (선택)</Text>
+            <TextInput
+              style={[styles.textInput, { minHeight: 70 }]}
+              value={promoText}
+              onChangeText={setPromoText}
+              placeholder="예: 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
         </View>
 
         {/* AI Store Promo Hook Chips */}
@@ -394,11 +371,13 @@ export default function MarketingScreen() {
           )}
         </View>
 
-        {/* Selected product summary */}
-        {selectedProduct && (
-          <View style={styles.selectedSummary}>
+        {/* Ready summary */}
+        {canGenerate && (
+          <View style={styles.readySummary}>
             <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
-            <Text style={styles.selectedSummaryText} numberOfLines={1}>선택된 상품: {selectedProduct}</Text>
+            <Text style={styles.readySummaryText} numberOfLines={1}>
+              {storeName.trim() ? storeName.trim() : '매장'} 홍보 숏폼 준비 완료!
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -412,12 +391,12 @@ export default function MarketingScreen() {
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.generateBtnText}>3초 만에 매장 광고·제휴 숏폼 만들기</Text>
+          <Text style={styles.generateBtnText}>10초 만에 매장 홍보 숏폼 만들기</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
 
-      {/* Hot Deal Picker Modal */}
+      {/* Hot Deal Picker Modal (from advanced affiliate section) */}
       <HotDealPickerModal
         visible={hotDealModalVisible}
         onClose={() => setHotDealModalVisible(false)}
@@ -529,6 +508,103 @@ export default function MarketingScreen() {
                 </View>
               </TouchableOpacity>
 
+              {/* Affiliate Sub-setting — Collapsible */}
+              <View style={styles.affiliateSection}>
+                <TouchableOpacity
+                  style={styles.affiliateToggle}
+                  onPress={() => {
+                    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+                      UIManager.setLayoutAnimationEnabledExperimental(true);
+                    }
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setAffiliateOpen((v) => !v);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Link2 size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.affiliateToggleText}>고급 제휴/부업 링크 연동 (선택)</Text>
+                  {affiliateOpen ? (
+                    <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  ) : (
+                    <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+
+                {affiliateOpen && (
+                  <View style={styles.affiliateBody}>
+                    <Text style={styles.affiliateDesc}>
+                      쿠팡·네이버 등 제휴 링크를 연동하면 숏폼에 부업 수익 링크를 추가할 수 있습니다. 매장 홍보만 하실 경우 그냥 두세요.
+                    </Text>
+
+                    <ClipboardAffiliateBanner
+                      onInsert={(url) => setAffiliateUrl(url)}
+                      currentUrl={affiliateUrl}
+                    />
+
+                    <TextInput
+                      style={styles.affiliateInput}
+                      value={affiliateUrl}
+                      onChangeText={setAffiliateUrl}
+                      placeholder="제휴 링크 URL (선택사항)"
+                      placeholderTextColor={theme.colors.dark.textFaint}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      multiline
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.affiliateSubmitBtn, (!affiliateUrl.trim() || extracting) && styles.affiliateSubmitBtnDisabled]}
+                      onPress={handleSaveAffiliate}
+                      disabled={!affiliateUrl.trim() || extracting}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.affiliateSubmitBtnText}>
+                        {extracting ? '추출 중...' : '링크에서 상품 정보 추출'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.hotDealLink}
+                      onPress={() => setHotDealModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Flame size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+                      <Text style={styles.hotDealLinkText}>실시간 핫딜에서 가져오기</Text>
+                      <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                    </TouchableOpacity>
+
+                    {extractError && (
+                      <View style={styles.errorBox}>
+                        <Text style={styles.errorText}>{extractError}</Text>
+                      </View>
+                    )}
+
+                    {productMeta && (productMeta.productName || productMeta.price) && (
+                      <View style={styles.productMetaCard}>
+                        {productMeta.image ? (
+                          <Image source={{ uri: productMeta.image }} style={styles.productMetaImage} resizeMode="cover" />
+                        ) : null}
+                        <View style={styles.productMetaInfo}>
+                          {productMeta.productName ? (
+                            <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
+                          ) : null}
+                          {productMeta.price ? (
+                            <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
+                          ) : null}
+                          {productMeta.brand ? (
+                            <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
+                          ) : null}
+                        </View>
+                        <View style={styles.productMetaCheck}>
+                          <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
               {/* Full Settings Link */}
               <TouchableOpacity
                 style={styles.fullSettingsBtn}
@@ -540,7 +616,7 @@ export default function MarketingScreen() {
               >
                 <Settings size={18} color={theme.colors.primary[300]} strokeWidth={2} />
                 <Text style={styles.fullSettingsText}>전체 설정 열기</Text>
-                <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2} />
+                <ArrowRight size={16} color={theme.colors.dark.textFaint} strokeWidth={2.5} />
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -597,40 +673,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  hotDealBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: theme.colors.warning[500] + '12',
-    borderRadius: theme.radius.lg,
-    padding: 16,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1.5,
-    borderColor: theme.colors.warning[400] + '40',
-  },
-  hotDealIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.warning[500] + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hotDealText: {
-    flex: 1,
-  },
-  hotDealTitle: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.warning[400],
-  },
-  hotDealSub: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginTop: 2,
-  },
-  urlSection: {
+  storeSection: {
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
@@ -638,24 +681,33 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
   },
-  urlHeader: {
+  storeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
   },
-  urlTitle: {
+  storeTitle: {
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
   },
-  urlDesc: {
+  storeDesc: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
   },
-  urlInput: {
+  inputGroup: {
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  textInput: {
     backgroundColor: theme.colors.dark.bg,
     borderRadius: theme.radius.md,
     paddingHorizontal: 14,
@@ -665,81 +717,6 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
-    marginBottom: theme.spacing.sm,
-    minHeight: 80,
-  },
-  urlSubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.accent[500],
-    borderRadius: theme.radius.md,
-    paddingVertical: 14,
-  },
-  urlSubmitBtnDisabled: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  urlSubmitBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
-  },
-  errorBox: {
-    backgroundColor: theme.colors.error[500] + '18',
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: theme.spacing.sm,
-  },
-  errorText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.error[400],
-    textAlign: 'center',
-  },
-  productMetaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: 12,
-    marginTop: theme.spacing.sm,
-    borderWidth: 1.5,
-    borderColor: theme.colors.success[400] + '30',
-  },
-  productMetaImage: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.radius.sm,
-  },
-  productMetaInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  productMetaName: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  productMetaPrice: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primary[300],
-  },
-  productMetaBrand: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-  },
-  productMetaCheck: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.success[500] + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   hookSection: {
     backgroundColor: theme.colors.dark.surface,
@@ -839,7 +816,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
   },
-  selectedSummary: {
+  readySummary: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -848,7 +825,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  selectedSummaryText: {
+  readySummaryText: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.success[400],
@@ -888,7 +865,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radius.xl,
     borderTopRightRadius: theme.radius.xl,
     paddingTop: theme.spacing.md,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -987,6 +964,135 @@ const styles = StyleSheet.create({
   },
   toggleKnobActive: {
     transform: [{ translateX: 18 }],
+  },
+  // Affiliate sub-setting styles
+  affiliateSection: {
+    gap: 0,
+  },
+  affiliateToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  affiliateToggleText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  affiliateBody: {
+    marginTop: 8,
+    gap: 8,
+  },
+  affiliateDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 16,
+  },
+  affiliateInput: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    minHeight: 60,
+  },
+  affiliateSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+  },
+  affiliateSubmitBtnDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  affiliateSubmitBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  hotDealLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.warning[500] + '12',
+    alignSelf: 'flex-start',
+  },
+  hotDealLinkText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  errorBox: {
+    backgroundColor: theme.colors.error[500] + '18',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'center',
+  },
+  productMetaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  productMetaImage: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.sm,
+  },
+  productMetaInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  productMetaName: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  productMetaPrice: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[300],
+  },
+  productMetaBrand: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  productMetaCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.success[500] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fullSettingsBtn: {
     flexDirection: 'row',
