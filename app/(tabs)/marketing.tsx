@@ -9,6 +9,9 @@ import {
   TextInput,
   Image,
   Modal,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import {
   Flame,
@@ -27,6 +30,9 @@ import {
   Store,
   Tag,
   TrendingUp,
+  PenLine,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -81,6 +87,8 @@ export default function MarketingScreen() {
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
+  const [manualPromptOpen, setManualPromptOpen] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
   const lastActionRef = useRef(0);
 
   const STORE_HOOK_CHIPS = [
@@ -179,8 +187,14 @@ export default function MarketingScreen() {
           await setItem('marketing_affiliate_priority', 'false');
         }
       } catch {}
-      if (selectedHook) {
-        await setItem('marketing_selected_hook', selectedHook);
+      if (customPrompt.trim()) {
+        await setItem('marketing_custom_prompt', customPrompt.trim());
+        await setItem('marketing_selected_hook', customPrompt.trim());
+      } else {
+        await setItem('marketing_custom_prompt', '');
+        if (selectedHook) {
+          await setItem('marketing_selected_hook', selectedHook);
+        }
       }
       router.push('/' as never);
     } catch {
@@ -328,6 +342,56 @@ export default function MarketingScreen() {
               );
             })}
           </View>
+
+          {/* Manual Prompt Toggle */}
+          <TouchableOpacity
+            style={styles.manualToggle}
+            onPress={() => {
+              if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+                UIManager.setLayoutAnimationEnabledExperimental(true);
+              }
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setManualPromptOpen((v) => !v);
+            }}
+            activeOpacity={0.7}
+          >
+            <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.manualToggleText}>직접 프롬프트/문구 입력하기</Text>
+            {manualPromptOpen ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          {manualPromptOpen && (
+            <View style={styles.manualInputWrap}>
+              <TextInput
+                style={styles.manualInput}
+                value={customPrompt}
+                onChangeText={setCustomPrompt}
+                placeholder="예: 매콤한 아보카도 명란 비빔밥, 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료 제공"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                multiline
+                textAlignVertical="top"
+              />
+              {customPrompt.trim().length > 0 && (
+                <TouchableOpacity
+                  style={styles.manualClearBtn}
+                  onPress={() => setCustomPrompt('')}
+                  activeOpacity={0.7}
+                >
+                  <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.manualClearText}>지우기</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={[styles.manualHint, customPrompt.trim().length > 0 && { color: theme.colors.success[400] }]}>
+                {customPrompt.trim().length > 0
+                  ? '✓ 입력하신 문구가 AI 생성에 반영됩니다'
+                  : 'AI가 놓친 가격·할인·강조 내용을 직접 넣으세요'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Selected product summary */}
@@ -720,6 +784,60 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
     flexShrink: 1,
+  },
+  manualToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '30',
+    marginTop: 4,
+  },
+  manualToggleText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  manualInputWrap: {
+    marginTop: 8,
+    gap: 6,
+  },
+  manualInput: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+    minHeight: 80,
+  },
+  manualClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  manualClearText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  manualHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
   selectedSummary: {
     flexDirection: 'row',
