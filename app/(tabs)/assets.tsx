@@ -32,6 +32,8 @@ import {
   type UploadPlatformKey,
 } from '@/lib/platformUpload';
 import { getTrendingSuggestions } from '@/lib/trendingHashtags';
+import { ReviewReelAutomation } from '@/components/ReviewReelAutomation';
+import { InventoryAlertAgent } from '@/components/InventoryAlertAgent';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -497,6 +499,12 @@ export default function AssetsScreen() {
           )}
         </View>
       )}
+
+      {/* Review Reel Automation Module */}
+      <ReviewReelAutomation />
+
+      {/* Inventory Alert Agent Module */}
+      <InventoryAlertAgent />
 
       {/* Sort/Filter Bar */}
       {assets.length > 0 && (
