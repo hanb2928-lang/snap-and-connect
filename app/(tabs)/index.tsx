@@ -35,6 +35,7 @@ import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { ImageCropModal } from '@/components/ImageCropModal';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
+import { WebCameraView } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { VoiceCommandFloatingButton } from '@/components/VoiceCommandFloatingButton';
 import { TriggerBanner } from '@/components/TriggerBanner';
@@ -455,11 +456,22 @@ export default function CameraScreen() {
     }
   };
 
+  const handleWebCapture = async (base64: string, mimeType: string) => {
+    setSelectedImage(base64);
+    setSelectedImageMime(mimeType);
+    setSelectedHook(null);
+    setCustomPrompt('');
+    setManualPromptOpen(false);
+    setMultiAngleShots([]);
+    setCaptureMode('single');
+    setFunnelStage('analyzing');
+  };
+
   const hasImage = selectedImage || previewCapture?.base64;
 
   if (isWebPlatform()) {
     return (
-      <WebSimpleScreen
+      <WebCameraScreen
         selectedImage={selectedImage}
         selectedImageMime={selectedImageMime}
         multiAngleCount={multiAngleShots.length}
@@ -468,9 +480,11 @@ export default function CameraScreen() {
         onCaptureModeToggle={handleCaptureModeToggle}
         onMoodFilterChange={setMoodFilter}
         onPickImage={handlePickImage}
+        onWebCapture={handleWebCapture}
         onGenerate={handleGenerate}
         onMultiAnglePress={() => setMultiAngleVisible(true)}
         onSettingsPress={() => router.push('/settings' as never)}
+        onCreditPress={() => setCreditModalVisible(true)}
         processing={processing}
         error={error}
         progressStep={progressStep}
@@ -481,7 +495,17 @@ export default function CameraScreen() {
         fadeAnim={fadeAnim}
         safeTop={safeTop}
         tabBarHeight={tabBarHeight}
-        onCreditPress={() => setCreditModalVisible(true)}
+        bottomInset={bottomInset}
+        isActive={isActive}
+        funnelStage={funnelStage}
+        selectedHook={selectedHook}
+        onSelectHook={setSelectedHook}
+        customPrompt={customPrompt}
+        onCustomPromptChange={setCustomPrompt}
+        manualPromptOpen={manualPromptOpen}
+        onToggleManualPrompt={() => setManualPromptOpen((v) => !v)}
+        onClearImage={() => { setSelectedImage(null); setFunnelStage('idle'); setSelectedHook(null); setCustomPrompt(''); }}
+        onDismissFunnel={() => { setFunnelStage('idle'); setSelectedImage(null); setSelectedHook(null); setCustomPrompt(''); }}
       />
     );
   }
@@ -863,7 +887,7 @@ export default function CameraScreen() {
   );
 }
 
-interface WebSimpleScreenProps {
+interface WebCameraScreenProps {
   selectedImage: string | null;
   selectedImageMime: string;
   multiAngleCount: number;
@@ -872,9 +896,11 @@ interface WebSimpleScreenProps {
   onCaptureModeToggle: () => void;
   onMoodFilterChange: (m: 'none' | 'warm' | 'fresh') => void;
   onPickImage: () => void;
+  onWebCapture: (base64: string, mimeType: string) => void;
   onGenerate: () => void;
   onMultiAnglePress: () => void;
   onSettingsPress: () => void;
+  onCreditPress: () => void;
   processing: boolean;
   error: string | null;
   progressStep: number;
@@ -885,10 +911,20 @@ interface WebSimpleScreenProps {
   fadeAnim: ReturnType<typeof useSharedValue<number>>;
   safeTop: number;
   tabBarHeight: number;
-  onCreditPress: () => void;
+  bottomInset: number;
+  isActive: boolean;
+  funnelStage: 'idle' | 'analyzing' | 'selecting_hook';
+  selectedHook: string | null;
+  onSelectHook: (h: string | null) => void;
+  customPrompt: string;
+  onCustomPromptChange: (s: string) => void;
+  manualPromptOpen: boolean;
+  onToggleManualPrompt: () => void;
+  onClearImage: () => void;
+  onDismissFunnel: () => void;
 }
 
-function WebSimpleScreen({
+function WebCameraScreen({
   selectedImage,
   selectedImageMime,
   multiAngleCount,
@@ -897,9 +933,11 @@ function WebSimpleScreen({
   onCaptureModeToggle,
   onMoodFilterChange,
   onPickImage,
+  onWebCapture,
   onGenerate,
   onMultiAnglePress,
   onSettingsPress,
+  onCreditPress,
   processing,
   error,
   progressStep,
@@ -909,96 +947,233 @@ function WebSimpleScreen({
   overlayStyle,
   safeTop,
   tabBarHeight,
-  onCreditPress,
-}: WebSimpleScreenProps) {
+  bottomInset,
+  isActive,
+  funnelStage,
+  selectedHook,
+  onSelectHook,
+  customPrompt,
+  onCustomPromptChange,
+  manualPromptOpen,
+  onToggleManualPrompt,
+  onClearImage,
+  onDismissFunnel,
+}: WebCameraScreenProps) {
+  const moodOverlayColor =
+    moodFilter === 'warm' ? 'rgba(255, 180, 80, 0.12)' :
+    moodFilter === 'fresh' ? 'rgba(100, 200, 220, 0.12)' :
+    'transparent';
+
+  // When an image is selected, show the funnel (same as mobile)
+  if (selectedImage && funnelStage !== 'idle') {
+    return (
+      <View style={styles.container}>
+        {/* Funnel top bar */}
+        <View style={[styles.funnelTopBar, { paddingTop: safeTop + 8 }]}>
+          <TouchableOpacity style={styles.funnelBackBtn} onPress={onDismissFunnel} activeOpacity={0.7}>
+            <X size={22} color="#fff" strokeWidth={2.5} />
+          </TouchableOpacity>
+          <Text style={styles.funnelTitle}>AI 인스턴트 분석</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        <View style={styles.funnelImageWrap}>
+          <Image
+            source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }}
+            style={styles.funnelImage}
+            resizeMode="cover"
+          />
+          <View style={styles.funnelImageDim} />
+          <TouchableOpacity
+            style={[styles.clearImageBtn, { top: safeTop + 56 }]}
+            onPress={onClearImage}
+            activeOpacity={0.7}
+          >
+            <X size={20} color="#fff" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+
+        {funnelStage === 'analyzing' && (
+          <View style={styles.funnelAnalyzing}>
+            <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+            <Text style={styles.funnelAnalyzingTitle}>AI가 매장 메뉴와 분위기를 분석 중입니다...</Text>
+            <Text style={styles.funnelAnalyzingSub}>잠시만 기다려주세요</Text>
+          </View>
+        )}
+
+        {funnelStage === 'selecting_hook' && (
+          <ScrollView
+            style={styles.funnelScroll}
+            contentContainerStyle={{ paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + theme.spacing.xl }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.funnelHookSection}>
+              <View style={styles.funnelSectionHeader}>
+                <Sparkles size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+                <Text style={styles.funnelSectionTitle}>AI 추천 훅 문구</Text>
+              </View>
+              <Text style={styles.funnelSectionDesc}>원하는 문구를 골라보세요</Text>
+
+              <View style={styles.funnelChipWrap}>
+                {INSTANT_HOOKS.map((hook) => {
+                  const Icon = hook.icon;
+                  const isSelected = selectedHook === hook.label;
+                  return (
+                    <TouchableOpacity
+                      key={hook.key}
+                      style={[styles.funnelChip, isSelected && { backgroundColor: hook.color + '30', borderColor: hook.color }]}
+                      onPress={() => { onSelectHook(isSelected ? null : hook.label); onCustomPromptChange(''); }}
+                      activeOpacity={0.7}
+                    >
+                      <Icon size={16} color={hook.color} strokeWidth={2} />
+                      <Text style={[styles.funnelChipText, isSelected && { color: hook.color }]}>{hook.label}</Text>
+                      {isSelected && <Check size={16} color={hook.color} strokeWidth={2.5} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Mood filter chips */}
+            <View style={styles.funnelMoodSection}>
+              <View style={styles.funnelSectionHeader}>
+                <Sun size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.funnelSectionTitle}>매장 분위기 보정</Text>
+              </View>
+              <Text style={styles.funnelSectionDesc}>어두운 조명이나 탁한 색감을 한 번에 보정하세요</Text>
+              <View style={styles.funnelMoodRow}>
+                <TouchableOpacity
+                  style={[styles.funnelMoodChip, moodFilter === 'none' && styles.funnelMoodChipActive]}
+                  onPress={() => onMoodFilterChange('none')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.funnelMoodChipText, moodFilter === 'none' && styles.funnelMoodChipTextActive]}>원본</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.funnelMoodChip, moodFilter === 'warm' && styles.funnelMoodChipWarm]}
+                  onPress={() => onMoodFilterChange(moodFilter === 'warm' ? 'none' : 'warm')}
+                  activeOpacity={0.7}
+                >
+                  <Sun size={14} color={moodFilter === 'warm' ? '#fff' : theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={[styles.funnelMoodChipText, moodFilter === 'warm' && styles.funnelMoodChipTextActive]}>온기 가득 카페 감성</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.funnelMoodChip, moodFilter === 'fresh' && styles.funnelMoodChipFresh]}
+                  onPress={() => onMoodFilterChange(moodFilter === 'fresh' ? 'none' : 'fresh')}
+                  activeOpacity={0.7}
+                >
+                  <Droplet size={14} color={moodFilter === 'fresh' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={[styles.funnelMoodChipText, moodFilter === 'fresh' && styles.funnelMoodChipTextActive]}>신선함 청량 푸드</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.funnelManualToggle} onPress={onToggleManualPrompt} activeOpacity={0.7}>
+              <PenLine size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.funnelManualToggleText}>직접 프롬프트/문구 입력하기</Text>
+              <ChevronDown
+                size={18}
+                color={theme.colors.dark.textDim}
+                strokeWidth={2}
+                style={{ transform: [{ rotate: manualPromptOpen ? '180deg' : '0deg' }] }}
+              />
+            </TouchableOpacity>
+
+            {manualPromptOpen && (
+              <View style={styles.funnelManualInput}>
+                <TextInput
+                  style={styles.funnelTextInput}
+                  placeholder="예: 숯불돈까스 9천원, 매일 오픈런"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  value={customPrompt}
+                  onChangeText={onCustomPromptChange}
+                  multiline
+                  maxLength={200}
+                />
+                {customPrompt.length > 0 && (
+                  <TouchableOpacity onPress={() => onCustomPromptChange('')} activeOpacity={0.7} style={styles.funnelClearPrompt}>
+                    <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.funnelGenerateBtn, (!selectedHook && !customPrompt.trim()) && styles.funnelGenerateBtnDisabled]}
+              onPress={onGenerate}
+              disabled={processing || (!selectedHook && !customPrompt.trim())}
+              activeOpacity={0.85}
+            >
+              <Flame size={24} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.funnelGenerateBtnText}>홍보 만들기 시작</Text>
+              <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+
+        {processing && (
+          <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
+            <ProgressOverlay
+              progressSV={progressWidth}
+              step={progressStep as 0 | 1 | 2 | 3}
+              text={progressText}
+              stepLabels={['업로드', '분석', '저장']}
+            />
+          </Animated.View>
+        )}
+      </View>
+    );
+  }
+
+  // No image selected yet — show live camera viewfinder
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: safeTop + theme.spacing.lg, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + 24 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Top Bar */}
-        <View style={styles.webTopBar}>
-          <TouchableOpacity onPress={onSettingsPress} activeOpacity={0.7}>
-            <Settings size={24} color={theme.colors.dark.text} strokeWidth={2} />
+      {/* Top bar with settings + credits */}
+      <View style={[styles.topBar, { top: safeTop + 8 }]}>
+        <View style={styles.topBarLeft}>
+          <TouchableOpacity style={styles.topBarBtn} onPress={onSettingsPress} activeOpacity={0.7}>
+            <Settings size={22} color={theme.colors.dark.text} strokeWidth={2} />
           </TouchableOpacity>
           <CreditBalanceBadge onPress={onCreditPress} compact />
         </View>
-
-        {/* Hero */}
-        <View style={styles.webHero}>
-          <View style={styles.webHeroIcon}>
-            <Sparkles size={40} color={theme.colors.primary[400]} strokeWidth={1.8} />
-          </View>
-          <Text style={styles.webHeroTitle}>매장 홍보 숏폼 만들기</Text>
-          <Text style={styles.webHeroSub}>
-            사진 한 장으로 매장 홍보 숏폼을 만들어요
-          </Text>
+        <View style={styles.topBarRight}>
+          <TouchableOpacity style={styles.topBarBtn} onPress={onMultiAnglePress} activeOpacity={0.7}>
+            <Layers size={20} color="#fff" strokeWidth={2} />
+            {multiAngleCount > 0 && (
+              <View style={styles.webAngleBadge}>
+                <Text style={styles.webAngleBadgeText}>{multiAngleCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Capture quality tip */}
-        <View style={styles.webCaptureTip}>
-          <Info size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-          <Text style={styles.webCaptureTipText}>
-            단품 사진 + 측면/디테일 컷을 함께 올리면 분석 정확도가 높아져요!
-          </Text>
-        </View>
+      <TriggerBanner />
 
-        {/* Selected image preview */}
-        {selectedImage && (
-          <View style={styles.webImagePreview}>
-            <Image
-              source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }}
-              style={[
-                styles.webPreviewImg,
-                moodFilter === 'warm' && { tintColor: 'rgba(255,180,80,0.1)' },
-                moodFilter === 'fresh' && { tintColor: 'rgba(100,200,220,0.1)' },
-              ]}
-              resizeMode="contain"
-            />
-          </View>
+      {/* Live camera viewfinder */}
+      <View style={styles.cameraPreviewWrap}>
+        <WebCameraView
+          onCapture={onWebCapture}
+          onPickImage={onPickImage}
+          isActive={isActive}
+          safeTop={safeTop}
+          tabBarHeight={tabBarHeight}
+          bottomInset={bottomInset}
+        />
+
+        {/* Mood filter overlay */}
+        {moodFilter !== 'none' && (
+          <View style={[styles.moodOverlay, { backgroundColor: moodOverlayColor }]} pointerEvents="none" />
         )}
+      </View>
 
-        {/* Multi-angle shortcut */}
-        <TouchableOpacity style={styles.multiAngleBtn} onPress={onMultiAnglePress} activeOpacity={0.7}>
-          <Layers size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
-          <Text style={styles.multiAngleBtnText}>다각도 사진으로 정확도 높이기</Text>
-          {multiAngleCount > 0 && (
-            <View style={styles.multiAngleBadge}>
-              <Text style={styles.multiAngleBadgeText}>{multiAngleCount}장</Text>
-            </View>
-          )}
-          <ArrowRight size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
-        </TouchableOpacity>
-
-        {/* Main action buttons */}
-        <TouchableOpacity style={styles.webPickBtn} onPress={onPickImage} disabled={processing} activeOpacity={0.8}>
-          <ImageIcon size={22} color="#fff" strokeWidth={2} />
-          <Text style={styles.webPickBtnText}>사진 선택 / 업로드</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.webGenerateBtn, !selectedImage && styles.webGenerateBtnDisabled]}
-          onPress={onGenerate}
-          disabled={!selectedImage || processing}
-          activeOpacity={0.85}
-        >
-          <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.webGenerateBtnText}>홍보 만들기 시작</Text>
-          <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
-        </TouchableOpacity>
-
-        {!selectedImage && (
-          <Text style={styles.webHint}>사진을 먼저 선택해주세요</Text>
-        )}
-
-        {error && (
-          <View style={styles.webErrorBanner}>
+      {error && (
+        <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+          <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
-        )}
-      </ScrollView>
+        </View>
+      )}
 
       {processing && (
         <Animated.View style={[styles.processingOverlay, overlayStyle]} onLayout={fadeIn}>
@@ -1006,7 +1181,7 @@ function WebSimpleScreen({
             progressSV={progressWidth}
             step={progressStep as 0 | 1 | 2 | 3}
             text={progressText}
-            stepLabels={['업로드', '분석', '저장']}
+            stepLabels={['촬영', '분석', '저장']}
           />
         </Animated.View>
       )}
@@ -1605,5 +1780,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: theme.spacing.md,
+  },
+  webAngleBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  webAngleBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
