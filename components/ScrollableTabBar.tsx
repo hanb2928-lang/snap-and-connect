@@ -58,7 +58,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(routeIndex as never);
+              navigation.navigate(route.name as never);
             }
           };
 
