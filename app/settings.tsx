@@ -14,7 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp } from 'lucide-react-native';
 import { SectionCard } from '@/components/SectionCard';
 import { theme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -681,6 +681,27 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>분석 및 수익 대시보드</Text>
+        <Text style={styles.sectionDesc}>
+          제휴 링크 수익, 숏폼 성과, 클릭 및 전환율을 한눈에 확인하세요
+        </Text>
+        <TouchableOpacity
+          style={styles.analyticsShortcutCard}
+          onPress={() => router.push('/(tabs)/analytics')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.analyticsShortcutIconWrap}>
+            <BarChart3 size={22} color={theme.colors.success[400]} strokeWidth={2} />
+          </View>
+          <View style={styles.analyticsShortcutInfo}>
+            <Text style={styles.analyticsShortcutTitle}>성과 및 수익 확인하기</Text>
+            <Text style={styles.analyticsShortcutDesc}>총 수익금 · 숏폼 조회수 · 클릭 전환율 · QR 스캔 통계</Text>
+          </View>
+          <ArrowRight size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>크레딧 관리</Text>
@@ -2310,6 +2331,38 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     lineHeight: 20,
     marginBottom: theme.spacing.md,
+  },
+  analyticsShortcutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  analyticsShortcutIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  analyticsShortcutInfo: {
+    flex: 1,
+  },
+  analyticsShortcutTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  analyticsShortcutDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 3,
+    lineHeight: 16,
   },
   card: {
     backgroundColor: theme.colors.dark.surface,

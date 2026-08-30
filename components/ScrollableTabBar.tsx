@@ -22,6 +22,7 @@ import {
   BookMarked,
   Settings,
   MoreHorizontal,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -43,6 +44,7 @@ const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 export type TabBadgeMap = Record<string, boolean>;
 
 const MORE_ITEMS = [
+  { key: '(tabs)/analytics', labelKey: 'tab.analytics', icon: BarChart3, color: theme.colors.success[400] },
   { key: 'guide', labelKey: 'tab.guide', icon: BookMarked, color: theme.colors.primary[400] },
   { key: 'settings', labelKey: 'tab.settings', icon: Settings, color: theme.colors.accent[400] },
 ];
