@@ -104,6 +104,7 @@ import type { RenderJob } from '@/lib/jobQueue';
 import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { MotionZoomVideo } from '@/components/MotionZoomVideo';
+import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
 import { LinkInBioCard } from '@/components/LinkInBioCard';
 import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
@@ -137,6 +138,7 @@ export default function ResultScreen() {
   const [heroAspect, setHeroAspect] = useState<number>(1);
   const [autoMarketingCopy, setAutoMarketingCopy] = useState<string | null>(null);
   const [hookOverride, setHookOverride] = useState<string | null>(null);
+  const [priceOverride, setPriceOverride] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [editingProduct, setEditingProduct] = useState(false);
   const [productNameInput, setProductNameInput] = useState('');
@@ -494,7 +496,7 @@ export default function ResultScreen() {
   const detectedProducts: DetectedProduct[] = useMemo(() => scan?.detected_products ?? [], [scan?.detected_products]);
   const selectedProduct = useMemo(() => detectedProducts[selectedProductIndex] ?? null, [detectedProducts, selectedProductIndex]);
   const activeProductName = useMemo(() => selectedProduct?.productName || scan?.product_name || '', [selectedProduct, scan?.product_name]);
-  const activePriceEstimate = useMemo(() => selectedProduct?.priceEstimate || scan?.price_estimate || '', [selectedProduct, scan?.price_estimate]);
+  const activePriceEstimate = useMemo(() => priceOverride !== null ? priceOverride : (selectedProduct?.priceEstimate || scan?.price_estimate || ''), [priceOverride, selectedProduct, scan?.price_estimate]);
   const activeShoppingMatches = useMemo(() => selectedProduct?.shoppingMatches ?? scan?.shopping_matches ?? [], [selectedProduct, scan?.shopping_matches]);
   const activeTemplateData = useMemo(() => selectedProduct?.templateData ?? scan?.template_data, [selectedProduct, scan?.template_data]);
   const activeOneLiner = useMemo(() => selectedProduct?.oneLiner || scan?.one_liner || '', [selectedProduct, scan?.one_liner]);
@@ -1603,6 +1605,29 @@ export default function ResultScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        <QuickTweakPanel
+          hook={activeHook}
+          productName={activeProductName}
+          priceEstimate={activePriceEstimate}
+          affiliateUrl={customLinkForCurrentProduct?.url ?? (primaryAffiliateUrl || null)}
+          affiliateLabel={customLinkForCurrentProduct?.label ?? ''}
+          shortUrl={shortUrl}
+          onHookChange={(h) => setHookOverride(h)}
+          onProductNameChange={(name) => {
+            if (scan) {
+              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
+              setScan({ ...scan, product_name: name });
+            }
+          }}
+          onPriceChange={(price) => setPriceOverride(price)}
+          onAffiliateChange={(url, label) => {
+            if (scan && url) {
+              handleSaveCustomLink(url, label, selectedProductIndex);
+            }
+          }}
+          onSaveAndShare={handleCopyCaption}
+        />
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
           <AffiliatePromptBanner
