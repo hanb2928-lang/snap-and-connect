@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform } from 'react-native';
-import { Mic, MicOff, X, Radio, Sparkles } from 'lucide-react-native';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Platform, Animated } from 'react-native';
+import { Mic, MicOff, X, Radio, Sparkles, Ear } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVoiceCommand, type ParsedVoiceCommand } from '@/hooks/useVoiceCommand';
+import { getItem, setItem } from '@/lib/storage';
 
 interface VoiceCommandFloatingButtonProps {
   onCommand: (cmd: ParsedVoiceCommand) => void;
@@ -13,15 +14,35 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const voice = useVoiceCommand(onCommand);
+  const [justWoke, setJustWoke] = useState(false);
+  const autoStartedRef = useRef(false);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const onCommandRef = useRef(onCommand);
+
+  useEffect(() => {
+    onCommandRef.current = onCommand;
+  }, [onCommand]);
+
+  const handleCommandWithFlash = useCallback((cmd: ParsedVoiceCommand) => {
+    setJustWoke(true);
+    Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+    ]).start(() => setJustWoke(false));
+    onCommandRef.current(cmd);
+  }, [pulseAnim]);
+
+  const voice = useVoiceCommand(handleCommandWithFlash);
 
   const handleToggle = useCallback(() => {
     if (active) {
       voice.stop();
       setActive(false);
+      setItem('voice_always_on', 'false');
     } else {
       voice.start();
       setActive(true);
+      setItem('voice_always_on', 'true');
     }
   }, [active, voice]);
 
@@ -30,6 +51,24 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
       setActive(false);
     }
   }, [voice.state]);
+
+  // Auto-start listening on mount — like Bixby, phone is always listening for the wake word
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    (async () => {
+      if (Platform.OS !== 'web') return;
+      try {
+        const alwaysOn = await getItem('voice_always_on');
+        // Default to always-on. If user explicitly turned it off, respect that.
+        if (alwaysOn !== 'false') {
+          voice.start();
+          setActive(true);
+          await setItem('voice_always_on', 'true');
+        }
+      } catch {}
+    })();
+  }, [voice]);
 
   const isListening = active && voice.state === 'listening';
 
@@ -43,17 +82,41 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
           { top: insets.top + 56 },
         ]}
       >
+        {/* Always-on ear indicator */}
+        {active && (
+          <Animated.View
+            style={[
+              styles.alwaysOnBadge,
+              justWoke && {
+                opacity: pulseAnim,
+                transform: [{
+                  scale: pulseAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.15],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Ear size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <Text style={styles.alwaysOnText}>항상 대기</Text>
+          </Animated.View>
+        )}
+
         <TouchableOpacity
           style={[
             styles.button,
             isListening && styles.buttonActive,
             voice.state === 'error' && styles.buttonError,
+            justWoke && styles.buttonWoke,
           ]}
           onPress={handleToggle}
           onLongPress={() => setShowHelp(true)}
           activeOpacity={0.7}
         >
-          {isListening ? (
+          {justWoke ? (
+            <Sparkles size={22} color={theme.colors.primary[200]} strokeWidth={2.5} />
+          ) : isListening ? (
             <Radio size={22} color="#fff" strokeWidth={2.5} />
           ) : voice.state === 'error' ? (
             <MicOff size={22} color={theme.colors.error[400]} strokeWidth={2.2} />
@@ -71,8 +134,14 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
               <View style={[styles.liveDot, styles.liveDot3]} />
             </View>
             <Text style={styles.statusText} numberOfLines={1}>
-              {voice.partialTranscript || '음성 대기 중...'}
+              {voice.partialTranscript || '"숏커넥트"라고 불러주세요'}
             </Text>
+          </View>
+        )}
+
+        {voice.state === 'error' && voice.error && (
+          <View style={styles.errorBubble}>
+            <Text style={styles.errorText} numberOfLines={2}>{voice.error}</Text>
           </View>
         )}
       </View>
@@ -83,37 +152,37 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
           <View style={styles.helpCard}>
             <View style={styles.helpHeader}>
               <Sparkles size={20} color={theme.colors.primary[400]} strokeWidth={2} />
-              <Text style={styles.helpTitle}>핸즈프리 음성 명령</Text>
+              <Text style={styles.helpTitle}>빅스처럼 음성으로 깨우기</Text>
               <TouchableOpacity onPress={() => setShowHelp(false)} activeOpacity={0.7}>
                 <X size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.helpDesc}>
-              손에 기름이나 물이 묻었을 때, 화면을 터치하지 않고 목소리만으로 숏폼을 만들 수 있어요.
+              폰을 놔두고 "숏커넥트"라고 부르면, 주방이나 홀에서 손을 닦지 않고도 숏폼을 만들 수 있어요. 카메라 화면에 들어오면 자동으로 듣기 시작합니다.
             </Text>
 
             <View style={styles.helpStep}>
               <Text style={styles.helpStepNum}>1</Text>
               <View style={styles.helpStepBody}>
-                <Text style={styles.helpStepTitle}>마이크 버튼을 탭하세요</Text>
-                <Text style={styles.helpStepSub}>버튼이 빨간색으로 깜빡이면 음성 대기 중</Text>
+                <Text style={styles.helpStepTitle}>그냥 "숏커넥트"라고 부르세요</Text>
+                <Text style={styles.helpStepSub}>버튼을 누를 필요 없이 자동으로 듣고 있어요</Text>
               </View>
             </View>
 
             <View style={styles.helpStep}>
               <Text style={styles.helpStepNum}>2</Text>
               <View style={styles.helpStepBody}>
-                <Text style={styles.helpStepTitle}>웨이크워드를 말하세요</Text>
-                <Text style={styles.helpStepSub}>"숏커넥트" 또는 "뚝딱"이라고 외치세요</Text>
+                <Text style={styles.helpStepTitle}>웨이크워드 + 홍보 멘트</Text>
+                <Text style={styles.helpStepSub}>"숏커넥트, 오늘 남은 항정살 마감 떨이!"</Text>
               </View>
             </View>
 
             <View style={styles.helpStep}>
               <Text style={styles.helpStepNum}>3</Text>
               <View style={styles.helpStepBody}>
-                <Text style={styles.helpStepTitle}>홍보 멘트를 덧붙이세요</Text>
-                <Text style={styles.helpStepSub}>"숏커넥트, 오늘 남은 항정살 마감 떨이!"</Text>
+                <Text style={styles.helpStepTitle}>자동으로 숏폼 제작 시작</Text>
+                <Text style={styles.helpStepSub}>말이 끝나면 홍보 만들기가 자동으로 실행됩니다</Text>
               </View>
             </View>
 
@@ -129,7 +198,7 @@ export function VoiceCommandFloatingButton({ onCommand }: VoiceCommandFloatingBu
             </View>
 
             <Text style={styles.helpNote}>
-              음성 명령이 감지되면 자동으로 숏폼 제작 화면으로 이동하고 홍보 만들기가 시작됩니다.
+              음성 대기를 끄려면 마이크 버튼을 한 번 더 탭하세요. 다음에 카메라 화면에 들어올 때 다시 켜집니다.
             </Text>
           </View>
         </View>
@@ -164,6 +233,10 @@ const styles = StyleSheet.create({
   buttonError: {
     borderColor: theme.colors.error[400],
   },
+  buttonWoke: {
+    backgroundColor: theme.colors.primary[600],
+    borderColor: theme.colors.primary[400],
+  },
   pulseRing: {
     position: 'absolute',
     width: 48,
@@ -171,6 +244,22 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
     borderWidth: 2,
     borderColor: theme.colors.error[400],
+  },
+  alwaysOnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.success[500] + '18',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  alwaysOnText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   statusBubble: {
     flexDirection: 'row',
@@ -199,6 +288,21 @@ const styles = StyleSheet.create({
   liveDot1: { opacity: 1 },
   liveDot2: { opacity: 0.6 },
   liveDot3: { opacity: 0.3 },
+  errorBubble: {
+    backgroundColor: theme.colors.error[500] + '18',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '30',
+    maxWidth: 200,
+  },
+  errorText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'right',
+  },
   statusText: {
     flex: 1,
     fontSize: 11,
@@ -302,3 +406,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
+
+
+export { VoiceCommandFloatingButton }
