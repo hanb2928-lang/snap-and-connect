@@ -496,16 +496,43 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top Bar: Settings + Credits */}
+      {/* Top Bar: Settings (left) + Flash & Flip (right) */}
       <View style={[styles.topBar, { top: safeTop + 8 }]}>
-        <TouchableOpacity
-          style={styles.topBarBtn}
-          onPress={() => router.push('/settings' as never)}
-          activeOpacity={0.7}
-        >
-          <Settings size={22} color={theme.colors.dark.text} strokeWidth={2} />
-        </TouchableOpacity>
-        <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
+        <View style={styles.topBarLeft}>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => router.push('/settings' as never)}
+            activeOpacity={0.7}
+          >
+            <Settings size={22} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
+        </View>
+        <View style={styles.topBarRight}>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
+            activeOpacity={0.7}
+          >
+            {flash === 'on' ? (
+              <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2} />
+            ) : flash === 'auto' ? (
+              <View style={styles.flashAutoWrap}>
+                <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.flashAutoLabel}>A</Text>
+              </View>
+            ) : (
+              <ZapOff size={20} color="#fff" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+            activeOpacity={0.7}
+          >
+            <RotateCcw size={20} color="#fff" strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Unified Trigger Banner (Weather + Inventory + Breaktime alerts) */}
@@ -538,99 +565,6 @@ export default function CameraScreen() {
           </View>
         )}
 
-        {/* Camera controls */}
-        <View style={styles.cameraControls}>
-          <View style={styles.cameraCtrlRow}>
-            <TouchableOpacity
-              style={styles.cameraCtrlBtn}
-              onPress={() => setGridVisible((g) => !g)}
-              activeOpacity={0.7}
-            >
-              {gridVisible ? (
-                <Grid3x3 size={18} color={theme.colors.primary[400]} strokeWidth={2} />
-              ) : (
-                <Grid3x3 size={18} color="#fff" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cameraCtrlBtn}
-              onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
-              activeOpacity={0.7}
-            >
-              {flash === 'on' ? (
-                <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-              ) : flash === 'auto' ? (
-                <View style={styles.flashAutoWrap}>
-                  <Zap size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.flashAutoLabel}>A</Text>
-                </View>
-              ) : (
-                <ZapOff size={18} color="#fff" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cameraCtrlBtn}
-              onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
-              activeOpacity={0.7}
-            >
-              <RotateCcw size={18} color="#fff" strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Capture mode toggle + mood filter */}
-        <View style={styles.cameraExtraControls}>
-          <View style={styles.captureModeToggle}>
-            <TouchableOpacity
-              style={[styles.captureModeBtn, captureMode === 'single' && styles.captureModeBtnActive]}
-              onPress={() => { setCaptureMode('single'); setMultiAngleShots([]); }}
-              activeOpacity={0.7}
-            >
-              <Camera size={14} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.captureModeText, captureMode === 'single' && styles.captureModeTextActive]}>1장 빠른 촬영</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.captureModeBtn, captureMode === 'multi' && styles.captureModeBtnActive]}
-              onPress={handleCaptureModeToggle}
-              activeOpacity={0.7}
-            >
-              <Layers size={14} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.captureModeText, captureMode === 'multi' && styles.captureModeTextActive]}>다각도 연사</Text>
-              {multiAngleShots.length > 0 && (
-                <View style={styles.captureModeBadge}>
-                  <Text style={styles.captureModeBadgeText}>{multiAngleShots.length}장</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.moodFilterRow}>
-            <TouchableOpacity
-              style={[styles.moodChip, moodFilter === 'none' && styles.moodChipActive]}
-              onPress={() => setMoodFilter('none')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.moodChipText, moodFilter === 'none' && styles.moodChipTextActive]}>원본</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.moodChip, moodFilter === 'warm' && styles.moodChipActiveWarm]}
-              onPress={() => setMoodFilter(moodFilter === 'warm' ? 'none' : 'warm')}
-              activeOpacity={0.7}
-            >
-              <Sun size={12} color={moodFilter === 'warm' ? '#fff' : theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={[styles.moodChipText, moodFilter === 'warm' && styles.moodChipTextActive]}>따뜻한 카페</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.moodChip, moodFilter === 'fresh' && styles.moodChipActiveFresh]}
-              onPress={() => setMoodFilter(moodFilter === 'fresh' ? 'none' : 'fresh')}
-              activeOpacity={0.7}
-            >
-              <Droplet size={12} color={moodFilter === 'fresh' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={[styles.moodChipText, moodFilter === 'fresh' && styles.moodChipTextActive]}>청량 푸드</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Mood filter overlay */}
         {moodFilter !== 'none' && (
           <View style={[styles.moodOverlay, { backgroundColor: moodOverlayColor }]} pointerEvents="none" />
@@ -641,7 +575,7 @@ export default function CameraScreen() {
           <View style={styles.selectedImageOverlay}>
             <Image source={{ uri: `data:${selectedImageMime};base64,${selectedImage}` }} style={[styles.selectedImage, moodOverlayStyle]} resizeMode="cover" />
             <TouchableOpacity
-              style={styles.clearImageBtn}
+              style={[styles.clearImageBtn, { top: safeTop + 56 }]}
               onPress={() => { setSelectedImage(null); setFunnelStage('idle'); setSelectedHook(null); setCustomPrompt(''); }}
               activeOpacity={0.7}
             >
@@ -651,69 +585,85 @@ export default function CameraScreen() {
         )}
       </View>
 
-      {/* Bottom Action Area */}
-      <View style={[styles.bottomAction, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+      {/* Bottom Camera Bar — Instagram style */}
+      <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        {/* Capture quality tip */}
-        <View style={styles.captureTip}>
-          <Info size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-          <Text style={styles.captureTipText}>
-            단품 사진 + 측면/디테일 컷을 함께 올리면 분석 정확도가 높아져요!
-          </Text>
+        {/* Capture mode segment */}
+        <View style={styles.modeSegmentWrap}>
+          <View style={styles.modeSegment}>
+            <TouchableOpacity
+              style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive]}
+              onPress={() => { setCaptureMode('single'); setMultiAngleShots([]); }}
+              activeOpacity={0.7}
+            >
+              <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>1장</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive]}
+              onPress={handleCaptureModeToggle}
+              activeOpacity={0.7}
+            >
+              <Layers size={13} color={captureMode === 'multi' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.modeSegmentText, captureMode === 'multi' && styles.modeSegmentTextActive]}>다각도</Text>
+              {multiAngleShots.length > 0 && (
+                <View style={styles.modeSegmentBadge}>
+                  <Text style={styles.modeSegmentBadgeText}>{multiAngleShots.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Multi-angle shortcut */}
-        <TouchableOpacity
-          style={styles.multiAngleBtn}
-          onPress={() => setMultiAngleVisible(true)}
-          activeOpacity={0.7}
-        >
-          <Layers size={16} color={theme.colors.accent[400]} strokeWidth={2.2} />
-          <Text style={styles.multiAngleBtnText}>다각도 사진으로 정확도 높이기</Text>
-          {multiAngleShots.length > 0 && (
-            <View style={styles.multiAngleBadge}>
-              <Text style={styles.multiAngleBadgeText}>{multiAngleShots.length}장</Text>
-            </View>
-          )}
-          <ArrowRight size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
-        </TouchableOpacity>
+        {/* Bottom controls row: Gallery | Shutter | Grid */}
+        <View style={styles.bottomControlsRow}>
+          {/* Gallery thumbnail (left) */}
+          <TouchableOpacity
+            style={styles.galleryThumb}
+            onPress={handlePickImage}
+            disabled={processing}
+            activeOpacity={0.8}
+          >
+            <ImageIcon size={22} color="#fff" strokeWidth={2} />
+          </TouchableOpacity>
 
-        {/* Gallery button (secondary, full-width) */}
-        <TouchableOpacity
-          style={styles.galleryBtnFull}
-          onPress={handlePickImage}
-          disabled={processing}
-          activeOpacity={0.7}
-        >
-          <ImageIcon size={20} color={theme.colors.dark.text} strokeWidth={2} />
-          <Text style={styles.galleryBtnFullText}>사진 선택</Text>
-        </TouchableOpacity>
+          {/* Shutter button (center) */}
+          <TouchableOpacity
+            style={[styles.shutterBtn, hasImage && styles.shutterBtnGenerate, (!hasImage && !cameraReady) && styles.shutterBtnDisabled]}
+            onPress={hasImage ? handleGenerate : handleCapture}
+            disabled={processing || (!hasImage && !cameraReady)}
+            activeOpacity={0.85}
+          >
+            {hasImage ? (
+              <Flame size={28} color="#fff" strokeWidth={2.5} />
+            ) : (
+              <Camera size={30} color="#fff" strokeWidth={2.5} />
+            )}
+          </TouchableOpacity>
 
-        {/* Main capture/generate button (full-width, centered) */}
-        <TouchableOpacity
-          style={styles.captureBtnFull}
-          onPress={hasImage ? handleGenerate : handleCapture}
-          disabled={processing || (!hasImage && !cameraReady)}
-          activeOpacity={0.85}
-        >
-          {hasImage ? (
-            <>
-              <Flame size={26} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.captureBtnText}>홍보 만들기 시작</Text>
-              <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
-            </>
-          ) : (
-            <>
-              <Camera size={28} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.captureBtnText}>사진 촬영</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          {/* Grid toggle (right) */}
+          <TouchableOpacity
+            style={styles.gridToggleBtn}
+            onPress={() => setGridVisible((g) => !g)}
+            activeOpacity={0.7}
+          >
+            {gridVisible ? (
+              <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+            ) : (
+              <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Generate hint text */}
+        {hasImage && (
+          <Text style={styles.shutterHintText}>홍보 만들기 시작</Text>
+        )}
       </View>
 
       {/* Preview Modal */}
@@ -1091,9 +1041,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     zIndex: 20,
   },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
   topBarBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: theme.radius.full,
     backgroundColor: 'rgba(10, 15, 30, 0.6)',
     justifyContent: 'center',
@@ -1147,30 +1107,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  cameraControls: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  cameraCtrlRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    backgroundColor: 'rgba(10, 15, 30, 0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-  },
-  cameraCtrlBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.radius.full,
-    backgroundColor: 'rgba(10, 15, 30, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   flashAutoWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1192,7 +1128,7 @@ const styles = StyleSheet.create({
   },
   clearImageBtn: {
     position: 'absolute',
-    top: 60,
+    top: 56,
     right: theme.spacing.lg,
     width: 40,
     height: 40,
@@ -1201,12 +1137,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bottomAction: {
-    backgroundColor: theme.colors.dark.surface,
-    paddingTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
+  bottomBar: {
+    backgroundColor: 'rgba(5, 8, 18, 0.85)',
+    paddingTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xl,
   },
   errorBanner: {
     backgroundColor: theme.colors.error[500] + '18',
@@ -1221,22 +1155,93 @@ const styles = StyleSheet.create({
     color: theme.colors.error[400],
     textAlign: 'center',
   },
-  captureTip: {
-    flexDirection: 'row',
+  modeSegmentWrap: {
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.primary[500] + '12',
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
     marginBottom: theme.spacing.sm,
   },
-  captureTipText: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.primary[300],
-    lineHeight: 15,
+  modeSegment: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 15, 30, 0.6)',
+    borderRadius: theme.radius.full,
+    padding: 3,
+    gap: 3,
+  },
+  modeSegmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: theme.radius.full,
+  },
+  modeSegmentBtnActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  modeSegmentText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  modeSegmentTextActive: {
+    color: '#fff',
+  },
+  modeSegmentBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  modeSegmentBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  bottomControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.sm,
+  },
+  galleryThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(10, 15, 30, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shutterBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  shutterBtnGenerate: {
+    backgroundColor: theme.colors.accent[500],
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  shutterBtnDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  gridToggleBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(10, 15, 30, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shutterHintText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    marginTop: 4,
   },
   multiAngleBtn: {
     flexDirection: 'row',
@@ -1265,37 +1270,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.accent[300],
-  },
-  galleryBtnFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.lg,
-    paddingVertical: 14,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    marginBottom: theme.spacing.sm,
-  },
-  galleryBtnFullText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  captureBtnFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 18,
-    backgroundColor: theme.colors.primary[600],
-    borderRadius: theme.radius.lg,
-  },
-  captureBtnText: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
   funnelOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1504,86 +1478,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 100,
   },
-  cameraExtraControls: {
-    position: 'absolute',
-    top: 112,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-    gap: 8,
-  },
-  captureModeToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(10, 15, 30, 0.5)',
-    borderRadius: theme.radius.full,
-    padding: 4,
-    gap: 4,
-  },
-  captureModeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-  },
-  captureModeBtnActive: {
-    backgroundColor: theme.colors.primary[600],
-  },
-  captureModeText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  captureModeTextActive: {
-    color: '#fff',
-  },
-  captureModeBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  captureModeBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
-  moodFilterRow: {
-    flexDirection: 'row',
-    gap: 6,
-    backgroundColor: 'rgba(10, 15, 30, 0.5)',
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  moodChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.radius.full,
-  },
-  moodChipActive: {
-    backgroundColor: theme.colors.dark.surface,
-  },
-  moodChipActiveWarm: {
-    backgroundColor: theme.colors.warning[500],
-  },
-  moodChipActiveFresh: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  moodChipText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  moodChipTextActive: {
-    color: '#fff',
-    fontFamily: theme.typography.fontFamily.semiBold,
-  },
+
   moodOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
