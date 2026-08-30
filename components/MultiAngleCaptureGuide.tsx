@@ -119,30 +119,19 @@ export function MultiAngleCaptureGuide({
   }, []);
 
   const handleComplete = useCallback(() => {
-    // Always emit shots in fixed ANGLE_GUIDES order (front → side → detail)
     const ordered = ANGLE_GUIDES.map((g, idx) => {
       const shot = shots[g.id];
       if (!shot) return null;
       return { ...shot, orderIndex: idx };
     }).filter(Boolean) as AngleShot[];
     onComplete(ordered);
-    // Explicitly release data URL references for GC before clearing
-    for (const key of Object.keys(shots)) {
-      shots[key].dataUrl = undefined;
-      shots[key].base64 = undefined;
-    }
     setShots({});
   }, [shots, onComplete]);
 
   const handleClose = useCallback(() => {
-    // Release data URL references before clearing to avoid lingering blob memory
-    for (const key of Object.keys(shots)) {
-      shots[key].dataUrl = undefined;
-      shots[key].base64 = undefined;
-    }
     setShots({});
     onClose();
-  }, [shots, onClose]);
+  }, [onClose]);
 
   return (
     <Modal visible={visible} transparent animationType="slide">

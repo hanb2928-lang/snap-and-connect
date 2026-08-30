@@ -48,6 +48,7 @@ export function WebCameraView({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mountedRef = useRef(true);
   const [facing, setFacing] = useState<Facing>('environment');
   const [gridVisible, setGridVisible] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -79,13 +80,18 @@ export function WebCameraView({
         },
         audio: false,
       });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        setCameraReady(true);
+        if (mountedRef.current) setCameraReady(true);
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
       if (msg.includes('Permission') || msg.includes('NotAllowed')) {
         setError('카메라 권한이 필요합니다. 브라우저 설정에서 카메라를 허용해주세요.');
@@ -112,7 +118,10 @@ export function WebCameraView({
   }, [isActive, facing, previewBase64, startStream, stopStream]);
 
   useEffect(() => {
-    return () => { stopStream(); };
+    return () => {
+      mountedRef.current = false;
+      stopStream();
+    };
   }, [stopStream]);
 
   // Clear internal capture state when capture mode changes to prevent state leak

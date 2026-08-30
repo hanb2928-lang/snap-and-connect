@@ -638,7 +638,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         else{line=tl;}
       }
       var neededH=lineCount*lineH+padding*2;
-      if(neededH<=h){break;}
+      if(neededH<=h){bubbleH=h;break;}
       bubbleH=neededH;
     }
     ctx.font=fontBase.replace(/(\d+)px/,fontSize+'px');
@@ -1238,6 +1238,10 @@ export function ComicShortGenerator({
     return () => {
       if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
       if (webGenCleanupRef.current) {
         webGenCleanupRef.current();
         webGenCleanupRef.current = null;
@@ -1578,6 +1582,10 @@ export function ComicShortGenerator({
     generateTimeoutRef.current = setTimeout(() => {
       setState((prev) => {
         if (prev === 'generating') {
+          if (webGenCleanupRef.current) {
+            webGenCleanupRef.current();
+            webGenCleanupRef.current = null;
+          }
           showToast('생성 시간이 초과됐어요. 다시 시도해주세요');
           return 'error';
         }
@@ -1826,6 +1834,12 @@ export function ComicShortGenerator({
 
   const handleReset = useCallback(() => {
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+    setPreviewingVoiceKey(null);
     if (webGenCleanupRef.current) {
       webGenCleanupRef.current();
       webGenCleanupRef.current = null;
@@ -1870,7 +1884,8 @@ export function ComicShortGenerator({
     mbtiCommentary: mbtiMode ? mbtiCommentary : [],
     emotionOverlay,
     localStoreInfo,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure]);
+    genId: genIdRef.current,
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, genIdRef.current]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 
