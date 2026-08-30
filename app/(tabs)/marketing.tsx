@@ -159,8 +159,9 @@ export default function MarketingScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (voiceCommandHandledRef.current) return;
+      let cancelled = false;
       (async () => {
+        if (voiceCommandHandledRef.current) return;
         try {
           const active = await getItem('marketing_voice_command_active');
           if (active !== 'true') return;
@@ -171,6 +172,7 @@ export default function MarketingScreen() {
           await setItem('marketing_voice_command_active', 'false');
           voiceCommandHandledRef.current = true;
 
+          if (cancelled) return;
           if (promptText && promptText.trim()) {
             setCustomPrompt(promptText.trim());
             setManualPromptOpen(true);
@@ -210,6 +212,10 @@ export default function MarketingScreen() {
           }
         } catch {}
       })();
+      return () => {
+        cancelled = true;
+        voiceCommandHandledRef.current = false;
+      };
     }, []),
   );
 
