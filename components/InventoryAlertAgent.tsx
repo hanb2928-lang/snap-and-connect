@@ -69,6 +69,11 @@ export function InventoryAlertAgent() {
   const [error, setError] = useState<string | null>(null);
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastAlertCheckRef = useRef(0);
+  const alertsRef = useRef<PushAlert[]>([]);
+
+  useEffect(() => {
+    alertsRef.current = alerts;
+  }, [alerts]);
 
   const loadAll = useCallback(async () => {
     try {
@@ -118,7 +123,7 @@ export function InventoryAlertAgent() {
         const lowStockItems = checkInventoryAlerts(currentItems);
         for (const item of lowStockItems) {
           // Check if we already have an unread alert for this item
-          const existing = alerts.find(
+          const existing = alertsRef.current.find(
             (a) => a.alert_type === 'low_stock' &&
             a.inventory_item_id === item.id &&
             !a.is_read,
@@ -132,7 +137,7 @@ export function InventoryAlertAgent() {
 
         // 2. Breaktime alert (once per breaktime window)
         if (isInBreaktime(now, settings.breaktime_start, settings.breaktime_end)) {
-          const existingBreaktime = alerts.find(
+          const existingBreaktime = alertsRef.current.find(
             (a) => a.alert_type === 'breaktime' &&
             !a.is_read &&
             new Date(a.triggered_at).toDateString() === now.toDateString(),
@@ -146,7 +151,7 @@ export function InventoryAlertAgent() {
 
         // 3. Closing soon alert (once per day)
         if (isClosingSoon(now, settings.closing_hour, settings.closing_alert_minutes)) {
-          const existingClosing = alerts.find(
+          const existingClosing = alertsRef.current.find(
             (a) => a.alert_type === 'closing_soon' &&
             !a.is_read &&
             new Date(a.triggered_at).toDateString() === now.toDateString(),
@@ -169,14 +174,27 @@ export function InventoryAlertAgent() {
         checkIntervalRef.current = null;
       }
     };
-  }, [settings, alerts]);
+  }, [settings]);
 
   const handleToggleEnabled = async (enabled: boolean) => {
-    setSettings((prev) => prev ? { ...prev, enabled } : prev);
+    setSettings((prev) => {
+      if (!prev) {
+        return {
+          id: 1,
+          enabled,
+          breaktime_start: '15:00',
+          breaktime_end: '17:00',
+          closing_hour: 21,
+          closing_alert_minutes: 60,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return { ...prev, enabled };
+    });
     try {
       await updateAlertSettings({ enabled });
     } catch {
-      setSettings((prev) => prev ? { ...prev, enabled: !enabled } : prev);
+      setSettings((prev) => (prev ? { ...prev, enabled: !enabled } : prev));
     }
   };
 
@@ -996,3 +1014,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+
+export { InventoryAlertAgent }

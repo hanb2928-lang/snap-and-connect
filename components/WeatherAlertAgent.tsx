@@ -74,6 +74,11 @@ export function WeatherAlertAgent() {
   const [checking, setChecking] = useState(false);
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCheckRef = useRef(0);
+  const alertsRef = useRef<WeatherAlert[]>([]);
+
+  useEffect(() => {
+    alertsRef.current = alerts;
+  }, [alerts]);
 
   // Settings form state
   const [latInput, setLatInput] = useState('');
@@ -131,6 +136,8 @@ export function WeatherAlertAgent() {
         const weather = await fetchLiveWeather(
           settings.store_latitude!,
           settings.store_longitude!,
+          settings.cold_snap_threshold,
+          settings.heat_wave_threshold,
         );
         const condition = weather.is_snowing ? '눈' : weather.is_raining ? '비' : weather.is_cold ? '한파' : weather.is_hot ? '폭염' : '맑음';
         setCurrentWeather({ temp: Math.round(weather.temperature), condition });
@@ -140,7 +147,7 @@ export function WeatherAlertAgent() {
         if (alertData) {
           // Check if we already have an unread alert of the same type within last 2 hours
           const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-          const existing = alerts.find(
+          const existing = alertsRef.current.find(
             (a) => a.alert_type === alertData.type && !a.is_read && new Date(a.triggered_at) > twoHoursAgo,
           );
           if (!existing) {
@@ -174,10 +181,27 @@ export function WeatherAlertAgent() {
         checkIntervalRef.current = null;
       }
     };
-  }, [settings, alerts]);
+  }, [settings]);
 
   const handleToggleEnabled = async (enabled: boolean) => {
-    setSettings((prev) => (prev ? { ...prev, enabled } : prev));
+    setSettings((prev) => {
+      if (!prev) {
+        return {
+          id: 1,
+          enabled,
+          store_latitude: null,
+          store_longitude: null,
+          store_name: null,
+          rain_alert_enabled: true,
+          cold_snap_threshold: 0,
+          heat_wave_threshold: 35,
+          last_weather_check: null,
+          last_alert_type: null,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return { ...prev, enabled };
+    });
     try {
       await updateWeatherAlertSettings({ enabled });
     } catch {

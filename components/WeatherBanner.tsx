@@ -63,6 +63,8 @@ export function WeatherBanner() {
       const weather = await fetchLiveWeather(
         settings.store_latitude,
         settings.store_longitude,
+        settings.cold_snap_threshold,
+        settings.heat_wave_threshold,
       );
 
       const condition: WeatherCondition = weather.is_snowing

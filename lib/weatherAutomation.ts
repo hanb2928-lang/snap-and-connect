@@ -88,7 +88,7 @@ export function determineWeatherAlert(
     };
   }
 
-  if (weather.is_cold) {
+  if (weather.is_cold || weather.temperature <= settings.cold_snap_threshold) {
     return {
       type: 'cold_snap',
       title: '한파! 몸녹이는 메뉴 긴급 마케팅',
@@ -98,7 +98,7 @@ export function determineWeatherAlert(
     };
   }
 
-  if (weather.is_hot) {
+  if (weather.is_hot || weather.temperature >= settings.heat_wave_threshold) {
     return {
       type: 'heat_wave',
       title: '폭염! 시원한 메뉴 긴급 마케팅',
@@ -181,9 +181,17 @@ export async function deleteWeatherAlert(id: string): Promise<void> {
 }
 
 // Fetch live weather from the edge function
-export async function fetchLiveWeather(lat: number, lon: number): Promise<WeatherData> {
+export async function fetchLiveWeather(
+  lat: number,
+  lon: number,
+  coldThreshold?: number,
+  hotThreshold?: number,
+): Promise<WeatherData> {
   const { supabaseUrl, supabaseAnonKey } = await import('@/lib/supabase');
-  const url = `${supabaseUrl}/functions/v1/weather-check?lat=${lat}&lon=${lon}`;
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  if (coldThreshold !== undefined) params.set('cold', String(coldThreshold));
+  if (hotThreshold !== undefined) params.set('hot', String(hotThreshold));
+  const url = `${supabaseUrl}/functions/v1/weather-check?${params.toString()}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${supabaseAnonKey}`,
