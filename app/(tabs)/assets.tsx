@@ -35,6 +35,7 @@ import { getTrendingSuggestions } from '@/lib/trendingHashtags';
 import { ReviewReelAutomation } from '@/components/ReviewReelAutomation';
 import { InventoryAlertAgent } from '@/components/InventoryAlertAgent';
 import { WeatherAlertAgent } from '@/components/WeatherAlertAgent';
+import { WeatherMarketingHistory } from '@/components/WeatherMarketingHistory';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -509,6 +510,9 @@ export default function AssetsScreen() {
 
       {/* Weather Alert Agent Module */}
       <WeatherAlertAgent />
+
+      {/* Weather Marketing History Module */}
+      <WeatherMarketingHistory />
 
       {/* Sort/Filter Bar */}
       {assets.length > 0 && (

@@ -28,6 +28,10 @@ export interface WeatherAlert {
   is_acted_on: boolean;
   triggered_at: string;
   read_at: string | null;
+  visitor_count: number;
+  revenue_impact: number;
+  shortform_created: boolean;
+  result_note: string | null;
 }
 
 export interface WeatherData {
