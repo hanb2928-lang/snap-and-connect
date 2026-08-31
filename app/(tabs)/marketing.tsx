@@ -53,6 +53,7 @@ import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner'
 import { validateAffiliateUrl } from '@/lib/affiliate';
 import { extractProductMeta } from '@/lib/analysis';
 import { useVoiceRecording } from '@/hooks/useVoiceRecording';
+import { PillNavCard } from '@/components/PillNavCard';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
@@ -115,6 +116,7 @@ export default function MarketingScreen() {
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const [manualPromptOpen, setManualPromptOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [marketingStep, setMarketingStep] = useState<string | null>('store');
   const lastActionRef = useRef(0);
   const voice = useVoiceRecording();
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
@@ -437,12 +439,18 @@ export default function MarketingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Store Info Input Section */}
-        <View style={styles.storeSection}>
-          <View style={styles.storeHeader}>
-            <Store size={18} color={theme.colors.primary[300]} strokeWidth={2.5} />
-            <Text style={styles.storeTitle}>매장 홍보 정보</Text>
-          </View>
+        {/* Step 1: Store Info Input */}
+        <PillNavCard
+          icon={<Store size={22} color={theme.colors.primary[300]} strokeWidth={2.5} />}
+          title="매장 홍보 정보"
+          subtitle="가게 이름 · 대표 메뉴 · 특가 멘트 입력"
+          accentColor={theme.colors.primary[400]}
+          iconBg={theme.colors.primary[500] + '22'}
+          stepNumber={1}
+          completed={storeSaved}
+          expanded={marketingStep === 'store'}
+          onToggle={() => setMarketingStep(marketingStep === 'store' ? null : 'store')}
+        >
           <Text style={styles.storeDesc}>가게 이름과 대표 메뉴만 적어도 AI가 알아서 숏폼을 만들어드려요</Text>
 
           <View style={styles.inputGroup}>
@@ -494,14 +502,20 @@ export default function MarketingScreen() {
               {storeSaved ? '저장됨' : '매장 정보 저장'}
             </Text>
           </TouchableOpacity>
-        </View>
+        </PillNavCard>
 
-        {/* AI Store Promo Hook Chips */}
-        <View style={styles.hookSection}>
-          <View style={styles.hookHeader}>
-            <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.hookTitle}>AI 매장 홍보 훅 문구</Text>
-          </View>
+        {/* Step 2: AI Hook Selection */}
+        <PillNavCard
+          icon={<Sparkles size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="홍보 문구 및 템플릿 선택"
+          subtitle="AI 매장 훅 문구 · 직접 프롬프트 입력"
+          accentColor={theme.colors.accent[400]}
+          iconBg={theme.colors.accent[500] + '22'}
+          stepNumber={2}
+          completed={!!selectedHook || !!customPrompt.trim()}
+          expanded={marketingStep === 'hook'}
+          onToggle={() => setMarketingStep(marketingStep === 'hook' ? null : 'hook')}
+        >
           <Text style={styles.hookDesc}>사장님 매장에 맞는 오프닝 문구를 선택하세요</Text>
           <View style={styles.hookChipRow}>
             {STORE_HOOK_CHIPS.map((chip) => {
@@ -570,14 +584,20 @@ export default function MarketingScreen() {
               </Text>
             </View>
           )}
-        </View>
+        </PillNavCard>
 
-        {/* Voice Recording Section */}
-        <View style={styles.voiceSection}>
-          <View style={styles.voiceHeader}>
-            <Mic size={18} color={theme.colors.accent[400]} strokeWidth={2.5} />
-            <Text style={styles.voiceTitle}>내 목소리 얹기</Text>
-          </View>
+        {/* Step 3: Voice Recording */}
+        <PillNavCard
+          icon={<Mic size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="내 목소리 얹기 (선택)"
+          subtitle="짧은 녹음 → AI 잡음 제거 + BGM 믹싱"
+          accentColor={theme.colors.accent[400]}
+          iconBg={theme.colors.accent[500] + '22'}
+          stepNumber={3}
+          completed={!!voiceDataUrl}
+          expanded={marketingStep === 'voice'}
+          onToggle={() => setMarketingStep(marketingStep === 'voice' ? null : 'voice')}
+        >
           <Text style={styles.voiceDesc}>짧게 한마디하면 AI가 잡음 제거 + BGM 믹싱으로 프로급 숏폼을 만들어드려요</Text>
 
           {Platform.OS !== 'web' ? (
@@ -648,7 +668,7 @@ export default function MarketingScreen() {
               )}
             </>
           )}
-        </View>
+        </PillNavCard>
 
         {/* Ready summary */}
         {canGenerate && (

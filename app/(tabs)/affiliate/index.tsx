@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, Tag, RefreshCw } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -18,7 +18,7 @@ import { getUserSettings } from '@/lib/settings';
 import { fetchRevenueRecords } from '@/lib/revenue';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
-import { VerticalSectionCard } from '@/components/VerticalSectionCard';
+import { PillNavCard } from '@/components/PillNavCard';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { SkeletonList } from '@/components/Skeleton';
 import { CapturePreviewModal } from '@/components/CapturePreviewModal';
@@ -553,83 +553,23 @@ export default function AffiliateScreen() {
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            오늘 어떤 방식으로 제휴 상품을 발굴하시겠습니까? 아래에서 트랙을 선택하세요.
+            제작 순서대로 아래 카드를 펼쳐 진행하세요
           </Text>
         </View>
 
-        {/* 3 Track Entry Cards */}
-        <View style={styles.trackEntryGrid}>
-          <TouchableOpacity
-            style={styles.trackEntryCard}
-            onPress={() => scrollToStep(1)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
-              <Flame size={44} color={theme.colors.warning[400]} strokeWidth={2} />
-            </View>
-            <Text style={styles.trackEntryTitle}>실시간 떡상 꿀템 픽</Text>
-            <Text style={styles.trackEntryDesc}>쿠팡·아마존·알리 실시간 급상승 파트너스 키워드</Text>
-            <View style={styles.trackEntryTagRow}>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                <TrendingUp size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.warning[400] }]}>급상승</Text>
-              </View>
-              <Text style={styles.trackEntryArrow}>→</Text>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-                <Sparkles size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.warning[400] }]}>1클릭 파싱</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.trackEntryCard}
-            onPress={() => scrollToStep(1)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
-              <Link2 size={44} color={theme.colors.accent[400]} strokeWidth={2} />
-            </View>
-            <Text style={styles.trackEntryTitle}>URL / 제휴 링크 입력</Text>
-            <Text style={styles.trackEntryDesc}>클립보드 자동 인식 & 붙여넣기로 상품 정보 추출</Text>
-            <View style={styles.trackEntryTagRow}>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                <Link2 size={10} color={theme.colors.accent[300]} strokeWidth={2} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.accent[300] }]}>URL 입력</Text>
-              </View>
-              <Text style={styles.trackEntryArrow}>→</Text>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-                <Check size={10} color={theme.colors.accent[300]} strokeWidth={2.5} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.accent[300] }]}>자동 추출</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.trackEntryCard}
-            onPress={() => router.push('/affiliate/trending' as never)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.trackEntryIconWrap, { backgroundColor: theme.colors.primary[500] + '22' }]}>
-              <Tag size={44} color={theme.colors.primary[300]} strokeWidth={2} />
-            </View>
-            <Text style={styles.trackEntryTitle}>카테고리별 꿀조합</Text>
-            <Text style={styles.trackEntryDesc}>패션·뷰티·자취·IT 기기별 마케팅 훅과 묶음 상품</Text>
-            <View style={styles.trackEntryTagRow}>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <Tag size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.primary[300] }]}>카테고리</Text>
-              </View>
-              <Text style={styles.trackEntryArrow}>→</Text>
-              <View style={[styles.trackEntryTag, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <ShoppingBag size={10} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={[styles.trackEntryTagText, { color: theme.colors.primary[300] }]}>꿀조합</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Revenue summary */}
+        {/* Full-width pill nav cards in production order */}
+        <PillNavCard
+          icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="제휴 링크 입력"
+          subtitle="URL 붙여넣기 · 클립보드 자동 인식 · 상품 정보 추출"
+          accentColor={theme.colors.accent[400]}
+          iconBg={theme.colors.accent[500] + '22'}
+          stepNumber={1}
+          expanded={expandedStep === 'affiliate'}
+          completed={completedSteps.has('affiliate')}
+          onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
+        >
+          {/* Revenue summary */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryLeft}>
             <TrendingUp size={20} color={theme.colors.success[400]} strokeWidth={2} />
@@ -676,21 +616,7 @@ export default function AffiliateScreen() {
           }}
         />
 
-        {/* STEP 1: Affiliate Link Connection */}
-        <View
-          ref={(ref) => { stepRefs.current[1] = ref; }}
-          collapsable={false}
-        >
-        <VerticalSectionCard
-          icon={<Link2 size={24} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="제휴 링크 연결"
-          desc="어느 상품을 홍보할지 제휴 링크를 먼저 연결하세요. 상품 정보와 이미지가 자동으로 추출됩니다."
-          iconBg={theme.colors.accent[500] + '22'}
-          accentColor={STEP_META.affiliate.color}
-          completed={completedSteps.has('affiliate')}
-          expanded={expandedStep === 'affiliate'}
-          onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
-        >
+
           <View style={styles.affiliateHintBox}>
             <Text style={styles.affiliateHintText}>
               제휴 플랫폼을 선택하고 링크를 붙여넣으세요. 파트너스 ID가 설정되어 있으면 링크에 자동으로 추적 코드가 포함됩니다.
@@ -918,20 +844,30 @@ export default function AffiliateScreen() {
               </View>
             </View>
           )}
-        </VerticalSectionCard>
-        </View>
+        </PillNavCard>
+
+        {/* Quick nav: Trending products */}
+        <PillNavCard
+          icon={<Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="실시간 꿀템 픽"
+          subtitle="급상승 키워드 · 파트너스 1클릭 파싱 · 카테고리별 꿀조합"
+          accentColor={theme.colors.warning[400]}
+          iconBg={theme.colors.warning[500] + '22'}
+          onPress={() => router.push('/affiliate/trending' as never)}
+        />
 
         {/* STEP 2: AI Analysis & Image */}
         <View
           ref={(ref) => { stepRefs.current[2] = ref; }}
           collapsable={false}
-        >
-        <VerticalSectionCard
-          icon={<ScanSearch size={24} color={theme.colors.success[400]} strokeWidth={2.5} />}
+        />
+        <PillNavCard
+          icon={<ScanSearch size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
           title="AI 분석 및 이미지 생성"
-          desc="제휴 링크에서 추출된 상품 이미지로 AI 분석을 진행합니다. 내 사진으로 교체하거나 AI 가상 컷·피팅으로 더 다양한 이미지를 만들 수 있습니다."
+          subtitle="상품 이미지 AI 분석 · 내 사진 교체 · 가상 컷·피팅"
+          accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
-          accentColor={STEP_META.analyze.color}
+          stepNumber={2}
           completed={completedSteps.has('analyze')}
           expanded={expandedStep === 'analyze'}
           onToggle={() => setExpandedStep(expandedStep === 'analyze' ? null : 'analyze')}
@@ -1052,20 +988,20 @@ export default function AffiliateScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </VerticalSectionCard>
-        </View>
+        </PillNavCard>
 
         {/* STEP 3: Content & Template Editing */}
         <View
           ref={(ref) => { stepRefs.current[3] = ref; }}
           collapsable={false}
-        >
-        <VerticalSectionCard
-          icon={<Palette size={24} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+        />
+        <PillNavCard
+          icon={<Palette size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
           title="콘텐츠 및 템플릿 편집"
-          desc="AI가 스타일·음성·해시태그를 자동으로 설정했어요. 버튼을 눌러 바로 제작하거나, 아래에서 직접 수정할 수 있어요."
+          subtitle="AI 자동 추천 · 스타일·음성·해시태그 설정 · 문구 입력"
+          accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
-          accentColor={STEP_META.content.color}
+          stepNumber={3}
           completed={completedSteps.has('content')}
           expanded={expandedStep === 'content'}
           onToggle={() => setExpandedStep(expandedStep === 'content' ? null : 'content')}
@@ -1220,20 +1156,20 @@ export default function AffiliateScreen() {
               <Text style={styles.contentTemplateBtnText}>보관함 보기</Text>
             </TouchableOpacity>
           </View>
-        </VerticalSectionCard>
-        </View>
+        </PillNavCard>
 
         {/* STEP 4: Platform Upload */}
         <View
           ref={(ref) => { stepRefs.current[4] = ref; }}
           collapsable={false}
-        >
-        <VerticalSectionCard
-          icon={<Share2 size={24} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="플랫폼 업로드 및 공정위 문구 확인"
-          desc="제휴 링크가 자동으로 삽입된 콘텐츠를 릴스·쇼츠·틱톡·블로그에 업로드하세요."
+        />
+        <PillNavCard
+          icon={<Share2 size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
+          title="플랫폼 업로드 및 공정위 문구"
+          subtitle="릴스·쇼츠·틱톡·블로그 업로드 · 공정위 문구 자동 추가"
+          accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
-          accentColor={STEP_META.upload.color}
+          stepNumber={4}
           completed={completedSteps.has('upload')}
           expanded={expandedStep === 'upload'}
           onToggle={() => setExpandedStep(expandedStep === 'upload' ? null : 'upload')}
@@ -1486,8 +1422,7 @@ export default function AffiliateScreen() {
               </Text>
             </View>
           )}
-        </VerticalSectionCard>
-        </View>
+        </PillNavCard>
 
         <TouchableOpacity
           style={styles.marketingCtaButton}
@@ -1738,62 +1673,6 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
     borderWidth: 1.5,
     borderColor: theme.glass.border,
-  },
-  trackEntryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-  },
-  trackEntryCard: {
-    width: '48.5%',
-    backgroundColor: theme.glass.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    borderColor: theme.glass.border,
-    padding: theme.spacing.md,
-    gap: 6,
-  },
-  trackEntryIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  trackEntryTitle: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  trackEntryDesc: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 15,
-  },
-  trackEntryTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  trackEntryTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: theme.radius.sm,
-  },
-  trackEntryTagText: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.semiBold,
-  },
-  trackEntryArrow: {
-    fontSize: 10,
-    color: theme.colors.dark.textFaint,
   },
   summaryLeft: {
     flexDirection: 'row',
