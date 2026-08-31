@@ -53,6 +53,29 @@ const UPLOAD_PLATFORMS = [
   { key: 'twitter', label: '트위터/스레드', icon: Hash, color: '#1DA1F2' },
 ] as const;
 
+const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
+  instagram: [
+    { key: 'reels', label: '릴스' },
+    { key: 'feed', label: '피드 게시물' },
+    { key: 'story', label: '스토리' },
+  ],
+  blog: [
+    { key: 'category_post', label: '카테고리 포스트' },
+    { key: 'review', label: '리뷰 글' },
+    { key: 'promotion', label: '프로모션 글' },
+  ],
+  youtube: [
+    { key: 'shorts', label: '쇼츠' },
+    { key: 'community', label: '커뮤니티 탭' },
+    { key: 'video', label: '일반 영상' },
+  ],
+  twitter: [
+    { key: 'thread', label: '스레드' },
+    { key: 'tweet', label: '일반 트윗' },
+    { key: 'reply', label: '답글' },
+  ],
+};
+
 const CONTENT_TYPES = [
   { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hint: '제품을 한 줄로 매력적으로 표현하세요' },
   { key: 'hashtag', label: '해시태그', icon: Hash, color: theme.colors.accent[400], hint: '관련 키워드를 # 과 함께 나열하세요' },
@@ -104,7 +127,8 @@ export default function AffiliateScreen() {
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
-  const [selectedUploadPlatforms, setSelectedUploadPlatforms] = useState<Set<string>>(new Set());
+  const [selectedUploadPlatform, setSelectedUploadPlatform] = useState<string | null>(null);
+  const [selectedBoard, setSelectedBoard] = useState<string | null>(null);
   const [manualUploadPlatforms, setManualUploadPlatforms] = useState<{ key: string; label: string }[]>([]);
   const [manualPlatformName, setManualPlatformName] = useState('');
   const [extracting, setExtracting] = useState(false);
@@ -663,22 +687,18 @@ export default function AffiliateScreen() {
           expanded={expandedStep === 'platformSelect'}
           onToggle={() => setExpandedStep(expandedStep === 'platformSelect' ? null : 'platformSelect')}
         >
-          <Text style={styles.sectionLabel}>주요 플랫폼</Text>
+          <Text style={styles.sectionLabel}>주요 플랫폼 (1개 선택)</Text>
           <View style={styles.uploadGrid}>
             {UPLOAD_PLATFORMS.map((p) => {
               const Icon = p.icon;
-              const isSelected = selectedUploadPlatforms.has(p.key);
+              const isSelected = selectedUploadPlatform === p.key;
               return (
                 <TouchableOpacity
                   key={p.key}
                   style={[styles.uploadCard, isSelected && { borderColor: p.color, backgroundColor: p.color + '15' }]}
                   onPress={() => {
-                    setSelectedUploadPlatforms((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(p.key)) next.delete(p.key);
-                      else next.add(p.key);
-                      return next;
-                    });
+                    setSelectedUploadPlatform((prev) => (prev === p.key ? null : p.key));
+                    setSelectedBoard(null);
                   }}
                   activeOpacity={0.7}
                 >
@@ -686,7 +706,7 @@ export default function AffiliateScreen() {
                     <Icon size={20} color={p.color} strokeWidth={2} />
                   </View>
                   <Text style={styles.uploadLabel}>{p.label}</Text>
-                  <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: p.color }]}>
+                  <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: p.color, borderColor: p.color }]}>
                     {isSelected ? (
                       <Check size={12} color="#fff" strokeWidth={2.5} />
                     ) : (
@@ -699,18 +719,14 @@ export default function AffiliateScreen() {
           </View>
 
           {manualUploadPlatforms.map((mp) => {
-            const isSelected = selectedUploadPlatforms.has(mp.key);
+            const isSelected = selectedUploadPlatform === mp.key;
             return (
               <TouchableOpacity
                 key={mp.key}
                 style={[styles.manualPlatformRow, isSelected && { borderColor: theme.colors.accent[400] }]}
                 onPress={() => {
-                  setSelectedUploadPlatforms((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(mp.key)) next.delete(mp.key);
-                    else next.add(mp.key);
-                    return next;
-                  });
+                  setSelectedUploadPlatform((prev) => (prev === mp.key ? null : mp.key));
+                  setSelectedBoard(null);
                 }}
                 activeOpacity={0.7}
               >
@@ -718,7 +734,7 @@ export default function AffiliateScreen() {
                   <Share2 size={18} color={theme.colors.accent[300]} strokeWidth={2} />
                 </View>
                 <Text style={styles.manualPlatformLabel}>{mp.label}</Text>
-                <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: theme.colors.accent[400] }]}>
+                <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: theme.colors.accent[400], borderColor: theme.colors.accent[400] }]}>
                   {isSelected ? (
                     <Check size={12} color="#fff" strokeWidth={2.5} />
                   ) : (
@@ -728,11 +744,10 @@ export default function AffiliateScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     setManualUploadPlatforms((prev) => prev.filter((x) => x.key !== mp.key));
-                    setSelectedUploadPlatforms((prev) => {
-                      const next = new Set(prev);
-                      next.delete(mp.key);
-                      return next;
-                    });
+                    if (isSelected) {
+                      setSelectedUploadPlatform(null);
+                      setSelectedBoard(null);
+                    }
                   }}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -756,7 +771,6 @@ export default function AffiliateScreen() {
                 if (!manualPlatformName.trim()) return;
                 const key = 'manual_' + Date.now();
                 setManualUploadPlatforms((prev) => [...prev, { key, label: manualPlatformName.trim() }]);
-                setSelectedUploadPlatforms((prev) => { const next = new Set(prev); next.add(key); return next; });
                 setManualPlatformName('');
               }}
               disabled={!manualPlatformName.trim()}
@@ -767,11 +781,48 @@ export default function AffiliateScreen() {
             </TouchableOpacity>
           </View>
 
-          {selectedUploadPlatforms.size > 0 && (
+          {selectedUploadPlatform && PLATFORM_BOARDS[selectedUploadPlatform] && (
+            <>
+              <Text style={[styles.sectionLabel, { marginTop: theme.spacing.md }]}>
+                업로드 게시판 선택
+              </Text>
+              <View style={styles.boardListWrap}>
+                {PLATFORM_BOARDS[selectedUploadPlatform].map((b) => {
+                  const isBoardSelected = selectedBoard === b.key;
+                  return (
+                    <TouchableOpacity
+                      key={b.key}
+                      style={[styles.boardChip, isBoardSelected && styles.boardChipActive]}
+                      onPress={() => setSelectedBoard(isBoardSelected ? null : b.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[styles.boardChipText, isBoardSelected && styles.boardChipTextActive]}
+                      >
+                        {b.label}
+                      </Text>
+                      {isBoardSelected && <Check size={13} color="#fff" strokeWidth={2.5} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {selectedUploadPlatform && (!PLATFORM_BOARDS[selectedUploadPlatform]) && (
+            <Text style={[styles.sectionLabel, { marginTop: theme.spacing.md }]}>
+              이 플랫폼은 게시판 선택이 없습니다. 바로 업로드할 수 있습니다.
+            </Text>
+          )}
+
+          {selectedUploadPlatform && (
             <View style={styles.platformSummaryBox}>
               <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
               <Text style={styles.platformSummaryText}>
-                {selectedUploadPlatforms.size}개 플랫폼 선택됨
+                {UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label
+                  || manualUploadPlatforms.find((mp) => mp.key === selectedUploadPlatform)?.label
+                  || '플랫폼'} 선택됨
+                {selectedBoard ? ` · ${PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard)?.label ?? ''}` : ''}
               </Text>
             </View>
           )}
@@ -2556,6 +2607,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.success[400],
+  },
+  boardListWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  boardChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  boardChipActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[500],
+  },
+  boardChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  boardChipTextActive: {
+    color: '#fff',
   },
   uploadDoneBadge: {
     flexDirection: 'row',
