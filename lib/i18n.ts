@@ -44,7 +44,7 @@ const ko: TranslationDict = {
   'tab.camera': '카메라',
   'tab.affiliate': '제휴쇼핑',
   'tab.marketing': '마케팅',
-  'tab.create': '숏폼 제작',
+  'tab.create': '마케팅',
   'tab.library': '보관함',
   'tab.assets': '제작물',
   'tab.analytics': '분석',
