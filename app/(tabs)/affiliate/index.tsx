@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2 } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -1104,121 +1104,102 @@ export default function AffiliateScreen() {
           expanded={expandedStep === 'analyze'}
           onToggle={() => setExpandedStep(expandedStep === 'analyze' ? null : 'analyze')}
         >
-          {selectedImage && mediaType === 'photo' ? (
-            <>
-              {/* Image preview + source switcher */}
-              <View style={styles.mediaPreviewWrap}>
+          {/* Video preview area */}
+          <View style={styles.videoPreviewWrap}>
+            {imagePreviewUri ? (
+              <>
                 <Image
-                  source={{ uri: imagePreviewUri ?? '' }}
-                  style={styles.mediaPreview}
+                  source={{ uri: imagePreviewUri }}
+                  style={styles.videoPreviewThumb}
                   resizeMode="cover"
                 />
-                {imageSource === 'product' && (
-                  <View style={styles.imageSourceBadge}>
-                    <Check size={10} color="#fff" strokeWidth={2.5} />
-                    <Text style={styles.imageSourceBadgeText}>상품 이미지</Text>
-                  </View>
-                )}
-                {imageSource === 'user' && (
-                  <View style={[styles.imageSourceBadge, { backgroundColor: theme.colors.accent[500] + 'CC' }]}>
-                    <ImageIcon size={10} color="#fff" strokeWidth={2.5} />
-                    <Text style={styles.imageSourceBadgeText}>내 사진</Text>
-                  </View>
-                )}
-              </View>
-
-              <TouchableOpacity style={styles.mediaBtn} onPress={handlePickPhoto} activeOpacity={0.7} disabled={mediaLoading}>
-                {mediaLoading ? (
-                  <Loader size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-                ) : (
-                  <ImageIcon size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-                )}
-                <Text style={styles.mediaBtnText}>내 사진으로 교체</Text>
-              </TouchableOpacity>
-
-              {/* 2a: AI 이미지 생성 도구 (선택) */}
-              <Text style={styles.aiToolSectionLabel}>AI 이미지 생성 도구 (선택)</Text>
-              <Text style={styles.aiToolSectionDesc}>
-                상품 이미지나 내 사진으로 AI 분석을 진행할 수 있습니다. 마음에 드는 이미지를 선택하면 그 이미지로 AI 분석이 진행됩니다.
-              </Text>
-
-              {aiGeneratedUrl && (
-                <View style={styles.aiGeneratedNotice}>
-                  <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  <Text style={styles.aiGeneratedNoticeText}>AI 생성 이미지가 적용되었습니다. 아래에서 AI 분석을 시작하면 이 이미지로 분석합니다.</Text>
+                <View style={styles.videoPreviewOverlay}>
+                  <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
+                    <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                  </TouchableOpacity>
                 </View>
-              )}
-
-              {/* 2b: AI 분석 시작 */}
-              <View style={styles.aiToolDivider} />
-
-              <TouchableOpacity
-                style={styles.analyzeBtn}
-                onPress={handleAnalyzePhoto}
-                disabled={analyzing}
-                activeOpacity={0.85}
-              >
-                {analyzing ? (
-                  <Loader size={18} color="#fff" strokeWidth={2} />
-                ) : (
-                  <ScanSearch size={18} color="#fff" strokeWidth={2} />
-                )}
-                <Text style={styles.analyzeBtnText}>
-                  {analyzing
-                    ? 'AI 분석 중...'
-                    : aiGeneratedUrl
-                      ? '선택한 이미지로 AI 분석 시작'
-                      : 'AI 분석 시작하기'}
+                <View style={styles.videoSpecBadge}>
+                  <Clapperboard size={11} color="#fff" strokeWidth={2} />
+                  <Text style={styles.videoSpecBadgeText}>
+                    {viralAnalysisResult
+                      ? `${viralAnalysisResult.specs.ratio} · ${viralAnalysisResult.specs.maxDuration}`
+                      : selectedUploadPlatform && selectedBoard
+                        ? `${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.ratio ?? '16:9'} · ${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.maxDuration ?? '60초'}`
+                        : '9:16 · 60초'}
+                  </Text>
+                </View>
+                <View style={styles.videoTimelineBar}>
+                  <View style={styles.videoTimelineProgress} />
+                </View>
+                <View style={styles.videoTimelineLabels}>
+                  <Text style={styles.videoTimelineLabel}>0:00</Text>
+                  <Text style={styles.videoTimelineLabel}>
+                    {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.videoPreviewEmpty}>
+                <Clapperboard size={32} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
+                <Text style={styles.videoPreviewEmptyText}>
+                  1단계에서 제휴 링크를 연결하면 미리보기 영상이 생성됩니다
                 </Text>
-              </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
-              {analyzeError && (
-                <View style={styles.analyzeErrorBox}>
-                  <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
-                </View>
-              )}
+          {/* AI 분석 시작 */}
+          <TouchableOpacity
+            style={styles.analyzeBtn}
+            onPress={handleAnalyzePhoto}
+            disabled={analyzing || !selectedImage}
+            activeOpacity={0.85}
+          >
+            {analyzing ? (
+              <Loader size={18} color="#fff" strokeWidth={2} />
+            ) : (
+              <ScanSearch size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.analyzeBtnText}>
+              {analyzing
+                ? 'AI 분석 중...'
+                : selectedImage
+                  ? 'AI 분석 시작하기'
+                  : '제휴 링크를 먼저 연결해주세요'}
+            </Text>
+          </TouchableOpacity>
 
-              {(completedSteps.has('analyze') || aiRecommendLoading) && (
-                aiRecommendLoading ? (
-                  <View style={styles.aiRecommendBadge}>
-                    <Loader size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={styles.aiRecommendText}>AI가 최적의 스타일을 분석하는 중...</Text>
-                  </View>
-                ) : aiBundle ? (
-                  <View style={styles.aiRecommendBundleBox}>
-                    <View style={styles.aiRecommendBadge}>
-                      <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                      <Text style={styles.aiRecommendText}>
-                        AI 추천: {aiBundle.templateLabel} · {aiBundle.style.cardStyle} · {aiBundle.style.duration}초
-                      </Text>
-                    </View>
-                    <Text style={styles.aiRecommendDetail}>{aiBundle.summary}</Text>
-                    <Text style={styles.aiRecommendReason}>{aiBundle.style.reason}</Text>
-                  </View>
-                ) : aiRecommendation ? (
-                  <View style={styles.aiRecommendBadge}>
-                    <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                    <Text style={styles.aiRecommendText}>
-                      AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
-                    </Text>
-                  </View>
-                ) : null
-              )}
-            </>
-          ) : (
-            <View style={styles.analyzeWaitingBox}>
-              <Text style={styles.analyzeWaitingText}>
-                1단계에서 제휴 링크를 먼저 연결하면 상품 이미지가 자동으로 설정됩니다. 내 사진을 직접 사용하려면 아래 버튼을 누르세요.
-              </Text>
-              <TouchableOpacity style={styles.mediaBtn} onPress={handlePickPhoto} activeOpacity={0.7} disabled={mediaLoading}>
-                {mediaLoading ? (
-                  <Loader size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-                ) : (
-                  <ImageIcon size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-                )}
-                <Text style={styles.mediaBtnText}>내 사진 불러오기</Text>
-              </TouchableOpacity>
+          {analyzeError && (
+            <View style={styles.analyzeErrorBox}>
+              <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
             </View>
+          )}
+
+          {(completedSteps.has('analyze') || aiRecommendLoading) && (
+            aiRecommendLoading ? (
+              <View style={styles.aiRecommendBadge}>
+                <Loader size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.aiRecommendText}>AI가 최적의 스타일을 분석하는 중...</Text>
+              </View>
+            ) : aiBundle ? (
+              <View style={styles.aiRecommendBundleBox}>
+                <View style={styles.aiRecommendBadge}>
+                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.aiRecommendText}>
+                    AI 추천: {aiBundle.templateLabel} · {aiBundle.style.cardStyle} · {aiBundle.style.duration}초
+                  </Text>
+                </View>
+                <Text style={styles.aiRecommendDetail}>{aiBundle.summary}</Text>
+                <Text style={styles.aiRecommendReason}>{aiBundle.style.reason}</Text>
+              </View>
+            ) : aiRecommendation ? (
+              <View style={styles.aiRecommendBadge}>
+                <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.aiRecommendText}>
+                  AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
+                </Text>
+              </View>
+            ) : null
           )}
         </PillNavCard>
 
@@ -2243,6 +2224,99 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
+  },
+  videoPreviewWrap: {
+    position: 'relative',
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    aspectRatio: 9 / 16,
+    maxHeight: 380,
+    marginBottom: theme.spacing.md,
+    backgroundColor: '#000',
+  },
+  videoPreviewThumb: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    opacity: 0.7,
+  },
+  videoPreviewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlayBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  videoSpecBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(10,15,30,0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: theme.radius.full,
+  },
+  videoSpecBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  videoTimelineBar: {
+    position: 'absolute',
+    bottom: 28,
+    left: 12,
+    right: 12,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+  },
+  videoTimelineProgress: {
+    width: '35%',
+    height: '100%',
+    backgroundColor: theme.colors.success[400],
+    borderRadius: 2,
+  },
+  videoTimelineLabels: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  videoTimelineLabel: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  videoPreviewEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    padding: theme.spacing.lg,
+  },
+  videoPreviewEmptyText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   analyzeWaitingText: {
     fontSize: 13,
