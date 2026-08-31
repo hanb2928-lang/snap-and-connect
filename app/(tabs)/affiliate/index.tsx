@@ -36,7 +36,6 @@ import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
-import { TrendingProductCuration } from '@/components/TrendingProductCuration';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
@@ -569,59 +568,6 @@ export default function AffiliateScreen() {
           completed={completedSteps.has('affiliate')}
           onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
         >
-          {/* Revenue summary */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryLeft}>
-            <TrendingUp size={20} color={theme.colors.success[400]} strokeWidth={2} />
-            <View>
-              <Text style={styles.summaryLabel}>총 수익</Text>
-              <Text style={styles.summaryValue}>
-                {totalRevenue.toLocaleString('ko-KR')}원
-              </Text>
-            </View>
-          </View>
-          <View style={styles.summaryRight}>
-            <Text style={styles.summaryCount}>{revenue.length}건</Text>
-            <Text style={styles.summaryCountLabel}>최근 기록</Text>
-          </View>
-        </View>
-
-        {/* Trending product curation — top 10 viral affiliate products */}
-        <TrendingProductCuration
-          onSelectProduct={(product) => {
-            setAffiliateUrl(product.link);
-            const lower = (product.marketplace || '').toLowerCase();
-            if (lower.includes('coupang')) setSelectedPlatform('Coupang');
-            else if (lower.includes('toss')) setSelectedPlatform('Toss');
-            else if (lower.includes('naver')) setSelectedPlatform('BrandConnect');
-            setProductMeta({
-              productName: product.name,
-              description: '',
-              price: product.price,
-              image: product.imageUrl,
-              platform: product.marketplace || '',
-              brand: '',
-            });
-            if (product.imageUrl) {
-              import('@/lib/base64').then(({ urlToDataUrl }) => {
-                urlToDataUrl(product.imageUrl).then((dataUrl) => {
-                  setSelectedImage(cleanBase64(dataUrl));
-                  setSelectedImageMime('image/jpeg');
-                  setMediaType('photo');
-                  setImageSource('product');
-                }).catch(() => {});
-              }).catch(() => {});
-            }
-            markCompleted('affiliate');
-          }}
-        />
-
-
-          <View style={styles.affiliateHintBox}>
-            <Text style={styles.affiliateHintText}>
-              제휴 플랫폼을 선택하고 링크를 붙여넣으세요. 파트너스 ID가 설정되어 있으면 링크에 자동으로 추적 코드가 포함됩니다.
-            </Text>
-          </View>
 
           {/* Platform quick select */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.platformChipsScroll}>
@@ -1663,47 +1609,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     paddingHorizontal: theme.spacing.md,
   },
-  summaryCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.glass.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md + 4,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1.5,
-    borderColor: theme.glass.border,
-  },
-  summaryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.success[400],
-    marginTop: 2,
-  },
-  summaryRight: {
-    alignItems: 'flex-end',
-  },
-  summaryCount: {
-    fontSize: 18,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  summaryCountLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginTop: 2,
-  },
   mediaPreviewWrap: {
     position: 'relative',
     borderRadius: theme.radius.md,
@@ -1751,20 +1656,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
-  },
-  affiliateHintBox: {
-    backgroundColor: theme.colors.accent[500] + '10',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm + 2,
-    marginBottom: theme.spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.accent[400] + '60',
-  },
-  affiliateHintText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 17,
   },
   analyzeBtn: {
     flexDirection: 'row',
