@@ -127,7 +127,16 @@ type ViralAnalysisResult = {
   hooks: ViralHook[];
   specs: { ratio: string; resolution: string; maxDuration: string; format: string };
   topReference: { title: string; views: string; revenue: string };
+  mediaMode: 'video' | 'image';
 };
+
+function detectMediaMode(format: string): 'video' | 'image' {
+  const upper = format.toUpperCase();
+  if (upper.includes('JPG') || upper.includes('PNG') || upper.includes('GIF') || upper.includes('정지형')) {
+    return 'image';
+  }
+  return 'video';
+}
 
 function generateViralAnalysis(platform: string, board: string, productUrl: string): ViralAnalysisResult {
   const specs = BOARD_VIDEO_SPECS[platform]?.[board] ?? { ratio: '16:9', resolution: '1920×1080', maxDuration: '60초', format: 'MP4' };
@@ -194,7 +203,7 @@ function generateViralAnalysis(platform: string, board: string, productUrl: stri
   const refKey = `${platformPrefix[platform] ?? platform}_${board}`;
   const topReference = referenceMap[refKey] ?? { title: '상위 1% 제휴 영상', views: '1M+', revenue: '월 300만원+' };
 
-  return { hooks: baseHooks, specs, topReference };
+  return { hooks: baseHooks, specs, topReference, mediaMode: detectMediaMode(specs.format) };
 }
 
 const CONTENT_TYPES = [
@@ -256,6 +265,7 @@ export default function AffiliateScreen() {
   const [viralAnalysisResult, setViralAnalysisResult] = useState<ViralAnalysisResult | null>(null);
   const [videoPreviewGenerating, setVideoPreviewGenerating] = useState(false);
   const [videoPreviewScenes, setVideoPreviewScenes] = useState<{ time: string; hook: string; desc: string }[] | null>(null);
+  const [previewMediaMode, setPreviewMediaMode] = useState<'video' | 'image'>('video');
   const videoPreviewProgress = useSharedValue(0);
   const [videoRendering, setVideoRendering] = useState(false);
   const [videoRenderComplete, setVideoRenderComplete] = useState(false);
@@ -1072,6 +1082,7 @@ export default function AffiliateScreen() {
                         setVideoPreviewGenerating(true);
                         setVideoPreviewScenes(null);
                         setVideoRenderComplete(false);
+                        setPreviewMediaMode(viralAnalysisResult.mediaMode);
                         videoPreviewProgress.value = 0;
                         videoPreviewProgress.value = withTiming(1, {
                           duration: 2200,
@@ -1098,7 +1109,9 @@ export default function AffiliateScreen() {
                         <ScanSearch size={16} color="#fff" strokeWidth={2} />
                       )}
                       <Text style={styles.viralPreviewBtnText}>
-                        {videoPreviewGenerating ? '미리보기 생성 중...' : '분석 영상 미리보기 생성하기'}
+                        {videoPreviewGenerating
+                          ? (viralAnalysisResult.mediaMode === 'image' ? '이미지 생성 중...' : '미리보기 생성 중...')
+                          : (viralAnalysisResult.mediaMode === 'image' ? '분석 이미지 미리보기 생성하기' : '분석 영상 미리보기 생성하기')}
                       </Text>
                       <ArrowRight size={14} color="#fff" strokeWidth={2} />
                     </TouchableOpacity>
@@ -1163,21 +1176,27 @@ export default function AffiliateScreen() {
               {videoPreviewGenerating ? (
                 <View style={styles.videoPreviewGenWrap}>
                   <Loader size={28} color="#fff" strokeWidth={2} />
-                  <Text style={styles.videoPreviewGenText}>심리 자극 요소 기반 스토리보드 생성 중...</Text>
+                  <Text style={styles.videoPreviewGenText}>
+                    {previewMediaMode === 'image'
+                      ? '심리 자극 요소 기반 이미지 스토리보드 생성 중...'
+                      : '심리 자극 요소 기반 스토리보드 생성 중...'}
+                  </Text>
                 </View>
               ) : videoRendering ? (
                 <View style={styles.videoPreviewGenWrap}>
                   <Loader size={28} color="#fff" strokeWidth={2} />
-                  <Text style={styles.videoPreviewGenText}>스토리보드 기반 영상 렌더링 중...</Text>
+                  <Text style={styles.videoPreviewGenText}>
+                    {previewMediaMode === 'image' ? '스토리보드 기반 이미지 렌더링 중...' : '스토리보드 기반 영상 렌더링 중...'}
+                  </Text>
                 </View>
               ) : videoRenderComplete ? (
                 <View style={styles.videoSceneWrap}>
                   <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
-                  <Text style={styles.videoSceneBadgeText}>영상 생성 완료</Text>
+                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료'}</Text>
                 </View>
               ) : videoPreviewScenes ? (
                 <View style={styles.videoSceneWrap}>
-                  <Text style={styles.videoSceneBadgeText}>스토리보드 미리보기</Text>
+                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 스토리보드 미리보기' : '스토리보드 미리보기'}</Text>
                 </View>
               ) : imagePreviewUri ? (
                 <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
@@ -1220,9 +1239,13 @@ export default function AffiliateScreen() {
           {/* Storyboard scenes from viral hooks */}
           {videoPreviewScenes && videoPreviewScenes.length > 0 && (
             <View style={styles.videoStoryboardWrap}>
-              <Text style={styles.videoStoryboardTitle}>심리 자극 요소 기반 스토리보드</Text>
+              <Text style={styles.videoStoryboardTitle}>
+                {previewMediaMode === 'image' ? '심리 자극 요소 기반 이미지 스토리보드' : '심리 자극 요소 기반 스토리보드'}
+              </Text>
               <Text style={styles.videoStoryboardDesc}>
-                상위 1% 수익화 영상 패턴을 적용한 장면 구성
+                {previewMediaMode === 'image'
+                  ? '상위 1% 수익화 이미지 패턴을 적용한 장면 구성'
+                  : '상위 1% 수익화 영상 패턴을 적용한 장면 구성'}
               </Text>
               {videoPreviewScenes.map((scene, i) => (
                 <View key={i} style={styles.videoSceneCard}>
@@ -1265,10 +1288,14 @@ export default function AffiliateScreen() {
                 ) : videoRenderComplete ? (
                   <Check size={16} color="#fff" strokeWidth={2.5} />
                 ) : (
-                  <Film size={16} color="#fff" strokeWidth={2} />
+                  previewMediaMode === 'image' ? <ImageIcon size={16} color="#fff" strokeWidth={2} /> : <Film size={16} color="#fff" strokeWidth={2} />
                 )}
                 <Text style={styles.renderVideoBtnText}>
-                  {videoRendering ? '영상 렌더링 중...' : videoRenderComplete ? '영상 생성 완료' : '스토리보드로 영상 만들기'}
+                  {videoRendering
+                    ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '영상 렌더링 중...')
+                    : videoRenderComplete
+                      ? (previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료')
+                      : (previewMediaMode === 'image' ? '스토리보드로 이미지 만들기' : '스토리보드로 영상 만들기')}
                 </Text>
               </TouchableOpacity>
 
@@ -1283,7 +1310,9 @@ export default function AffiliateScreen() {
               {videoRenderComplete && (
                 <View style={styles.renderCompleteBox}>
                   <Text style={styles.renderCompleteText}>
-                    심리 자극 요소 {videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.
+                    {previewMediaMode === 'image'
+                      ? `심리 자극 요소 ${videoPreviewScenes.length}개 요소가 적용된 이미지가 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`
+                      : `심리 자극 요소 ${videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`}
                   </Text>
                 </View>
               )}
