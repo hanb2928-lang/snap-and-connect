@@ -575,7 +575,7 @@ export default function AffiliateScreen() {
         {/* Full-width pill nav cards in production order */}
         <PillNavCard
           icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="제휴 링크 추가하기"
+          title="제휴 상품 선택하기"
           subtitle="URL 붙여넣기 · 클립보드 자동 인식 · 상품 정보 추출"
           accentColor={theme.colors.accent[400]}
           iconBg={theme.colors.accent[500] + '22'}
@@ -584,8 +584,6 @@ export default function AffiliateScreen() {
           completed={completedSteps.has('affiliate')}
           onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
         >
-
-          <Text style={styles.platformListLabel}>제휴플랫폼 링크 연결하기</Text>
 
           {/* Platform list (collapsible) */}
           <PlatformListSection
