@@ -920,9 +920,8 @@ export default function CameraScreen() {
           </View>
         </View>
 
-        {/* Bottom controls row: Gallery | Shutter | Grid */}
+        {/* Top row: Gallery (left) | Grid (right) */}
         <View style={styles.bottomControlsRow}>
-          {/* Gallery thumbnail (left) */}
           <TouchableOpacity
             style={styles.galleryThumb}
             onPress={handlePickImage}
@@ -932,7 +931,21 @@ export default function CameraScreen() {
             <ImageIcon size={22} color="#fff" strokeWidth={2} />
           </TouchableOpacity>
 
-          {/* Shutter button (center) */}
+          <TouchableOpacity
+            style={styles.gridToggleBtn}
+            onPress={() => setGridVisible((g) => !g)}
+            activeOpacity={0.7}
+          >
+            {gridVisible ? (
+              <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+            ) : (
+              <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Shutter button (centered, one step below) */}
+        <View style={styles.shutterRow}>
           <TouchableOpacity
             style={[
               styles.shutterBtn,
@@ -951,19 +964,6 @@ export default function CameraScreen() {
               <Zap size={30} color="#fff" strokeWidth={2.5} />
             ) : (
               <Camera size={30} color="#fff" strokeWidth={2.5} />
-            )}
-          </TouchableOpacity>
-
-          {/* Grid toggle (right) */}
-          <TouchableOpacity
-            style={styles.gridToggleBtn}
-            onPress={() => setGridVisible((g) => !g)}
-            activeOpacity={0.7}
-          >
-            {gridVisible ? (
-              <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-            ) : (
-              <Grid3x3 size={24} color="#fff" strokeWidth={2} />
             )}
           </TouchableOpacity>
         </View>
@@ -1715,6 +1715,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: theme.spacing.sm,
+  },
+  shutterRow: {
+    alignItems: 'center',
     paddingVertical: theme.spacing.sm,
   },
   galleryThumb: {
