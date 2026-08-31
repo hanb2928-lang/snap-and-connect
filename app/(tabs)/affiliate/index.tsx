@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
 import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -255,6 +256,18 @@ export default function AffiliateScreen() {
   const [viralAnalysisResult, setViralAnalysisResult] = useState<ViralAnalysisResult | null>(null);
   const [videoPreviewGenerating, setVideoPreviewGenerating] = useState(false);
   const [videoPreviewScenes, setVideoPreviewScenes] = useState<{ time: string; hook: string; desc: string }[] | null>(null);
+  const videoPreviewProgress = useSharedValue(0);
+  const [videoRendering, setVideoRendering] = useState(false);
+  const [videoRenderComplete, setVideoRenderComplete] = useState(false);
+  const renderProgress = useSharedValue(0);
+
+  const animatedProgressStyle = useAnimatedStyle(() => ({
+    width: `${videoPreviewProgress.value * 100}%`,
+  }));
+
+  const animatedRenderStyle = useAnimatedStyle(() => ({
+    width: `${renderProgress.value * 100}%`,
+  }));
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -1058,6 +1071,12 @@ export default function AffiliateScreen() {
                         if (!viralAnalysisResult) return;
                         setVideoPreviewGenerating(true);
                         setVideoPreviewScenes(null);
+                        setVideoRenderComplete(false);
+                        videoPreviewProgress.value = 0;
+                        videoPreviewProgress.value = withTiming(1, {
+                          duration: 2200,
+                          easing: Easing.inOut(Easing.ease),
+                        });
                         setExpandedStep('analyze');
                         setTimeout(() => {
                           const maxDur = viralAnalysisResult.specs.maxDuration ?? '60초';
@@ -1146,6 +1165,16 @@ export default function AffiliateScreen() {
                   <Loader size={28} color="#fff" strokeWidth={2} />
                   <Text style={styles.videoPreviewGenText}>심리 자극 요소 기반 스토리보드 생성 중...</Text>
                 </View>
+              ) : videoRendering ? (
+                <View style={styles.videoPreviewGenWrap}>
+                  <Loader size={28} color="#fff" strokeWidth={2} />
+                  <Text style={styles.videoPreviewGenText}>스토리보드 기반 영상 렌더링 중...</Text>
+                </View>
+              ) : videoRenderComplete ? (
+                <View style={styles.videoSceneWrap}>
+                  <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                  <Text style={styles.videoSceneBadgeText}>영상 생성 완료</Text>
+                </View>
               ) : videoPreviewScenes ? (
                 <View style={styles.videoSceneWrap}>
                   <Text style={styles.videoSceneBadgeText}>스토리보드 미리보기</Text>
@@ -1176,7 +1205,9 @@ export default function AffiliateScreen() {
             </View>
 
             <View style={styles.videoTimelineBar}>
-              <View style={styles.videoTimelineProgress} />
+              <Animated.View
+                style={[styles.videoTimelineProgress, animatedProgressStyle]}
+              />
             </View>
             <View style={styles.videoTimelineLabels}>
               <Text style={styles.videoTimelineLabel}>0:00</Text>
@@ -1207,6 +1238,55 @@ export default function AffiliateScreen() {
                   </View>
                 </View>
               ))}
+
+              {/* Render video from storyboard button */}
+              <TouchableOpacity
+                style={[styles.renderVideoBtn, videoRendering && styles.renderVideoBtnDisabled]}
+                onPress={() => {
+                  if (videoRendering || videoRenderComplete) return;
+                  setVideoRendering(true);
+                  setVideoRenderComplete(false);
+                  renderProgress.value = 0;
+                  renderProgress.value = withTiming(1, {
+                    duration: 3000,
+                    easing: Easing.inOut(Easing.ease),
+                  }, (finished) => {
+                    if (finished) {
+                      runOnJS(setVideoRendering)(false);
+                      runOnJS(setVideoRenderComplete)(true);
+                    }
+                  });
+                }}
+                disabled={videoRendering || videoRenderComplete}
+                activeOpacity={0.85}
+              >
+                {videoRendering ? (
+                  <Loader size={16} color="#fff" strokeWidth={2} />
+                ) : videoRenderComplete ? (
+                  <Check size={16} color="#fff" strokeWidth={2.5} />
+                ) : (
+                  <Film size={16} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.renderVideoBtnText}>
+                  {videoRendering ? '영상 렌더링 중...' : videoRenderComplete ? '영상 생성 완료' : '스토리보드로 영상 만들기'}
+                </Text>
+              </TouchableOpacity>
+
+              {videoRendering && (
+                <View style={styles.renderProgressBarWrap}>
+                  <Animated.View
+                    style={[styles.renderProgressBarFill, animatedRenderStyle]}
+                  />
+                </View>
+              )}
+
+              {videoRenderComplete && (
+                <View style={styles.renderCompleteBox}>
+                  <Text style={styles.renderCompleteText}>
+                    심리 자극 요소 {videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -1214,7 +1294,7 @@ export default function AffiliateScreen() {
           <TouchableOpacity
             style={styles.analyzeBtn}
             onPress={handleAnalyzePhoto}
-            disabled={analyzing || !selectedImage}
+            disabled={analyzing || (!selectedImage && !affiliateUrl.trim())}
             activeOpacity={0.85}
           >
             {analyzing ? (
@@ -1227,7 +1307,9 @@ export default function AffiliateScreen() {
                 ? 'AI 분석 중...'
                 : selectedImage
                   ? 'AI 분석 시작하기'
-                  : '제휴 링크를 먼저 연결해주세요'}
+                  : affiliateUrl.trim()
+                    ? '상품 사진을 업로드하고 AI 분석 시작하기'
+                    : '제휴 링크를 먼저 연결해주세요'}
             </Text>
           </TouchableOpacity>
 
@@ -2485,6 +2567,51 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.success[400],
+  },
+  renderVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.success[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+  },
+  renderVideoBtnDisabled: {
+    opacity: 0.6,
+  },
+  renderVideoBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  renderProgressBarWrap: {
+    height: 4,
+    backgroundColor: theme.colors.dark.border,
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  renderProgressBarFill: {
+    height: '100%',
+    backgroundColor: theme.colors.success[400],
+    borderRadius: 2,
+  },
+  renderCompleteBox: {
+    backgroundColor: theme.colors.success[500] + '15',
+    borderRadius: theme.radius.sm,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.success[500] + '40',
+  },
+  renderCompleteText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 16,
   },
   analyzeWaitingText: {
     fontSize: 13,
