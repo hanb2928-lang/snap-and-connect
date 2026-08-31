@@ -408,7 +408,7 @@ export function CarouselGenerator({
         ))}
       </View>
 
-      {exportState === 'idle' && (
+      {exportState === 'idle' && Platform.OS === 'web' && (
         <View>
           <TemplateBadge label={tpl.badgeLabel} />
           <TouchableOpacity
@@ -419,6 +419,14 @@ export function CarouselGenerator({
           <Film size={18} color="#fff" strokeWidth={2} />
           <Text style={styles.generateButtonText}>20초 동영상 만들기</Text>
         </TouchableOpacity>
+        </View>
+      )}
+
+      {exportState === 'idle' && Platform.OS !== 'web' && (
+        <View style={styles.webOnlyNotice}>
+          <Text style={styles.webOnlyNoticeText}>
+            캐러셀 동영상 생성은 웹 브라우저에서 지원됩니다.
+          </Text>
         </View>
       )}
 
@@ -693,5 +701,17 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.success[400],
+  },
+  webOnlyNotice: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    alignItems: 'center',
+  },
+  webOnlyNoticeText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
 });

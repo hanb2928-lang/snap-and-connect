@@ -580,63 +580,73 @@ export default function MarketingScreen() {
           </View>
           <Text style={styles.voiceDesc}>짧게 한마디하면 AI가 잡음 제거 + BGM 믹싱으로 프로급 숏폼을 만들어드려요</Text>
 
-          {voice.error && (
-            <View style={styles.voiceErrorBox}>
-              <Text style={styles.voiceErrorText}>{voice.error}</Text>
+          {Platform.OS !== 'web' ? (
+            <View style={styles.voiceWebOnlyNotice}>
+              <Text style={styles.voiceWebOnlyNoticeText}>
+                음성 녹음은 웹 브라우저에서 지원됩니다. 모바일에서는 AI 보이스만 사용할 수 있어요.
+              </Text>
             </View>
-          )}
-
-          {!voiceDataUrl ? (
+          ) : (
             <>
-              <TouchableOpacity
-                style={[
-                  styles.voiceRecordBtn,
-                  voice.state === 'recording' && styles.voiceRecordBtnActive,
-                ]}
-                onPress={handleVoiceRecord}
-                activeOpacity={0.8}
-              >
-                {voice.state === 'recording' ? (
-                  <>
-                    <Square size={20} color="#fff" fill="#fff" strokeWidth={2} />
-                    <Text style={styles.voiceRecordBtnText}>녹음 중... {voice.duration}초</Text>
-                  </>
-                ) : (
-                  <>
-                    <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
-                    <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>녹음 시작</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              {voice.state === 'recording' && (
-                <View style={styles.waveformContainer}>
-                  {WAVEFORM_BARS.map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.waveformBar,
-                        { height: getWaveformHeight(i, voice.duration), opacity: getWaveformOpacity(i, voice.duration) } as ViewStyle,
-                      ]}
-                    />
-                  ))}
+              {voice.error && (
+                <View style={styles.voiceErrorBox}>
+                  <Text style={styles.voiceErrorText}>{voice.error}</Text>
+                </View>
+              )}
+
+              {!voiceDataUrl ? (
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.voiceRecordBtn,
+                      voice.state === 'recording' && styles.voiceRecordBtnActive,
+                    ]}
+                    onPress={handleVoiceRecord}
+                    activeOpacity={0.8}
+                  >
+                    {voice.state === 'recording' ? (
+                      <>
+                        <Square size={20} color="#fff" fill="#fff" strokeWidth={2} />
+                        <Text style={styles.voiceRecordBtnText}>녹음 중... {voice.duration}초</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
+                        <Text style={[styles.voiceRecordBtnText, { color: theme.colors.accent[400] }]}>녹음 시작</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  {voice.state === 'recording' && (
+                    <View style={styles.waveformContainer}>
+                      {WAVEFORM_BARS.map((_, i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.waveformBar,
+                            { height: getWaveformHeight(i, voice.duration), opacity: getWaveformOpacity(i, voice.duration) } as ViewStyle,
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.voicePlayerRow}>
+                  <TouchableOpacity style={styles.voicePlayBtn} onPress={handleVoicePlay} activeOpacity={0.7}>
+                    {voicePlaying ? (
+                      <Square size={16} color="#fff" fill="#fff" strokeWidth={2} />
+                    ) : (
+                      <Play size={16} color="#fff" fill="#fff" strokeWidth={2} />
+                    )}
+                    <Text style={styles.voicePlayBtnText}>{voicePlaying ? '일시정지' : '재생'}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.voiceRecordedLabel}>녹음 완료! AI 보이스에 활용됩니다</Text>
+                  <TouchableOpacity style={styles.voiceDeleteBtn} onPress={handleVoiceDelete} activeOpacity={0.7}>
+                    <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                  </TouchableOpacity>
                 </View>
               )}
             </>
-          ) : (
-            <View style={styles.voicePlayerRow}>
-              <TouchableOpacity style={styles.voicePlayBtn} onPress={handleVoicePlay} activeOpacity={0.7}>
-                {voicePlaying ? (
-                  <Square size={16} color="#fff" fill="#fff" strokeWidth={2} />
-                ) : (
-                  <Play size={16} color="#fff" fill="#fff" strokeWidth={2} />
-                )}
-                <Text style={styles.voicePlayBtnText}>{voicePlaying ? '일시정지' : '재생'}</Text>
-              </TouchableOpacity>
-              <Text style={styles.voiceRecordedLabel}>녹음 완료! AI 보이스에 활용됩니다</Text>
-              <TouchableOpacity style={styles.voiceDeleteBtn} onPress={handleVoiceDelete} activeOpacity={0.7}>
-                <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
           )}
         </View>
 
@@ -1163,6 +1173,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
+  },
+  voiceWebOnlyNotice: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  voiceWebOnlyNoticeText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   voiceRecordBtn: {
     flexDirection: 'row',
