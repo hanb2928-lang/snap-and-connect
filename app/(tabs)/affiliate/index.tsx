@@ -99,6 +99,7 @@ export default function AffiliateScreen() {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
+  const [expandedStep, setExpandedStep] = useState<StepKey | null>('affiliate');
 
   // Image for analysis (from product meta or user upload)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -180,9 +181,15 @@ export default function AffiliateScreen() {
   const totalRevenue = useMemo(() => revenue.reduce((sum, r) => sum + (r.amount || 0), 0), [revenue]);
 
   const markCompleted = (key: StepKey) => {
-    setCompletedSteps((prev) => new Set(prev).add(key));
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
     const idx = STEP_ORDER.indexOf(key);
     if (idx < STEP_ORDER.length - 1) {
+      const nextKey = STEP_ORDER[idx + 1];
+      setExpandedStep(nextKey);
       const nextStepNum = idx + 2;
       setTimeout(() => {
         const targetRef = stepRefs.current[nextStepNum];
@@ -681,6 +688,8 @@ export default function AffiliateScreen() {
           iconBg={theme.colors.accent[500] + '22'}
           accentColor={STEP_META.affiliate.color}
           completed={completedSteps.has('affiliate')}
+          expanded={expandedStep === 'affiliate'}
+          onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
         >
           <View style={styles.affiliateHintBox}>
             <Text style={styles.affiliateHintText}>
@@ -924,6 +933,8 @@ export default function AffiliateScreen() {
           iconBg={theme.colors.success[500] + '22'}
           accentColor={STEP_META.analyze.color}
           completed={completedSteps.has('analyze')}
+          expanded={expandedStep === 'analyze'}
+          onToggle={() => setExpandedStep(expandedStep === 'analyze' ? null : 'analyze')}
         >
           {selectedImage && mediaType === 'photo' ? (
             <>
@@ -1056,6 +1067,8 @@ export default function AffiliateScreen() {
           iconBg={theme.colors.warning[500] + '22'}
           accentColor={STEP_META.content.color}
           completed={completedSteps.has('content')}
+          expanded={expandedStep === 'content'}
+          onToggle={() => setExpandedStep(expandedStep === 'content' ? null : 'content')}
         >
           {/* AI one-tap auto-recommend button */}
           {lastScanId && completedSteps.has('analyze') && (
@@ -1222,6 +1235,8 @@ export default function AffiliateScreen() {
           iconBg={theme.colors.success[500] + '22'}
           accentColor={STEP_META.upload.color}
           completed={completedSteps.has('upload')}
+          expanded={expandedStep === 'upload'}
+          onToggle={() => setExpandedStep(expandedStep === 'upload' ? null : 'upload')}
         >
           {/* Link summary */}
           {affiliateUrl.trim() ? (
