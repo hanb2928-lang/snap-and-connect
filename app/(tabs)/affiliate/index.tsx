@@ -608,6 +608,8 @@ export default function AffiliateScreen() {
             </TouchableOpacity>
           </View>
 
+          <Text style={styles.platformListLabel}>제휴플랫폼 링크 연결하기</Text>
+
           {/* Platform list (collapsible) */}
           <PlatformListSection
             platforms={PLATFORMS}
@@ -1713,6 +1715,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
+  },
+  platformListLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   aiRecommendBadge: {
     flexDirection: 'row',
