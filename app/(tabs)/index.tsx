@@ -579,6 +579,27 @@ export default function CameraScreen() {
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
       try {
+        const video = document.querySelector('video') as HTMLVideoElement | null;
+        if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+          const maxDim = 1080;
+          const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+          const w = Math.round(video.videoWidth * scale);
+          const h = Math.round(video.videoHeight * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('canvas unsupported');
+          ctx.drawImage(video, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          const compressed = await withTimeout(
+            prepareImageForApi(dataUrl, 1080, 0.7),
+            PICK_TIMEOUT_MS,
+            '이미지 압축',
+          );
+          return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
+        }
+        // Fallback to file picker if no live webcam stream
         const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '웹 캡처');
         if (images.length === 0) return null;
         const compressed = await withTimeout(
@@ -1447,16 +1468,7 @@ function WebCameraScreen({
           </TouchableOpacity>
           <CreditBalanceBadge onPress={onCreditPress} compact />
         </View>
-        <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.topBarBtn} onPress={onMultiAnglePress} activeOpacity={0.7}>
-            <Layers size={20} color="#fff" strokeWidth={2} />
-            {multiAngleCount > 0 && (
-              <View style={styles.webAngleBadge}>
-                <Text style={styles.webAngleBadgeText}>{multiAngleCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <View style={styles.topBarRight} />
       </View>
 
       <TriggerBanner />
