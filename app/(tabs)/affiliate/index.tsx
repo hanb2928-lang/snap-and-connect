@@ -557,45 +557,6 @@ export default function AffiliateScreen() {
           onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
         >
 
-          <TextInput
-            style={styles.affiliateInput}
-            value={affiliateUrl}
-            onChangeText={setAffiliateUrl}
-            placeholder="제휴 링크 URL을 여기에 붙여넣으세요"
-            placeholderTextColor={theme.colors.dark.textFaint}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            multiline
-          />
-
-          <View style={styles.affiliateActionRow}>
-            <TouchableOpacity
-              style={styles.affiliateSaveBtn}
-              onPress={handleSaveAffiliate}
-              activeOpacity={0.7}
-              disabled={!affiliateUrl.trim() || extracting}
-            >
-              {extracting ? (
-                <Loader size={16} color="#fff" strokeWidth={2} />
-              ) : (
-                <Check size={16} color="#fff" strokeWidth={2} />
-              )}
-              <Text style={styles.affiliateSaveBtnText}>
-                {extracting ? '상품 정보 추출 중...' : '링크 저장'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.affiliateSettingsBtn}
-              onPress={() => router.push('/settings')}
-              activeOpacity={0.7}
-            >
-              <SettingsIcon size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.affiliateSettingsBtnText}>ID 설정</Text>
-            </TouchableOpacity>
-          </View>
-
           <Text style={styles.platformListLabel}>제휴플랫폼 링크 연결하기</Text>
 
           {/* Platform list (collapsible) */}
@@ -1762,8 +1723,8 @@ const styles = StyleSheet.create({
     color: theme.colors.primary[300],
   },
   platformListLabel: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
     marginTop: theme.spacing.sm,
     marginBottom: theme.spacing.xs,
