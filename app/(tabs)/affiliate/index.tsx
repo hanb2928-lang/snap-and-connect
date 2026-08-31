@@ -472,6 +472,11 @@ export default function AffiliateScreen() {
         platform: meta.platform || '',
         brand: meta.brand || '',
       };
+      if (!newMeta.productName && !newMeta.description && !newMeta.image) {
+        setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 상품 사진을 직접 업로드하고 진행할 수 있습니다.');
+        setProductMeta(null);
+        return;
+      }
       setProductMeta(newMeta);
       markCompleted('affiliate');
       // Auto-set product image as the analysis image
