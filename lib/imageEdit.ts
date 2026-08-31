@@ -232,10 +232,31 @@ async function compositeOnBackgroundNative(productDataUrl: string, _bgUrl: strin
   return productDataUrl;
 }
 
+export type MoodFilterType = 'none' | 'warm' | 'fresh';
+
+const MOOD_OVERLAY_COLORS: Record<Exclude<MoodFilterType, 'none'>, string> = {
+  warm: 'rgba(255, 170, 60, 0.18)',
+  fresh: 'rgba(80, 200, 230, 0.15)',
+};
+
+function applyMoodOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  mood: Exclude<MoodFilterType, 'none'>,
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = MOOD_OVERLAY_COLORS[mood];
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
 export async function prepareImageForApi(
   dataUrl: string,
   maxDimension = 1024,
   quality = 0.8,
+  moodFilter: MoodFilterType = 'none',
 ): Promise<string> {
   const normalizedDataUrl = normalizeImageDataUrl(dataUrl);
   if (Platform.OS === 'web') {
@@ -248,6 +269,9 @@ export async function prepareImageForApi(
       const ctx = canvas.getContext('2d');
       if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (moodFilter !== 'none') {
+        applyMoodOverlay(ctx, canvas.width, canvas.height, moodFilter);
+      }
       return canvas.toDataURL('image/webp', quality);
     } catch {
       return normalizedDataUrl;

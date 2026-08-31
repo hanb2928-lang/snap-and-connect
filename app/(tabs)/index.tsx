@@ -30,6 +30,7 @@ import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
 import { isOnline } from '@/hooks/useNetworkStatus';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
+import type { MoodFilterType } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { OnboardingModal } from '@/components/OnboardingModal';
@@ -221,7 +222,7 @@ export default function CameraScreen() {
         if (!photo?.base64) throw new Error('Failed to capture image data');
         const cleanB64 = cleanBase64(photo.base64);
         const compressedDataUrl = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
@@ -280,7 +281,7 @@ export default function CameraScreen() {
       if (!photo?.base64) throw new Error('Failed to capture image data');
       const cleanB64 = cleanBase64(photo.base64);
       const compressedDataUrl = await withTimeout(
-        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
         PICK_TIMEOUT_MS,
         '이미지 압축',
       );
@@ -305,7 +306,7 @@ export default function CameraScreen() {
         const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
         if (images.length === 0) return;
         const compressed = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7, moodFilter as MoodFilterType),
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
@@ -531,7 +532,7 @@ export default function CameraScreen() {
         if (!photo?.base64) throw new Error('auto-capture failed');
         const cleanB64 = cleanBase64(photo.base64);
         const compressedDataUrl = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
@@ -593,7 +594,7 @@ export default function CameraScreen() {
           ctx.drawImage(video, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
           const compressed = await withTimeout(
-            prepareImageForApi(dataUrl, 1080, 0.7),
+            prepareImageForApi(dataUrl, 1080, 0.7, moodFilter as MoodFilterType),
             PICK_TIMEOUT_MS,
             '이미지 압축',
           );
@@ -603,7 +604,7 @@ export default function CameraScreen() {
         const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '웹 캡처');
         if (images.length === 0) return null;
         const compressed = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7, moodFilter as MoodFilterType),
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
@@ -627,7 +628,7 @@ export default function CameraScreen() {
       if (!photo?.base64) return null;
       const cleanB64 = cleanBase64(photo.base64);
       const compressedDataUrl = await withTimeout(
-        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7),
+        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
         PICK_TIMEOUT_MS,
         '이미지 압축',
       );
@@ -643,7 +644,7 @@ export default function CameraScreen() {
         const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
         if (images.length === 0) return null;
         const compressed = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7, moodFilter as MoodFilterType),
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
