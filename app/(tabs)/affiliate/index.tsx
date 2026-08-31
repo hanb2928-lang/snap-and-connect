@@ -253,6 +253,8 @@ export default function AffiliateScreen() {
   const [manualPlatformName, setManualPlatformName] = useState('');
   const [viralAnalyzing, setViralAnalyzing] = useState(false);
   const [viralAnalysisResult, setViralAnalysisResult] = useState<ViralAnalysisResult | null>(null);
+  const [videoPreviewGenerating, setVideoPreviewGenerating] = useState(false);
+  const [videoPreviewScenes, setVideoPreviewScenes] = useState<{ time: string; hook: string; desc: string }[] | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -1052,11 +1054,32 @@ export default function AffiliateScreen() {
                   <View style={styles.viralPreviewBtnWrap}>
                     <TouchableOpacity
                       style={styles.viralPreviewBtn}
-                      onPress={() => setExpandedStep('analyze')}
+                      onPress={() => {
+                        setVideoPreviewGenerating(true);
+                        setVideoPreviewScenes(null);
+                        setExpandedStep('analyze');
+                        setTimeout(() => {
+                          const maxDur = viralAnalysisResult?.specs.maxDuration ?? '60초';
+                          const totalSec = parseInt(maxDur, 10) || 60;
+                          const scenes = viralAnalysisResult.hooks.map((hook, i) => ({
+                            time: `${Math.floor((totalSec / viralAnalysisResult.hooks.length) * i)}s`,
+                            hook: hook.title,
+                            desc: hook.desc,
+                          }));
+                          setVideoPreviewScenes(scenes);
+                          setVideoPreviewGenerating(false);
+                        }, 2200);
+                      }}
                       activeOpacity={0.85}
                     >
-                      <ScanSearch size={16} color="#fff" strokeWidth={2} />
-                      <Text style={styles.viralPreviewBtnText}>분석 영상 미리보기 생성하기</Text>
+                      {videoPreviewGenerating ? (
+                        <Loader size={16} color="#fff" strokeWidth={2} />
+                      ) : (
+                        <ScanSearch size={16} color="#fff" strokeWidth={2} />
+                      )}
+                      <Text style={styles.viralPreviewBtnText}>
+                        {videoPreviewGenerating ? '미리보기 생성 중...' : '분석 영상 미리보기 생성하기'}
+                      </Text>
                       <ArrowRight size={14} color="#fff" strokeWidth={2} />
                     </TouchableOpacity>
                   </View>
@@ -1114,9 +1137,20 @@ export default function AffiliateScreen() {
                   resizeMode="cover"
                 />
                 <View style={styles.videoPreviewOverlay}>
-                  <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
-                    <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
-                  </TouchableOpacity>
+                  {videoPreviewGenerating ? (
+                    <View style={styles.videoPreviewGenWrap}>
+                      <Loader size={28} color="#fff" strokeWidth={2} />
+                      <Text style={styles.videoPreviewGenText}>심리 자극 요소 기반 스토리보드 생성 중...</Text>
+                    </View>
+                  ) : videoPreviewScenes ? (
+                    <View style={styles.videoSceneWrap}>
+                      <Text style={styles.videoSceneBadgeText}>스토리보드 미리보기</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
+                      <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <View style={styles.videoSpecBadge}>
                   <Clapperboard size={11} color="#fff" strokeWidth={2} />
@@ -1147,6 +1181,30 @@ export default function AffiliateScreen() {
               </View>
             )}
           </View>
+
+          {/* Storyboard scenes from viral hooks */}
+          {videoPreviewScenes && videoPreviewScenes.length > 0 && (
+            <View style={styles.videoStoryboardWrap}>
+              <Text style={styles.videoStoryboardTitle}>심리 자극 요소 기반 스토리보드</Text>
+              <Text style={styles.videoStoryboardDesc}>
+                상위 1% 수익화 영상 패턴을 적용한 장면 구성
+              </Text>
+              {videoPreviewScenes.map((scene, i) => (
+                <View key={i} style={styles.videoSceneCard}>
+                  <View style={styles.videoSceneTimeBadge}>
+                    <Text style={styles.videoSceneTimeText}>{scene.time}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.videoSceneHookText}>{scene.hook}</Text>
+                    <Text style={styles.videoSceneDescText} numberOfLines={2}>{scene.desc}</Text>
+                  </View>
+                  <View style={styles.videoSceneNumber}>
+                    <Text style={styles.videoSceneNumberText}>{i + 1}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* AI 분석 시작 */}
           <TouchableOpacity
@@ -2317,6 +2375,96 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textAlign: 'center',
     lineHeight: 17,
+  },
+  videoPreviewGenWrap: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  videoPreviewGenText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+  videoSceneWrap: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  videoSceneBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+    backgroundColor: 'rgba(10,15,30,0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.full,
+    overflow: 'hidden',
+  },
+  videoStoryboardWrap: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  videoStoryboardTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    marginBottom: 2,
+  },
+  videoStoryboardDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginBottom: theme.spacing.sm,
+  },
+  videoSceneCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.dark.border,
+  },
+  videoSceneTimeBadge: {
+    backgroundColor: theme.colors.success[500] + '22',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 38,
+    alignItems: 'center',
+  },
+  videoSceneTimeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
+  },
+  videoSceneHookText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 2,
+  },
+  videoSceneDescText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 14,
+  },
+  videoSceneNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.success[500] + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoSceneNumberText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
   },
   analyzeWaitingText: {
     fontSize: 13,
