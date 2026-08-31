@@ -88,6 +88,114 @@ const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
   ],
 };
 
+const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resolution: string; maxDuration: string; format: string }>> = {
+  instagram: {
+    reels: { ratio: '9:16', resolution: '1080×1920', maxDuration: '90초', format: 'MP4' },
+    feed: { ratio: '1:1 또는 4:5', resolution: '1080×1080', maxDuration: '60초', format: 'MP4' },
+    story: { ratio: '9:16', resolution: '1080×1920', maxDuration: '15초', format: 'MP4' },
+  },
+  blog: {
+    category_post: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
+    review: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
+    promotion: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
+  },
+  youtube: {
+    shorts: { ratio: '9:16', resolution: '1080×1920', maxDuration: '60초', format: 'MP4' },
+    community: { ratio: '1:1', resolution: '1080×1080', maxDuration: 'GIF/이미지', format: 'MP4/GIF' },
+    video: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4' },
+  },
+  tiktok: {
+    video: { ratio: '9:16', resolution: '1080×1920', maxDuration: '10분', format: 'MP4' },
+    carousel: { ratio: '9:16', resolution: '1080×1920', maxDuration: '정지형', format: 'JPG/PNG' },
+    story: { ratio: '9:16', resolution: '1080×1920', maxDuration: '15초', format: 'MP4' },
+  },
+  pinterest: {
+    pin: { ratio: '2:3', resolution: '1000×1500', maxDuration: '정지형', format: 'JPG/PNG' },
+    idea_pin: { ratio: '9:16', resolution: '1080×1920', maxDuration: '60초', format: 'MP4' },
+    board: { ratio: '2:3', resolution: '1000×1500', maxDuration: '정지형', format: 'JPG/PNG' },
+  },
+  twitter: {
+    thread: { ratio: '16:9', resolution: '1920×1080', maxDuration: '140초', format: 'MP4' },
+    tweet: { ratio: '16:9', resolution: '1920×1080', maxDuration: '140초', format: 'MP4' },
+    reply: { ratio: '16:9', resolution: '1920×1080', maxDuration: '140초', format: 'MP4' },
+  },
+};
+
+type ViralHook = { title: string; desc: string };
+type ViralAnalysisResult = {
+  hooks: ViralHook[];
+  specs: { ratio: string; resolution: string; maxDuration: string; format: string };
+  topReference: { title: string; views: string; revenue: string };
+};
+
+function generateViralAnalysis(platform: string, board: string, productUrl: string): ViralAnalysisResult {
+  const specs = BOARD_VIDEO_SPECS[platform]?.[board] ?? { ratio: '16:9', resolution: '1920×1080', maxDuration: '60초', format: 'MP4' };
+
+  const baseHooks: ViralHook[] = [
+    { title: '첫 3초 강렬한 후크', desc: '상위 1% 영상의 90%가 첫 3초 내 시각적 충격 + 질문 던지기로 시청자를 붙잡습니다. 스와이프를 멈추게 하는 반전 요소를 첫 프레임에 배치하세요.' },
+    { title: '손실 회피 심리 자극', desc: '"지금 안 사면 손해"라는 메시지를 스토리텔링으로 삽입. 상위 영상들은 할인 종료, 재고 소진, 한정 판매 등 긴박감을 2~3회 반복 언급합니다.' },
+    { title: '사회적 증거 결합', desc: '"이미 12,000명이 구매했습니다" 형태의 사회적 증거를 중간 지점에 배치. 인간은 타인의 선택을 무의식적으로 따라하는 심리가 있습니다.' },
+    { title: '감정 곡선 설계', desc: '호기심 → 놀람 → 공감 → 갈망 → 행동의 5단계 감정 곡선을 따라 영상 구조를 설계합니다. 상위 1%는 이 흐름을 압축된 시간 안에 배치합니다.' },
+    { title: '행동 유도 최적화', desc: '마지막 3초에 명확한 CTA + 제휴 링크 위치 힌트를 제시. 댓글 유도 질문으로 참여율을 높이고 알고리즘 가시성을 극대화합니다.' },
+  ];
+
+  if (platform === 'tiktok' || platform === 'youtube') {
+    baseHooks.push(
+      { title: '무한 루프 구조', desc: '영상 끝이 시작과 연결되는 무한 루프 구조로 재생 수를 극대화. 짧은 영상에서 특히 효과적인 반복 시청 유도 기법입니다.' },
+    );
+  }
+  if (platform === 'instagram') {
+    baseHooks.push(
+      { title: '스토리 텔링 몰입', desc: '릴스에서는 개인적 스토리로 시작해 제품 자연스러운 노출로 전환. 광고 느낌을 최소화하고 진정성을 강조하세요.' },
+    );
+  }
+  if (platform === 'pinterest') {
+    baseHooks.push(
+      { title: '시각적 임팩트 선행', desc: '핀터레스트는 정지형 이미지가 중심입니다. 제품의 가장 매력적인 각도를 전체 화면으로 배치하고 텍스트 오버레이로 핵심 가치를 한 줄로 전달하세요.' },
+    );
+  }
+  if (board === 'story') {
+    baseHooks.push(
+      { title: '24시간 긴박감 활용', desc: '스토리의 24시간 소멸 특성을 활용해 "오늘만"이라는 메시지로 즉각적 행동을 유도합니다.' },
+    );
+  }
+
+  const referenceMap: Record<string, { title: string; views: string; revenue: string }> = {
+    ig_reels: { title: '인플루언서 릴스 제품 리뷰', views: '2.4M', revenue: '월 480만원' },
+    ig_feed: { title: '카드뉴스 스타일 제품 소개', views: '890K', revenue: '월 120만원' },
+    ig_story: { title: '데일리 스토리 제품 태그', views: '350K', revenue: '월 80만원' },
+    yt_shorts: { title: '쇼츠 제품 언박싱', views: '5.1M', revenue: '월 650만원' },
+    yt_community: { title: '커뮤니티 탭 제품 투표', views: '420K', revenue: '월 90만원' },
+    yt_video: { title: '상세 리뷰 영상', views: '1.2M', revenue: '월 340만원' },
+    blog_category_post: { title: '블로그 상품 리뷰 포스트', views: '450K', revenue: '월 210만원' },
+    blog_review: { title: '블로그 상세 리뷰', views: '320K', revenue: '월 180만원' },
+    blog_promotion: { title: '블로그 프로모션 글', views: '280K', revenue: '월 150만원' },
+    tt_video: { title: '틱톡 바이럴 제품 영상', views: '8.7M', revenue: '월 920만원' },
+    tt_carousel: { title: '틱톡 캐러셀 제품 비교', views: '1.8M', revenue: '월 280만원' },
+    tt_story: { title: '틱톡 스토리 제품', views: '1.1M', revenue: '월 160만원' },
+    pin_pin: { title: '핀터레스트 제품 핀', views: '1.5M', revenue: '월 190만원' },
+    pin_idea_pin: { title: '아이디어 핀 제품 데모', views: '2.2M', revenue: '월 310만원' },
+    pin_board: { title: '핀터레스트 보드 컬렉션', views: '980K', revenue: '월 140만원' },
+    tw_thread: { title: '트위터 제품 스레드', views: '670K', revenue: '월 95만원' },
+    tw_tweet: { title: '트위터 제품 트윗', views: '420K', revenue: '월 65만원' },
+    tw_reply: { title: '트위터 제품 답글', views: '310K', revenue: '월 48만원' },
+  };
+
+  const platformPrefix: Record<string, string> = {
+    instagram: 'ig',
+    youtube: 'yt',
+    blog: 'blog',
+    tiktok: 'tt',
+    pinterest: 'pin',
+    twitter: 'tw',
+  };
+
+  const refKey = `${platformPrefix[platform] ?? platform}_${board}`;
+  const topReference = referenceMap[refKey] ?? { title: '상위 1% 제휴 영상', views: '1M+', revenue: '월 300만원+' };
+
+  return { hooks: baseHooks, specs, topReference };
+}
+
 const CONTENT_TYPES = [
   { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hint: '제품을 한 줄로 매력적으로 표현하세요' },
   { key: 'hashtag', label: '해시태그', icon: Hash, color: theme.colors.accent[400], hint: '관련 키워드를 # 과 함께 나열하세요' },
@@ -143,6 +251,8 @@ export default function AffiliateScreen() {
   const [selectedBoard, setSelectedBoard] = useState<string | null>(null);
   const [manualUploadPlatforms, setManualUploadPlatforms] = useState<{ key: string; label: string }[]>([]);
   const [manualPlatformName, setManualPlatformName] = useState('');
+  const [viralAnalyzing, setViralAnalyzing] = useState(false);
+  const [viralAnalysisResult, setViralAnalysisResult] = useState<ViralAnalysisResult | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -836,6 +946,113 @@ export default function AffiliateScreen() {
               </Text>
             </View>
           )}
+
+          {selectedUploadPlatform && selectedBoard && (
+            <View style={styles.viralAnalysisBox}>
+              <View style={styles.viralAnalysisHeader}>
+                <View style={styles.viralAnalysisIconWrap}>
+                  <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.viralAnalysisTitle}>상위 1% 수익화 영상 분석</Text>
+                  <Text style={styles.viralAnalysisSub}>
+                    {UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label ?? ''} ·{' '}
+                    {PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard)?.label ?? ''} 게시판
+                  </Text>
+                </View>
+              </View>
+
+              {viralAnalyzing ? (
+                <View style={styles.viralLoadingWrap}>
+                  <Loader size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.viralLoadingText}>연결 링크 크롤링 · 상위 1% 영상 패턴 분석 중...</Text>
+                </View>
+              ) : viralAnalysisResult ? (
+                <View style={styles.viralResultWrap}>
+                  <View style={styles.viralSpecRow}>
+                    <View style={styles.viralSpecChip}>
+                      <Text style={styles.viralSpecLabel}>화면비</Text>
+                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.ratio}</Text>
+                    </View>
+                    <View style={styles.viralSpecChip}>
+                      <Text style={styles.viralSpecLabel}>해상도</Text>
+                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.resolution}</Text>
+                    </View>
+                    <View style={styles.viralSpecChip}>
+                      <Text style={styles.viralSpecLabel}>최대 길이</Text>
+                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.maxDuration}</Text>
+                    </View>
+                    <View style={styles.viralSpecChip}>
+                      <Text style={styles.viralSpecLabel}>포맷</Text>
+                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.format}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.viralRefBox}>
+                    <Text style={styles.viralRefTitle}>참조: {viralAnalysisResult.topReference.title}</Text>
+                    <View style={styles.viralRefStats}>
+                      <View style={styles.viralRefStat}>
+                        <Text style={styles.viralRefStatValue}>{viralAnalysisResult.topReference.views}</Text>
+                        <Text style={styles.viralRefStatLabel}>조회수</Text>
+                      </View>
+                      <View style={styles.viralRefDivider} />
+                      <View style={styles.viralRefStat}>
+                        <Text style={styles.viralRefStatValue}>{viralAnalysisResult.topReference.revenue}</Text>
+                        <Text style={styles.viralRefStatLabel}>예상 수익</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <Text style={styles.viralHooksLabel}>심리 자극 요소 분석</Text>
+                  {viralAnalysisResult.hooks.map((hook, i) => (
+                    <View key={i} style={styles.viralHookRow}>
+                      <View style={styles.viralHookNumber}>
+                        <Text style={styles.viralHookNumberText}>{i + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.viralHookTitle}>{hook.title}</Text>
+                        <Text style={styles.viralHookDesc}>{hook.desc}</Text>
+                      </View>
+                    </View>
+                  ))}
+
+                  <View style={styles.viralPreviewBtnWrap}>
+                    <TouchableOpacity
+                      style={styles.viralPreviewBtn}
+                      onPress={() => setExpandedStep('analyze')}
+                      activeOpacity={0.85}
+                    >
+                      <ScanSearch size={16} color="#fff" strokeWidth={2} />
+                      <Text style={styles.viralPreviewBtnText}>분석 영상 미리보기 생성하기</Text>
+                      <ArrowRight size={14} color="#fff" strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.viralStartBtn}
+                  onPress={() => {
+                    setViralAnalyzing(true);
+                    setTimeout(() => {
+                      setViralAnalyzing(false);
+                      setViralAnalysisResult(
+                        generateViralAnalysis(
+                          selectedUploadPlatform,
+                          selectedBoard,
+                          affiliateUrl,
+                        ),
+                      );
+                    }, 1800);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                  <Text style={styles.viralStartBtnText}>심리 자극 영상 분석 시작</Text>
+                  <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </PillNavCard>
 
         {/* STEP 2: AI Analysis & Image */}
@@ -845,8 +1062,8 @@ export default function AffiliateScreen() {
         />
         <PillNavCard
           icon={<ScanSearch size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="AI 분석 및 이미지 생성"
-          subtitle="상품 이미지 AI 분석 · 내 사진 교체 · 가상 컷·피팅"
+          title="분석 영상 미리보기"
+          subtitle="상위 1% 수익화 영상 분석 · 심리 자극 요소 추출 · 미리보기 생성"
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
           stepNumber={2}
@@ -2645,6 +2862,187 @@ const styles = StyleSheet.create({
   },
   boardChipTextActive: {
     color: '#fff',
+  },
+  viralAnalysisBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  viralAnalysisHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: theme.spacing.sm + 2,
+  },
+  viralAnalysisIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.warning[400] + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viralAnalysisTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  viralAnalysisSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  viralLoadingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: theme.spacing.sm + 2,
+  },
+  viralLoadingText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.warning[400],
+    flex: 1,
+  },
+  viralResultWrap: {
+    gap: 10,
+  },
+  viralSpecRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  viralSpecChip: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  viralSpecLabel: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  viralSpecValue: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: 1,
+  },
+  viralRefBox: {
+    backgroundColor: theme.colors.warning[400] + '10',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '25',
+  },
+  viralRefTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 8,
+  },
+  viralRefStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viralRefStat: {
+    flex: 1,
+  },
+  viralRefStatValue: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  viralRefStatLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  viralRefDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: theme.colors.dark.border,
+  },
+  viralHooksLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: 4,
+  },
+  viralHookRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  viralHookNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: theme.colors.warning[400],
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  viralHookNumberText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  viralHookTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 2,
+  },
+  viralHookDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  viralPreviewBtnWrap: {
+    marginTop: theme.spacing.sm,
+  },
+  viralPreviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.success[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+  },
+  viralPreviewBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  viralStartBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[400] + '60',
+    backgroundColor: theme.colors.warning[400] + '10',
+  },
+  viralStartBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+    flex: 1,
   },
   uploadDoneBadge: {
     flexDirection: 'row',
