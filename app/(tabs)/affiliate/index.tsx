@@ -559,7 +559,7 @@ export default function AffiliateScreen() {
         {/* Full-width pill nav cards in production order */}
         <PillNavCard
           icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="제휴 링크 입력"
+          title="제휴 링크 추가하기"
           subtitle="URL 붙여넣기 · 클립보드 자동 인식 · 상품 정보 추출"
           accentColor={theme.colors.accent[400]}
           iconBg={theme.colors.accent[500] + '22'}
