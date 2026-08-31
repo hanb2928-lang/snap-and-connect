@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -44,15 +44,6 @@ const PLATFORMS = [
   { key: 'Coupang', label: '쿠팡 파트너스', icon: ShoppingBag, color: '#FF3E3E', signupUrl: 'https://partners.coupang.com/', desc: '쿠팡 상품 링크를 공유하고 수수료를 받으세요' },
   { key: 'Toss', label: '토스 쉐어링크', icon: Send, color: '#0064FF', signupUrl: 'https://sharelink.toss.im/', desc: '토스로 링크를 공유하고 보상을 받으세요' },
   { key: 'BrandConnect', label: '네이버 브랜드커넥트', icon: Globe, color: '#03C75A', signupUrl: 'https://brandconnect.naver.com/about/creator', desc: '네이버 쇼핑 제휴 링크를 발급받으세요' },
-  { key: 'OliveYoung', label: '올리브영', icon: ShoppingBasket, color: '#1A1A1A', signupUrl: 'https://www.oliveyoung.co.kr/', desc: '올리브영 상품 링크를 공유하세요' },
-  { key: 'TodayHouse', label: '오늘의집', icon: Home, color: '#35C5F0', signupUrl: 'https://ohou.se/', desc: '오늘의집 상품 링크를 공유하세요' },
-  { key: 'Kurly', label: '컬리', icon: ShoppingBasket, color: '#5F0080', signupUrl: 'https://kurly.com/', desc: '컬리 상품 링크를 공유하세요' },
-  { key: 'MyRealTrip', label: '마이리얼트립', icon: Palmtree, color: '#FF6B35', signupUrl: 'https://www.myrealtrip.com/', desc: '여행 상품 링크를 공유하세요' },
-  { key: 'Klook', label: '클룩', icon: Ticket, color: '#FF5722', signupUrl: 'https://www.klook.com/', desc: '여행 활동 링크를 공유하세요' },
-  // Global affiliate platforms
-  { key: 'Amazon', label: 'Amazon Associates', icon: ShoppingBag, color: '#FF9900', signupUrl: 'https://affiliate-program.amazon.com/', desc: '아마존 상품 링크로 글로벌 수수료를 받으세요' },
-  { key: 'AliExpress', label: 'AliExpress Affiliate', icon: Globe, color: '#E62E04', signupUrl: 'https://portals.aliexpress.com/', desc: '알리익스프레스 제휴 링크로 전 세계 고객에게 홍보하세요' },
-  { key: 'Shopee', label: 'Shopee Affiliate', icon: ShoppingBag, color: '#EE4D2D', signupUrl: 'https://shopee.com/m/affiliate-program', desc: '동남아시아 쇼피 플랫폼 제휴 링크를 발급받으세요' },
 ] as const;
 
 const UPLOAD_PLATFORMS = [
@@ -112,9 +103,6 @@ export default function AffiliateScreen() {
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
-  const [showAddPlatform, setShowAddPlatform] = useState(false);
-  const [newPlatformName, setNewPlatformName] = useState('');
-  const [newPlatformUrl, setNewPlatformUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -617,6 +605,20 @@ export default function AffiliateScreen() {
             copiedPlatform={copiedPlatform}
             onOpenUrl={handleOpenUrl}
             onCopySignup={handleCopySignup}
+            customPlatforms={customPlatforms}
+            onAddCustomPlatform={(name, url) => {
+              const key = 'custom_' + Date.now();
+              setCustomPlatforms((prev) => [...prev, { key, label: name, url }]);
+            }}
+            onRemoveCustomPlatform={(key) => {
+              setCustomPlatforms((prev) => prev.filter((cp) => cp.key !== key));
+              if (selectedPlatform === key) setSelectedPlatform('');
+            }}
+            onSelectCustomPlatform={(key, url) => {
+              setSelectedPlatform(key);
+              setAffiliateUrl(url);
+            }}
+            selectedPlatform={selectedPlatform}
           />
 
           {/* Product metadata preview */}
@@ -1405,19 +1407,38 @@ function PlatformListSection({
   copiedPlatform,
   onOpenUrl,
   onCopySignup,
+  customPlatforms,
+  onAddCustomPlatform,
+  onRemoveCustomPlatform,
+  onSelectCustomPlatform,
+  selectedPlatform,
 }: {
   platforms: typeof PLATFORMS;
   isConfigured: (key: string) => boolean;
   copiedPlatform: string | null;
   onOpenUrl: (url: string) => void;
   onCopySignup: (platform: string, url: string) => void;
+  customPlatforms: { key: string; label: string; url: string }[];
+  onAddCustomPlatform: (name: string, url: string) => void;
+  onRemoveCustomPlatform: (key: string) => void;
+  onSelectCustomPlatform: (key: string, url: string) => void;
+  selectedPlatform: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const visiblePlatforms = expanded ? platforms : platforms.slice(0, 3);
+  const [showAddBox, setShowAddBox] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+
+  const handleAdd = () => {
+    if (!newName.trim() || !newUrl.trim()) return;
+    onAddCustomPlatform(newName.trim(), newUrl.trim());
+    setNewName('');
+    setNewUrl('');
+    setShowAddBox(false);
+  };
 
   return (
     <View>
-      {visiblePlatforms.map((p) => {
+      {platforms.map((p) => {
         const Icon = p.icon;
         const configured = isConfigured(p.key);
         return (
@@ -1457,20 +1478,82 @@ function PlatformListSection({
         );
       })}
 
-      <TouchableOpacity
-        style={styles.platformToggleBtn}
-        onPress={() => setExpanded(!expanded)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.platformToggleText}>
-          {expanded ? '접기' : `전체 ${platforms.length}개 플랫폼 보기`}
-        </Text>
-        {expanded ? (
-          <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-        ) : (
-          <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-        )}
-      </TouchableOpacity>
+      {customPlatforms.map((cp) => {
+        const isActive = selectedPlatform === cp.key;
+        return (
+          <View key={cp.key} style={styles.platformRow}>
+            <View style={[styles.platformIcon, { backgroundColor: theme.colors.accent[400] + '20' }]}>
+              <Link2 size={18} color={theme.colors.accent[300]} strokeWidth={2} />
+            </View>
+            <View style={styles.platformInfo}>
+              <View style={styles.platformTitleRow}>
+                <Text style={styles.platformLabel}>{cp.label}</Text>
+                {isActive ? (
+                  <View style={styles.configuredBadge}>
+                    <Check size={10} color="#fff" strokeWidth={2.5} />
+                    <Text style={styles.configuredBadgeText}>선택됨</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.platformDesc} numberOfLines={1}>{cp.url}</Text>
+            </View>
+            <View style={styles.platformActions}>
+              <TouchableOpacity onPress={() => onSelectCustomPlatform(cp.key, cp.url)} activeOpacity={0.7}>
+                <ExternalLink size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onRemoveCustomPlatform(cp.key)} activeOpacity={0.7}>
+                <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      })}
+
+      {showAddBox ? (
+        <View style={styles.addPlatformBox}>
+          <View style={styles.addPlatformHeader}>
+            <Text style={styles.addPlatformTitle}>제휴플랫폼 수동 추가</Text>
+            <TouchableOpacity onPress={() => { setShowAddBox(false); setNewName(''); setNewUrl(''); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.addPlatformInput}
+            value={newName}
+            onChangeText={setNewName}
+            placeholder="플랫폼 이름 (예: 11번가)"
+            placeholderTextColor={theme.colors.dark.textFaint}
+          />
+          <TextInput
+            style={styles.addPlatformInput}
+            value={newUrl}
+            onChangeText={setNewUrl}
+            placeholder="제휴 링크 URL"
+            placeholderTextColor={theme.colors.dark.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          <TouchableOpacity
+            style={[styles.addPlatformConfirmBtn, (!newName.trim() || !newUrl.trim()) && styles.addPlatformConfirmBtnDisabled]}
+            onPress={handleAdd}
+            activeOpacity={0.7}
+            disabled={!newName.trim() || !newUrl.trim()}
+          >
+            <Check size={16} color="#fff" strokeWidth={2} />
+            <Text style={styles.addPlatformConfirmBtnText}>추가하기</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.manualAddBtn}
+          onPress={() => setShowAddBox(true)}
+          activeOpacity={0.7}
+        >
+          <Plus size={16} color={theme.colors.accent[300]} strokeWidth={2} />
+          <Text style={styles.manualAddBtnText}>제휴플랫폼 수동 추가하기</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -1582,27 +1665,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     lineHeight: 17,
   },
-  platformChipsScroll: {
-    flexDirection: 'row',
-    marginBottom: theme.spacing.sm,
-  },
-  platformAddChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    borderStyle: 'dashed',
-  },
-  platformAddChipText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
   addPlatformBox: {
     backgroundColor: theme.colors.dark.surfaceLight,
     borderRadius: theme.radius.md,
@@ -1649,23 +1711,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
-  },
-  platformChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    marginRight: 6,
-  },
-  platformChipText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
   },
   affiliateInput: {
     backgroundColor: theme.colors.dark.surfaceLight,
@@ -2146,18 +2191,23 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  platformToggleBtn: {
+  manualAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 10,
+    gap: 6,
+    paddingVertical: 12,
     marginTop: 4,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '12',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+    borderStyle: 'dashed',
   },
-  platformToggleText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+  manualAddBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
   },
   sectionLabel: {
     fontSize: 13,
