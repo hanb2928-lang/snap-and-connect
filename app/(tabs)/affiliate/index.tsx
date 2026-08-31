@@ -706,6 +706,39 @@ export default function AffiliateScreen() {
           completed={completedSteps.has('affiliate')}
           onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
         >
+          {/* Affiliate URL input — top of card */}
+          <View style={styles.affiliateUrlInputWrap}>
+            <View style={styles.affiliateUrlInputRow}>
+              <View style={styles.affiliateUrlInputField}>
+                <Link2 size={16} color={theme.colors.dark.textDim} strokeWidth={2} style={styles.affiliateUrlInputIcon} />
+                <TextInput
+                  style={styles.affiliateUrlInput}
+                  value={affiliateUrl}
+                  onChangeText={setAffiliateUrl}
+                  placeholder="제휴 상품 링크 URL 입력하기"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  returnKeyType="go"
+                  onSubmitEditing={handleSaveAffiliate}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.affiliateUrlConnectBtn, (!affiliateUrl.trim() || extracting) && styles.affiliateUrlConnectBtnDisabled]}
+                onPress={handleSaveAffiliate}
+                disabled={!affiliateUrl.trim() || extracting}
+                activeOpacity={0.85}
+              >
+                {extracting ? (
+                  <Loader size={16} color="#fff" strokeWidth={2} />
+                ) : (
+                  <ArrowRight size={16} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.affiliateUrlConnectBtnText}>연결</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Platform list (collapsible) */}
           <PlatformListSection
@@ -2708,6 +2741,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.accent[300],
+  },
+  affiliateUrlInputWrap: {
+    marginBottom: theme.spacing.md,
+  },
+  affiliateUrlInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  affiliateUrlInputField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    height: 46,
+  },
+  affiliateUrlInputIcon: {
+    position: 'absolute',
+    left: 12,
+    zIndex: 1,
+  },
+  affiliateUrlInput: {
+    flex: 1,
+    paddingLeft: 36,
+    paddingRight: 12,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  affiliateUrlConnectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 16,
+    height: 46,
+  },
+  affiliateUrlConnectBtnDisabled: {
+    opacity: 0.4,
+  },
+  affiliateUrlConnectBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   linkEmptyBox: {
     backgroundColor: theme.colors.dark.surfaceLight,
