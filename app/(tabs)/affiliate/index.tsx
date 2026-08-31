@@ -1292,8 +1292,14 @@ export default function AffiliateScreen() {
 
           {/* AI 분석 시작 */}
           <TouchableOpacity
-            style={styles.analyzeBtn}
-            onPress={handleAnalyzePhoto}
+            style={[styles.analyzeBtn, (!selectedImage && !affiliateUrl.trim()) && styles.analyzeBtnDisabled]}
+            onPress={() => {
+              if (selectedImage) {
+                handleAnalyzePhoto();
+              } else if (affiliateUrl.trim()) {
+                handlePickPhoto();
+              }
+            }}
             disabled={analyzing || (!selectedImage && !affiliateUrl.trim())}
             activeOpacity={0.85}
           >
@@ -2159,6 +2165,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.success[500],
     marginBottom: theme.spacing.sm,
     ...theme.shadows.elevated,
+  },
+  analyzeBtnDisabled: {
+    opacity: 0.4,
   },
   analyzeBtnText: {
     fontSize: 15,
