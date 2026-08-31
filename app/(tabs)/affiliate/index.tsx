@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, Tag } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, ShoppingBasket, Hop as Home, Ticket, TreePalm as Palmtree, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, Tag, RefreshCw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -272,8 +272,14 @@ export default function AffiliateScreen() {
   // Step 1: Save affiliate link and extract product metadata
   const [urlWarning, setUrlWarning] = useState<string | null>(null);
 
+  const [urlToast, setUrlToast] = useState<string | null>(null);
+
   const handleSaveAffiliate = async () => {
-    if (!affiliateUrl.trim()) return;
+    if (!affiliateUrl.trim()) {
+      setUrlToast('올바른 상품 링크를 입력해주세요');
+      setTimeout(() => setUrlToast(null), 3000);
+      return;
+    }
     const validation = validateAffiliateUrl(affiliateUrl);
     if (!validation.valid) {
       setExtractError(validation.error);
@@ -314,7 +320,7 @@ export default function AffiliateScreen() {
       }
     } catch {
       setProductMeta(null);
-      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. AI 분석은 계속 진행할 수 있습니다.');
+      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 네트워크 연결을 확인하거나 링크를 다시 확인해주세요.');
     } finally {
       setExtracting(false);
     }
@@ -842,6 +848,32 @@ export default function AffiliateScreen() {
           {extractError && (
             <View style={styles.extractErrorBox}>
               <Text style={styles.extractErrorText}>{extractError}</Text>
+              <View style={styles.extractErrorActionRow}>
+                <TouchableOpacity
+                  style={styles.extractRetryBtn}
+                  onPress={handleSaveAffiliate}
+                  disabled={extracting}
+                  activeOpacity={0.7}
+                >
+                  {extracting ? (
+                    <Loader size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  ) : (
+                    <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  )}
+                  <Text style={styles.extractRetryBtnText}>재시도</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.extractManualBtn}
+                  onPress={() => {
+                    setExtractError(null);
+                    scrollToStep(2);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <ImageIcon size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.extractManualBtnText}>수동 입력으로 진행</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -1531,6 +1563,16 @@ export default function AffiliateScreen() {
         onConfirm={handleConfirmUpload}
         onClose={() => setPreviewUpload(null)}
       />
+
+      {/* URL validation toast */}
+      {urlToast && (
+        <View style={styles.urlToastContainer}>
+          <View style={styles.urlToastBox}>
+            <AlertTriangle size={16} color="#fff" strokeWidth={2} />
+            <Text style={styles.urlToastText}>{urlToast}</Text>
+          </View>
+        </View>
+      )}
 
       {/* Upload completion confirm popup — shown after returning from platform app */}
       {showUploadConfirm && (
@@ -2233,6 +2275,66 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     lineHeight: 17,
+    marginBottom: 8,
+  },
+  extractErrorActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  extractRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.error[500] + '18',
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '40',
+  },
+  extractRetryBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.error[400],
+  },
+  extractManualBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  extractManualBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  urlToastContainer: {
+    position: 'absolute',
+    top: 120,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  urlToastBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.error[500],
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: theme.radius.full,
+    ...theme.shadows.elevated,
+  },
+  urlToastText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   urlWarningBox: {
     flexDirection: 'row',

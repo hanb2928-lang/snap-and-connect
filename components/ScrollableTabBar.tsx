@@ -14,18 +14,21 @@ import {
   Camera,
   Folder,
   Zap,
+  ShoppingBag,
   type LucideIcon,
 } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
   marketing: Zap,
+  affiliate: ShoppingBag,
   assets: Folder,
 };
 
 const TAB_KEYS: Record<string, string> = {
   index: 'tab.camera',
   marketing: 'tab.create',
+  affiliate: 'tab.affiliate',
   assets: 'tab.library',
 };
 
