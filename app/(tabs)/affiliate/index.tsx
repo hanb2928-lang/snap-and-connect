@@ -65,11 +65,12 @@ const TEMPLATE_STYLES = [
   { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText },
 ] as const;
 
-type StepKey = 'affiliate' | 'analyze' | 'content' | 'upload';
+type StepKey = 'affiliate' | 'platformSelect' | 'analyze' | 'content' | 'upload';
 
 const STEP_ORDER: StepKey[] = ['affiliate', 'analyze', 'content', 'upload'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   affiliate: { num: 1, color: theme.colors.accent[400] },
+  platformSelect: { num: 0, color: theme.colors.warning[400] },
   analyze: { num: 2, color: theme.colors.success[400] },
   content: { num: 3, color: theme.colors.warning[400] },
   upload: { num: 4, color: theme.colors.success[400] },
@@ -103,6 +104,9 @@ export default function AffiliateScreen() {
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
+  const [selectedUploadPlatforms, setSelectedUploadPlatforms] = useState<Set<string>>(new Set());
+  const [manualUploadPlatforms, setManualUploadPlatforms] = useState<{ key: string; label: string }[]>([]);
+  const [manualPlatformName, setManualPlatformName] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -649,15 +653,129 @@ export default function AffiliateScreen() {
           )}
         </PillNavCard>
 
-        {/* Quick nav: Trending products */}
+        {/* Platform selection */}
         <PillNavCard
-          icon={<Flame size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
-          title="실시간 꿀템 픽"
-          subtitle="급상승 키워드 · 파트너스 1클릭 파싱 · 카테고리별 꿀조합"
+          icon={<Share2 size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="플랫폼 선택하기"
+          subtitle="주요 플랫폼 업로드 게시판 선택 · 수동 입력"
           accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
-          onPress={() => router.push('/affiliate/trending' as never)}
-        />
+          expanded={expandedStep === 'platformSelect'}
+          onToggle={() => setExpandedStep(expandedStep === 'platformSelect' ? null : 'platformSelect')}
+        >
+          <Text style={styles.sectionLabel}>주요 플랫폼</Text>
+          <View style={styles.uploadGrid}>
+            {UPLOAD_PLATFORMS.map((p) => {
+              const Icon = p.icon;
+              const isSelected = selectedUploadPlatforms.has(p.key);
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.uploadCard, isSelected && { borderColor: p.color, backgroundColor: p.color + '15' }]}
+                  onPress={() => {
+                    setSelectedUploadPlatforms((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(p.key)) next.delete(p.key);
+                      else next.add(p.key);
+                      return next;
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.uploadIcon, { backgroundColor: p.color + '20' }]}>
+                    <Icon size={20} color={p.color} strokeWidth={2} />
+                  </View>
+                  <Text style={styles.uploadLabel}>{p.label}</Text>
+                  <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: p.color }]}>
+                    {isSelected ? (
+                      <Check size={12} color="#fff" strokeWidth={2.5} />
+                    ) : (
+                      <Plus size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {manualUploadPlatforms.map((mp) => {
+            const isSelected = selectedUploadPlatforms.has(mp.key);
+            return (
+              <TouchableOpacity
+                key={mp.key}
+                style={[styles.manualPlatformRow, isSelected && { borderColor: theme.colors.accent[400] }]}
+                onPress={() => {
+                  setSelectedUploadPlatforms((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(mp.key)) next.delete(mp.key);
+                    else next.add(mp.key);
+                    return next;
+                  });
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.uploadIcon, { backgroundColor: theme.colors.accent[400] + '20' }]}>
+                  <Share2 size={18} color={theme.colors.accent[300]} strokeWidth={2} />
+                </View>
+                <Text style={styles.manualPlatformLabel}>{mp.label}</Text>
+                <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: theme.colors.accent[400] }]}>
+                  {isSelected ? (
+                    <Check size={12} color="#fff" strokeWidth={2.5} />
+                  ) : (
+                    <Plus size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setManualUploadPlatforms((prev) => prev.filter((x) => x.key !== mp.key));
+                    setSelectedUploadPlatforms((prev) => {
+                      const next = new Set(prev);
+                      next.delete(mp.key);
+                      return next;
+                    });
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })}
+
+          <View style={styles.manualPlatformInputRow}>
+            <TextInput
+              style={styles.manualPlatformInput}
+              value={manualPlatformName}
+              onChangeText={setManualPlatformName}
+              placeholder="플랫폼 이름 입력 (예: 틱톡, 핀터레스트)"
+              placeholderTextColor={theme.colors.dark.textFaint}
+            />
+            <TouchableOpacity
+              style={[styles.manualPlatformAddBtn, !manualPlatformName.trim() && styles.addPlatformConfirmBtnDisabled]}
+              onPress={() => {
+                if (!manualPlatformName.trim()) return;
+                const key = 'manual_' + Date.now();
+                setManualUploadPlatforms((prev) => [...prev, { key, label: manualPlatformName.trim() }]);
+                setSelectedUploadPlatforms((prev) => { const next = new Set(prev); next.add(key); return next; });
+                setManualPlatformName('');
+              }}
+              disabled={!manualPlatformName.trim()}
+              activeOpacity={0.7}
+            >
+              <Plus size={16} color="#fff" strokeWidth={2} />
+              <Text style={styles.manualPlatformAddBtnText}>추가</Text>
+            </TouchableOpacity>
+          </View>
+
+          {selectedUploadPlatforms.size > 0 && (
+            <View style={styles.platformSummaryBox}>
+              <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.platformSummaryText}>
+                {selectedUploadPlatforms.size}개 플랫폼 선택됨
+              </Text>
+            </View>
+          )}
+        </PillNavCard>
 
         {/* STEP 2: AI Analysis & Image */}
         <View
@@ -2364,6 +2482,80 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
+  },
+  platformSelectBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  manualPlatformRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    marginBottom: 8,
+  },
+  manualPlatformLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  manualPlatformInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  manualPlatformInput: {
+    flex: 1,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  manualPlatformAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500],
+  },
+  manualPlatformAddBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  platformSummaryBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.success[500] + '12',
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 8,
+  },
+  platformSummaryText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   uploadDoneBadge: {
     flexDirection: 'row',
