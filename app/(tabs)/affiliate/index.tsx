@@ -10,7 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -50,6 +50,8 @@ const UPLOAD_PLATFORMS = [
   { key: 'instagram', label: '인스타그램', icon: Camera, color: '#E1306C' },
   { key: 'blog', label: '네이버 블로그', icon: FileText, color: '#03C75A' },
   { key: 'youtube', label: '유튜브 숏츠', icon: Youtube, color: '#FF0000' },
+  { key: 'tiktok', label: '틱톡', icon: Music2, color: '#000000' },
+  { key: 'pinterest', label: '핀터레스트', icon: ImageIcon, color: '#E60023' },
   { key: 'twitter', label: '트위터/스레드', icon: Hash, color: '#1DA1F2' },
 ] as const;
 
@@ -68,6 +70,16 @@ const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
     { key: 'shorts', label: '쇼츠' },
     { key: 'community', label: '커뮤니티 탭' },
     { key: 'video', label: '일반 영상' },
+  ],
+  tiktok: [
+    { key: 'video', label: '틱톡 영상' },
+    { key: 'carousel', label: '캐러셀' },
+    { key: 'story', label: '스토리' },
+  ],
+  pinterest: [
+    { key: 'pin', label: '핀' },
+    { key: 'idea_pin', label: '아이디어 핀' },
+    { key: 'board', label: '보드' },
   ],
   twitter: [
     { key: 'thread', label: '스레드' },
