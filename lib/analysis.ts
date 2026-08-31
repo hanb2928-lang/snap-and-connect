@@ -282,6 +282,9 @@ export async function extractProductMeta(
   platform: string;
   brand: string;
   availability: string;
+  searchUrl: string;
+  productId: string;
+  extractionMethod: string;
 }> {
   const extractUrl = `${supabaseUrl}/functions/v1/extract-product-meta`;
   const response = await safeFetch(extractUrl, {

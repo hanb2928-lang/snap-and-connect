@@ -16,6 +16,9 @@ interface ProductMeta {
   platform: string;
   availability: string;
   brand: string;
+  searchUrl: string;
+  productId: string;
+  extractionMethod: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -37,9 +40,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const platform = detectPlatform(url);
+    const productId = extractProductId(url, platform);
+    const searchUrl = buildSearchUrl(url, platform, productId);
+    const brandFromUrl = extractBrandFromUrl(url, platform);
+
     let meta: ProductMeta;
     try {
       meta = await fetchAndParse(url);
+      meta.searchUrl = searchUrl;
+      meta.productId = productId;
+      meta.extractionMethod = "crawl";
     } catch {
       meta = {
         productName: "",
@@ -48,9 +59,12 @@ Deno.serve(async (req: Request) => {
         currency: "KRW",
         image: "",
         url,
-        platform: detectPlatform(url),
+        platform,
         availability: "",
-        brand: "",
+        brand: brandFromUrl,
+        searchUrl,
+        productId,
+        extractionMethod: "failed",
       };
     }
 
@@ -59,6 +73,9 @@ Deno.serve(async (req: Request) => {
       if (openaiKey) {
         try {
           meta = await enrichWithAI(url, meta, openaiKey);
+          if (meta.extractionMethod === "failed") {
+            meta.extractionMethod = "ai_inferred";
+          }
         } catch {
           // keep basic meta
         }
@@ -86,7 +103,93 @@ function detectPlatform(url: string): string {
   if (u.includes("aliexpress.com")) return "AliExpress";
   if (u.includes("amazon.com")) return "Amazon";
   if (u.includes("toss.to")) return "Toss";
+  if (u.includes("shopee.")) return "Shopee";
+  if (u.includes("coupang.com")) return "Coupang";
   return "Unknown";
+}
+
+function extractProductId(url: string, platform: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname;
+    const segments = path.split("/").filter(Boolean);
+
+    switch (platform) {
+      case "Coupang": {
+        const vpIdx = segments.findIndex((s) => s === "vp");
+        if (vpIdx >= 0 && segments[vpIdx + 1]) return segments[vpIdx + 1];
+        const productsIdx = segments.findIndex((s) => s === "products");
+        if (productsIdx >= 0 && segments[productsIdx + 1]) return segments[productsIdx + 1];
+        break;
+      }
+      case "Naver": {
+        const productsIdx = segments.findIndex((s) => s === "products");
+        if (productsIdx >= 0 && segments[productsIdx + 1]) return segments[productsIdx + 1];
+        break;
+      }
+      case "AliExpress": {
+        const itemIdx = segments.findIndex((s) => s.startsWith("item"));
+        if (itemIdx >= 0 && segments[itemIdx + 1]) return segments[itemIdx + 1];
+        break;
+      }
+      case "Amazon": {
+        const dpIdx = segments.findIndex((s) => s === "dp");
+        if (dpIdx >= 0 && segments[dpIdx + 1]) return segments[dpIdx + 1];
+        const gpIdx = segments.findIndex((s) => s === "gp" && segments[gpIdx + 1] === "product");
+        if (gpIdx >= 0 && segments[gpIdx + 2]) return segments[gpIdx + 2];
+        break;
+      }
+    }
+
+    for (const seg of segments) {
+      if (/^\d{6,}$/.test(seg)) return seg;
+    }
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+function buildSearchUrl(url: string, platform: string, productId: string): string {
+  try {
+    const parsed = new URL(url);
+    switch (platform) {
+      case "Coupang":
+        return `https://www.coupang.com/np/search?q=${productId || ""}`;
+      case "Naver":
+        return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(parsed.hostname + " " + (productId || ""))}`;
+      case "AliExpress":
+        return `https://www.aliexpress.com/wholesale?SearchText=${productId || ""}`;
+      case "Amazon":
+        return `https://www.amazon.com/s?k=${productId || ""}`;
+      case "11st":
+        return `https://search.11st.co.kr/Search.tmall?kwd=${productId || ""}`;
+      case "Gmarket":
+        return `https://browse.gmarket.co.kr/search?keyword=${productId || ""}`;
+      default:
+        return `https://www.google.com/search?q=${encodeURIComponent(parsed.hostname + " " + (productId || ""))}`;
+    }
+  } catch {
+    return "";
+  }
+}
+
+function extractBrandFromUrl(url: string, platform: string): string {
+  try {
+    const parsed = new URL(url);
+    if (platform === "Coupang") return "Coupang";
+    if (platform === "Naver") {
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      if (segments[0] === "brands") return segments[1] || "Naver";
+      return parsed.hostname.replace("smartstore.", "").replace("brand.", "").split(".")[0];
+    }
+    if (platform === "AliExpress") return "AliExpress";
+    if (platform === "Amazon") return "Amazon";
+    return parsed.hostname.split(".")[0];
+  } catch {
+    return "";
+  }
 }
 
 async function fetchAndParse(url: string): Promise<ProductMeta> {
@@ -108,7 +211,8 @@ async function fetchAndParse(url: string): Promise<ProductMeta> {
   }
 
   const html = await response.text();
-  return parseHtml(html, url);
+  const meta = parseHtml(html, url);
+  return meta;
 }
 
 function parseHtml(html: string, url: string): ProductMeta {
@@ -155,6 +259,9 @@ function parseHtml(html: string, url: string): ProductMeta {
     platform,
     availability,
     brand,
+    searchUrl: "",
+    productId: "",
+    extractionMethod: "crawl",
   };
 }
 
@@ -235,11 +342,12 @@ function extractBrand(html: string, siteName: string): string {
 
 async function enrichWithAI(url: string, basic: ProductMeta, apiKey: string): Promise<ProductMeta> {
   const systemPrompt =
-    "You are a product information extractor. Given a URL, infer the most likely product name, category, price range, and key selling points. " +
+    "You are a product information extractor. Given a shopping URL, infer the most likely product name, category, price range, and key selling points. " +
+    "Use the URL structure (path segments, query params, product IDs) as clues. For example, a URL containing 'wireless-earbuds' likely refers to wireless earbuds. " +
     "Return ONLY valid JSON with fields: productName, description, price, brand. " +
     "All text in Korean. If you cannot determine a field, leave it empty.";
 
-  const userPrompt = `URL: ${url}\nPlatform: ${basic.platform}\nExtracted title: ${basic.productName}\nReturn product metadata as JSON.`;
+  const userPrompt = `URL: ${url}\nPlatform: ${basic.platform}\nProduct ID: ${basic.productId}\nExtracted title: ${basic.productName}\nReturn product metadata as JSON.`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);

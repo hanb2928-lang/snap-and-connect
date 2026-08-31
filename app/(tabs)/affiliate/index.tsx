@@ -287,6 +287,7 @@ export default function AffiliateScreen() {
     image: string;
     platform: string;
     brand: string;
+    searchUrl: string;
   } | null>(null);
 
   // Step 2: AI Analysis
@@ -471,9 +472,13 @@ export default function AffiliateScreen() {
         image: meta.image || '',
         platform: meta.platform || '',
         brand: meta.brand || '',
+        searchUrl: meta.searchUrl || '',
       };
       if (!newMeta.productName && !newMeta.description && !newMeta.image) {
-        setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 상품 사진을 직접 업로드하고 진행할 수 있습니다.');
+        const searchHint = newMeta.searchUrl
+          ? `상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 검색 페이지에서 상품을 확인하거나, 상품 사진을 직접 업로드하여 진행할 수 있습니다.|||${newMeta.searchUrl}`
+          : '상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 상품 사진을 직접 업로드하고 진행할 수 있습니다.';
+        setExtractError(searchHint);
         setProductMeta(null);
         return;
       }
@@ -796,7 +801,22 @@ export default function AffiliateScreen() {
           {/* Product metadata preview */}
           {extractError && (
             <View style={styles.extractErrorBox}>
-              <Text style={styles.extractErrorText}>{extractError}</Text>
+              <Text style={styles.extractErrorText}>
+                {extractError.split('|||')[0]}
+              </Text>
+              {extractError.includes('|||') && (
+                <TouchableOpacity
+                  style={styles.extractSearchBtn}
+                  onPress={() => {
+                    const searchUrl = extractError.split('|||')[1];
+                    if (searchUrl) Linking.openURL(searchUrl).catch(() => {});
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <ScanSearch size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.extractSearchBtnText}>검색 페이지에서 상품 확인</Text>
+                </TouchableOpacity>
+              )}
               <View style={styles.extractErrorActionRow}>
                 <TouchableOpacity
                   style={styles.extractRetryBtn}
@@ -2845,6 +2865,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  extractSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.accent[500] + '18',
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '40',
+    marginBottom: 8,
+  },
+  extractSearchBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
   },
   urlToastContainer: {
     position: 'absolute',
