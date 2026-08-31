@@ -822,7 +822,7 @@ function WebClipGenerator({
       }
       await preloadBabyImage().catch(() => {});
       const settingsData = await getUserSettings().catch(() => null);
-      const mascotEnabled = settingsData?.mascot_enabled ?? true;
+      const effectiveMascotEnabled = settingsData?.mascot_enabled ?? mascotEnabled;
       const safeImageUrl = await urlToDataUrl(imageUrl);
       const L = getLayout(format);
       const canvas = document.createElement('canvas');
@@ -1085,7 +1085,7 @@ function WebClipGenerator({
 
         // Baby + link sticker composited into the video frame
         if (shortUrl && t < 0.667) {
-          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor, mascotEnabled);
+          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor, effectiveMascotEnabled);
         }
 
         // Disclosure text (last ~2 seconds)
@@ -1109,7 +1109,10 @@ function WebClipGenerator({
         } else {
           recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') {
-              try { recorder.stop(); } catch {}
+              try { recorder.stop(); } catch {
+                // If stop throws, force-resolve the done promise so render doesn't hang
+                recorder.onstop = null;
+              }
             }
           }, 150);
         }
@@ -1175,7 +1178,7 @@ function WebClipGenerator({
         showToast('동영상 생성에 실패했어요');
       }
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure]);
+  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure, mascotEnabled]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;

@@ -312,14 +312,16 @@ export default function MarketingScreen() {
       audioRef.current?.pause();
       setVoicePlaying(false);
     } else {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(voiceDataUrl);
-        audioRef.current.onended = () => setVoicePlaying(false);
-      } else {
-        audioRef.current.src = voiceDataUrl;
+      if (Platform.OS === 'web') {
+        if (!audioRef.current) {
+          audioRef.current = new Audio(voiceDataUrl);
+          audioRef.current.onended = () => setVoicePlaying(false);
+        } else {
+          audioRef.current.src = voiceDataUrl;
+        }
+        audioRef.current.play().catch(() => setVoicePlaying(false));
+        setVoicePlaying(true);
       }
-      audioRef.current.play().catch(() => setVoicePlaying(false));
-      setVoicePlaying(true);
     }
   };
 

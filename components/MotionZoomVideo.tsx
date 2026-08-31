@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -58,11 +58,15 @@ export function MotionZoomVideo({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const dataUrl = imageUrl.startsWith('data:')
-    ? imageUrl
-    : imageUrl.startsWith('http')
+  const dataUrl = useMemo(() =>
+    imageUrl.startsWith('data:')
       ? imageUrl
-      : buildDataUrl(cleanBase64(imageUrl), 'image/jpeg');
+      : imageUrl.startsWith('http')
+        ? imageUrl
+        : buildDataUrl(cleanBase64(imageUrl), 'image/jpeg')
+  , [imageUrl]);
+
+  const videoUrlRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
     if (animFrameRef.current) {
@@ -73,6 +77,10 @@ export function MotionZoomVideo({
       recorderRef.current.stop();
     }
     chunksRef.current = [];
+    if (videoUrlRef.current) {
+      URL.revokeObjectURL(videoUrlRef.current);
+      videoUrlRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -250,7 +258,9 @@ export function MotionZoomVideo({
       await done;
 
       const blob = new Blob(chunksRef.current, { type: mimeType });
+      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
       const url = URL.createObjectURL(blob);
+      videoUrlRef.current = url;
       setVideoUrl(url);
       setVideoMime(mimeType);
       if (onVideoReady) onVideoReady(url);

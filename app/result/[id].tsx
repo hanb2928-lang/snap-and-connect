@@ -155,6 +155,7 @@ export default function ResultScreen() {
   const [styleAppliedKey, setStyleAppliedKey] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
   const [focusTileKey, setFocusTileKey] = useState<string | null>(null);
   const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
@@ -211,19 +212,21 @@ export default function ResultScreen() {
   useEffect(() => {
     if (!scan || scan.tts_url || ttsUrl) return;
     const interval = setInterval(() => {
-      supabase
-        .from('scans')
-        .select('tts_url')
-        .eq('id', scan.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.tts_url && mountedRef.current) {
-            setTtsUrl(data.tts_url);
-          }
-        });
+      Promise.resolve(
+        supabase
+          .from('scans')
+          .select('tts_url')
+          .eq('id', scan.id)
+          .maybeSingle()
+      ).then(({ data }: { data: { tts_url: string } | null }) => {
+        if (data?.tts_url && mountedRef.current) {
+          setTtsUrl(data.tts_url);
+        }
+      }).catch(() => {});
     }, 5000);
     return () => clearInterval(interval);
   }, [scan, ttsUrl]);
+
 
   // Re-check TTS URL when app returns to foreground
   useEffect(() => {
@@ -265,7 +268,10 @@ export default function ResultScreen() {
         // Finalize: write analysis data to scan row, cache result, trigger TTS
         (async () => {
           try {
-            await finalizeAnalysisFromJob(scan.id, job.id, job.result ?? {});
+            if (!job.result) {
+              throw new Error('분석 결과가 비어 있습니다. 다시 시도해주세요.');
+            }
+            await finalizeAnalysisFromJob(scan.id, job.id, job.result);
             // Refresh the scan to get the updated data
             const { data: refreshed } = await supabase
               .from('scans')
@@ -313,9 +319,7 @@ export default function ResultScreen() {
       clearInterval(pollInterval);
       handleJobUpdateRef.current = null;
     };
-  }, [scan?.analysis_job_id]);
-
-  // Re-check job status immediately when app returns to foreground
+  }, [scan?.analysis_job_id, retryCount]);
   // (OS suspends timers when screen is off / app is backgrounded)
   useEffect(() => {
     if (!scan?.analysis_job_id) return;
@@ -1628,9 +1632,15 @@ export default function ResultScreen() {
             </Text>
             <TouchableOpacity
               style={styles.analysisRetryBtn}
-              onPress={() => {
+              onPress={async () => {
                 if (scan?.analysis_job_id) {
                   setAnalysisStatus('processing');
+                  setAnalysisError(null);
+                  await supabase
+                    .from('render_jobs')
+                    .update({ status: 'queued', error_message: null })
+                    .eq('id', scan.analysis_job_id);
+                  setRetryCount((c) => c + 1);
                 }
               }}
               activeOpacity={0.8}
