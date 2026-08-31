@@ -579,7 +579,7 @@ export default function CameraScreen() {
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
       try {
-        const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '웹 캡처');
+        const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '웹 캡처');
         if (images.length === 0) return null;
         const compressed = await withTimeout(
           prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7),

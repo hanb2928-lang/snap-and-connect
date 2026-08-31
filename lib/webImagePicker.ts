@@ -55,7 +55,7 @@ function resizeImage(file: File, maxSize = 1280, quality = 0.65): Promise<{ base
   });
 }
 
-export async function pickImageWeb(multiple = false, maxCount = 4): Promise<PickedImage[]> {
+export async function pickImageWeb(multiple = false, maxCount = 4, useCamera = false): Promise<PickedImage[]> {
   return new Promise((resolve, reject) => {
     if (Platform.OS !== 'web') {
       reject(new Error('웹에서만 사용할 수 있는 기능입니다'));
@@ -64,6 +64,9 @@ export async function pickImageWeb(multiple = false, maxCount = 4): Promise<Pick
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    if (useCamera) {
+      (input as HTMLInputElement & { capture?: string }).capture = 'environment';
+    }
     if (multiple) {
       input.multiple = true;
     }
