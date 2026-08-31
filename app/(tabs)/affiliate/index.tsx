@@ -1055,11 +1055,12 @@ export default function AffiliateScreen() {
                     <TouchableOpacity
                       style={styles.viralPreviewBtn}
                       onPress={() => {
+                        if (!viralAnalysisResult) return;
                         setVideoPreviewGenerating(true);
                         setVideoPreviewScenes(null);
                         setExpandedStep('analyze');
                         setTimeout(() => {
-                          const maxDur = viralAnalysisResult?.specs.maxDuration ?? '60초';
+                          const maxDur = viralAnalysisResult.specs.maxDuration ?? '60초';
                           const totalSec = parseInt(maxDur, 10) || 60;
                           const scenes = viralAnalysisResult.hooks.map((hook, i) => ({
                             time: `${Math.floor((totalSec / viralAnalysisResult.hooks.length) * i)}s`,
@@ -1130,56 +1131,59 @@ export default function AffiliateScreen() {
           {/* Video preview area */}
           <View style={styles.videoPreviewWrap}>
             {imagePreviewUri ? (
-              <>
-                <Image
-                  source={{ uri: imagePreviewUri }}
-                  style={styles.videoPreviewThumb}
-                  resizeMode="cover"
-                />
-                <View style={styles.videoPreviewOverlay}>
-                  {videoPreviewGenerating ? (
-                    <View style={styles.videoPreviewGenWrap}>
-                      <Loader size={28} color="#fff" strokeWidth={2} />
-                      <Text style={styles.videoPreviewGenText}>심리 자극 요소 기반 스토리보드 생성 중...</Text>
-                    </View>
-                  ) : videoPreviewScenes ? (
-                    <View style={styles.videoSceneWrap}>
-                      <Text style={styles.videoSceneBadgeText}>스토리보드 미리보기</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
-                      <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={styles.videoSpecBadge}>
-                  <Clapperboard size={11} color="#fff" strokeWidth={2} />
-                  <Text style={styles.videoSpecBadgeText}>
-                    {viralAnalysisResult
-                      ? `${viralAnalysisResult.specs.ratio} · ${viralAnalysisResult.specs.maxDuration}`
-                      : selectedUploadPlatform && selectedBoard
-                        ? `${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.ratio ?? '16:9'} · ${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.maxDuration ?? '60초'}`
-                        : '9:16 · 60초'}
-                  </Text>
-                </View>
-                <View style={styles.videoTimelineBar}>
-                  <View style={styles.videoTimelineProgress} />
-                </View>
-                <View style={styles.videoTimelineLabels}>
-                  <Text style={styles.videoTimelineLabel}>0:00</Text>
-                  <Text style={styles.videoTimelineLabel}>
-                    {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
-                  </Text>
-                </View>
-              </>
+              <Image
+                source={{ uri: imagePreviewUri }}
+                style={styles.videoPreviewThumb}
+                resizeMode="cover"
+              />
             ) : (
-              <View style={styles.videoPreviewEmpty}>
-                <Clapperboard size={32} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
-                <Text style={styles.videoPreviewEmptyText}>
-                  1단계에서 제휴 링크를 연결하면 미리보기 영상이 생성됩니다
-                </Text>
-              </View>
+              <View style={styles.videoPreviewPlaceholderBg} />
             )}
+
+            <View style={styles.videoPreviewOverlay}>
+              {videoPreviewGenerating ? (
+                <View style={styles.videoPreviewGenWrap}>
+                  <Loader size={28} color="#fff" strokeWidth={2} />
+                  <Text style={styles.videoPreviewGenText}>심리 자극 요소 기반 스토리보드 생성 중...</Text>
+                </View>
+              ) : videoPreviewScenes ? (
+                <View style={styles.videoSceneWrap}>
+                  <Text style={styles.videoSceneBadgeText}>스토리보드 미리보기</Text>
+                </View>
+              ) : imagePreviewUri ? (
+                <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
+                  <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.videoPreviewEmptyInline}>
+                  <Clapperboard size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />
+                  <Text style={styles.videoPreviewEmptyInlineText}>
+                    미리보기 생성 버튼을 눌러 영상 스토리보드를 만들어보세요
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.videoSpecBadge}>
+              <Clapperboard size={11} color="#fff" strokeWidth={2} />
+              <Text style={styles.videoSpecBadgeText}>
+                {viralAnalysisResult
+                  ? `${viralAnalysisResult.specs.ratio} · ${viralAnalysisResult.specs.maxDuration}`
+                  : selectedUploadPlatform && selectedBoard
+                    ? `${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.ratio ?? '16:9'} · ${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.maxDuration ?? '60초'}`
+                    : '9:16 · 60초'}
+              </Text>
+            </View>
+
+            <View style={styles.videoTimelineBar}>
+              <View style={styles.videoTimelineProgress} />
+            </View>
+            <View style={styles.videoTimelineLabels}>
+              <Text style={styles.videoTimelineLabel}>0:00</Text>
+              <Text style={styles.videoTimelineLabel}>
+                {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
+              </Text>
+            </View>
           </View>
 
           {/* Storyboard scenes from viral hooks */}
@@ -2361,6 +2365,22 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.medium,
     color: 'rgba(255,255,255,0.7)',
+  },
+  videoPreviewPlaceholderBg: {
+    flex: 1,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  videoPreviewEmptyInline: {
+    alignItems: 'center',
+    gap: 8,
+    padding: theme.spacing.lg,
+  },
+  videoPreviewEmptyInlineText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 17,
   },
   videoPreviewEmpty: {
     flex: 1,
