@@ -2554,10 +2554,10 @@ export default function AffiliateScreen() {
                 <Text style={[styles.subAccordionNumText, contentSubStep === 0 && styles.subAccordionNumTextActive]}>1</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>원소재 선택{previewMediaMode === 'video' ? ' 및 영상 편집' : ''}</Text>
+                <Text style={styles.subAccordionTitle}>소재 선택</Text>
                 <Text style={styles.subAccordionDesc} numberOfLines={1}>
                   {previewMediaMode === 'video'
-                    ? stockVideoClip ? '영상 선택됨' : '무료 영상을 검색해 선택하세요'
+                    ? stockVideoClip ? 'Pexels 영상 선택됨' : '가로 스크롤로 무료 영상을 선택하세요'
                     : 'AI 분석 결과를 바탕으로 이미지가 준비됩니다'}
                 </Text>
               </View>
@@ -2573,65 +2573,26 @@ export default function AffiliateScreen() {
             <View style={styles.subAccordionBody}>
               {previewMediaMode === 'video' && (
                 <>
-                  <TouchableOpacity
-                    style={styles.customToggle}
-                    onPress={() => setShowAdvancedVideo(!showAdvancedVideo)}
-                    activeOpacity={0.7}
-                  >
-                    <Film size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                    <Text style={styles.customToggleText}>
-                      {showAdvancedVideo ? '영상 편집 옵션 접기' : '영상 편집 옵션 펼치기'}
-                    </Text>
-                    {showAdvancedVideo ? (
-                      <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                    ) : (
-                      <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                    )}
-                  </TouchableOpacity>
+                  <StockVideoPicker
+                    productName={productMeta?.productName}
+                    productCategory={undefined}
+                    orientation={(() => {
+                      const specs = selectedUploadPlatform && selectedBoard
+                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                        : null;
+                      if (!specs) return 'portrait';
+                      return specs.ratio.includes('9:16') ? 'portrait'
+                        : specs.ratio.includes('16:9') ? 'landscape'
+                        : 'square';
+                    })()}
+                    selectedClip={stockVideoClip}
+                    onSelectClip={setStockVideoClip}
+                  />
 
-                  {showAdvancedVideo && (
-                    <>
-                      <StockVideoPicker
-                        productName={productMeta?.productName}
-                        productCategory={undefined}
-                        orientation={(() => {
-                          const specs = selectedUploadPlatform && selectedBoard
-                            ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                            : null;
-                          if (!specs) return 'portrait';
-                          return specs.ratio.includes('9:16') ? 'portrait'
-                            : specs.ratio.includes('16:9') ? 'landscape'
-                            : 'square';
-                        })()}
-                        selectedClip={stockVideoClip}
-                        onSelectClip={setStockVideoClip}
-                      />
-
-                      <VideoEditPlanCard
-                        productName={productMeta?.productName}
-                        productCategory={undefined}
-                        platform={selectedUploadPlatform || undefined}
-                        accentColor={undefined}
-                        hook={undefined}
-                        oneLiner={undefined}
-                        hasVideoSelected={stockVideoClip !== null}
-                        onPlanGenerated={setVideoEditPlan}
-                      />
-
-                      <VideoRenderCard
-                        clip={stockVideoClip}
-                        plan={videoEditPlan}
-                        ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
-                        disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
-                        productName={productMeta?.productName}
-                      />
-                    </>
-                  )}
-
-                  {!showAdvancedVideo && stockVideoClip && (
+                  {stockVideoClip && (
                     <View style={styles.subStepHintBox}>
                       <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                      <Text style={styles.subStepHintText}>영상이 선택되었습니다. 편집 옵션을 펼치면 수정할 수 있습니다.</Text>
+                      <Text style={styles.subStepHintText}>영상이 선택되었습니다.</Text>
                     </View>
                   )}
                 </>
@@ -2651,7 +2612,7 @@ export default function AffiliateScreen() {
                 onPress={() => setContentSubStep(1)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.subNextBtnText}>다음: 스타일 & 카피 설정</Text>
+                <Text style={styles.subNextBtnText}>다음: 전략 및 페이싱</Text>
                 <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
               </TouchableOpacity>
             </View>
@@ -2668,9 +2629,9 @@ export default function AffiliateScreen() {
                 <Text style={[styles.subAccordionNumText, contentSubStep === 1 && styles.subAccordionNumTextActive]}>2</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>스타일 & 카피 설정</Text>
+                <Text style={styles.subAccordionTitle}>전략 및 페이싱</Text>
                 <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {selectedTemplate ? '스타일 선택됨' : '템플릿·콘텐츠 유형·문구를 설정하세요'}
+                  {videoEditPlan ? `${videoEditPlan.duration}초 페이싱 · 전략 적용됨` : '15초/30초와 심리 전략을 선택하세요'}
                 </Text>
               </View>
             </View>
@@ -2683,6 +2644,20 @@ export default function AffiliateScreen() {
 
           {contentSubStep === 1 && (
             <View style={styles.subAccordionBody}>
+              {previewMediaMode === 'video' && (
+                <VideoEditPlanCard
+                  productName={productMeta?.productName}
+                  productCategory={undefined}
+                  platform={selectedUploadPlatform || undefined}
+                  accentColor={undefined}
+                  hook={undefined}
+                  oneLiner={undefined}
+                  hasVideoSelected={stockVideoClip !== null}
+                  onPlanGenerated={setVideoEditPlan}
+                  hideCopyVariants
+                />
+              )}
+
               {/* Collapsible custom options */}
               <TouchableOpacity
                 style={styles.customToggle}
@@ -2954,7 +2929,7 @@ export default function AffiliateScreen() {
                 onPress={() => setContentSubStep(2)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.subNextBtnText}>다음: 최종 확인</Text>
+                <Text style={styles.subNextBtnText}>다음: 카피 및 발행</Text>
                 <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
               </TouchableOpacity>
             </View>
@@ -2971,9 +2946,9 @@ export default function AffiliateScreen() {
                 <Text style={[styles.subAccordionNumText, contentSubStep === 2 && styles.subAccordionNumTextActive]}>3</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>최종 확인</Text>
+                <Text style={styles.subAccordionTitle}>카피 및 발행</Text>
                 <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {contentText.trim() ? '문구 입력됨 · 5단계에서 업로드' : '문구를 입력하고 5단계로 진행하세요'}
+                  {contentText.trim() ? 'A/B 카피 입력됨 · 플랫폼 선택 후 발행' : '카피 변형과 발행 플랫폼을 확인하세요'}
                 </Text>
               </View>
             </View>
@@ -3041,7 +3016,7 @@ export default function AffiliateScreen() {
                 activeOpacity={0.8}
               >
                 <PenLine size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.subFinishBtnText}>5단계 업로드로 이동</Text>
+                <Text style={styles.subFinishBtnText}>플랫폼 선택 후 발행으로 이동</Text>
               </TouchableOpacity>
             </View>
           )}

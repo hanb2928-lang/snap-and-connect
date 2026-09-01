@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Info,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '@/lib/theme';
@@ -41,6 +42,7 @@ interface VideoEditPlanCardProps {
   oneLiner?: string;
   hasVideoSelected: boolean;
   onPlanGenerated?: (plan: EditPlan) => void;
+  hideCopyVariants?: boolean;
 }
 
 const PSYCHOLOGY_OPTIONS: { key: PsychologyPreset; label: string; desc: string }[] = [
@@ -60,6 +62,7 @@ export function VideoEditPlanCard({
   oneLiner,
   hasVideoSelected,
   onPlanGenerated,
+  hideCopyVariants = false,
 }: VideoEditPlanCardProps) {
   const [duration, setDuration] = useState<15 | 30>(15);
   const [psychPreset, setPsychPreset] = useState<PsychologyPreset>('auto');
@@ -69,6 +72,7 @@ export function VideoEditPlanCard({
   const [expandedCopy, setExpandedCopy] = useState<number | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [showDetailGuide, setShowDetailGuide] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -272,11 +276,6 @@ export function VideoEditPlanCard({
 
       {plan && (
         <ScrollView style={styles.planScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          {/* Reason */}
-          <View style={styles.reasonBox}>
-            <Text style={styles.reasonText}>{plan.reason}</Text>
-          </View>
-
           {/* Segments timeline */}
           <Text style={styles.sectionLabel}>컷 편집 타임라인</Text>
           <View style={styles.segmentsWrap}>
@@ -299,52 +298,6 @@ export function VideoEditPlanCard({
             })}
           </View>
 
-          {/* Hook timing */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoCardHeader}>
-              <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.infoCardTitle}>후킹 타이밍</Text>
-            </View>
-            <Text style={styles.infoCardBody}>
-              첫 후킹: {plan.hookTiming.firstHookSec}초{'\n'}{plan.hookTiming.reason}
-            </Text>
-          </View>
-
-          {/* Psychology */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoCardHeader}>
-              <Brain size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.infoCardTitle}>심리학 적용</Text>
-            </View>
-            <Text style={styles.infoCardLabel}>원리: {plan.psychology.principle}</Text>
-            <Text style={styles.infoCardBody}>{plan.psychology.application}</Text>
-            <Text style={styles.infoCardTrigger}>트리거 지점: {plan.psychology.triggerPoint}</Text>
-          </View>
-
-          {/* Anti-algorithm */}
-          <View style={styles.infoCardAnti}>
-            <View style={styles.infoCardHeader}>
-              <ShieldOff size={14} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={styles.infoCardTitle}>알고리즘 중복 회피 전략</Text>
-            </View>
-            <View style={styles.antiItem}>
-              <Text style={styles.antiLabel}>문구 변형</Text>
-              <Text style={styles.antiText}>{plan.antiAlgorithm.copyVariation}</Text>
-            </View>
-            <View style={styles.antiItem}>
-              <Text style={styles.antiLabel}>페이싱</Text>
-              <Text style={styles.antiText}>{plan.antiAlgorithm.pacingStrategy}</Text>
-            </View>
-            <View style={styles.antiItem}>
-              <Text style={styles.antiLabel}>비주얼 변경</Text>
-              <Text style={styles.antiText}>{plan.antiAlgorithm.visualChangeStrategy}</Text>
-            </View>
-            <View style={styles.antiItem}>
-              <Text style={styles.antiLabel}>오디오 변경</Text>
-              <Text style={styles.antiText}>{plan.antiAlgorithm.audioChangeStrategy}</Text>
-            </View>
-          </View>
-
           {/* Music & motion */}
           <View style={styles.metaRow}>
             <View style={styles.metaChip}>
@@ -357,9 +310,83 @@ export function VideoEditPlanCard({
             </View>
           </View>
 
+          {/* Collapsible detail guide */}
+          <TouchableOpacity
+            style={styles.detailToggle}
+            onPress={() => setShowDetailGuide(!showDetailGuide)}
+            activeOpacity={0.7}
+          >
+            <Info size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.detailToggleText}>
+              {showDetailGuide ? '상세 가이드 접기' : '상세 가이드 보기'}
+            </Text>
+            {showDetailGuide ? (
+              <ChevronUp size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          {showDetailGuide && (
+            <>
+              {/* Reason */}
+              <View style={styles.reasonBox}>
+                <Text style={styles.reasonText}>{plan.reason}</Text>
+              </View>
+
+              {/* Hook timing */}
+              <View style={styles.infoCard}>
+                <View style={styles.infoCardHeader}>
+                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.infoCardTitle}>후킹 타이밍</Text>
+                </View>
+                <Text style={styles.infoCardBody}>
+                  첫 후킹: {plan.hookTiming.firstHookSec}초{'\n'}{plan.hookTiming.reason}
+                </Text>
+              </View>
+
+              {/* Psychology */}
+              <View style={styles.infoCard}>
+                <View style={styles.infoCardHeader}>
+                  <Brain size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.infoCardTitle}>심리학 적용</Text>
+                </View>
+                <Text style={styles.infoCardLabel}>원리: {plan.psychology.principle}</Text>
+                <Text style={styles.infoCardBody}>{plan.psychology.application}</Text>
+                <Text style={styles.infoCardTrigger}>트리거 지점: {plan.psychology.triggerPoint}</Text>
+              </View>
+
+              {/* Anti-algorithm */}
+              <View style={styles.infoCardAnti}>
+                <View style={styles.infoCardHeader}>
+                  <ShieldOff size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={styles.infoCardTitle}>알고리즘 중복 회피 전략</Text>
+                </View>
+                <View style={styles.antiItem}>
+                  <Text style={styles.antiLabel}>문구 변형</Text>
+                  <Text style={styles.antiText}>{plan.antiAlgorithm.copyVariation}</Text>
+                </View>
+                <View style={styles.antiItem}>
+                  <Text style={styles.antiLabel}>페이싱</Text>
+                  <Text style={styles.antiText}>{plan.antiAlgorithm.pacingStrategy}</Text>
+                </View>
+                <View style={styles.antiItem}>
+                  <Text style={styles.antiLabel}>비주얼 변경</Text>
+                  <Text style={styles.antiText}>{plan.antiAlgorithm.visualChangeStrategy}</Text>
+                </View>
+                <View style={styles.antiItem}>
+                  <Text style={styles.antiLabel}>오디오 변경</Text>
+                  <Text style={styles.antiText}>{plan.antiAlgorithm.audioChangeStrategy}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
           {/* Copy variants */}
+          {!hideCopyVariants && (
           <Text style={styles.sectionLabel}>카피 변형 (알고리즘 피하기)</Text>
-          {plan.copyVariants.map((variant, i) => {
+          )}
+          {!hideCopyVariants && plan.copyVariants.map((variant, i) => {
             const isExpanded = expandedCopy === i;
             return (
               <View key={i} style={styles.copyCard}>
@@ -611,6 +638,19 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     borderLeftWidth: 3,
     borderLeftColor: theme.colors.warning[400] + '60',
+  },
+  detailToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  detailToggleText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
   reasonText: {
     fontSize: 12,
