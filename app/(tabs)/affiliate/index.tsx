@@ -316,6 +316,8 @@ export default function AffiliateScreen() {
   const [selectedVoiceKey, setSelectedVoiceKey] = useState<string | null>(null);
   const [recommendedVoiceKey, setRecommendedVoiceKey] = useState<string | null>(null);
   const [voiceCategoryFilter, setVoiceCategoryFilter] = useState<VoiceCategory | 'all'>('all');
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [showAdvancedVideo, setShowAdvancedVideo] = useState(false);
 
   // Step 5: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
@@ -2571,40 +2573,67 @@ export default function AffiliateScreen() {
             <View style={styles.subAccordionBody}>
               {previewMediaMode === 'video' && (
                 <>
-                  <StockVideoPicker
-                    productName={productMeta?.productName}
-                    productCategory={undefined}
-                    orientation={(() => {
-                      const specs = selectedUploadPlatform && selectedBoard
-                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                        : null;
-                      if (!specs) return 'portrait';
-                      return specs.ratio.includes('9:16') ? 'portrait'
-                        : specs.ratio.includes('16:9') ? 'landscape'
-                        : 'square';
-                    })()}
-                    selectedClip={stockVideoClip}
-                    onSelectClip={setStockVideoClip}
-                  />
+                  <TouchableOpacity
+                    style={styles.customToggle}
+                    onPress={() => setShowAdvancedVideo(!showAdvancedVideo)}
+                    activeOpacity={0.7}
+                  >
+                    <Film size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.customToggleText}>
+                      {showAdvancedVideo ? '영상 편집 옵션 접기' : '영상 편집 옵션 펼치기'}
+                    </Text>
+                    {showAdvancedVideo ? (
+                      <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    ) : (
+                      <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    )}
+                  </TouchableOpacity>
 
-                  <VideoEditPlanCard
-                    productName={productMeta?.productName}
-                    productCategory={undefined}
-                    platform={selectedUploadPlatform || undefined}
-                    accentColor={undefined}
-                    hook={undefined}
-                    oneLiner={undefined}
-                    hasVideoSelected={stockVideoClip !== null}
-                    onPlanGenerated={setVideoEditPlan}
-                  />
+                  {showAdvancedVideo && (
+                    <>
+                      <StockVideoPicker
+                        productName={productMeta?.productName}
+                        productCategory={undefined}
+                        orientation={(() => {
+                          const specs = selectedUploadPlatform && selectedBoard
+                            ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                            : null;
+                          if (!specs) return 'portrait';
+                          return specs.ratio.includes('9:16') ? 'portrait'
+                            : specs.ratio.includes('16:9') ? 'landscape'
+                            : 'square';
+                        })()}
+                        selectedClip={stockVideoClip}
+                        onSelectClip={setStockVideoClip}
+                      />
 
-                  <VideoRenderCard
-                    clip={stockVideoClip}
-                    plan={videoEditPlan}
-                    ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
-                    disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
-                    productName={productMeta?.productName}
-                  />
+                      <VideoEditPlanCard
+                        productName={productMeta?.productName}
+                        productCategory={undefined}
+                        platform={selectedUploadPlatform || undefined}
+                        accentColor={undefined}
+                        hook={undefined}
+                        oneLiner={undefined}
+                        hasVideoSelected={stockVideoClip !== null}
+                        onPlanGenerated={setVideoEditPlan}
+                      />
+
+                      <VideoRenderCard
+                        clip={stockVideoClip}
+                        plan={videoEditPlan}
+                        ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
+                        disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
+                        productName={productMeta?.productName}
+                      />
+                    </>
+                  )}
+
+                  {!showAdvancedVideo && stockVideoClip && (
+                    <View style={styles.subStepHintBox}>
+                      <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                      <Text style={styles.subStepHintText}>영상이 선택되었습니다. 편집 옵션을 펼치면 수정할 수 있습니다.</Text>
+                    </View>
+                  )}
                 </>
               )}
 
@@ -2764,8 +2793,25 @@ export default function AffiliateScreen() {
                 </>
               )}
 
-              {/* TTS Voice Picker — AI auto-select + manual override */}
-              <Text style={styles.sectionLabel}>TTS 성우 선택</Text>
+              {/* TTS Voice Picker — collapsed by default to reduce cognitive overload */}
+              <TouchableOpacity
+                style={styles.customToggle}
+                onPress={() => setShowVoicePicker(!showVoicePicker)}
+                activeOpacity={0.7}
+              >
+                <Music2 size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.customToggleText}>
+                  {showVoicePicker ? '성우 선택 접기' : '성우 선택 펼치기'}
+                </Text>
+                {showVoicePicker ? (
+                  <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+
+              {showVoicePicker && (
+                <>
               {recommendedVoiceKey && (
                 <View style={styles.voiceRecommendBadge}>
                   <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
@@ -2841,6 +2887,26 @@ export default function AffiliateScreen() {
                     );
                   })}
               </View>
+                </>
+              )}
+
+              {!showVoicePicker && selectedVoiceKey && (
+                <View style={styles.subStepHintBox}>
+                  <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={styles.subStepHintText}>
+                    선택된 성우: {TTS_VOICES.find((v) => v.key === selectedVoiceKey)?.label ?? ''}
+                  </Text>
+                </View>
+              )}
+
+              {!showVoicePicker && !selectedVoiceKey && recommendedVoiceKey && (
+                <View style={styles.subStepHintBox}>
+                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.subStepHintText}>
+                    AI 추천 성우: {TTS_VOICES.find((v) => v.key === recommendedVoiceKey)?.label ?? ''} · 펼치면 직접 선택 가능
+                  </Text>
+                </View>
+              )}
 
               <TextInput
                 value={contentText}
