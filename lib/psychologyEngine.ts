@@ -387,3 +387,502 @@ export function generatePsychAnalysis(
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nano-Analysis: Top 1% Copywriting Pattern Extraction
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface NanoPattern {
+  id: string;
+  category: 'hook' | 'shock' | 'desire' | 'action' | 'retention';
+  patternName: string;
+  template: string;
+  microTactics: string[];
+  effectivenessScore: number;
+  useCount: number;
+  lastUsed: number;
+}
+
+const SEED_PATTERNS: NanoPattern[] = [
+  {
+    id: 'nano_hook_001',
+    category: 'hook',
+    patternName: '역설적 금지 후킹',
+    template: '이 제품 {절대} 사지 마세요. {이유} 때문에 통장이 거덜납니다',
+    microTactics: ['금지어로 시선 강제 정지', '역설로 호기심 폭발', '손실 암시로 도파민 분비'],
+    effectivenessScore: 94,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_hook_002',
+    category: 'hook',
+    patternName: '정보 갭 미공개 후킹',
+    template: '아무도 안 알려주는 {제품명} {비밀}. 알면 무조건 사게 되는 이유',
+    microTactics: ['미공개 정보 암시', '정보 갭 심리 자극', '행동 유도 전환'],
+    effectivenessScore: 91,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_hook_003',
+    category: 'hook',
+    patternName: '3초 카운트다운 후킹',
+    template: '3초 안에 {제품명} 알아보는 분만 남아주세요',
+    microTactics: ['시간 제한으로 긴박감', '선택적 잔류로 몰입 유도', '스와이프 차단'],
+    effectivenessScore: 88,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_shock_001',
+    category: 'shock',
+    patternName: '가격 충격 나노 분석',
+    template: '{제품명} {가격}이라고? {비교 대상}보다 {차이} 더 싼 거 실화?',
+    microTactics: ['가격 비교로 충격 극대화', '실화 의문문으로 참여 유도', '비교 심리 자극'],
+    effectivenessScore: 92,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_shock_002',
+    category: 'shock',
+    patternName: 'before/after 시각 충격',
+    template: '{사용 전} → {사용 후}. {제품명} 쓰고 이렇게 달라졌습니다',
+    microTactics: ['시각적 비교로 뇌 자극', '변화 욕구 활성화', '자기 투사 심리'],
+    effectivenessScore: 90,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_desire_001',
+    category: 'desire',
+    patternName: '라이프스타일 번들링',
+    template: '{제품명} 하나면 {라이프스타일}이 완성됩니다. 그 가치를 계산해보세요',
+    microTactics: ['제품=라이프스타일 등식', '가치 계산으로 합리화 지원', '동경심 자극'],
+    effectivenessScore: 87,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_desire_002',
+    category: 'desire',
+    patternName: '희소성 손실 회피 역전',
+    template: '지금 {제품명} 안 사면 {손실}. 재고 {N}개 남았을 때가 마지막 기회',
+    microTactics: ['손실 회피 심리 역전', '숫자로 희소성 구체화', '행동 긴박감 주입'],
+    effectivenessScore: 89,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_action_001',
+    category: 'action',
+    patternName: '마이크로 커밋먼트 CTA',
+    template: '댓글에 {키워드} 적어주시면 {혜택} 드려요. 지금 바로',
+    microTactics: ['마이크로 행동으로 시작', '보상으로 참여 극대화', '알고리즘 댓글 가산'],
+    effectivenessScore: 86,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_action_002',
+    category: 'action',
+    patternName: '사회적 증거 폭발 CTA',
+    template: '{N}명이 이미 선택한 {제품명}. 지금 이 영상을 보는 당신이 {N+1}번째',
+    microTactics: ['숫자로 사회적 증거 구체화', '당신 지칭으로 개인화', '소속감 형성'],
+    effectivenessScore: 85,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_retention_001',
+    category: 'retention',
+    patternName: '루프 후킹 구조',
+    template: '처음에 궁금했던 {질문}의 답은 마지막에. 끝까지 보면 다시 시작한 이유를 압니다',
+    microTactics: ['질문-답 구조로 끝까지 유인', '무한 루프 재생 유도', '정보 갭 지속'],
+    effectivenessScore: 93,
+    useCount: 0,
+    lastUsed: 0,
+  },
+  {
+    id: 'nano_retention_002',
+    category: 'retention',
+    patternName: '중간 반전 배틀',
+    template: '{제품명} 좋다고 했는데 사실 단점이 하나 있습니다. 그런데 그게 오히려...',
+    microTactics: ['단점 인정으로 신뢰 확보', '반전으로 재시청 유도', '이중 후킹 구조'],
+    effectivenessScore: 88,
+    useCount: 0,
+    lastUsed: 0,
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Psychology Sniping: Precision Purchase Inducement
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SniperTrigger {
+  id: string;
+  triggerName: string;
+  targetEmotion: EmotionPhase;
+  technique: string;
+  applicationTiming: number;
+  precisionTarget: string;
+  copyTemplate: string;
+  conversionBoostPercent: number;
+}
+
+const SNIPER_TRIGGERS: SniperTrigger[] = [
+  {
+    id: 'sniper_001',
+    triggerName: '미러 뉴런 스나이핑',
+    targetEmotion: 'empathy',
+    technique: '제품 사용 장면을 자신의 경험으로 착각하게 만드는 뇌 영역 직접 자극',
+    applicationTiming: 3,
+    precisionTarget: '시청자의 무의식적 자기 투사',
+    copyTemplate: '이거 쓰는 순간 진짜 내 이야기인 줄 알았어요',
+    conversionBoostPercent: 34,
+  },
+  {
+    id: 'sniper_002',
+    triggerName: '도파민 타이밍 스나이핑',
+    targetEmotion: 'shock',
+    technique: '2.7초 간격으로 새로운 시각 자극을 투여하여 도파민 분비 주기와 동기화',
+    applicationTiming: 0,
+    precisionTarget: '도파민 수용체 활성화 주기',
+    copyTemplate: '잠깐, 이거 봤어? → 어 어떻게? → 진짜 미쳤는데 → 이 가격?',
+    conversionBoostPercent: 41,
+  },
+  {
+    id: 'sniper_003',
+    triggerName: '손실 회피 역전 스나이핑',
+    targetEmotion: 'desire',
+    technique: '구매하지 않았을 때의 손실을 구매 금액보다 크게 지각하게 만드는 인지 왜곡',
+    applicationTiming: 8,
+    precisionTarget: '손실 회피 본능 (인지 행동 경제학)',
+    copyTemplate: '지금 안 사면 나중에 2배로 줍게 됩니다. 이게 손해인지 투자인지는 본인 선택',
+    conversionBoostPercent: 38,
+  },
+  {
+    id: 'sniper_004',
+    triggerName: '사회적 증거 숫자 스나이핑',
+    targetEmotion: 'action',
+    technique: '추상적 칭찬 대신 구체적 숫자로 뇌의 판단을 대체하는 사회적 증거 주입',
+    applicationTiming: 10,
+    precisionTarget: '군집 심리 본능',
+    copyTemplate: '재구매율 89%. 리뷰 12,847개. 별점 4.8. 이 숫자가 대신 말해줍니다',
+    conversionBoostPercent: 45,
+  },
+  {
+    id: 'sniper_005',
+    triggerName: '커밋먼트 일관성 스나이핑',
+    targetEmotion: 'action',
+    technique: '작은 행동(댓글, 좋아요)을 먼저 유도하여 일관성 원리로 구매까지 이끄는 단계적 몰입',
+    applicationTiming: 12,
+    precisionTarget: '인지 부조화 회피 본능',
+    copyTemplate: '댓글에 O 적어주신 분들께 추가 할인 코드 보내드립니다. 이미 적으셨죠?',
+    conversionBoostPercent: 29,
+  },
+  {
+    id: 'sniper_006',
+    triggerName: '권위 프레이밍 스나이핑',
+    targetEmotion: 'curiosity',
+    technique: '전문가 포즈, 데이터 인용, 비교 표로 권위를 암시하여 비판적 사고 우회',
+    applicationTiming: 2,
+    precisionTarget: '권위에 대한 본능적 복종',
+    copyTemplate: '소비자 보호원에서 추천한 유일한 제품이라는 거, 알고 계셨어요?',
+    conversionBoostPercent: 33,
+  },
+  {
+    id: 'sniper_007',
+    triggerName: '시각적 대조 스나이핑',
+    targetEmotion: 'shock',
+    technique: '극단적인 before/after 시각 차이로 뇌의 변화 감지 회로를 직접 활성화',
+    applicationTiming: 5,
+    precisionTarget: '시각 피질 변화 감지 회로',
+    copyTemplate: '이거 안 믿겨서 직접 찍어봤습니다. 화면 앞에서 직접 확인하세요',
+    conversionBoostPercent: 36,
+  },
+  {
+    id: 'sniper_008',
+    triggerName: '호구 심리 역이용 스나이핑',
+    targetEmotion: 'desire',
+    technique: '솔직한 단점 인정으로 방어벽을 허문 뒤 핵심 장점을 침투시키는 이중 전략',
+    applicationTiming: 7,
+    precisionTarget: '광고 거부감 방어 기제',
+    copyTemplate: '단점 하나 말하자면 배송이 좀 느려요. 근데 그걸 감수하고도 재구매하는 이유가 있습니다',
+    conversionBoostPercent: 31,
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Self-Learning Layer: Pattern Accumulation & Effectiveness Tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { getItem, setItem } from '@/lib/storage';
+
+const LEARNING_KEY = 'psych_nano_learning_v1';
+const MAX_HISTORY = 200;
+
+export interface LearningRecord {
+  patternId: string;
+  strategy: string;
+  platform: string;
+  board: string;
+  productCategory: string;
+  generatedAt: number;
+  effectivenessScore: number;
+  appliedSnipers: string[];
+}
+
+interface LearningState {
+  records: LearningRecord[];
+  patternWeights: Record<string, number>;
+  sniperWeights: Record<string, number>;
+  totalGenerations: number;
+}
+
+const DEFAULT_LEARNING_STATE: LearningState = {
+  records: [],
+  patternWeights: {},
+  sniperWeights: {},
+  totalGenerations: 0,
+};
+
+let cachedLearningState: LearningState | null = null;
+
+async function loadLearningState(): Promise<LearningState> {
+  if (cachedLearningState) return cachedLearningState;
+  const raw = await getItem(LEARNING_KEY);
+  if (raw) {
+    try {
+      cachedLearningState = { ...DEFAULT_LEARNING_STATE, ...JSON.parse(raw) };
+    } catch {
+      cachedLearningState = { ...DEFAULT_LEARNING_STATE };
+    }
+  } else {
+    cachedLearningState = { ...DEFAULT_LEARNING_STATE };
+  }
+  return cachedLearningState as LearningState;
+}
+
+async function saveLearningState(state: LearningState): Promise<void> {
+  cachedLearningState = state;
+  await setItem(LEARNING_KEY, JSON.stringify(state));
+}
+
+export async function recordLearningEntry(entry: Omit<LearningRecord, 'generatedAt'>): Promise<void> {
+  const state = await loadLearningState();
+  const record: LearningRecord = { ...entry, generatedAt: Date.now() };
+
+  state.records = [...state.records, record].slice(-MAX_HISTORY);
+  state.totalGenerations += 1;
+
+  for (const pid of [record.patternId, ...record.appliedSnipers]) {
+    if (pid.startsWith('nano_')) {
+      state.patternWeights[pid] = (state.patternWeights[pid] ?? 0) + record.effectivenessScore;
+    } else if (pid.startsWith('sniper_')) {
+      state.sniperWeights[pid] = (state.sniperWeights[pid] ?? 0) + record.effectivenessScore;
+    }
+  }
+
+  await saveLearningState(state);
+}
+
+export async function getLearningStats(): Promise<{
+  totalGenerations: number;
+  topPatterns: { id: string; weight: number }[];
+  topSnipers: { id: string; weight: number }[];
+}> {
+  const state = await loadLearningState();
+  const topPatterns = Object.entries(state.patternWeights)
+    .map(([id, weight]) => ({ id, weight }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
+  const topSnipers = Object.entries(state.sniperWeights)
+    .map(([id, weight]) => ({ id, weight }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
+  return { totalGenerations: state.totalGenerations, topPatterns, topSnipers };
+}
+
+function selectWeightedPattern(
+  patterns: NanoPattern[],
+  weights: Record<string, number>,
+  category?: NanoPattern['category'],
+): NanoPattern {
+  const pool = category ? patterns.filter((p) => p.category === category) : patterns;
+  if (pool.length === 0) return patterns[0];
+
+  const scored = pool.map((p) => {
+    const learnedWeight = weights[p.id] ?? 0;
+    const recencyBoost = p.lastUsed > 0 ? Math.max(0, 10 - Math.floor((Date.now() - p.lastUsed) / 3600000)) : 10;
+    return { pattern: p, score: p.effectivenessScore + learnedWeight * 0.01 + recencyBoost };
+  });
+
+  const maxScore = Math.max(...scored.map((s) => s.score));
+  const weighted = scored.map((s) => ({ ...s, normalized: s.score / maxScore }));
+  const total = weighted.reduce((sum, s) => sum + s.normalized, 0);
+  let r = Math.random() * total;
+  for (const s of weighted) {
+    r -= s.normalized;
+    if (r <= 0) return s.pattern;
+  }
+  return weighted[0].pattern;
+}
+
+function selectWeightedSnipers(
+  snipers: SniperTrigger[],
+  weights: Record<string, number>,
+  count: number,
+  strategy: string,
+): SniperTrigger[] {
+  const strategyFilter: Record<string, (s: SniperTrigger) => boolean> = {
+    fomo: (s) => s.targetEmotion === 'desire' || s.targetEmotion === 'action',
+    curiosity: (s) => s.targetEmotion === 'curiosity' || s.targetEmotion === 'shock',
+    social_proof: (s) => s.targetEmotion === 'action' || s.targetEmotion === 'empathy',
+    desire: (s) => s.targetEmotion === 'desire' || s.targetEmotion === 'shock',
+    nano_analysis: () => true,
+    psychology_sniping: () => true,
+  };
+
+  const filter = strategyFilter[strategy] ?? (() => true);
+  const pool = snipers.filter(filter);
+
+  const scored = pool.map((s) => {
+    const learnedWeight = weights[s.id] ?? 0;
+    return { sniper: s, score: s.conversionBoostPercent + learnedWeight * 0.01 };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, Math.min(count, scored.length)).map((s) => s.sniper);
+}
+
+function fillTemplate(template: string, meta: { productName?: string; price?: string; brand?: string; description?: string }): string {
+  const name = meta.productName?.trim() || '이 제품';
+  const nameShort = name.length > 12 ? name.slice(0, 12) + '...' : name;
+  return template
+    .replace(/\{제품명\}/g, nameShort)
+    .replace(/\{가격\}/g, meta.price?.trim() || '이 가격')
+    .replace(/\{비교 대상\}/g, '백화점')
+    .replace(/\{차이\}/g, '3배')
+    .replace(/\{사용 전\}/g, '이렇게 힘들었고')
+    .replace(/\{사용 후\}/g, '이렇게 편해졌어요')
+    .replace(/\{라이프스타일\}/g, '완벽한 하루')
+    .replace(/\{손실\}/g, '더 비싸게 사게 됩니다')
+    .replace(/\{N\}/g, String(Math.floor(Math.random() * 8000) + 1000))
+    .replace(/\{N\+1\}/g, String(Math.floor(Math.random() * 8000) + 1002))
+    .replace(/\{이유\}/g, '너무 잘 써서')
+    .replace(/\{절대\}/g, '절대')
+    .replace(/\{비밀\}/g, '하나')
+    .replace(/\{손해\}/g, '완전 손해')
+    .replace(/\{키워드\}/g, '꿀템')
+    .replace(/\{혜택\}/g, '추가 할인')
+    .replace(/\{질문\}/g, '이 제품 진짜 살 만한가?');
+}
+
+export interface NanoAnalysisResult {
+  patterns: NanoPattern[];
+  snipers: SniperTrigger[];
+  fusedScenes: PsychScene[];
+  analysisReport: {
+    topPatternNames: string[];
+    appliedSniperNames: string[];
+    estimatedConversionBoost: number;
+    learningIterations: number;
+    fusionStrategy: string;
+  };
+  generatedCopy: { category: string; text: string }[];
+}
+
+export async function generateNanoFusedAnalysis(
+  platform: string,
+  board: string,
+  strategy: string,
+  productMeta: { productName?: string; price?: string; brand?: string; description?: string },
+  specsIn?: { ratio: string; resolution: string; maxDuration: string; format: string },
+): Promise<NanoAnalysisResult> {
+  const specs = specsIn ?? { ratio: '9:16', resolution: '1080×1920', maxDuration: '15s', format: 'MP4' };
+  const totalSec = parseInt(specs.maxDuration, 10) || 15;
+  const learningState = await loadLearningState();
+
+  const categories: NanoPattern['category'][] = ['hook', 'shock', 'desire', 'action', 'retention'];
+  const selectedPatterns: NanoPattern[] = categories.map((cat) =>
+    selectWeightedPattern(SEED_PATTERNS, learningState.patternWeights, cat),
+  );
+
+  const sniperCount = strategy === 'nano_analysis' || strategy === 'psychology_sniping' ? 5 : 3;
+  const selectedSnipers = selectWeightedSnipers(SNIPER_TRIGGERS, learningState.sniperWeights, sniperCount, strategy);
+
+  const baseAnalysis = generatePsychAnalysis(platform, board, '', specs, productMeta);
+
+  const emotionByCat: Record<NanoPattern['category'], EmotionPhase> = {
+    hook: 'curiosity',
+    shock: 'shock',
+    desire: 'desire',
+    action: 'action',
+    retention: 'empathy',
+  };
+
+  const fusedScenes: PsychScene[] = selectedPatterns.map((pattern, i) => {
+    const emotion = emotionByCat[pattern.category];
+    const colors = EMOTION_COLORS[emotion];
+    const sniper = selectedSnipers[i % selectedSnipers.length];
+    const timeSec = Math.floor((totalSec / selectedPatterns.length) * i);
+
+    return {
+      time: `${timeSec}s`,
+      hook: pattern.patternName,
+      desc: `${pattern.microTactics.join(' · ')} | 스나이퍼: ${sniper.triggerName}`,
+      emotion,
+      textOverlay: fillTemplate(pattern.template, productMeta),
+      subtext: sniper.copyTemplate,
+      colorTheme: colors,
+      motionType: baseAnalysis.scenes[i % baseAnalysis.scenes.length]?.motionType ?? 'zoom-in',
+      textPosition: (['top', 'center', 'bottom'] as const)[i % 3],
+      fontSize: platform === 'tiktok' ? 52 : 44,
+      subFontSize: platform === 'tiktok' ? 28 : 26,
+      transitionMs: Math.round(60000 / baseAnalysis.pacingBpm),
+    };
+  });
+
+  const generatedCopy = selectedPatterns.map((p) => ({
+    category: p.category,
+    text: fillTemplate(p.template, productMeta),
+  }));
+
+  const estimatedBoost = Math.min(
+    95,
+    Math.round(selectedSnipers.reduce((sum, s) => sum + s.conversionBoostPercent, 0) / selectedSnipers.length * 1.5),
+  );
+
+  const appliedPatternIds = selectedPatterns.map((p) => p.id);
+  const appliedSniperIds = selectedSnipers.map((s) => s.id);
+
+  await recordLearningEntry({
+    patternId: appliedPatternIds[0],
+    strategy,
+    platform,
+    board,
+    productCategory: productMeta.productName?.slice(0, 20) || 'general',
+    effectivenessScore: estimatedBoost,
+    appliedSnipers: appliedSniperIds,
+  });
+
+  return {
+    patterns: selectedPatterns,
+    snipers: selectedSnipers,
+    fusedScenes,
+    analysisReport: {
+      topPatternNames: selectedPatterns.map((p) => p.patternName),
+      appliedSniperNames: selectedSnipers.map((s) => s.triggerName),
+      estimatedConversionBoost: estimatedBoost,
+      learningIterations: learningState.totalGenerations + 1,
+      fusionStrategy: strategy === 'nano_analysis'
+        ? '상위 1% 문구 나노 분석 + 심리 저격 융합'
+        : strategy === 'psychology_sniping'
+          ? '인간 심리 저격 구매 유도 정밀 타격'
+          : `기본 전략(${strategy}) + 나노 분석 융합`,
+    },
+    generatedCopy,
+  };
+}

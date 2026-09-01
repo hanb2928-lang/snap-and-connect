@@ -39,7 +39,7 @@ import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommen
 import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory } from '@/lib/ttsVoices';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
-import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
+import { generatePsychAnalysis, generateNanoFusedAnalysis, getLearningStats, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { StockVideoPicker } from '@/components/StockVideoPicker';
 import { VideoEditPlanCard } from '@/components/VideoEditPlanCard';
@@ -324,6 +324,8 @@ export default function AffiliateScreen() {
   // Step 2: Auto-edit options
   const [selectedPacing, setSelectedPacing] = useState<'15s' | '30s'>('15s');
   const [selectedStrategy, setSelectedStrategy] = useState<string>('fomo');
+  const [nanoReport, setNanoReport] = useState<{ fusionStrategy: string; estimatedConversionBoost: number; learningIterations: number; topPatternNames: string[]; appliedSniperNames: string[] } | null>(null);
+  const [learningStats, setLearningStats] = useState<{ totalGenerations: number; topPatterns: { id: string; weight: number }[]; topSnipers: { id: string; weight: number }[] } | null>(null);
 
   // Step 5: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
@@ -1860,18 +1862,55 @@ export default function AffiliateScreen() {
       const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
       setPreviewMediaMode(boardMedia);
 
-      const analysis = generatePsychAnalysis(
-        selectedUploadPlatform ?? 'tiktok',
-        selectedBoard ?? 'reels',
-        affiliateUrl,
-        { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
-        {
-          productName: productMeta?.productName,
-          price: productMeta?.price,
-          brand: productMeta?.brand,
-          description: productMeta?.description,
-        },
-      );
+      let analysis: PsychAnalysis;
+      if (selectedStrategy === 'nano_analysis' || selectedStrategy === 'psychology_sniping') {
+        setAutoEditStep('상위 1% 문구 나노 분석 중...');
+        const nanoResult = await generateNanoFusedAnalysis(
+          selectedUploadPlatform ?? 'tiktok',
+          selectedBoard ?? 'reels',
+          selectedStrategy,
+          {
+            productName: productMeta?.productName,
+            price: productMeta?.price,
+            brand: productMeta?.brand,
+            description: productMeta?.description,
+          },
+          { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
+        );
+        analysis = {
+          ...generatePsychAnalysis(
+            selectedUploadPlatform ?? 'tiktok',
+            selectedBoard ?? 'reels',
+            affiliateUrl,
+            { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
+            { productName: productMeta?.productName, price: productMeta?.price, brand: productMeta?.brand, description: productMeta?.description },
+          ),
+          scenes: nanoResult.fusedScenes,
+        };
+        setNanoReport({
+          fusionStrategy: nanoResult.analysisReport.fusionStrategy,
+          estimatedConversionBoost: nanoResult.analysisReport.estimatedConversionBoost,
+          learningIterations: nanoResult.analysisReport.learningIterations,
+          topPatternNames: nanoResult.analysisReport.topPatternNames,
+          appliedSniperNames: nanoResult.analysisReport.appliedSniperNames,
+        });
+        const stats = await getLearningStats();
+        setLearningStats(stats);
+      } else {
+        analysis = generatePsychAnalysis(
+          selectedUploadPlatform ?? 'tiktok',
+          selectedBoard ?? 'reels',
+          affiliateUrl,
+          { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
+          {
+            productName: productMeta?.productName,
+            price: productMeta?.price,
+            brand: productMeta?.brand,
+            description: productMeta?.description,
+          },
+        );
+        setNanoReport(null);
+      }
       setViralAnalysisResult(analysis);
       setAutoEditStep('스토리보드 생성 중...');
 
@@ -2175,6 +2214,8 @@ export default function AffiliateScreen() {
               { key: 'curiosity', label: '호기심', icon: '🤔', desc: '정보 갭 후킹' },
               { key: 'social_proof', label: '사회적 증거', icon: '👥', desc: '리뷰·공감' },
               { key: 'desire', label: '욕구 자극', icon: '✨', desc: '가치·혜택' },
+              { key: 'nano_analysis', label: '나노분석', icon: '🔬', desc: '상위1% 문구 분석' },
+              { key: 'psychology_sniping', label: '심리저격', icon: '🎯', desc: '구매 유도 정밀 타격' },
             ] as const).map((s) => (
               <TouchableOpacity
                 key={s.key}
@@ -2269,6 +2310,43 @@ export default function AffiliateScreen() {
                   </View>
                 </View>
               ))}
+            </View>
+          )}
+
+          {/* Nano-analysis report */}
+          {nanoReport && videoPreviewScenes && videoPreviewScenes.length > 0 && (
+            <View style={styles.nanoReportCard}>
+              <View style={styles.nanoReportHeader}>
+                <Text style={styles.nanoReportTitle}>나노 분석 리포트</Text>
+                <View style={styles.nanoReportBoostBadge}>
+                  <Text style={styles.nanoReportBoostText}>전환율 +{nanoReport.estimatedConversionBoost}%</Text>
+                </View>
+              </View>
+              <Text style={styles.nanoReportStrategy}>{nanoReport.fusionStrategy}</Text>
+              <Text style={styles.nanoReportIterLabel}>자가 학습 누적: {nanoReport.learningIterations}회 반복</Text>
+              <View style={styles.nanoReportSection}>
+                <Text style={styles.nanoReportSectionTitle}>적용된 상위 1% 패턴</Text>
+                {nanoReport.topPatternNames.map((name, i) => (
+                  <View key={i} style={styles.nanoReportPatternRow}>
+                    <Text style={styles.nanoReportPatternDot}> </Text>
+                    <Text style={styles.nanoReportPatternText}>{name}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.nanoReportSection}>
+                <Text style={styles.nanoReportSectionTitle}>심리 저격 트리거</Text>
+                {nanoReport.appliedSniperNames.map((name, i) => (
+                  <View key={i} style={styles.nanoReportSniperRow}>
+                    <Text style={styles.nanoReportSniperDot}> </Text>
+                    <Text style={styles.nanoReportSniperText}>{name}</Text>
+                  </View>
+                ))}
+              </View>
+              {learningStats && learningStats.totalGenerations > 1 && (
+                <Text style={styles.nanoReportLearnSummary}>
+                  누적 학습: {learningStats.totalGenerations}회 · 시스템이 점점 더 정교해지고 있습니다
+                </Text>
+              )}
             </View>
           )}
 
@@ -3672,6 +3750,100 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
+  },
+  nanoReportCard: {
+    backgroundColor: theme.colors.accent[500] + '0D',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '25',
+  },
+  nanoReportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  nanoReportTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
+  },
+  nanoReportBoostBadge: {
+    backgroundColor: theme.colors.success[500] + '25',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  nanoReportBoostText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.success[400],
+  },
+  nanoReportStrategy: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  nanoReportIterLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[400],
+    marginBottom: 8,
+  },
+  nanoReportSection: {
+    marginBottom: 8,
+  },
+  nanoReportSectionTitle: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  nanoReportPatternRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  nanoReportPatternDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.accent[400],
+  },
+  nanoReportPatternText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  nanoReportSniperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  nanoReportSniperDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.warning[400],
+  },
+  nanoReportSniperText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  nanoReportLearnSummary: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[400],
+    marginTop: 4,
+    textAlign: 'center',
   },
   storyboardDisclosureBadge: {
     flexDirection: 'row',
