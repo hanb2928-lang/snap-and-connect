@@ -210,13 +210,14 @@ function getBoardMediaType(platform: string | null, board: string | null): 'imag
   return 'video';
 }
 
-type StepKey = 'source' | 'autoEdit' | 'preview';
+type StepKey = 'source' | 'autoEdit' | 'preview' | 'publish';
 
-const STEP_ORDER: StepKey[] = ['source', 'autoEdit', 'preview'];
+const STEP_ORDER: StepKey[] = ['source', 'autoEdit', 'preview', 'publish'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   source: { num: 1, color: theme.colors.accent[400] },
   autoEdit: { num: 2, color: theme.colors.warning[400] },
   preview: { num: 3, color: theme.colors.success[400] },
+  publish: { num: 4, color: theme.colors.primary[400] },
 };
 
 export default function AffiliateScreen() {
@@ -319,6 +320,10 @@ export default function AffiliateScreen() {
   const [voiceCategoryFilter, setVoiceCategoryFilter] = useState<VoiceCategory | 'all'>('all');
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const [showAdvancedVideo, setShowAdvancedVideo] = useState(false);
+
+  // Step 2: Auto-edit options
+  const [selectedPacing, setSelectedPacing] = useState<'15s' | '30s'>('15s');
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('fomo');
 
   // Step 5: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
@@ -1714,7 +1719,7 @@ export default function AffiliateScreen() {
         selectedUploadPlatform ?? 'tiktok',
         selectedBoard ?? 'reels',
         affiliateUrl,
-        undefined,
+        { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
         {
           productName: productMeta?.productName,
           price: productMeta?.price,
@@ -1741,7 +1746,7 @@ export default function AffiliateScreen() {
       setAutoEditing(false);
       setAutoEditStep('');
     }
-  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo]);
+  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo, selectedPacing]);
 
   return (
     <View style={styles.container}>
@@ -1764,7 +1769,7 @@ export default function AffiliateScreen() {
         <View style={styles.verticalHeader}>
           <Text style={styles.verticalTitle}>제휴쇼핑 숏폼 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            소스 불러오기 → AI 자동 편집 → 갤러리 저장
+            소스 불러오기 → AI 자동 편집 → 미리보기 → 멀티 플랫폼 발행
           </Text>
         </View>
 
@@ -1991,8 +1996,57 @@ export default function AffiliateScreen() {
           onToggle={() => setExpandedStep(expandedStep === 'autoEdit' ? null : 'autoEdit')}
         >
           <Text style={styles.autoEditDesc}>
-            제품 정보와 소스 영상을 기반으로 AI가 모든 편집을 자동으로 처리합니다. 버튼 한 번이면 됩니다.
+            제품 정보와 소스 영상을 기반으로 AI가 모든 편집을 자동으로 처리합니다. 타임라인 길이와 심리 전략만 선택하세요.
           </Text>
+
+          {/* Pacing selection */}
+          <Text style={styles.chipGroupLabel}>타임라인 길이</Text>
+          <View style={styles.chipRow}>
+            {([
+              { key: '15s', label: '15초', desc: '임팩트 중심' },
+              { key: '30s', label: '30초', desc: '스토리텔링' },
+            ] as const).map((p) => (
+              <TouchableOpacity
+                key={p.key}
+                style={[styles.pacingChip, selectedPacing === p.key && styles.pacingChipActive]}
+                onPress={() => setSelectedPacing(p.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.pacingChipLabel, selectedPacing === p.key && styles.pacingChipLabelActive]}>
+                  {p.label}
+                </Text>
+                <Text style={[styles.pacingChipDesc, selectedPacing === p.key && styles.pacingChipDescActive]}>
+                  {p.desc}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Psychology strategy selection */}
+          <Text style={styles.chipGroupLabel}>심리 전략</Text>
+          <View style={styles.strategyChipRow}>
+            {([
+              { key: 'fomo', label: 'FOMO', icon: '🔥', desc: '희소성·긴박감' },
+              { key: 'curiosity', label: '호기심', icon: '🤔', desc: '정보 갭 후킹' },
+              { key: 'social_proof', label: '사회적 증거', icon: '👥', desc: '리뷰·공감' },
+              { key: 'desire', label: '욕구 자극', icon: '✨', desc: '가치·혜택' },
+            ] as const).map((s) => (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.strategyChip, selectedStrategy === s.key && styles.strategyChipActive]}
+                onPress={() => setSelectedStrategy(s.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.strategyChipIcon}>{s.icon}</Text>
+                <Text style={[styles.strategyChipLabel, selectedStrategy === s.key && styles.strategyChipLabelActive]}>
+                  {s.label}
+                </Text>
+                <Text style={[styles.strategyChipDesc, selectedStrategy === s.key && styles.strategyChipDescActive]}>
+                  {s.desc}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Auto-applied features list */}
           <View style={styles.autoFeatureList}>
@@ -2207,6 +2261,144 @@ export default function AffiliateScreen() {
             <View style={{ marginTop: theme.spacing.md }}>
               <ShortLinkCopyBar url={affiliateUrl.trim()} label="제휴 단축 링크" />
             </View>
+          )}
+
+          {/* Next: publish */}
+          {renderedVideoUrl && videoRenderComplete && (
+            <TouchableOpacity
+              style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md, backgroundColor: theme.colors.primary[500] }]}
+              onPress={() => markCompleted('preview')}
+              activeOpacity={0.85}
+            >
+              <ArrowRight size={20} color="#fff" strokeWidth={2} />
+              <View style={styles.aiOneTapTextWrap}>
+                <Text style={styles.aiOneTapBtnTitle}>다음: 멀티 플랫폼 발행</Text>
+              </View>
+              <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+            </TouchableOpacity>
+          )}
+        </PillNavCard>
+
+        {/* ─────────── STEP 4: 멀티 플랫폼 발행 및 링크 위장 ─────────── */}
+        <View
+          ref={(ref) => { stepRefs.current[4] = ref; }}
+          collapsable={false}
+        />
+        <PillNavCard
+          icon={<Share2 size={22} color={theme.colors.primary[400]} strokeWidth={2.5} />}
+          title="멀티 플랫폼 발행"
+          subtitle="스마트 링크 단축 · 인스타 릴스 · 유튜브 쇼츠 · 네이버 클립 연동"
+          accentColor={theme.colors.primary[400]}
+          iconBg={theme.colors.primary[500] + '22'}
+          stepNumber={4}
+          expanded={expandedStep === 'publish'}
+          completed={completedSteps.has('publish')}
+          onToggle={() => setExpandedStep(expandedStep === 'publish' ? null : 'publish')}
+        >
+          {!renderedVideoUrl && (
+            <View style={styles.videoPreviewEmptyInline}>
+              <Share2 size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+              <Text style={styles.videoPreviewEmptyInlineText}>
+                3단계에서 영상을 먼저 완성해주세요
+              </Text>
+            </View>
+          )}
+
+          {renderedVideoUrl && (
+            <>
+              {/* Smart link cloaking section */}
+              <View style={styles.publishLinkSection}>
+                <View style={styles.publishLinkHeader}>
+                  <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={styles.publishLinkTitle}>스마트 제휴 링크 단축 (Cloaking)</Text>
+                </View>
+                <Text style={styles.publishLinkDesc}>
+                  원본 제휴 링크를 숨기고 짧은 링크로 변환하여 클릭률을 높이고 계정을 보호합니다.
+                </Text>
+                <ShortLinkCopyBar url={affiliateUrl.trim()} label="단축 링크 생성" />
+              </View>
+
+              {/* Platform publish grid */}
+              <Text style={styles.chipGroupLabel}>발행할 플랫폼 선택</Text>
+              <View style={styles.uploadGrid}>
+                {UPLOAD_PLATFORMS.map((p) => {
+                  const Icon = p.icon;
+                  const isUploaded = uploadedPlatforms.has(p.key);
+                  const dl = getDeepLink(p.key as UploadPlatformKey);
+                  return (
+                    <View key={p.key} style={[styles.uploadPlatformCard, isUploaded && styles.uploadPlatformCardDone]}>
+                      <View style={[styles.uploadPlatformIcon, { backgroundColor: p.color + '20' }]}>
+                        <Icon size={22} color={p.color} strokeWidth={2} />
+                      </View>
+                      <Text style={styles.uploadPlatformLabel}>{p.label}</Text>
+                      {isUploaded ? (
+                        <View style={styles.uploadDoneBadge}>
+                          <Check size={12} color="#fff" strokeWidth={2.5} />
+                          <Text style={styles.uploadDoneBadgeText}>발행 완료</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.uploadOpenBtn}
+                          onPress={() => handleOneTapCopyAndOpen(p.key)}
+                          activeOpacity={0.7}
+                        >
+                          <ExternalLink size={13} color="#fff" strokeWidth={2} />
+                          <Text style={styles.uploadOpenBtnText}>열기</Text>
+                        </TouchableOpacity>
+                      )}
+                      {copyFeedback === p.key && (
+                        <Text style={styles.copyFeedbackText}>복사됨!</Text>
+                      )}
+                      {deepLinkFeedback === p.key && (
+                        <Text style={styles.deepLinkFeedbackText}>{dl.appUrl.startsWith('http') ? '웹 열림' : '앱 열림'}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Auto disclosure badge */}
+              {autoDisclosure && disclosureText && (
+                <View style={styles.storyboardDisclosureBadge}>
+                  <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
+                    공정위 제휴 문구 자동 포함: {disclosureText}
+                  </Text>
+                </View>
+              )}
+
+              {/* Upload confirm modal */}
+              {showUploadConfirm && (
+                <View style={styles.uploadConfirmOverlay}>
+                  <View style={styles.uploadConfirmBox}>
+                    <Text style={styles.uploadConfirmTitle}>플랫폼에 업로드 완료</Text>
+                    <Text style={styles.uploadConfirmDesc}>
+                      {(() => {
+                        const p = UPLOAD_PLATFORMS.find((up) => up.key === showUploadConfirm);
+                        return p ? `${p.label}에 영상이 업로드되었나요?` : '업로드가 완료되었나요?';
+                      })()}
+                    </Text>
+                    <View style={styles.uploadConfirmActions}>
+                      <TouchableOpacity
+                        style={styles.uploadConfirmCancelBtn}
+                        onPress={handleCancelUploadConfirm}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.uploadConfirmCancelText}>아직</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.uploadConfirmDoneBtn}
+                        onPress={handleConfirmUploadComplete}
+                        activeOpacity={0.7}
+                      >
+                        <Check size={15} color="#fff" strokeWidth={2.5} />
+                        <Text style={styles.uploadConfirmDoneText}>완료</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </PillNavCard>
 
@@ -2719,6 +2911,246 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.text,
+  },
+  chipGroupLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginTop: theme.spacing.sm,
+    marginBottom: 6,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  pacingChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  pacingChipActive: {
+    backgroundColor: theme.colors.warning[400] + '22',
+    borderColor: theme.colors.warning[400],
+  },
+  pacingChipLabel: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  pacingChipLabelActive: {
+    color: theme.colors.warning[400],
+  },
+  pacingChipDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  pacingChipDescActive: {
+    color: theme.colors.warning[400] + 'CC',
+  },
+  strategyChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+  },
+  strategyChip: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    minWidth: 72,
+  },
+  strategyChipActive: {
+    backgroundColor: theme.colors.accent[400] + '22',
+    borderColor: theme.colors.accent[400],
+  },
+  strategyChipIcon: {
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  strategyChipLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  strategyChipLabelActive: {
+    color: theme.colors.accent[400],
+  },
+  strategyChipDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+  },
+  strategyChipDescActive: {
+    color: theme.colors.accent[400] + 'CC',
+  },
+  publishLinkSection: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginBottom: theme.spacing.md,
+  },
+  publishLinkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  publishLinkTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  publishLinkDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  uploadGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: theme.spacing.md,
+  },
+  uploadPlatformCard: {
+    alignItems: 'center',
+    width: 100,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    gap: 6,
+  },
+  uploadPlatformCardDone: {
+    borderColor: theme.colors.success[400] + '60',
+    backgroundColor: theme.colors.success[400] + '10',
+  },
+  uploadPlatformIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadPlatformLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+  },
+  uploadOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary[500],
+  },
+  uploadOpenBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  uploadDoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.success[500],
+  },
+  uploadDoneBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  copyFeedbackText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  deepLinkFeedbackText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[400],
+  },
+  uploadConfirmOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  uploadConfirmBox: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    width: 280,
+    alignItems: 'center',
+  },
+  uploadConfirmTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: 8,
+  },
+  uploadConfirmDesc: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  uploadConfirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  uploadConfirmCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  uploadConfirmCancelText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  uploadConfirmDoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  uploadConfirmDoneText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   customToggle: {
     flexDirection: 'row',
@@ -4119,11 +4551,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  uploadGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
   uploadCard: {
     width: '48%',
     alignItems: 'center',
@@ -4449,15 +4876,6 @@ const styles = StyleSheet.create({
     color: theme.colors.warning[400],
     flex: 1,
   },
-  uploadDoneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: theme.colors.success[500],
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: theme.radius.full,
-  },
   uploadDoneText: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.bold,
@@ -4714,76 +5132,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-  },
-  uploadConfirmOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  uploadConfirmModal: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg + 4,
-    marginHorizontal: theme.spacing.lg + 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
-  uploadConfirmIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: theme.colors.success[500] + '18',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  uploadConfirmTitle: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-    marginBottom: 6,
-  },
-  uploadConfirmDesc: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    textAlign: 'center',
-    lineHeight: 17,
-    marginBottom: theme.spacing.md,
-  },
-  uploadConfirmBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  uploadConfirmCancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
-  uploadConfirmCancelText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  uploadConfirmDoneBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
-  },
-  uploadConfirmDoneText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
   deepLinkBtn: {
     flexDirection: 'row',
