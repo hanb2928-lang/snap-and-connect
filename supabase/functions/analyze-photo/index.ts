@@ -38,6 +38,16 @@ interface PlatformVariant {
   cardStyle: "magazine" | "bold" | "minimal" | "feed";
 }
 
+interface PsychologyInsight {
+  primaryTrigger: string;
+  triggerDescription: string;
+  emotionPhase: string;
+  psychologicalHook: string;
+  consumerDesire: string;
+  persuasionAngle: string;
+  behavioralNudge: string;
+}
+
 interface TemplateData {
   priceLabel: string;
   oneLiner: string;
@@ -48,6 +58,7 @@ interface TemplateData {
   productAdvantages: string[];
   caption: string;
   platformVariants: Record<string, PlatformVariant>;
+  psychologyInsight?: PsychologyInsight | null;
 }
 
 interface DetectedProduct {
@@ -124,6 +135,7 @@ const DEFAULT_TEMPLATE: TemplateData = {
   productAdvantages: [],
   caption: "",
   platformVariants: {},
+  psychologyInsight: null,
 };
 
 Deno.serve(async (req: Request) => {
@@ -249,8 +261,39 @@ async function analyzeWithOpenAI(
     : "";
 
   const systemPrompt =
-    "You are a viral short-form marketing copywriter and product identification assistant. " +
-    "Analyze the photo and identify products, then generate KILLER marketing content for each product.\n" +
+    "You are a consumer psychology expert and viral short-form marketing strategist. " +
+    "Your core mission: analyze products through the lens of HUMAN PSYCHOLOGY — understand what deep desire, fear, or aspiration the product touches, then craft marketing content that PIERCES through psychological defenses.\n" +
+    "\n" +
+    "PSYCHOLOGY-DRIVEN ANALYSIS FRAMEWORK (CRITICAL — apply to EVERY product):\n" +
+    "Before writing any copy, analyze the product through these psychological lenses:\n" +
+    "1. PRIMARY PSYCHOLOGICAL TRIGGER: Which fundamental human drive does this product activate?\n" +
+    "   - FOMO (fear of missing out): '이거 지금 안 사면 손해' feeling\n" +
+    "   - SOCIAL PROOF: '다들 쓰니까 나도' herd mentality\n" +
+    "   - LOSS AVERSION: '이 가격이 마지막일 수도' scarcity fear\n" +
+    "   - MIRROR NEURON: '저 사람 쓰는 거 보니까 나도 쓰고 싶다' imitation desire\n" +
+    "   - IDENTITY PROJECTION: '이거 쓰면 나도 그런 사람이 될 수 있어' self-image\n" +
+    "   - RECIPROCITY: '이렇게 좋은 걸 추천해주니까 보답해야지' gratitude loop\n" +
+    "   - AUTHORITY BIAS: '전문가가 인정한 거면 믿을 수 있어' trust transfer\n" +
+    "   - CONTRAST EFFECT: '이 가격에 이 품질?' expectation violation\n" +
+    "2. EMOTIONAL PHASE: Map the consumer's emotional journey:\n" +
+    "   curiosity → shock → empathy → desire → action\n" +
+    "3. CONSUMER DESIRE: What is the REAL desire the consumer is trying to fulfill?\n" +
+    "   (Not 'I want shoes' but 'I want to feel confident and stylish')\n" +
+    "4. PERSUASION ANGLE: How to bypass the consumer's ad defense mechanism:\n" +
+    "   - Story-first (not product-first): make the brain think it's watching a story, not an ad\n" +
+    "   - Problem-agitation: remind them of a pain point they've been ignoring\n" +
+    "   - Aspiration gap: show the gap between current self and ideal self\n" +
+    "   - Social validation: imply 'people like you already use this'\n" +
+    "5. BEHAVIORAL NUDGE: The subtle push that converts desire into action:\n" +
+    "   - Scarcity: '재고 얼마 안 남음'\n" +
+    "   - Urgency: '오늘까지만'\n" +
+    "   - Anchoring: show original price next to sale price\n" +
+    "   - Commitment: '댓글로 문의하면 추가 할인'\n" +
+    "\n" +
+    "Apply this framework to generate marketing content that doesn't just DESCRIBE the product,\n" +
+    "but STIMULATES the psychological triggers that make people WANT it.\n" +
+    "The hook, caption, and all copy must be rooted in psychological insight, not product features.\n" +
+    "\n" +
     "Return a JSON object with these fields:\n" +
     "- title: short 2-5 word catchy title for the overall scan (in Korean)\n" +
     "- summary: 2-3 sentence description of what's in the photo (in Korean)\n" +
@@ -271,7 +314,15 @@ async function analyzeWithOpenAI(
     "    - hook: a scroll-stopping hook phrase in Korean (10-20 chars, the kind that makes people stop scrolling). Think curiosity gap + emotional trigger. Examples: '이거 모르면 손해', '다들 이거 사느라 난리남', '가성비 끝판왕 등장', '이 가격에 이 품질?'\n" +
     "    - hashtags: array of 5-8 Korean hashtags WITHOUT the # symbol, optimized for Naver/Instagram search. Mix broad and niche tags. Example: ['착붕템', '가성비', '스니커즈', '신발추천', '옷장필수템', '데일리룩', '오늘뭐입지']\n" +
     "    - productAdvantages: array of 2-4 short Korean phrases describing the product's REAL advantages (e.g. '통화 기능', '가성비', '실용성', '스마트한 일상', '장시간 착용 편안함', '초경량'). Focus on concrete, product-specific benefits — NOT target audience or emotional angle.\n" +
-    "    - caption: a full 2-4 line caption in Korean for posting (shortform style). Must include the hook at the start, a brief product recommendation, and end with a call-to-action. Natural, conversational tone like a real influencer post. Do NOT include hashtags in the caption.\n" +
+    "    - psychologyInsight: object with ALL of these fields (MANDATORY — this is the core of psychology-driven marketing):\n" +
+    "      - primaryTrigger: one of 'FOMO' | 'SOCIAL_PROOF' | 'LOSS_AVERSION' | 'MIRROR_NEURON' | 'IDENTITY_PROJECTION' | 'RECIPROCITY' | 'AUTHORITY_BIAS' | 'CONTRAST_EFFECT' — pick the ONE trigger most relevant to this product\n" +
+    "      - triggerDescription: 1-2 sentence explanation in Korean of WHY this trigger works for this product (e.g. '이 상품은 한정 재고여서 손실 회피 심리를 자극합니다')\n" +
+    "      - emotionPhase: the dominant emotion this content should evoke — one of 'curiosity' | 'shock' | 'empathy' | 'desire' | 'action'\n" +
+    "      - psychologicalHook: a Korean phrase (10-25 chars) that directly targets the psychological trigger, NOT a product description. Examples: '이거 모르면 평생 손해', '다들 이거 쓰더라', '이 가격 다시 없을 수도'\n" +
+    "      - consumerDesire: the DEEP underlying desire in Korean (not the product feature, but the emotional need). Examples: '자신감 있는 나를 원함', '더 편한 일상을 갈망함', '남들보다 앞서고 싶은 마음'\n" +
+    "      - persuasionAngle: 1-2 sentence Korean explanation of how to bypass the consumer's ad defense (e.g. '제품 소개가 아닌 일상 스토리로 시작하여 광고 거부감 제거')\n" +
+    "      - behavioralNudge: a Korean phrase (10-30 chars) that subtly pushes toward action. Examples: '지금 아니면 다시 없을 가격', '댓글 남기면 추가 할인', '선착순 50명 한정'\n" +
+    "    - caption: a full 2-4 line caption in Korean for posting (shortform style). MUST be rooted in the psychologyInsight — start with the psychological hook, weave in the consumer desire, and end with the behavioral nudge as a call-to-action. Natural, conversational tone like a real person sharing a discovery, NOT a product pitch. Do NOT include hashtags in the caption.\n" +
     "    - platformVariants: object with 5 platform-specific variant objects. Each key MUST be exactly \"naverBlog\", \"shortform\", \"instagram\", \"threads\", or \"twitter\":\n" +
     "      - naverBlog: optimized for Naver Blog clip format. hook = a curiosity-driven title (15-30 chars Korean, like a blog post title). caption = 3-5 sentence paragraph in Korean, conversational blog-review style, naturally weaving in the product and a recommendation. hashtags = 8-12 Korean blog SEO keywords WITHOUT # symbol (broader, search-intent focused). cardStyle = \"magazine\"\n" +
     "      - shortform: optimized for TikTok/Reels. hook = scroll-stopping phrase (10-20 chars, punchy and visual). caption = 2-3 short punchy lines in Korean with line breaks, influencer speak, end with a CTA. hashtags = 6-10 mix of trending + niche Korean tags WITHOUT # symbol. cardStyle = \"bold\"\n" +
@@ -329,10 +380,19 @@ async function analyzeMultiShotWithOpenAI(
   productContext?: ProductContext,
 ): Promise<AnalysisResult> {
   const systemPrompt =
-    "You are a viral short-form marketing copywriter and product identification assistant. " +
+    "You are a consumer psychology expert and viral short-form marketing strategist. " +
     "You are given MULTIPLE photos of the SAME product taken from different angles. " +
     "Analyze ALL photos together to get a comprehensive understanding of the product — its design, material, features, brand, and details visible from different sides.\n" +
-    "Then generate KILLER marketing content for this ONE product.\n" +
+    "Then generate PSYCHOLOGY-DRIVEN marketing content for this ONE product.\n" +
+    "\n" +
+    "PSYCHOLOGY-DRIVEN ANALYSIS FRAMEWORK (CRITICAL):\n" +
+    "Before writing any copy, analyze the product through human psychological triggers:\n" +
+    "1. PRIMARY TRIGGER: Which fundamental human drive does this activate? (FOMO, SOCIAL_PROOF, LOSS_AVERSION, MIRROR_NEURON, IDENTITY_PROJECTION, RECIPROCITY, AUTHORITY_BIAS, CONTRAST_EFFECT)\n" +
+    "2. EMOTIONAL PHASE: curiosity → shock → empathy → desire → action\n" +
+    "3. CONSUMER DESIRE: The DEEP underlying desire (not 'I want shoes' but 'I want to feel confident')\n" +
+    "4. PERSUASION ANGLE: How to bypass ad defense (story-first, problem-agitation, aspiration gap, social validation)\n" +
+    "5. BEHAVIORAL NUDGE: The subtle push that converts desire into action (scarcity, urgency, anchoring, commitment)\n" +
+    "The hook, caption, and all copy must be rooted in psychological insight, not product features.\n" +
     "Return a JSON object with these fields:\n" +
     "- title: short 2-5 word catchy title for the product (in Korean)\n" +
     "- summary: 2-3 sentence description combining what you see across all angles (in Korean)\n" +
@@ -351,7 +411,15 @@ async function analyzeMultiShotWithOpenAI(
     "  - hook: a scroll-stopping hook phrase in Korean (10-20 chars, the kind that makes people stop scrolling). Think curiosity gap + emotional trigger. Examples: '이거 모르면 손해', '다들 이거 사느라 난리남', '가성비 끝판왕 등장', '이 가격에 이 품질?'\n" +
     "  - hashtags: array of 5-8 Korean hashtags WITHOUT the # symbol, optimized for Naver/Instagram search. Mix broad and niche tags. Example: ['착붕템', '가성비', '스니커즈', '신발추천', '옷장필수템', '데일리룩', '오늘뭐입지']\n" +
     "  - productAdvantages: array of 2-4 short Korean phrases describing the product's REAL advantages (e.g. '통화 기능', '가성비', '실용성', '스마트한 일상', '장시간 착용 편안함', '초경량'). Focus on concrete, product-specific benefits — NOT target audience or emotional angle.\n" +
-    "  - caption: a full 2-4 line caption in Korean for posting (shortform style). Must include the hook at the start, a brief product recommendation, and end with a call-to-action. Natural, conversational tone like a real influencer post. Do NOT include hashtags in the caption.\n" +
+    "  - psychologyInsight: object with ALL of these fields (MANDATORY — this is the core of psychology-driven marketing):\n" +
+    "    - primaryTrigger: one of 'FOMO' | 'SOCIAL_PROOF' | 'LOSS_AVERSION' | 'MIRROR_NEURON' | 'IDENTITY_PROJECTION' | 'RECIPROCITY' | 'AUTHORITY_BIAS' | 'CONTRAST_EFFECT' — pick the ONE trigger most relevant to this product\n" +
+    "    - triggerDescription: 1-2 sentence explanation in Korean of WHY this trigger works for this product\n" +
+    "    - emotionPhase: the dominant emotion this content should evoke — one of 'curiosity' | 'shock' | 'empathy' | 'desire' | 'action'\n" +
+    "    - psychologicalHook: a Korean phrase (10-25 chars) that directly targets the psychological trigger, NOT a product description. Examples: '이거 모르면 평생 손해', '다들 이거 쓰더라', '이 가격 다시 없을 수도'\n" +
+    "    - consumerDesire: the DEEP underlying desire in Korean (not the product feature, but the emotional need)\n" +
+    "    - persuasionAngle: 1-2 sentence Korean explanation of how to bypass the consumer's ad defense\n" +
+    "    - behavioralNudge: a Korean phrase (10-30 chars) that subtly pushes toward action\n" +
+    "  - caption: a full 2-4 line caption in Korean for posting (shortform style). MUST be rooted in the psychologyInsight — start with the psychological hook, weave in the consumer desire, and end with the behavioral nudge as a call-to-action. Natural, conversational tone like a real person sharing a discovery, NOT a product pitch. Do NOT include hashtags in the caption.\n" +
     "  - platformVariants: object with 5 platform-specific variant objects. Each key MUST be exactly \"naverBlog\", \"shortform\", \"instagram\", \"threads\", or \"twitter\":\n" +
     "    - naverBlog: optimized for Naver Blog clip format. hook = a curiosity-driven title (15-30 chars Korean, like a blog post title). caption = 3-5 sentence paragraph in Korean, conversational blog-review style, naturally weaving in the product and a recommendation. hashtags = 8-12 Korean blog SEO keywords WITHOUT # symbol (broader, search-intent focused). cardStyle = \"magazine\"\n" +
     "    - shortform: optimized for TikTok/Reels. hook = scroll-stopping phrase (10-20 chars, punchy and visual). caption = 2-3 short punchy lines in Korean with line breaks, influencer speak, end with a CTA. hashtags = 6-10 mix of trending + niche Korean tags WITHOUT # symbol. cardStyle = \"bold\"\n" +
@@ -359,6 +427,7 @@ async function analyzeMultiShotWithOpenAI(
     "    - twitter: optimized for X/Twitter. hook = a provocative or bold claim (10-20 chars). caption = 1-2 lines max 280 chars in Korean, punchy and shareable. hashtags = 3-5 trending Korean tags WITHOUT # symbol. cardStyle = \"minimal\"\n" +
     "    - threads: optimized for Meta Threads. hook = a conversational, thought-provoking question or statement (10-25 chars Korean). caption = 2-4 lines in Korean, casual and discussion-friendly tone, like sharing a personal discovery. hashtags = 5-8 Korean tags WITHOUT # symbol (conversation-driven). cardStyle = \"minimal\"\n" +
     "  All five variants must feel native to that platform, not copy-pasted with minor edits. Different hooks, different caption lengths, different hashtag strategies.\n" +
+    "  Each variant's hook and caption should also reflect the psychologyInsight — adapt the psychological trigger to each platform's culture.\n" +
     "  Also populate the top-level hook, hashtags, productAdvantages, caption with the SHORTFORM variant's values (since shortform is the default view).\n" +
     "Also populate detectedProducts as an array with exactly ONE element using the same product data (for backward compatibility).\n" +
     "For shoppingMatches, use the official Naver Brand Connect creator page: https://brandconnect.naver.com/about/creator\n" +
@@ -508,6 +577,23 @@ async function callOpenAIWithRetry(
   throw lastError || new Error("AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
 }
 
+function normalizePsychologyInsight(raw: unknown): PsychologyInsight | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const trigger = String(obj.primaryTrigger || "").toUpperCase();
+  const validTriggers = ["FOMO", "SOCIAL_PROOF", "LOSS_AVERSION", "MIRROR_NEURON", "IDENTITY_PROJECTION", "RECIPROCITY", "AUTHORITY_BIAS", "CONTRAST_EFFECT"];
+  if (!validTriggers.includes(trigger)) return null;
+  return {
+    primaryTrigger: trigger,
+    triggerDescription: String(obj.triggerDescription || ""),
+    emotionPhase: String(obj.emotionPhase || "desire"),
+    psychologicalHook: String(obj.psychologicalHook || ""),
+    consumerDesire: String(obj.consumerDesire || ""),
+    persuasionAngle: String(obj.persuasionAngle || ""),
+    behavioralNudge: String(obj.behavioralNudge || ""),
+  };
+}
+
 function normalizeTemplate(raw: Record<string, unknown> | undefined, fallback: Partial<TemplateData>): TemplateData {
   const td = (raw || {}) as Record<string, unknown>;
   return {
@@ -519,6 +605,7 @@ function normalizeTemplate(raw: Record<string, unknown> | undefined, fallback: P
     hashtags: Array.isArray(td.hashtags) ? td.hashtags.map(String) : (Array.isArray(fallback.hashtags) ? fallback.hashtags : []),
     productAdvantages: Array.isArray(td.productAdvantages) ? td.productAdvantages.map(String).filter(Boolean) : (Array.isArray(fallback.productAdvantages) ? fallback.productAdvantages : []),
     caption: String(td.caption || fallback.caption || ""),
+    psychologyInsight: normalizePsychologyInsight(td.psychologyInsight),
     platformVariants: normalizePlatformVariants(td.platformVariants, {
       hook: String(td.hook || fallback.hook || ""),
       caption: String(td.caption || fallback.caption || ""),

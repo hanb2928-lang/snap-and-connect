@@ -34,6 +34,16 @@ export interface PlatformVariant {
   cardStyle: 'magazine' | 'bold' | 'minimal' | 'feed';
 }
 
+export interface PsychologyInsight {
+  primaryTrigger: string;
+  triggerDescription: string;
+  emotionPhase: string;
+  psychologicalHook: string;
+  consumerDesire: string;
+  persuasionAngle: string;
+  behavioralNudge: string;
+}
+
 export interface TemplateData {
   priceLabel: string;
   oneLiner: string;
@@ -44,6 +54,7 @@ export interface TemplateData {
   productAdvantages: string[];
   caption: string;
   platformVariants?: Record<PlatformKey, PlatformVariant>;
+  psychologyInsight?: PsychologyInsight | null;
 }
 
 export interface CustomReview {

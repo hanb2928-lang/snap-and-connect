@@ -103,6 +103,7 @@ function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {
       hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
       productAdvantages: Array.isArray(data.productAdvantages) ? data.productAdvantages : [],
       caption: (data.caption as string) || '',
+      psychologyInsight: null,
     },
     detectedProducts: Array.isArray(data.detectedProducts) ? data.detectedProducts : [],
   };
@@ -226,6 +227,7 @@ export async function saveManualScan(
         hashtags: [],
         productAdvantages: [],
         caption: '',
+        psychologyInsight: null,
       },
       detected_products: [],
     })
