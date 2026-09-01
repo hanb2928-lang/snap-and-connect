@@ -21,6 +21,7 @@ const ALLOWED_JOB_TYPES = new Set([
   "generate-copy",
   "generate-review",
   "generate-comic-scenario",
+  "render-video",
 ]);
 
 const JOB_TYPE_TO_FUNCTION_SLUG: Record<string, string> = {

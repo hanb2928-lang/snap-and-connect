@@ -7,7 +7,8 @@ export type JobType =
   | 'generate-tts'
   | 'generate-copy'
   | 'generate-review'
-  | 'generate-comic-scenario';
+  | 'generate-comic-scenario'
+  | 'render-video';
 
 export type JobStatus = 'queued' | 'processing' | 'done' | 'error';
 

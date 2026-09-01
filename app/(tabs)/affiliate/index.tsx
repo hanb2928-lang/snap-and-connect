@@ -270,6 +270,7 @@ export default function AffiliateScreen() {
   const [stockVideoClip, setStockVideoClip] = useState<StockVideoClip | null>(null);
   const [videoEditPlan, setVideoEditPlan] = useState<EditPlan | null>(null);
   const renderProgress = useSharedValue(0);
+  const masterGainRef = useRef<GainNode | null>(null);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${videoPreviewProgress.value * 100}%`,
@@ -881,7 +882,7 @@ export default function AffiliateScreen() {
     return getDisclosureForPlatforms(platforms, autoDisclosure);
   }, [selectedPlatform, autoDisclosure]);
 
-  const generatePreviewVideo = useCallback(async () => {
+  const generatePreviewVideo = useCallback(async (quality: 'preview' | 'high' = 'high') => {
     if (Platform.OS !== 'web') {
       setRenderError('웹 브라우저에서만 영상 생성이 가능합니다.');
       return;
@@ -890,6 +891,7 @@ export default function AffiliateScreen() {
       setRenderError('먼저 스토리보드를 생성해주세요.');
       return;
     }
+    const isPreview = quality === 'preview';
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -945,11 +947,11 @@ export default function AffiliateScreen() {
       const analysis = viralAnalysisResult;
       const specsRatio = analysis?.specs.ratio ?? '9:16';
       const isPortrait = specsRatio.includes('9:16') || specsRatio.includes('16:9') === false;
-      const W = isPortrait ? 1080 : 1920;
-      const H = isPortrait ? 1920 : 1080;
-      const FPS = 30;
+      const W = isPortrait ? (isPreview ? 540 : 1080) : (isPreview ? 960 : 1920);
+      const H = isPortrait ? (isPreview ? 960 : 1920) : (isPreview ? 540 : 1080);
+      const FPS = isPreview ? 24 : 30;
       const totalSec = parseInt(analysis?.specs.maxDuration ?? '60', 10) || 60;
-      const DURATION = Math.min(totalSec, 60);
+      const DURATION = isPreview ? Math.min(totalSec, 30) : Math.min(totalSec, 60);
       const cg = analysis?.colorGrading ?? { warm: 10, contrast: 20, saturation: 15, vignette: 30 };
       const bpm = analysis?.pacingBpm ?? 100;
 
@@ -959,12 +961,19 @@ export default function AffiliateScreen() {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('캔버스를 생성할 수 없습니다.');
 
-      // Set up audio context for BGM + TTS voiceover
-      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const audioDest = audioCtx.createMediaStreamDestination();
+      // Set up audio context for BGM + TTS voiceover (high-quality only — preview skips audio for speed)
+      let audioCtx: AudioContext | null = null;
+      let audioDest: MediaStreamAudioDestinationNode | null = null;
+      let bgmOsc: OscillatorNode | null = null;
+      let melodyOsc: OscillatorNode | null = null;
+
+      if (!isPreview) {
+      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioDest = audioCtx.createMediaStreamDestination();
       const masterGain = audioCtx.createGain();
       masterGain.gain.value = 0.7;
       masterGain.connect(audioDest);
+      masterGainRef.current = masterGain;
 
       // Generate BGM: platform-specific beat pattern using oscillators
       const bgmGain = audioCtx.createGain();
@@ -972,7 +981,7 @@ export default function AffiliateScreen() {
       bgmGain.connect(masterGain);
 
       const beatInterval = 60 / bpm; // seconds per beat
-      const bgmOsc = audioCtx.createOscillator();
+      bgmOsc = audioCtx.createOscillator();
       const bgmOscGain = audioCtx.createGain();
       bgmOsc.type = 'sine';
       bgmOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 80 : selectedUploadPlatform === 'instagram' ? 60 : 70;
@@ -991,7 +1000,7 @@ export default function AffiliateScreen() {
       bgmOscGain.connect(bgmGain);
 
       // Add a secondary melody oscillator for richness
-      const melodyOsc = audioCtx.createOscillator();
+      melodyOsc = audioCtx.createOscillator();
       const melodyGain = audioCtx.createGain();
       melodyOsc.type = 'triangle';
       melodyOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 220 : selectedUploadPlatform === 'instagram' ? 165 : 196;
@@ -1009,15 +1018,20 @@ export default function AffiliateScreen() {
         melodyGain.gain.setValueAtTime(0.08, noteTime);
         melodyGain.gain.exponentialRampToValueAtTime(0.001, noteTime + beatInterval * 1.5);
       }
+      } // end audio setup (high-quality only)
 
-      // Combine canvas video stream + audio stream
+      // Combine canvas video stream + audio stream (audio only for high-quality)
       const canvasStream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(FPS);
-      const combinedStream = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...audioDest.stream.getAudioTracks(),
-      ]);
+      const combinedStream = audioDest
+        ? new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioDest.stream.getAudioTracks(),
+          ])
+        : canvasStream;
 
-      const codecCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      const codecCandidates = isPreview
+        ? ['video/webm;codecs=vp8', 'video/webm', 'video/mp4']
+        : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
       let mimeType = '';
       for (const c of codecCandidates) {
         try {
@@ -1026,7 +1040,7 @@ export default function AffiliateScreen() {
       }
       if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
 
-      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 6_000_000 });
+      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -1047,7 +1061,8 @@ export default function AffiliateScreen() {
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
 
-      // Generate TTS voiceover from scene texts
+      // Generate TTS voiceover from scene texts (high-quality only — preview skips TTS)
+      if (!isPreview) {
       try {
         const narrationText = scenes.map(s => s.textOverlay).join('. ');
         if ('speechSynthesis' in window) {
@@ -1063,11 +1078,13 @@ export default function AffiliateScreen() {
           }, 200);
         }
       } catch { /* TTS is optional */ }
+      } // end TTS (high-quality only)
 
-      // Add transition sound effects (whoosh/zip) at scene boundaries
+      // Add transition sound effects (whoosh/zip) at scene boundaries (high-quality only)
+      if (!isPreview && audioCtx && masterGainRef.current) {
       const sfxGain = audioCtx.createGain();
       sfxGain.gain.value = 0.2;
-      sfxGain.connect(masterGain);
+      sfxGain.connect(masterGainRef.current);
       for (let i = 1; i < totalScenes; i++) {
         const sfxTime = (DURATION / totalScenes) * i;
         const sfxOsc = audioCtx.createOscillator();
@@ -1082,6 +1099,7 @@ export default function AffiliateScreen() {
         sfxOsc.start(sfxTime);
         sfxOsc.stop(sfxTime + 0.15);
       }
+      } // end SFX (high-quality only)
 
       const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
         ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
@@ -1507,12 +1525,13 @@ export default function AffiliateScreen() {
       requestAnimationFrame(drawFrame);
 
       await done;
-      // Clean up audio resources
+      // Clean up audio resources (high-quality mode only has audio to clean up)
       try {
-        bgmOsc.stop();
-        melodyOsc.stop();
-        audioCtx.close();
+        if (bgmOsc) bgmOsc.stop();
+        if (melodyOsc) melodyOsc.stop();
+        if (audioCtx) audioCtx.close();
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        masterGainRef.current = null;
       } catch { /* cleanup best-effort */ }
       const blob = new Blob(chunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
@@ -2842,31 +2861,53 @@ export default function AffiliateScreen() {
                 </View>
               )}
 
-              {/* Render video from storyboard button */}
-              <TouchableOpacity
-                style={[styles.renderVideoBtn, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
-                onPress={() => {
-                  if (videoRendering || videoRenderComplete) return;
-                  generatePreviewVideo();
-                }}
-                disabled={videoRendering || videoRenderComplete}
-                activeOpacity={0.85}
-              >
-                {videoRendering ? (
-                  <Loader size={16} color="#fff" strokeWidth={2} />
-                ) : videoRenderComplete ? (
-                  <Check size={16} color="#fff" strokeWidth={2.5} />
-                ) : (
-                  previewMediaMode === 'image' ? <ImageIcon size={16} color="#fff" strokeWidth={2} /> : <Film size={16} color="#fff" strokeWidth={2} />
-                )}
-                <Text style={styles.renderVideoBtnText}>
-                  {videoRendering
-                    ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '영상 렌더링 중...')
-                    : videoRenderComplete
-                      ? (previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료')
-                      : (previewMediaMode === 'image' ? '스토리보드로 이미지 만들기' : '스토리보드로 영상 만들기')}
-                </Text>
-              </TouchableOpacity>
+              {/* Render video from storyboard — two-tier: quick preview + high-quality */}
+              <View style={styles.renderBtnRow}>
+                <TouchableOpacity
+                  style={[styles.renderVideoBtn, { flex: 1, marginRight: 8 }, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
+                  onPress={() => {
+                    if (videoRendering || videoRenderComplete) return;
+                    generatePreviewVideo('preview');
+                  }}
+                  disabled={videoRendering || videoRenderComplete}
+                  activeOpacity={0.85}
+                >
+                  {videoRendering ? (
+                    <Loader size={16} color="#fff" strokeWidth={2} />
+                  ) : (
+                    previewMediaMode === 'image' ? <ImageIcon size={16} color="#fff" strokeWidth={2} /> : <Film size={16} color="#fff" strokeWidth={2} />
+                  )}
+                  <Text style={styles.renderVideoBtnText}>
+                    {videoRendering
+                      ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '빠른 미리보기 생성 중...')
+                      : (previewMediaMode === 'image' ? '빠른 이미지 미리보기' : '빠른 미리보기 (540p)')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.renderVideoBtn, { flex: 1, marginLeft: 8, backgroundColor: theme.colors.accent[500] }, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
+                  onPress={() => {
+                    if (videoRendering || videoRenderComplete) return;
+                    generatePreviewVideo('high');
+                  }}
+                  disabled={videoRendering || videoRenderComplete}
+                  activeOpacity={0.85}
+                >
+                  {videoRendering ? (
+                    <Loader size={16} color="#fff" strokeWidth={2} />
+                  ) : videoRenderComplete ? (
+                    <Check size={16} color="#fff" strokeWidth={2.5} />
+                  ) : (
+                    <Sparkles size={16} color="#fff" strokeWidth={2} />
+                  )}
+                  <Text style={styles.renderVideoBtnText}>
+                    {videoRendering
+                      ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '고품질 렌더링 중...')
+                      : videoRenderComplete
+                        ? (previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료')
+                        : (previewMediaMode === 'image' ? '고품질 이미지 만들기' : '고품질 영상 만들기 (1080p)')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               {videoRendering && (
                 <View style={styles.renderProgressBarWrap}>
@@ -4283,6 +4324,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.success[400],
+  },
+  renderBtnRow: {
+    flexDirection: "row",
+    marginTop: theme.spacing.sm,
   },
   renderVideoBtn: {
     flexDirection: 'row',

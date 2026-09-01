@@ -81,3 +81,6 @@ verify_jwt = false
 
 [functions.generate-video-edit-plan]
 verify_jwt = false
+
+[functions.render-video]
+verify_jwt = false
