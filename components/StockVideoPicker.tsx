@@ -14,7 +14,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { Search, Film, Check, X, RefreshCw, Settings, Download, Image as ImageIcon } from 'lucide-react-native';
+import { Search, Film, Check, X, RefreshCw, Settings, Download, Image as ImageIcon, Camera, RotateCcw } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -154,6 +154,130 @@ export function StockVideoPicker({
       setSaving(false);
     }
   }, [selectedClip]);
+
+  // ── In-component camera capture (webcam) ──
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [facing, setFacing] = useState<'user' | 'environment'>('environment');
+
+  const stopCameraStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setCameraReady(false);
+  }, []);
+
+  const startCamera = useCallback(async (face: 'user' | 'environment') => {
+    if (Platform.OS !== 'web') return;
+    stopCameraStream();
+    setCameraError(null);
+    setCameraReady(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+        setCameraReady(true);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '카메라 접근 실패';
+      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
+        setCameraError('카메라 권한이 필요합니다. 브라우저 설정에서 카메라를 허용해주세요.');
+      } else if (msg.includes('NotFound') || msg.includes('NotReadable')) {
+        setCameraError('사용 가능한 카메라를 찾을 수 없습니다.');
+      } else {
+        setCameraError('카메라를 시작할 수 없습니다: ' + msg);
+      }
+    }
+  }, [stopCameraStream]);
+
+  const handleOpenCamera = useCallback(() => {
+    setCapturedDataUrl(null);
+    setShowCamera(true);
+    setTimeout(() => startCamera(facing), 100);
+  }, [facing, startCamera]);
+
+  const handleCloseCamera = useCallback(() => {
+    stopCameraStream();
+    setShowCamera(false);
+    setCapturedDataUrl(null);
+    setCameraError(null);
+  }, [stopCameraStream]);
+
+  const handleFlipCamera = useCallback(() => {
+    const next = facing === 'environment' ? 'user' : 'environment';
+    setFacing(next);
+    if (showCamera) startCamera(next);
+  }, [facing, showCamera, startCamera]);
+
+  const handleCapturePhoto = useCallback(async () => {
+    if (!videoRef.current || !cameraReady) return;
+    setCapturing(true);
+    try {
+      const video = videoRef.current;
+      const rawW = video.videoWidth || 1080;
+      const rawH = video.videoHeight || 1920;
+      const maxDim = 1080;
+      const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
+      const w = Math.round(rawW * scale);
+      const h = Math.round(rawH * scale);
+      const canvas = captureCanvasRef.current ?? document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas 미지원');
+      if (facing === 'user') {
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(video, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      setCapturedDataUrl(dataUrl);
+    } catch {
+      setCameraError('촬영에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setCapturing(false);
+    }
+  }, [cameraReady, facing]);
+
+  const handleConfirmCapture = useCallback(() => {
+    if (!capturedDataUrl) return;
+    const clip: StockVideoClip = {
+      id: Date.now(),
+      duration: 0,
+      width: 1080,
+      height: 1920,
+      previewUrl: capturedDataUrl,
+      thumbnailUrl: capturedDataUrl,
+      videoUrl: capturedDataUrl,
+      author: '직접 촬영',
+      ratio: '9:16',
+      mediaType: 'image',
+    };
+    onSelectClip(clip);
+    stopCameraStream();
+    setShowCamera(false);
+    setCapturedDataUrl(null);
+  }, [capturedDataUrl, onSelectClip, stopCameraStream]);
+
+  const handleRetakeCapture = useCallback(() => {
+    setCapturedDataUrl(null);
+  }, []);
+
+  useEffect(() => {
+    return () => { stopCameraStream(); };
+  }, [stopCameraStream]);
 
   const initialQuery = productName || productCategory || '';
   const hasSearched = clips.length > 0 || error !== null;
@@ -366,6 +490,102 @@ export function StockVideoPicker({
           )
         }
       />
+
+      {/* ── Camera capture section ── */}
+      {!showCamera && (
+        <TouchableOpacity
+          style={styles.captureBtn}
+          onPress={handleOpenCamera}
+          activeOpacity={0.8}
+        >
+          <Camera size={18} color="#fff" strokeWidth={2.5} />
+          <Text style={styles.captureBtnText}>캡처하기 (웹캠 촬영)</Text>
+        </TouchableOpacity>
+      )}
+
+      {showCamera && (
+        <View style={styles.cameraSection}>
+          <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
+          {capturedDataUrl ? (
+            <View style={styles.capturePreviewWrap}>
+              {/* @ts-ignore web-only img */}
+              <img
+                src={capturedDataUrl}
+                style={{ width: '100%', maxHeight: 400, borderRadius: 12, objectFit: 'contain' }}
+              />
+              <View style={styles.capturePreviewActions}>
+                <TouchableOpacity style={styles.captureRetakeBtn} onPress={handleRetakeCapture} activeOpacity={0.8}>
+                  <RotateCcw size={16} color="#fff" strokeWidth={2} />
+                  <Text style={styles.captureRetakeText}>다시 촬영</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.captureConfirmBtn} onPress={handleConfirmCapture} activeOpacity={0.85}>
+                  <Check size={16} color="#fff" strokeWidth={2.5} />
+                  <Text style={styles.captureConfirmText}>이 사진 사용</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.cameraViewWrap}>
+              {/* @ts-ignore web-only video */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: '100%',
+                  height: 320,
+                  borderRadius: 12,
+                  objectFit: 'cover',
+                  transform: facing === 'user' ? 'scaleX(-1)' : 'none',
+                }}
+              />
+              {!cameraReady && !cameraError && (
+                <View style={styles.cameraLoadingWrap}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.cameraLoadingText}>카메라 시작 중...</Text>
+                </View>
+              )}
+              {cameraError && (
+                <View style={styles.cameraErrorWrap}>
+                  <Text style={styles.cameraErrorText}>{cameraError}</Text>
+                  <TouchableOpacity
+                    style={styles.cameraRetryBtn}
+                    onPress={() => startCamera(facing)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.cameraRetryText}>다시 시도</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+          {!capturedDataUrl && (
+            <View style={styles.cameraActions}>
+              <TouchableOpacity style={styles.cameraFlipBtn} onPress={handleFlipCamera} disabled={!cameraReady} activeOpacity={0.7}>
+                <RotateCcw size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.cameraFlipText}>카메라 전환</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cameraShutterBtn, !cameraReady && styles.cameraShutterDisabled]}
+                onPress={handleCapturePhoto}
+                disabled={!cameraReady || capturing}
+                activeOpacity={0.85}
+              >
+                {capturing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Camera size={26} color="#fff" strokeWidth={2.5} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cameraCloseBtn} onPress={handleCloseCamera} activeOpacity={0.7}>
+                <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.cameraCloseText}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -638,5 +858,155 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: theme.colors.success[400],
     borderRadius: 2,
+  },
+  // ── Camera capture styles ──
+  captureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.primary[600],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    marginTop: theme.spacing.sm,
+  },
+  captureBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  cameraSection: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  cameraViewWrap: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  cameraLoadingWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cameraLoadingText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  cameraErrorWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 8,
+    backgroundColor: 'rgba(5,8,18,0.85)',
+  },
+  cameraErrorText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  cameraRetryBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.primary[600],
+    borderRadius: theme.radius.md,
+  },
+  cameraRetryText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  cameraActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cameraFlipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+  },
+  cameraFlipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  cameraShutterBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  cameraShutterDisabled: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  cameraCloseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+  },
+  cameraCloseText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  capturePreviewWrap: {
+    gap: theme.spacing.sm,
+  },
+  capturePreviewActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  captureRetakeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: theme.radius.md,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  captureRetakeText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  captureConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.success[500],
+    borderRadius: theme.radius.md,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  captureConfirmText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
