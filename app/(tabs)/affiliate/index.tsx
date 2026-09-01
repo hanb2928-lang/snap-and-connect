@@ -36,7 +36,9 @@ import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { addSnippet } from '@/lib/marketingSnippets';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
-import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory } from '@/lib/ttsVoices';
+import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory, getOpenAiVoiceParams } from '@/lib/ttsVoices';
+import { generateEmotionCurve, splitTextForEmotionCurve } from '@/lib/ttsEmotionCurve';
+import { BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { generatePsychAnalysis, generateNanoFusedAnalysis, getLearningStats, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
@@ -1256,24 +1258,59 @@ export default function AffiliateScreen() {
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
 
-      // Generate TTS voiceover from scene texts (high-quality only — preview skips TTS)
-      if (!isPreview) {
+      // Generate neural TTS voiceover via OpenAI gpt-4o-mini-tts (high-quality only)
+      // Splits narration by emotion curve (doubt→surprise→conviction) for natural prosody
+      if (!isPreview && audioCtx && masterGainRef.current) {
       try {
         const narrationText = scenes.map(s => s.textOverlay).join('. ');
-        if ('speechSynthesis' in window) {
-          const ttsUtterance = new SpeechSynthesisUtterance(narrationText);
-          ttsUtterance.lang = 'ko-KR';
-          ttsUtterance.rate = selectedUploadPlatform === 'tiktok' ? 1.15 : selectedUploadPlatform === 'youtube' ? 0.95 : 1.05;
-          ttsUtterance.pitch = 1.0;
-          const voices = window.speechSynthesis.getVoices();
-          const koreanVoice = voices.find(v => v.lang.startsWith('ko'));
-          if (koreanVoice) ttsUtterance.voice = koreanVoice;
-          setTimeout(() => {
-            window.speechSynthesis.speak(ttsUtterance);
-          }, 200);
+        if (narrationText.trim()) {
+          const voiceKey = selectedVoiceKey ?? settings?.default_tts_voice ?? 'bright_female_1';
+          const voiceParams = getOpenAiVoiceParams(voiceKey, settings?.tts_speed ?? null);
+          const emotionCurve = generateEmotionCurve(DURATION);
+          const segments = splitTextForEmotionCurve(
+            narrationText,
+            emotionCurve,
+            voiceParams.voice,
+            voiceParams.instructions,
+          );
+          const batchItems = segments.map((seg) => ({
+            languageCode: 'ko',
+            text: seg.text,
+            voice: seg.voice,
+            instructions: seg.instructions,
+            speed: seg.speed,
+          }));
+          const ttsResp = await fetch(BATCH_TTS_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supabaseAnonKey}`,
+              apikey: supabaseAnonKey,
+            },
+            body: JSON.stringify({ items: batchItems }),
+          });
+          if (ttsResp.ok) {
+            const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };
+            let playbackOffset = 0.2;
+            for (const result of ttsData.results) {
+              if (!result.audioBase64 || result.error) continue;
+              try {
+                const audioBytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+                const audioBuf = await audioCtx.decodeAudioData(audioBytes.buffer.slice(0));
+                const src = audioCtx.createBufferSource();
+                src.buffer = audioBuf;
+                const ttsGain = audioCtx.createGain();
+                ttsGain.gain.value = 0.85;
+                src.connect(ttsGain);
+                ttsGain.connect(masterGainRef.current);
+                src.start(playbackOffset);
+                playbackOffset += audioBuf.duration + 0.15;
+              } catch { /* skip failed segment decode */ }
+            }
+          }
         }
-      } catch { /* TTS is optional */ }
-      } // end TTS (high-quality only)
+      } catch { /* TTS is optional — BGM still plays */ }
+      } // end neural TTS (high-quality only)
 
       // Add transition sound effects (whoosh/zip) at scene boundaries (high-quality only)
       if (!isPreview && audioCtx && masterGainRef.current) {

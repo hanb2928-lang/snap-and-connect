@@ -47,11 +47,14 @@ export function speakOnDevice(
     // Korean language hint
     utterance.lang = 'ko-KR';
 
-    // Apply rate jitter for human-like variation (±0.08)
+    // Human-like prosody: rate jitter (±0.08) + pitch variation (±0.04)
+    // to avoid the flat, mechanical cadence of default browser TTS
     const baseRate = options?.rate ?? 1.0;
-    const jitter = (Math.random() - 0.5) * 0.16;
-    utterance.rate = Math.min(Math.max(baseRate + jitter, 0.5), 2.0);
-    utterance.pitch = options?.pitch ?? 1.0;
+    const rateJitter = (Math.random() - 0.5) * 0.16;
+    utterance.rate = Math.min(Math.max(baseRate + rateJitter, 0.5), 2.0);
+    const basePitch = options?.pitch ?? 1.0;
+    const pitchJitter = (Math.random() - 0.5) * 0.08;
+    utterance.pitch = Math.min(Math.max(basePitch + pitchJitter, 0.0), 2.0);
 
     // Try to find a Korean voice
     const voices = window.speechSynthesis.getVoices();
