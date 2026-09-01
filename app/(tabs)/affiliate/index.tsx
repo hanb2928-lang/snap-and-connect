@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -49,43 +49,47 @@ const PLATFORMS = [
 
 const UPLOAD_PLATFORMS = [
   { key: 'instagram', label: '인스타그램', icon: Camera, color: '#E1306C' },
-  { key: 'blog', label: '네이버 블로그', icon: FileText, color: '#03C75A' },
-  { key: 'youtube', label: '유튜브 숏츠', icon: Youtube, color: '#FF0000' },
+  { key: 'youtube', label: '유튜브', icon: Youtube, color: '#FF0000' },
   { key: 'tiktok', label: '틱톡', icon: Music2, color: '#000000' },
+  { key: 'naver_clip', label: '네이버 클립', icon: Video, color: '#03C75A' },
+  { key: 'blog', label: '네이버 블로그', icon: FileText, color: '#03C75A' },
   { key: 'pinterest', label: '핀터레스트', icon: ImageIcon, color: '#E60023' },
   { key: 'twitter', label: '트위터/스레드', icon: Hash, color: '#1DA1F2' },
 ] as const;
 
-const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
+const PLATFORM_BOARDS: Record<string, { key: string; label: string; desc: string }[]> = {
   instagram: [
-    { key: 'reels', label: '릴스' },
-    { key: 'feed', label: '피드 게시물' },
-    { key: 'story', label: '스토리' },
-  ],
-  blog: [
-    { key: 'category_post', label: '카테고리 포스트' },
-    { key: 'review', label: '리뷰 글' },
-    { key: 'promotion', label: '프로모션 글' },
+    { key: 'reels', label: '릴스', desc: '트렌디한 숏폼 중심. 음악, 시각적 효과, 2030 타겟 유입에 최적화된 세로형 영상' },
+    { key: 'feed', label: '피드 게시물', desc: '이미지와 텍스트 중심. 미학적 큐레이션과 카드뉴스에 적합' },
+    { key: 'story', label: '스토리', desc: '24시간 소멸형 콘텐츠. 긴박감과 희소성으로 즉각적 반응 유도' },
   ],
   youtube: [
-    { key: 'shorts', label: '쇼츠' },
-    { key: 'community', label: '커뮤니티 탭' },
-    { key: 'video', label: '일반 영상' },
+    { key: 'shorts', label: '쇼츠', desc: '검색 유입과 알고리즘 추천이 강력한 숏폼. 롱텀 조회수와 구독자 확보에 유리' },
+    { key: 'community', label: '커뮤니티 탭', desc: '이미지와 텍스트 투표 등 피드형. 구독자와 직접 소통하며 가볍게 제안' },
+    { key: 'video', label: '일반 영상', desc: '긴 호흡의 정보 전달. 3막 구조(문제-해결-결과)로 신뢰 구축' },
   ],
   tiktok: [
-    { key: 'video', label: '틱톡 영상' },
-    { key: 'carousel', label: '캐러셀' },
-    { key: 'story', label: '스토리' },
+    { key: 'video', label: '틱톡 영상', desc: '바이럴 확산 속도가 가장 빠른 숏폼. 챌린지와 밈 기반 대중적 노출에 최적화' },
+    { key: 'carousel', label: '캐러셀', desc: '여러 장 이미지 슬라이드. 정보성 카드뉴스나 전후 비교(Before & After) 콘텐츠에 적합' },
+    { key: 'story', label: '스토리', desc: '24시간 소멸형 숏폼. 긴박감으로 즉각적 반응 유도' },
+  ],
+  naver_clip: [
+    { key: 'clip', label: '네이버 클립', desc: '네이버 블로그·검색·NOW 등 생태계와 연동되는 숏폼. 국내 검색 사용자 대상 제휴 마케팅 유입에 효과적' },
+  ],
+  blog: [
+    { key: 'category_post', label: '카테고리 포스트', desc: '상세한 리뷰와 정보성 텍스트 중심. 검색 엔진 상위 노출로 꾸준한 유기적 유입' },
+    { key: 'review', label: '리뷰 글', desc: '상세한 사용 후기. 비교 분석 정보로 신뢰 구축 후 전환' },
+    { key: 'promotion', label: '프로모션 글', desc: '할인·이벤트 정보 전달. 직관적인 구매 유도' },
   ],
   pinterest: [
-    { key: 'pin', label: '핀' },
-    { key: 'idea_pin', label: '아이디어 핀' },
-    { key: 'board', label: '보드' },
+    { key: 'pin', label: '핀', desc: '이미지와 시각적 큐레이션 중심. 인테리어, 패션, 리빙 등 구매 전환 직전 검색 유입이 매우 높음' },
+    { key: 'idea_pin', label: '아이디어 핀', desc: '여러 장면이 슬라이드처럼 전환. 각 장면마다 하나의 핵심 메시지' },
+    { key: 'board', label: '보드', desc: '테마별 컬렉션 구성. 큐레이션 자체가 소유 심리를 충족' },
   ],
   twitter: [
-    { key: 'thread', label: '스레드' },
-    { key: 'tweet', label: '일반 트윗' },
-    { key: 'reply', label: '답글' },
+    { key: 'thread', label: '스레드', desc: '연속 트윗 구조. 정보 갭의 연속으로 끝까지 읽게 만드는 정보성 콘텐츠' },
+    { key: 'tweet', label: '일반 트윗', desc: '짧고 강렬한 한 줄. 트렌드 편승으로 노출 5배 이상 증가' },
+    { key: 'reply', label: '답글', desc: '기존 트윗에 대한 반응. 즉각적 도파민 루프로 참여 유도' },
   ],
 };
 
@@ -144,11 +148,6 @@ const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resoluti
     feed: { ratio: '1:1 또는 4:5', resolution: '1080×1080', maxDuration: '60초', format: 'MP4' },
     story: { ratio: '9:16', resolution: '1080×1920', maxDuration: '15초', format: 'MP4' },
   },
-  blog: {
-    category_post: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
-    review: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
-    promotion: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
-  },
   youtube: {
     shorts: { ratio: '9:16', resolution: '1080×1920', maxDuration: '60초', format: 'MP4' },
     community: { ratio: '1:1', resolution: '1080×1080', maxDuration: 'GIF/이미지', format: 'MP4/GIF' },
@@ -158,6 +157,14 @@ const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resoluti
     video: { ratio: '9:16', resolution: '1080×1920', maxDuration: '10분', format: 'MP4' },
     carousel: { ratio: '9:16', resolution: '1080×1920', maxDuration: '정지형', format: 'JPG/PNG' },
     story: { ratio: '9:16', resolution: '1080×1920', maxDuration: '15초', format: 'MP4' },
+  },
+  naver_clip: {
+    clip: { ratio: '9:16', resolution: '1080×1920', maxDuration: '60초', format: 'MP4' },
+  },
+  blog: {
+    category_post: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
+    review: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
+    promotion: { ratio: '16:9', resolution: '1920×1080', maxDuration: '제한 없음', format: 'MP4/YouTube 임베드' },
   },
   pinterest: {
     pin: { ratio: '2:3', resolution: '1000×1500', maxDuration: '정지형', format: 'JPG/PNG' },
@@ -1905,6 +1912,15 @@ export default function AffiliateScreen() {
                   );
                 })}
               </View>
+              {selectedBoard && (() => {
+                const board = PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard);
+                if (!board?.desc) return null;
+                return (
+                  <View style={styles.boardDescBox}>
+                    <Text style={styles.boardDescText}>{board.desc}</Text>
+                  </View>
+                );
+              })()}
             </>
           )}
 
@@ -4726,6 +4742,20 @@ const styles = StyleSheet.create({
   },
   boardChipTextActive: {
     color: '#fff',
+  },
+  boardDescBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary[400] + '60',
+  },
+  boardDescText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
   },
   viralAnalysisBox: {
     backgroundColor: theme.colors.dark.surfaceLight,

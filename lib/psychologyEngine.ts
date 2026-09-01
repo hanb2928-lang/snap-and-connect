@@ -196,6 +196,22 @@ const PLATFORM_PROFILES: Record<string, PlatformPsychProfile> = {
       { name: '즉각적 반응 심리', description: '좋아요/리트윗이 즉각적이라 도파민 루프가 더 짧고 강렬' },
     ],
   },
+  naver_clip: {
+    attentionPattern: 'F-pattern + 검색 연동 (검색 키워드 → 클립 시청 1.5초)',
+    primaryDrive: '검색 신뢰 + 국내 로컬 밀착',
+    avgWatchTime: '3~10초',
+    optimalHookSec: 2,
+    textStyle: '굵은 산세리프, 하단 배치, 한국어 가독성 우선',
+    pacingBpm: 110,
+    colorGrading: { warm: 8, contrast: 22, saturation: 18, vignette: 25 },
+    motionStyle: ['zoom-in', 'pan-right', 'tilt-up', 'pulse', 'zoom-out', 'pan-left'],
+    triggers: [
+      { name: '검색 생태계 연동', description: '네이버 블로그·검색·NOW와 연동되어 검색 유입이 자연스럽게 클립으로 이어짐' },
+      { name: '국내 로컬 밀착', description: '한국 사용자의 검색 습관에 최적화, 지역 기반 제품 추천에 효과적' },
+      { name: '신뢰 기반 전환', description: '네이버 브랜드 신뢰도가 구매 결정으로 직결, 블로그 리뷰와 시너지' },
+      { name: '정보 갭 + 검색 연결', description: '검색에서 들어온 사용자는 정보 갭이 큼, 품질 좋은 숏폼이 전환율 결정' },
+    ],
+  },
 };
 
 const REFERENCE_MAP: Record<string, { title: string; views: string; revenue: string }> = {
@@ -217,10 +233,11 @@ const REFERENCE_MAP: Record<string, { title: string; views: string; revenue: str
   tw_thread: { title: '트위터 제품 스레드', views: '670K', revenue: '월 95만원' },
   tw_tweet: { title: '트위터 제품 트윗', views: '420K', revenue: '월 65만원' },
   tw_reply: { title: '트위터 제품 답글', views: '310K', revenue: '월 48만원' },
+  nc_clip: { title: '네이버 클립 제품 영상', views: '1.3M', revenue: '월 220만원' },
 };
 
 const PLATFORM_PREFIX: Record<string, string> = {
-  instagram: 'ig', youtube: 'yt', blog: 'blog', tiktok: 'tt', pinterest: 'pin', twitter: 'tw',
+  instagram: 'ig', youtube: 'yt', blog: 'blog', tiktok: 'tt', pinterest: 'pin', twitter: 'tw', naver_clip: 'nc',
 };
 
 export function generatePsychAnalysis(
