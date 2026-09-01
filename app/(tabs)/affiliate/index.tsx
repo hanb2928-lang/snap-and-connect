@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, ImageDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -501,6 +501,42 @@ export default function AffiliateScreen() {
       markCompleted('affiliate');
     } finally {
       setExtracting(false);
+    }
+  };
+
+  const [capturingImage, setCapturingImage] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  const handleCaptureProductImage = async () => {
+    if (!affiliateUrl.trim() || capturingImage) return;
+    setCapturingImage(true);
+    setCaptureError(null);
+    try {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+      const response = await fetch(`${supabaseUrl}/functions/v1/extract-product-meta`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ url: affiliateUrl, captureOnly: true }),
+      });
+      if (!response.ok) throw new Error('이미지 캡처 실패');
+      const data = await response.json();
+      const meta = data.productMeta;
+      if (meta?.imageBase64) {
+        setSelectedImage(meta.imageBase64);
+        setSelectedImageMime(meta.imageMimeType || 'image/jpeg');
+        setMediaType('photo');
+        setImageSource('product');
+      } else {
+        setCaptureError('상품 이미지를 찾을 수 없습니다. 사진을 직접 업로드해주세요.');
+      }
+    } catch {
+      setCaptureError('이미지 캡처 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setCapturingImage(false);
     }
   };
 
@@ -1024,7 +1060,37 @@ export default function AffiliateScreen() {
             </View>
           </View>
 
-          {/* Platform list (collapsible) */}
+          {/* Platform image capture button — below URL input */}
+          {affiliateUrl.trim() && (
+            <View style={styles.captureImageRow}>
+              <TouchableOpacity
+                style={[styles.captureImageBtn, capturingImage && styles.captureImageBtnDisabled]}
+                onPress={handleCaptureProductImage}
+                disabled={capturingImage}
+                activeOpacity={0.85}
+              >
+                {capturingImage ? (
+                  <Loader size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                ) : (
+                  <ImageDown size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                )}
+                <Text style={styles.captureImageBtnText}>
+                  {capturingImage ? '캡처 중...' : '플랫폼에서 상품 이미지 캡처'}
+                </Text>
+              </TouchableOpacity>
+              {imageSource === 'product' && selectedImage && (
+                <View style={styles.captureImageDoneBadge}>
+                  <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
+                  <Text style={styles.captureImageDoneText}>이미지 캡처됨</Text>
+                </View>
+              )}
+            </View>
+          )}
+          {captureError && (
+            <View style={styles.captureErrorBox}>
+              <Text style={styles.captureErrorText}>{captureError}</Text>
+            </View>
+          )}
           <PlatformListSection
             platforms={PLATFORMS}
             isConfigured={isConfigured}
@@ -1117,7 +1183,13 @@ export default function AffiliateScreen() {
 
           {productMeta && (productMeta.productName || productMeta.price) && (
             <View style={styles.productMetaCard}>
-              {productMeta.image ? (
+              {imagePreviewUri ? (
+                <Image
+                  source={{ uri: imagePreviewUri }}
+                  style={styles.productMetaImage}
+                  resizeMode="cover"
+                />
+              ) : productMeta.image ? (
                 <Image
                   source={{ uri: productMeta.image }}
                   style={styles.productMetaImage}
@@ -3599,6 +3671,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  captureImageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: theme.spacing.md,
+  },
+  captureImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[400] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '50',
+  },
+  captureImageBtnDisabled: {
+    opacity: 0.5,
+  },
+  captureImageBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  captureImageDoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  captureImageDoneText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  captureErrorBox: {
+    backgroundColor: theme.colors.error[400] + '12',
+    borderRadius: theme.radius.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: theme.spacing.md,
+  },
+  captureErrorText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
   },
   linkEmptyBox: {
     backgroundColor: theme.colors.dark.surfaceLight,

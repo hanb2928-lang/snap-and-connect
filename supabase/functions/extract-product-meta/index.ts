@@ -34,7 +34,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { url } = await req.json();
+    const body = await req.json();
+    const url: string = body.url;
+    const captureOnly: boolean = body.captureOnly === true;
     if (!url || typeof url !== "string") {
       return new Response(
         JSON.stringify({ error: "URL is required" }),
@@ -46,6 +48,33 @@ Deno.serve(async (req: Request) => {
     const productId = extractProductId(url, platform);
     const searchUrl = buildSearchUrl(url, platform, productId);
     const brandFromUrl = extractBrandFromUrl(url, platform);
+
+    // captureOnly mode: skip full crawl, just fetch page and grab images as base64
+    if (captureOnly) {
+      const imagesBase64 = await captureImagesFromPage(url, 3);
+      return new Response(
+        JSON.stringify({
+          productMeta: {
+            productName: "",
+            description: "",
+            price: "",
+            currency: "KRW",
+            image: "",
+            imageBase64: imagesBase64[0]?.base64 || "",
+            imageMimeType: imagesBase64[0]?.mimeType || "",
+            imagesBase64,
+            url,
+            platform,
+            availability: "",
+            brand: brandFromUrl,
+            searchUrl,
+            productId,
+            extractionMethod: "capture_only",
+          },
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     let meta: ProductMeta;
     try {
@@ -75,14 +104,28 @@ Deno.serve(async (req: Request) => {
     // Server-side image capture: fetch og:image URL and convert to base64
     // This bypasses browser CORS restrictions entirely
     if (meta.image) {
+      const absoluteImageUrl = resolveUrl(meta.image, url);
       try {
-        const imgResult = await captureImageAsBase64(meta.image);
+        const imgResult = await captureImageAsBase64(absoluteImageUrl);
         if (imgResult) {
           meta.imageBase64 = imgResult.base64;
           meta.imageMimeType = imgResult.mimeType;
         }
       } catch {
-        // image capture failed — not critical, client can still use URL
+        // image capture failed — not critical
+      }
+    }
+
+    // If og:image capture failed, try capturing from page directly
+    if (!meta.imageBase64) {
+      try {
+        const imagesBase64 = await captureImagesFromPage(url, 1);
+        if (imagesBase64.length > 0) {
+          meta.imageBase64 = imagesBase64[0].base64;
+          meta.imageMimeType = imagesBase64[0].mimeType;
+        }
+      } catch {
+        // page image capture failed
       }
     }
 
@@ -358,6 +401,120 @@ function extractBrand(html: string, siteName: string): string {
     || html.match(/"brand"\s*:\s*"([^"]+)"/i)
     || html.match(/"brandName"\s*:\s*"([^"]+)"/i);
   return m?.[1] || siteName || "";
+}
+
+function resolveUrl(imageUrl: string, baseUrl: string): string {
+  try {
+    return new URL(imageUrl, baseUrl).href;
+  } catch {
+    return imageUrl;
+  }
+}
+
+async function captureImageAsBase64(imageUrl: string): Promise<{ base64: string; mimeType: string } | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SnapConnectBot/1.0; +https://snapconnect.app/bot)",
+        "Accept": "image/*,*/*;q=0.8",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const mimeType = contentType.split(";")[0].trim();
+
+    if (!mimeType.startsWith("image/")) return null;
+
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    if (bytes.length > 4 * 1024 * 1024) return null;
+
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+    }
+    const base64 = btoa(binary);
+
+    return { base64, mimeType };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function captureImagesFromPage(pageUrl: string, maxImages: number): Promise<Array<{ base64: string; mimeType: string }>> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const response = await fetch(pageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SnapConnectBot/1.0; +https://snapconnect.app/bot)",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return [];
+
+    const html = await response.text();
+    const imageUrls = extractImageUrls(html, pageUrl);
+
+    const results: Array<{ base64: string; mimeType: string }> = [];
+    for (const imgUrl of imageUrls) {
+      if (results.length >= maxImages) break;
+      const captured = await captureImageAsBase64(imgUrl);
+      if (captured) results.push(captured);
+    }
+    return results;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function extractImageUrls(html: string, baseUrl: string): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+
+  const addUrl = (raw: string) => {
+    const resolved = resolveUrl(raw.trim(), baseUrl);
+    if (!seen.has(resolved)) {
+      seen.add(resolved);
+      urls.push(resolved);
+    }
+  };
+
+  // og:image
+  const ogMatches = html.matchAll(/<meta[^>]+property=["']og:image[^"']*['"][^>]+content=["']([^"']+)["']/gi);
+  for (const m of ogMatches) if (m[1]) addUrl(m[1]);
+
+  // twitter:image
+  const twMatches = html.matchAll(/<meta[^>]+name=["']twitter:image[^"']*['"][^>]+content=["']([^"']+)["']/gi);
+  for (const m of twMatches) if (m[1]) addUrl(m[1]);
+
+  // <img> src tags (filter out tiny icons/spacers)
+  const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
+  for (const m of imgMatches) {
+    const src = m[1];
+    if (src && !src.includes("data:") && !src.includes("sprite") && !src.includes("icon") && !src.includes("logo") && !src.includes("blank")) {
+      addUrl(src);
+    }
+  }
+
+  return urls.slice(0, 10);
 }
 
 async function enrichWithAI(url: string, basic: ProductMeta, apiKey: string): Promise<ProductMeta> {
