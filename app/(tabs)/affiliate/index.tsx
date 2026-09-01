@@ -753,6 +753,11 @@ export default function AffiliateScreen() {
     [selectedImage, mediaType, selectedImageMime],
   );
 
+  const disclosureText = useMemo(() => {
+    const platforms = selectedPlatform ? [selectedPlatform] : [];
+    return getDisclosureForPlatforms(platforms, autoDisclosure);
+  }, [selectedPlatform, autoDisclosure]);
+
   const generatePreviewVideo = useCallback(async () => {
     if (Platform.OS !== 'web') {
       setRenderError('웹 브라우저에서만 영상 생성이 가능합니다.');
@@ -950,6 +955,26 @@ export default function AffiliateScreen() {
           ctx.globalAlpha = 1;
         }
 
+        // Auto-insert affiliate disclosure text at the bottom of every frame
+        if (disclosureText) {
+          const discFontSize = Math.round(W * 0.022);
+          ctx.globalAlpha = 0.82;
+          ctx.font = `600 ${discFontSize}px sans-serif`;
+          ctx.fillStyle = '#fff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = 6;
+          const discLines = disclosureText.match(/.{1,28}/g) || [disclosureText];
+          const discLineH = discFontSize + 6;
+          discLines.slice(0, 2).forEach((line, i) => {
+            ctx.fillText(line, W / 2, H - 12 - (discLines.length - 1 - i) * discLineH);
+          });
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
+        }
+
         const beatPhase = (elapsed / 1000) * (bpm / 60) * Math.PI * 2;
         const beatPulse = Math.sin(beatPhase) * 0.5 + 0.5;
         ctx.globalAlpha = 0.3 + beatPulse * 0.15;
@@ -992,7 +1017,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [videoPreviewScenes, viralAnalysisResult, renderProgress]);
+  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -1006,11 +1031,6 @@ export default function AffiliateScreen() {
       }
     }, 100);
   };
-
-  const disclosureText = useMemo(() => {
-    const platforms = selectedPlatform ? [selectedPlatform] : [];
-    return getDisclosureForPlatforms(platforms, autoDisclosure);
-  }, [selectedPlatform, autoDisclosure]);
 
   return (
     <View style={styles.container}>
@@ -1674,6 +1694,15 @@ export default function AffiliateScreen() {
                   ? '상위 1% 수익화 이미지 패턴을 적용한 장면 구성'
                   : '상위 1% 수익화 영상 패턴을 적용한 장면 구성'}
               </Text>
+
+              {autoDisclosure && disclosureText ? (
+                <View style={styles.storyboardDisclosureBadge}>
+                  <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
+                    공정위 제휴 문구 자동 삽입: {disclosureText}
+                  </Text>
+                </View>
+              ) : null}
               {videoPreviewScenes.map((scene, i) => (
                 <View key={i} style={styles.videoSceneCard}>
                   <View style={[styles.videoSceneTimeBadge, { backgroundColor: scene.colorTheme.primary }]}>
@@ -3076,6 +3105,24 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
+  },
+  storyboardDisclosureBadge: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: theme.colors.success[500] + '12',
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  storyboardDisclosureText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+    lineHeight: 16,
   },
   videoSceneCard: {
     flexDirection: 'row',
