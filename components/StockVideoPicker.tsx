@@ -156,6 +156,16 @@ export function StockVideoPicker({
   const initialQuery = productName || productCategory || '';
   const hasSearched = clips.length > 0 || error !== null;
 
+  const autoSearchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const query = productName || productCategory || '';
+    if (query && autoSearchedRef.current !== query && !loading) {
+      autoSearchedRef.current = query;
+      setSearchQuery('');
+      handleSearch();
+    }
+  }, [productName, productCategory, handleSearch, loading]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>

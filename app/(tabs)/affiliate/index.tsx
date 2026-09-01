@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
 import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video, PenLine } from 'lucide-react-native';
@@ -803,6 +804,51 @@ export default function AffiliateScreen() {
       Linking.openURL(dl.webUrl).catch(() => {});
     });
   };
+
+  const [savingVideo, setSavingVideo] = useState(false);
+  const [videoSaved, setVideoSaved] = useState(false);
+
+  const handleSaveRenderedVideo = useCallback(async () => {
+    if (!renderedVideoUrl) return;
+    setSavingVideo(true);
+    setVideoSaved(false);
+    try {
+      if (Platform.OS === 'web') {
+        const ext = renderedVideoMime.includes('mp4') ? 'mp4' : 'webm';
+        const a = document.createElement('a');
+        a.href = renderedVideoUrl;
+        a.download = `snapconnect-${Date.now()}.${ext}`;
+        a.click();
+        setVideoSaved(true);
+        setTimeout(() => setVideoSaved(false), 3000);
+        return;
+      }
+      const FileSystem = await import('expo-file-system/legacy');
+      const MediaLibrary = await import('expo-media-library');
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '갤러리에 저장하려면 미디어 접근 권한이 필요합니다. 설정에서 허용해주세요.', [
+          { text: '설정으로', onPress: () => Linking.openSettings() },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+      const fileName = `snapconnect_${Date.now()}.mp4`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const downloadRes = await FileSystem.downloadAsync(renderedVideoUrl, fileUri);
+      if (downloadRes.status !== 200) {
+        throw new Error('영상 다운로드에 실패했습니다.');
+      }
+      const asset = await MediaLibrary.createAssetAsync(downloadRes.uri);
+      await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
+      setVideoSaved(true);
+      setTimeout(() => setVideoSaved(false), 3000);
+    } catch (err) {
+      Alert.alert('저장 실패', err instanceof Error ? err.message : '갤러리 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSavingVideo(false);
+    }
+  }, [renderedVideoUrl, renderedVideoMime]);
 
   const handleCopyText = async (text: string) => {
     try {
@@ -2691,6 +2737,26 @@ export default function AffiliateScreen() {
                     {previewMediaMode === 'image' ? '스토리보드 기반 이미지 렌더링 중...' : '스토리보드 기반 영상 렌더링 중...'}
                   </Text>
                 </View>
+              ) : videoRenderComplete && renderedVideoUrl ? (
+                <View style={styles.videoSceneWrap}>
+                  {previewMediaMode === 'video' ? (
+                    // @ts-ignore web-only video element
+                    <video
+                      src={renderedVideoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      style={{ width: '100%', maxHeight: 300, borderRadius: 12, backgroundColor: '#000' }}
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri: renderedVideoUrl }}
+                      style={{ width: '100%', maxHeight: 300, borderRadius: 12, backgroundColor: '#000' }}
+                      resizeMode="contain"
+                    />
+                  )}
+                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료 · 재생 가능'}</Text>
+                </View>
               ) : videoRenderComplete ? (
                 <View style={styles.videoSceneWrap}>
                   {previewMediaMode === 'image'
@@ -2968,19 +3034,20 @@ export default function AffiliateScreen() {
                   <View style={styles.renderedVideoActions}>
                     <TouchableOpacity
                       style={styles.renderedDownloadBtn}
-                      onPress={() => {
-                        if (Platform.OS === 'web' && renderedVideoUrl) {
-                          const ext = renderedVideoMime.includes('mp4') ? 'mp4' : 'webm';
-                          const a = document.createElement('a');
-                          a.href = renderedVideoUrl;
-                          a.download = `preview-${Date.now()}.${ext}`;
-                          a.click();
-                        }
-                      }}
+                      onPress={handleSaveRenderedVideo}
+                      disabled={savingVideo}
                       activeOpacity={0.7}
                     >
-                      <Download size={15} color="#fff" strokeWidth={2} />
-                      <Text style={styles.renderedDownloadBtnText}>다운로드</Text>
+                      {savingVideo ? (
+                        <Loader size={15} color="#fff" strokeWidth={2} />
+                      ) : videoSaved ? (
+                        <Check size={15} color="#fff" strokeWidth={2.5} />
+                      ) : (
+                        <Download size={15} color="#fff" strokeWidth={2} />
+                      )}
+                      <Text style={styles.renderedDownloadBtnText}>
+                        {savingVideo ? '저장 중...' : videoSaved ? '갤러리에 저장됨' : '갤러리에 저장'}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.renderedRegenBtn}
