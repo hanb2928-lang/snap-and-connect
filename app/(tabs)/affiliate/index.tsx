@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video, PenLine } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -304,6 +304,7 @@ export default function AffiliateScreen() {
 
   // Step 4: Content
   const [simpleMode, setSimpleMode] = useState(true);
+  const [contentSubStep, setContentSubStep] = useState<number | null>(0);
   const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
   const [aiBundle, setAiBundle] = useState<AiRecommendBundle | null>(null);
   const [aiRecommendLoading, setAiRecommendLoading] = useState(false);
@@ -2534,198 +2535,361 @@ export default function AffiliateScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Video source & AI edit plan — integrated into Step 4 */}
-          {previewMediaMode === 'video' && (
-            <>
-              <Text style={styles.sectionLabel}>원소재 영상 선택</Text>
-              <StockVideoPicker
-                productName={productMeta?.productName}
-                productCategory={undefined}
-                orientation={(() => {
-                  const specs = selectedUploadPlatform && selectedBoard
-                    ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                    : null;
-                  if (!specs) return 'portrait';
-                  return specs.ratio.includes('9:16') ? 'portrait'
-                    : specs.ratio.includes('16:9') ? 'landscape'
-                    : 'square';
-                })()}
-                selectedClip={stockVideoClip}
-                onSelectClip={setStockVideoClip}
-              />
-
-              <VideoEditPlanCard
-                productName={productMeta?.productName}
-                productCategory={undefined}
-                platform={selectedUploadPlatform || undefined}
-                accentColor={undefined}
-                hook={undefined}
-                oneLiner={undefined}
-                hasVideoSelected={stockVideoClip !== null}
-                onPlanGenerated={setVideoEditPlan}
-              />
-
-              <VideoRenderCard
-                clip={stockVideoClip}
-                plan={videoEditPlan}
-                ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
-                disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
-                productName={productMeta?.productName}
-              />
-            </>
-          )}
-
-          {/* Collapsible custom options */}
+          {/* ── Sub-accordion: ① 원소재 선택 ── */}
           <TouchableOpacity
-            style={styles.customToggle}
-            onPress={() => setSimpleMode(!simpleMode)}
+            style={styles.subAccordionHeader}
+            onPress={() => setContentSubStep(contentSubStep === 0 ? null : 0)}
             activeOpacity={0.7}
           >
-            <SettingsIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={styles.customToggleText}>
-              {simpleMode ? '직접 스타일 선택하기' : '접기'}
-            </Text>
-            {simpleMode ? (
-              <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <View style={styles.subAccordionLeft}>
+              <View style={[styles.subAccordionNum, contentSubStep === 0 && styles.subAccordionNumActive]}>
+                <Text style={[styles.subAccordionNumText, contentSubStep === 0 && styles.subAccordionNumTextActive]}>1</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.subAccordionTitle}>원소재 선택{previewMediaMode === 'video' ? ' 및 영상 편집' : ''}</Text>
+                <Text style={styles.subAccordionDesc} numberOfLines={1}>
+                  {previewMediaMode === 'video'
+                    ? stockVideoClip ? '영상 선택됨' : '무료 영상을 검색해 선택하세요'
+                    : 'AI 분석 결과를 바탕으로 이미지가 준비됩니다'}
+                </Text>
+              </View>
+            </View>
+            {contentSubStep === 0 ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
             ) : (
-              <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
             )}
           </TouchableOpacity>
 
-          {!simpleMode && (
-            <>
-              {/* AI Recommendation badge */}
-              {aiRecommendation && (
-                <View style={styles.aiRecommendCard}>
-                  <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <View style={styles.aiRecommendCardBody}>
-                    <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
-                    <Text style={styles.aiRecommendCardDesc}>
-                      이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.aiRecommendApplyBtn}
-                    onPress={() => {
-                      const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
-                      if (match) setSelectedTemplate(match.key);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Check size={14} color="#fff" strokeWidth={2.5} />
-                    <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
-                  </TouchableOpacity>
+          {contentSubStep === 0 && (
+            <View style={styles.subAccordionBody}>
+              {previewMediaMode === 'video' && (
+                <>
+                  <StockVideoPicker
+                    productName={productMeta?.productName}
+                    productCategory={undefined}
+                    orientation={(() => {
+                      const specs = selectedUploadPlatform && selectedBoard
+                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                        : null;
+                      if (!specs) return 'portrait';
+                      return specs.ratio.includes('9:16') ? 'portrait'
+                        : specs.ratio.includes('16:9') ? 'landscape'
+                        : 'square';
+                    })()}
+                    selectedClip={stockVideoClip}
+                    onSelectClip={setStockVideoClip}
+                  />
+
+                  <VideoEditPlanCard
+                    productName={productMeta?.productName}
+                    productCategory={undefined}
+                    platform={selectedUploadPlatform || undefined}
+                    accentColor={undefined}
+                    hook={undefined}
+                    oneLiner={undefined}
+                    hasVideoSelected={stockVideoClip !== null}
+                    onPlanGenerated={setVideoEditPlan}
+                  />
+
+                  <VideoRenderCard
+                    clip={stockVideoClip}
+                    plan={videoEditPlan}
+                    ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
+                    disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
+                    productName={productMeta?.productName}
+                  />
+                </>
+              )}
+
+              {previewMediaMode === 'image' && (
+                <View style={styles.subStepHintBox}>
+                  <ImageIcon size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.subStepHintText}>
+                    2단계에서 분석한 이미지가 자동으로 사용됩니다. AI 자동 추천 버튼을 누르면 스타일까지 한 번에 적용됩니다.
+                  </Text>
                 </View>
               )}
 
-              {/* Template style selection */}
-              <Text style={styles.sectionLabel}>템플릿 스타일</Text>
-              <View style={styles.templateRow}>
-            {TEMPLATE_STYLES
-              .filter((t) => {
-                const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                if (t.mediaType === 'both') return true;
-                return t.mediaType === boardMedia;
-              })
-              .map((t) => {
-              const Icon = t.icon;
-              const isActive = selectedTemplate === t.key;
-              const isRecommended = aiRecommendation?.includes(t.label);
-              return (
-                <TouchableOpacity
-                  key={t.key}
-                  style={[styles.templateChip, isActive && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' }]}
-                  onPress={() => setSelectedTemplate(t.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={16} color={isActive ? theme.colors.warning[400] : theme.colors.dark.textDim} strokeWidth={2} />
-                  <View style={styles.templateTextWrap}>
-                    <Text style={[styles.templateChipLabel, isActive && { color: theme.colors.warning[400] }]}>{t.label}</Text>
-                    <Text style={styles.templateChipDesc}>{t.desc}</Text>
-                  </View>
-                  {isRecommended && (
-                    <View style={styles.recommendBadge}>
-                      <Sparkles size={9} color="#fff" strokeWidth={2.5} />
-                      <Text style={styles.recommendBadgeText}>추천</Text>
+              <TouchableOpacity
+                style={styles.subNextBtn}
+                onPress={() => setContentSubStep(1)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.subNextBtnText}>다음: 스타일 & 카피 설정</Text>
+                <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Sub-accordion: ② 스타일 & 카피 설정 ── */}
+          <TouchableOpacity
+            style={styles.subAccordionHeader}
+            onPress={() => setContentSubStep(contentSubStep === 1 ? null : 1)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subAccordionLeft}>
+              <View style={[styles.subAccordionNum, contentSubStep === 1 && styles.subAccordionNumActive]}>
+                <Text style={[styles.subAccordionNumText, contentSubStep === 1 && styles.subAccordionNumTextActive]}>2</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.subAccordionTitle}>스타일 & 카피 설정</Text>
+                <Text style={styles.subAccordionDesc} numberOfLines={1}>
+                  {selectedTemplate ? '스타일 선택됨' : '템플릿·콘텐츠 유형·문구를 설정하세요'}
+                </Text>
+              </View>
+            </View>
+            {contentSubStep === 1 ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          {contentSubStep === 1 && (
+            <View style={styles.subAccordionBody}>
+              {/* Collapsible custom options */}
+              <TouchableOpacity
+                style={styles.customToggle}
+                onPress={() => setSimpleMode(!simpleMode)}
+                activeOpacity={0.7}
+              >
+                <SettingsIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                <Text style={styles.customToggleText}>
+                  {simpleMode ? '직접 스타일 선택하기' : '접기'}
+                </Text>
+                {simpleMode ? (
+                  <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                ) : (
+                  <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+
+              {!simpleMode && (
+                <>
+                  {/* AI Recommendation badge */}
+                  {aiRecommendation && (
+                    <View style={styles.aiRecommendCard}>
+                      <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+                      <View style={styles.aiRecommendCardBody}>
+                        <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
+                        <Text style={styles.aiRecommendCardDesc}>
+                          이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.aiRecommendApplyBtn}
+                        onPress={() => {
+                          const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
+                          if (match) setSelectedTemplate(match.key);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Check size={14} color="#fff" strokeWidth={2.5} />
+                        <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
 
-              {/* Content type selection */}
-              <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
-              <View style={styles.contentTypeRow}>
-                {CONTENT_TYPES.map((t) => {
+                  {/* Template style selection */}
+                  <Text style={styles.sectionLabel}>템플릿 스타일</Text>
+                  <View style={styles.templateRow}>
+                {TEMPLATE_STYLES
+                  .filter((t) => {
+                    const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+                    if (t.mediaType === 'both') return true;
+                    return t.mediaType === boardMedia;
+                  })
+                  .map((t) => {
                   const Icon = t.icon;
-                  const isActive = contentType === t.key;
+                  const isActive = selectedTemplate === t.key;
+                  const isRecommended = aiRecommendation?.includes(t.label);
                   return (
                     <TouchableOpacity
                       key={t.key}
-                      style={[styles.contentTypeChip, isActive && { borderColor: t.color, backgroundColor: t.color + '15' }]}
-                      onPress={() => setContentType(t.key)}
+                      style={[styles.templateChip, isActive && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' }]}
+                      onPress={() => setSelectedTemplate(t.key)}
                       activeOpacity={0.7}
                     >
-                      <Icon size={14} color={t.color} strokeWidth={2} />
-                      <Text style={[styles.contentTypeText, isActive && { color: t.color }]}>{t.label}</Text>
+                      <Icon size={16} color={isActive ? theme.colors.warning[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                      <View style={styles.templateTextWrap}>
+                        <Text style={[styles.templateChipLabel, isActive && { color: theme.colors.warning[400] }]}>{t.label}</Text>
+                        <Text style={styles.templateChipDesc}>{t.desc}</Text>
+                      </View>
+                      {isRecommended && (
+                        <View style={styles.recommendBadge}>
+                          <Sparkles size={9} color="#fff" strokeWidth={2.5} />
+                          <Text style={styles.recommendBadgeText}>추천</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
               </View>
 
-              <Text style={styles.contentHint}>
-                {(() => {
-                  const ct = CONTENT_TYPES.find((t) => t.key === contentType);
-                  if (!ct) return '';
+                  {/* Content type selection */}
+                  <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
+                  <View style={styles.contentTypeRow}>
+                    {CONTENT_TYPES.map((t) => {
+                      const Icon = t.icon;
+                      const isActive = contentType === t.key;
+                      return (
+                        <TouchableOpacity
+                          key={t.key}
+                          style={[styles.contentTypeChip, isActive && { borderColor: t.color, backgroundColor: t.color + '15' }]}
+                          onPress={() => setContentType(t.key)}
+                          activeOpacity={0.7}
+                        >
+                          <Icon size={14} color={t.color} strokeWidth={2} />
+                          <Text style={[styles.contentTypeText, isActive && { color: t.color }]}>{t.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text style={styles.contentHint}>
+                    {(() => {
+                      const ct = CONTENT_TYPES.find((t) => t.key === contentType);
+                      if (!ct) return '';
+                      const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+                      return boardMedia === 'image' ? ct.hintImage : ct.hintVideo;
+                    })()}
+                  </Text>
+                </>
+              )}
+
+              <TextInput
+                style={styles.contentInput}
+                value={contentText}
+                onChangeText={setContentText}
+                placeholder={(() => {
                   const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                  return boardMedia === 'image' ? ct.hintImage : ct.hintVideo;
+                  if (simpleMode) {
+                    return boardMedia === 'image'
+                      ? "이미지에 넣을 마케팅 문구를 자유롭게 적어보세요..."
+                      : "영상에 넣을 마케팅 문구를 자유롭게 적어보세요...";
+                  }
+                  return boardMedia === 'image'
+                    ? "여기에 이미지용 마케팅 문구를 입력하세요..."
+                    : "여기에 영상용 마케팅 문구를 입력하세요...";
                 })()}
-              </Text>
-            </>
+                placeholderTextColor={theme.colors.dark.textFaint}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.contentActionRow}>
+                <TouchableOpacity
+                  style={styles.contentSaveBtn}
+                  onPress={handleSaveContent}
+                  activeOpacity={0.7}
+                  disabled={!contentText.trim()}
+                >
+                  <Check size={16} color="#fff" strokeWidth={2} />
+                  <Text style={styles.contentSaveBtnText}>소재 저장</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.contentTemplateBtn}
+                  onPress={() => router.push('/affiliate/assets')}
+                  activeOpacity={0.7}
+                >
+                  <FileText size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.contentTemplateBtnText}>보관함 보기</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.subNextBtn, { marginTop: 8 }]}
+                onPress={() => setContentSubStep(2)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.subNextBtnText}>다음: 최종 확인</Text>
+                <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+              </TouchableOpacity>
+            </View>
           )}
 
-          <TextInput
-            style={styles.contentInput}
-            value={contentText}
-            onChangeText={setContentText}
-            placeholder={(() => {
-              const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-              if (simpleMode) {
-                return boardMedia === 'image'
-                  ? "이미지에 넣을 마케팅 문구를 자유롭게 적어보세요..."
-                  : "영상에 넣을 마케팅 문구를 자유롭게 적어보세요...";
-              }
-              return boardMedia === 'image'
-                ? "여기에 이미지용 마케팅 문구를 입력하세요..."
-                : "여기에 영상용 마케팅 문구를 입력하세요...";
-            })()}
-            placeholderTextColor={theme.colors.dark.textFaint}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
+          {/* ── Sub-accordion: ③ 최종 확인 ── */}
+          <TouchableOpacity
+            style={styles.subAccordionHeader}
+            onPress={() => setContentSubStep(contentSubStep === 2 ? null : 2)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subAccordionLeft}>
+              <View style={[styles.subAccordionNum, contentSubStep === 2 && styles.subAccordionNumActive]}>
+                <Text style={[styles.subAccordionNumText, contentSubStep === 2 && styles.subAccordionNumTextActive]}>3</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.subAccordionTitle}>최종 확인</Text>
+                <Text style={styles.subAccordionDesc} numberOfLines={1}>
+                  {contentText.trim() ? '문구 입력됨 · 5단계에서 업로드' : '문구를 입력하고 5단계로 진행하세요'}
+                </Text>
+              </View>
+            </View>
+            {contentSubStep === 2 ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
 
-          <View style={styles.contentActionRow}>
-            <TouchableOpacity
-              style={styles.contentSaveBtn}
-              onPress={handleSaveContent}
-              activeOpacity={0.7}
-              disabled={!contentText.trim()}
-            >
-              <Check size={16} color="#fff" strokeWidth={2} />
-              <Text style={styles.contentSaveBtnText}>소재 저장</Text>
-            </TouchableOpacity>
+          {contentSubStep === 2 && (
+            <View style={styles.subAccordionBody}>
+              <View style={styles.subSummaryBox}>
+                <View style={styles.subSummaryRow}>
+                  <Text style={styles.subSummaryLabel}>템플릿</Text>
+                  <Text style={styles.subSummaryValue}>
+                    {TEMPLATE_STYLES.find((t) => t.key === selectedTemplate)?.label || '미선택'}
+                  </Text>
+                </View>
+                <View style={styles.subSummaryRow}>
+                  <Text style={styles.subSummaryLabel}>콘텐츠 유형</Text>
+                  <Text style={styles.subSummaryValue}>
+                    {CONTENT_TYPES.find((t) => t.key === contentType)?.label || '미선택'}
+                  </Text>
+                </View>
+                {previewMediaMode === 'video' && (
+                  <View style={styles.subSummaryRow}>
+                    <Text style={styles.subSummaryLabel}>원본 영상</Text>
+                    <Text style={styles.subSummaryValue}>
+                      {stockVideoClip ? '선택됨' : '미선택'}
+                    </Text>
+                  </View>
+                )}
+                {previewMediaMode === 'video' && videoEditPlan && (
+                  <View style={styles.subSummaryRow}>
+                    <Text style={styles.subSummaryLabel}>편집 계획</Text>
+                    <Text style={styles.subSummaryValue}>
+                      {videoEditPlan.duration}초 · {videoEditPlan.segments.length}컷
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.subSummaryRow}>
+                  <Text style={styles.subSummaryLabel}>마케팅 문구</Text>
+                  <Text style={styles.subSummaryValue} numberOfLines={2}>
+                    {contentText.trim() ? contentText.trim() : '미입력'}
+                  </Text>
+                </View>
+              </View>
 
-            <TouchableOpacity
-              style={styles.contentTemplateBtn}
-              onPress={() => router.push('/affiliate/assets')}
-              activeOpacity={0.7}
-            >
-              <FileText size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.contentTemplateBtnText}>보관함 보기</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={styles.subFinishBtn}
+                onPress={() => {
+                  setContentSubStep(null);
+                  setExpandedStep('upload');
+                  setTimeout(() => stepRefs.current[5]?.measureInWindow((x, y) => {
+                    if (typeof window !== 'undefined') window.scrollTo({ top: y, behavior: 'smooth' });
+                  }), 100);
+                }}
+                activeOpacity={0.8}
+              >
+                <PenLine size={14} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.subFinishBtnText}>5단계 업로드로 이동</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </PillNavCard>
 
         {/* STEP 5: Platform Upload */}
@@ -3564,6 +3728,131 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  subAccordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  subAccordionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  subAccordionNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  subAccordionNumActive: {
+    backgroundColor: theme.colors.warning[400] + '22',
+    borderColor: theme.colors.warning[400],
+  },
+  subAccordionNumText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.textDim,
+  },
+  subAccordionNumTextActive: {
+    color: theme.colors.warning[400],
+  },
+  subAccordionTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  subAccordionDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 1,
+  },
+  subAccordionBody: {
+    marginTop: 6,
+    paddingBottom: 4,
+  },
+  subStepHintBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+  },
+  subStepHintText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  subNextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
+  subNextBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  subSummaryBox: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    gap: 8,
+  },
+  subSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  subSummaryLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    flexShrink: 0,
+  },
+  subSummaryValue: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    textAlign: 'right',
+    flex: 1,
+  },
+  subFinishBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.success[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  subFinishBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   analyzeWaitingBox: {
     alignItems: 'center',
