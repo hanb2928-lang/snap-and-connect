@@ -2242,6 +2242,16 @@ export default function SettingsScreen() {
           <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginTop: 8, lineHeight: 16 }}>
             pexels.com에서 발급받은 키를 입력하면 제품 테마 영상 검색이 활성화됩니다.
           </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, alignSelf: 'flex-start' }}
+            onPress={() => Linking.openURL('https://www.pexels.com/api/')}
+            activeOpacity={0.7}
+          >
+            <ExternalLink size={12} color={theme.colors.success[400]} strokeWidth={2} />
+            <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.success[400] }}>
+              Pexels에서 무료 키 발급받기
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 

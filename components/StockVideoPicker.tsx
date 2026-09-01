@@ -11,7 +11,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { Search, Film, Check, X, RefreshCw } from 'lucide-react-native';
+import { Search, Film, Check, X, RefreshCw, Settings } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { theme } from '@/lib/theme';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
 
@@ -33,6 +34,7 @@ export function StockVideoPicker({
   const [clips, setClips] = useState<StockVideoClip[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [progress, setProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -154,6 +156,16 @@ export function StockVideoPicker({
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
+          {(error.includes('Pexels API 키') || error.includes('유효하지 않습니다')) && (
+            <TouchableOpacity
+              style={styles.errorSettingsBtn}
+              onPress={() => router.push('/settings')}
+              activeOpacity={0.7}
+            >
+              <Settings size={12} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.errorSettingsBtnText}>설정에서 Pexels 키 입력하기</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -342,6 +354,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     lineHeight: 17,
+  },
+  errorSettingsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  errorSettingsBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.error[400],
   },
   selectedBox: {
     flexDirection: 'row',
