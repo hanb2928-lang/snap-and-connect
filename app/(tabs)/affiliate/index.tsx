@@ -34,6 +34,7 @@ import { saveManualScan, uploadImage, analyzeImage, analyzeImageWithProductConte
 import { validateAffiliateUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
+import { addSnippet } from '@/lib/marketingSnippets';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory } from '@/lib/ttsVoices';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
@@ -756,9 +757,34 @@ export default function AffiliateScreen() {
   };
 
   // Step 4: Save content
-  const handleSaveContent = () => {
+  const [contentSaving, setContentSaving] = useState(false);
+  const [contentSaveSuccess, setContentSaveSuccess] = useState(false);
+  const [contentSaveError, setContentSaveError] = useState<string | null>(null);
+
+  const handleSaveContent = async () => {
     if (!contentText.trim()) return;
-    markCompleted('content');
+    setContentSaving(true);
+    setContentSaveError(null);
+    setContentSaveSuccess(false);
+    try {
+      const result = await addSnippet(
+        contentText.trim().slice(0, 30),
+        contentText.trim(),
+        contentType === 'hashtag' ? 'hashtag' : contentType === 'hook' ? 'hook' : 'copy',
+        selectedPlatform || undefined,
+      );
+      if (result) {
+        setContentSaveSuccess(true);
+        setTimeout(() => setContentSaveSuccess(false), 3000);
+        markCompleted('content');
+      } else {
+        setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch {
+      setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setContentSaving(false);
+    }
   };
 
   // Step 5: Open preview before upload
@@ -2575,14 +2601,28 @@ export default function AffiliateScreen() {
 
               <View style={styles.contentActionRow}>
                 <TouchableOpacity
-                  style={styles.contentSaveBtn}
+                  style={[styles.contentSaveBtn, contentSaving && styles.contentSaveBtnDisabled]}
                   onPress={handleSaveContent}
                   activeOpacity={0.7}
-                  disabled={!contentText.trim()}
+                  disabled={!contentText.trim() || contentSaving}
                 >
-                  <Check size={16} color="#fff" strokeWidth={2} />
-                  <Text style={styles.contentSaveBtnText}>소재 저장</Text>
+                  {contentSaving ? (
+                    <Loader size={16} color="#fff" strokeWidth={2} />
+                  ) : contentSaveSuccess ? (
+                    <Check size={16} color="#fff" strokeWidth={2.5} />
+                  ) : (
+                    <Check size={16} color="#fff" strokeWidth={2} />
+                  )}
+                  <Text style={styles.contentSaveBtnText}>
+                    {contentSaving ? '저장 중...' : contentSaveSuccess ? '저장됨' : '소재 저장'}
+                  </Text>
                 </TouchableOpacity>
+
+                {contentSaveError && (
+                  <Text style={{ fontSize: 11, color: theme.colors.error[400], marginTop: 4, fontFamily: theme.typography.fontFamily.regular }}>
+                    {contentSaveError}
+                  </Text>
+                )}
 
                 <TouchableOpacity
                   style={styles.contentTemplateBtn}
@@ -5061,6 +5101,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.warning[500],
+  },
+  contentSaveBtnDisabled: {
+    opacity: 0.5,
   },
   comicShortBtn: {
     flexDirection: 'row',
