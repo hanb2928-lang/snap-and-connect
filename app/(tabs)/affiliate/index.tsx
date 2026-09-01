@@ -181,10 +181,19 @@ const CONTENT_TYPES = [
 ] as const;
 
 const TEMPLATE_STYLES = [
-  { key: 'shortform', label: '숏폼 영상', desc: '릴스·쇼츠용 임팩트', icon: Film },
-  { key: 'comic', label: '웹툰형 만화', desc: '스토리텔링 만화', icon: Palette },
-  { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText },
+  { key: 'shortform', label: '숏폼 영상', desc: '릴스·쇼츠용 임팩트', icon: Film, mediaType: 'video' as const },
+  { key: 'comic', label: '웹툰형 만화', desc: '스토리텔링 만화', icon: Palette, mediaType: 'both' as const },
+  { key: 'cardnews', label: '카드뉴스', desc: '정보 전달 템플릿', icon: FileText, mediaType: 'image' as const },
 ] as const;
+
+function getBoardMediaType(platform: string | null, board: string | null): 'image' | 'video' {
+  if (!platform || !board) return 'video';
+  const specs = BOARD_VIDEO_SPECS[platform]?.[board];
+  if (!specs) return 'video';
+  const fmt = specs.format.toUpperCase();
+  if (fmt.includes('JPG') || fmt.includes('PNG') || fmt.includes('GIF') || specs.maxDuration === '정지형') return 'image';
+  return 'video';
+}
 
 type StepKey = 'affiliate' | 'platformSelect' | 'analyze' | 'content' | 'upload';
 
@@ -1359,7 +1368,13 @@ export default function AffiliateScreen() {
                     <TouchableOpacity
                       key={b.key}
                       style={[styles.boardChip, isBoardSelected && styles.boardChipActive]}
-                      onPress={() => setSelectedBoard(isBoardSelected ? null : b.key)}
+                      onPress={() => {
+                        const newBoard = isBoardSelected ? null : b.key;
+                        setSelectedBoard(newBoard);
+                        if (newBoard) {
+                          setPreviewMediaMode(getBoardMediaType(selectedUploadPlatform, newBoard));
+                        }
+                      }}
                       activeOpacity={0.7}
                     >
                       <Text
@@ -1514,6 +1529,8 @@ export default function AffiliateScreen() {
                   style={styles.viralStartBtn}
                   onPress={() => {
                     setViralAnalyzing(true);
+                    const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+                    setPreviewMediaMode(boardMedia);
                     setTimeout(() => {
                       setViralAnalyzing(false);
                       setViralAnalysisResult(
@@ -1528,7 +1545,9 @@ export default function AffiliateScreen() {
                   activeOpacity={0.85}
                 >
                   <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                  <Text style={styles.viralStartBtnText}>심리 자극 영상 분석 시작</Text>
+                  <Text style={styles.viralStartBtnText}>
+                    {getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image' ? '심리 자극 이미지 분석 시작' : '심리 자극 영상 분석 시작'}
+                  </Text>
                   <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2} />
                 </TouchableOpacity>
               )}
@@ -1583,7 +1602,9 @@ export default function AffiliateScreen() {
                 </View>
               ) : videoRenderComplete ? (
                 <View style={styles.videoSceneWrap}>
-                  <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                  {previewMediaMode === 'image'
+                    ? <ImageIcon size={28} color="#fff" strokeWidth={2} />
+                    : <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />}
                   <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료'}</Text>
                 </View>
               ) : videoPreviewScenes ? (
@@ -1592,20 +1613,28 @@ export default function AffiliateScreen() {
                 </View>
               ) : imagePreviewUri ? (
                 <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
-                  <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />
+                  {previewMediaMode === 'image'
+                    ? <ImageIcon size={28} color="#fff" strokeWidth={2} />
+                    : <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />}
                 </TouchableOpacity>
               ) : (
                 <View style={styles.videoPreviewEmptyInline}>
-                  <Clapperboard size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />
+                  {previewMediaMode === 'image'
+                    ? <ImageIcon size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />
+                    : <Clapperboard size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />}
                   <Text style={styles.videoPreviewEmptyInlineText}>
-                    미리보기 생성 버튼을 눌러 영상 스토리보드를 만들어보세요
+                    {previewMediaMode === 'image'
+                      ? '미리보기 생성 버튼을 눌러 이미지 스토리보드를 만들어보세요'
+                      : '미리보기 생성 버튼을 눌러 영상 스토리보드를 만들어보세요'}
                   </Text>
                 </View>
               )}
             </View>
 
             <View style={styles.videoSpecBadge}>
-              <Clapperboard size={11} color="#fff" strokeWidth={2} />
+              {previewMediaMode === 'image'
+                ? <ImageIcon size={11} color="#fff" strokeWidth={2} />
+                : <Clapperboard size={11} color="#fff" strokeWidth={2} />}
               <Text style={styles.videoSpecBadgeText}>
                 {viralAnalysisResult
                   ? `${viralAnalysisResult.specs.ratio} · ${viralAnalysisResult.specs.maxDuration}`
@@ -1615,17 +1644,21 @@ export default function AffiliateScreen() {
               </Text>
             </View>
 
-            <View style={styles.videoTimelineBar}>
-              <Animated.View
-                style={[styles.videoTimelineProgress, animatedProgressStyle]}
-              />
-            </View>
-            <View style={styles.videoTimelineLabels}>
-              <Text style={styles.videoTimelineLabel}>0:00</Text>
-              <Text style={styles.videoTimelineLabel}>
-                {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
-              </Text>
-            </View>
+            {previewMediaMode === 'video' && (
+              <>
+                <View style={styles.videoTimelineBar}>
+                  <Animated.View
+                    style={[styles.videoTimelineProgress, animatedProgressStyle]}
+                  />
+                </View>
+                <View style={styles.videoTimelineLabels}>
+                  <Text style={styles.videoTimelineLabel}>0:00</Text>
+                  <Text style={styles.videoTimelineLabel}>
+                    {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
 
           {/* Storyboard scenes from viral hooks */}
@@ -1711,20 +1744,35 @@ export default function AffiliateScreen() {
 
               {renderedVideoUrl && videoRenderComplete && (
                 <View style={styles.renderedVideoWrap}>
-                  {/* @ts-ignore web-only video element */}
-                  <video
-                    src={renderedVideoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    style={{
-                      width: '100%',
-                      maxHeight: 400,
-                      borderRadius: 12,
-                      backgroundColor: '#000',
-                    }}
-                  />
+                  {previewMediaMode === 'video' ? (
+                    <>
+                      {/* @ts-ignore web-only video element */}
+                      <video
+                        src={renderedVideoUrl}
+                        controls
+                        autoPlay
+                        loop
+                        muted
+                        style={{
+                          width: '100%',
+                          maxHeight: 400,
+                          borderRadius: 12,
+                          backgroundColor: '#000',
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <Image
+                      source={{ uri: renderedVideoUrl }}
+                      style={{
+                        width: '100%',
+                        maxHeight: 400,
+                        borderRadius: 12,
+                        backgroundColor: '#000',
+                      }}
+                      resizeMode="contain"
+                    />
+                  )}
                   <View style={styles.renderedVideoActions}>
                     <TouchableOpacity
                       style={styles.renderedDownloadBtn}
@@ -1905,7 +1953,13 @@ export default function AffiliateScreen() {
               {/* Template style selection */}
               <Text style={styles.sectionLabel}>템플릿 스타일</Text>
               <View style={styles.templateRow}>
-            {TEMPLATE_STYLES.map((t) => {
+            {TEMPLATE_STYLES
+              .filter((t) => {
+                const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+                if (t.mediaType === 'both') return true;
+                return t.mediaType === boardMedia;
+              })
+              .map((t) => {
               const Icon = t.icon;
               const isActive = selectedTemplate === t.key;
               const isRecommended = aiRecommendation?.includes(t.label);
