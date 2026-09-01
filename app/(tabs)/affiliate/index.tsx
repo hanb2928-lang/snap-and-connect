@@ -90,6 +90,54 @@ const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
   ],
 };
 
+function detectPlatformFromUrl(url: string): string {
+  const u = url.toLowerCase();
+  if (u.includes('coupang.com')) return 'Coupang';
+  if (u.includes('smartstore.naver.com') || u.includes('brand.naver.com')) return 'Naver';
+  if (u.includes('11st.co.kr')) return '11st';
+  if (u.includes('gmarket.com')) return 'Gmarket';
+  if (u.includes('aliexpress.com')) return 'AliExpress';
+  if (u.includes('amazon.com')) return 'Amazon';
+  if (u.includes('shopee.')) return 'Shopee';
+  if (u.includes('toss.to')) return 'Toss';
+  return '';
+}
+
+function buildFallbackSearchUrl(url: string, platform: string): string {
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    let productId = '';
+    if (platform === 'Coupang') {
+      const vpIdx = segments.findIndex((s) => s === 'vp');
+      if (vpIdx >= 0 && segments[vpIdx + 1]) productId = segments[vpIdx + 1];
+    } else if (platform === 'Naver') {
+      const pIdx = segments.findIndex((s) => s === 'products');
+      if (pIdx >= 0 && segments[pIdx + 1]) productId = segments[pIdx + 1];
+    } else if (platform === 'AliExpress') {
+      const iIdx = segments.findIndex((s) => s.startsWith('item'));
+      if (iIdx >= 0 && segments[iIdx + 1]) productId = segments[iIdx + 1];
+    } else if (platform === 'Amazon') {
+      const dpIdx = segments.findIndex((s) => s === 'dp');
+      if (dpIdx >= 0 && segments[dpIdx + 1]) productId = segments[dpIdx + 1];
+    }
+    for (const seg of segments) {
+      if (/^\d{6,}$/.test(seg)) { productId = seg; break; }
+    }
+    switch (platform) {
+      case 'Coupang': return `https://www.coupang.com/np/search?q=${productId}`;
+      case 'Naver': return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(parsed.hostname + ' ' + productId)}`;
+      case 'AliExpress': return `https://www.aliexpress.com/wholesale?SearchText=${productId}`;
+      case 'Amazon': return `https://www.amazon.com/s?k=${productId}`;
+      case '11st': return `https://search.11st.co.kr/Search.tmall?kwd=${productId}`;
+      case 'Gmarket': return `https://browse.gmarket.co.kr/search?keyword=${productId}`;
+      default: return `https://www.google.com/search?q=${encodeURIComponent(parsed.hostname + ' ' + productId)}`;
+    }
+  } catch {
+    return '';
+  }
+}
+
 const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resolution: string; maxDuration: string; format: string }>> = {
   instagram: {
     reels: { ratio: '9:16', resolution: '1080×1920', maxDuration: '90초', format: 'MP4' },
@@ -125,7 +173,6 @@ const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resoluti
 
 type ViralAnalysisResult = PsychAnalysis;
 
-type ViralHook = { title: string; desc: string };
 
 const CONTENT_TYPES = [
   { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hint: '제품을 한 줄로 매력적으로 표현하세요' },
@@ -400,10 +447,11 @@ export default function AffiliateScreen() {
       };
       if (!newMeta.productName && !newMeta.description && !newMeta.image) {
         const searchHint = newMeta.searchUrl
-          ? `상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 검색 페이지에서 상품을 확인하거나, 상품 사진을 직접 업로드하여 진행할 수 있습니다.|||${newMeta.searchUrl}`
-          : '상품 정보를 자동으로 가져오지 못했습니다. 해당 쇼핑몰에서 봇 접근을 차단했을 수 있어요. 상품 사진을 직접 업로드하고 진행할 수 있습니다.';
+          ? `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${newMeta.platform || '쇼핑몰'} ${newMeta.brand ? `· ${newMeta.brand} ` : ''}정보를 추론했습니다. 검색 페이지에서 상품을 확인하거나, 사진을 업로드하여 진행할 수 있습니다. 영상 생성은 바로 가능합니다.|||${newMeta.searchUrl}`
+          : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${newMeta.platform || '쇼핑몰'} ${newMeta.brand ? `· ${newMeta.brand} ` : ''}정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`;
         setExtractError(searchHint);
-        setProductMeta(null);
+        setProductMeta({ ...newMeta, productName: newMeta.platform ? `${newMeta.platform} 상품` : '상품' });
+        markCompleted('affiliate');
         return;
       }
       setProductMeta(newMeta);
@@ -422,8 +470,23 @@ export default function AffiliateScreen() {
         }
       }
     } catch {
-      setProductMeta(null);
-      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 네트워크 연결을 확인하거나 링크를 다시 확인해주세요.');
+      const platformKey = detectPlatformFromUrl(validation.normalizedUrl);
+      const searchUrl = buildFallbackSearchUrl(validation.normalizedUrl, platformKey);
+      setProductMeta({
+        productName: platformKey ? `${platformKey} 상품` : '상품',
+        description: '',
+        price: '',
+        image: '',
+        platform: platformKey,
+        brand: platformKey,
+        searchUrl,
+      });
+      setExtractError(
+        searchUrl
+          ? `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 검색 페이지에서 상품을 확인하거나, 사진을 업로드하여 진행할 수 있습니다. 영상 생성은 바로 가능합니다.|||${searchUrl}`
+          : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`,
+      );
+      markCompleted('affiliate');
     } finally {
       setExtracting(false);
     }
@@ -994,7 +1057,7 @@ export default function AffiliateScreen() {
                 </TouchableOpacity>
               )}
               <Text style={styles.extractHintText}>
-                상품 사진을 직접 업로드하면 AI가 사진만으로 상품을 분석합니다.
+                AI가 URL 패턴으로 플랫폼과 브랜드를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능하고, 바로 영상 생성도 가능합니다.
               </Text>
               <View style={styles.extractErrorActionRow}>
                 <TouchableOpacity
@@ -1020,6 +1083,16 @@ export default function AffiliateScreen() {
                 >
                   <ImageIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
                   <Text style={styles.extractManualBtnText}>사진 업로드로 진행</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.extractManualBtn, { borderColor: theme.colors.success[400], marginLeft: 8 }]}
+                  onPress={() => {
+                    setExtractError(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <ArrowRight size={12} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={[styles.extractManualBtnText, { color: theme.colors.success[400] }]}>그대로 진행</Text>
                 </TouchableOpacity>
               </View>
             </View>
