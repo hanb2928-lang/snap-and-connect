@@ -230,6 +230,11 @@ export default function AffiliateScreen() {
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [imageSource, setImageSource] = useState<'product' | 'user' | null>(null);
 
+  // Multi-angle images for TV commercial style video
+  const [multiImages, setMultiImages] = useState<{ uri: string; mime: string }[]>([]);
+  const [aiSceneImages, setAiSceneImages] = useState<string[]>([]);
+  const [aiImageGenerating, setAiImageGenerating] = useState(false);
+
   // Step 1: Affiliate link & product selection
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
@@ -537,11 +542,13 @@ export default function AffiliateScreen() {
     setMediaLoading(true);
     try {
       if (isWebPlatform()) {
-        const images = await pickImageWeb(false, 4);
+        const images = await pickImageWeb(true, 4);
         if (images.length === 0) {
           setMediaLoading(false);
           return;
         }
+        const newImages = images.map((img) => ({ uri: img.uri, mime: img.mimeType }));
+        setMultiImages((prev) => [...prev, ...newImages].slice(0, 4));
         const first = images[0];
         setSelectedImage(cleanBase64(first.base64));
         setSelectedImageMime(first.mimeType);
@@ -559,9 +566,13 @@ export default function AffiliateScreen() {
           setMediaLoading(false);
           return;
         }
-        const { base64, mimeType } = await compressImageToBase64(result.assets[0].uri, 1280, 0.7);
-        setSelectedImage(base64);
-        setSelectedImageMime(mimeType);
+        const compressed = await Promise.all(
+          result.assets.slice(0, 4).map((a) => compressImageToBase64(a.uri, 1280, 0.7)),
+        );
+        const newImages = compressed.map((c) => ({ uri: buildDataUrl(c.base64, c.mimeType), mime: c.mimeType }));
+        setMultiImages((prev) => [...prev, ...newImages].slice(0, 4));
+        setSelectedImage(compressed[0].base64);
+        setSelectedImageMime(compressed[0].mimeType);
         setMediaType('photo');
         setImageSource('user');
       }
@@ -569,6 +580,87 @@ export default function AffiliateScreen() {
       setCaptureError('이미지를 불러오지 못했습니다. 다시 시도해주세요.');
     } finally {
       setMediaLoading(false);
+    }
+  };
+
+  const handleRemoveMultiImage = (idx: number) => {
+    setMultiImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Map scenes to available images based on emotion phase
+  const sceneImageMap = useMemo(() => {
+    if (!videoPreviewScenes) return null;
+    const userImages = multiImages.map((m) => m.uri);
+    const allImages = [...userImages, ...aiSceneImages];
+    if (allImages.length === 0) return null;
+
+    const total = videoPreviewScenes.length;
+    const map: number[] = [];
+    for (let i = 0; i < total; i++) {
+      if (allImages.length >= total) {
+        map.push(i % allImages.length);
+      } else {
+        // Distribute images across scenes, prioritizing product-heavy scenes
+        const scene = videoPreviewScenes[i];
+        if (scene.emotion === 'desire' || scene.emotion === 'shock') {
+          map.push(Math.min(i, allImages.length - 1));
+        } else if (scene.emotion === 'action') {
+          map.push(0);
+        } else {
+          map.push(i % allImages.length);
+        }
+      }
+    }
+    return map;
+  }, [videoPreviewScenes, multiImages, aiSceneImages]);
+
+  // Generate AI scene images for scenes without user photos
+  const handleGenerateAiSceneImages = async () => {
+    if (!videoPreviewScenes || !productMeta) return;
+    setAiImageGenerating(true);
+    try {
+      const productName = productMeta.productName || '이 제품';
+      const productDesc = productMeta.description || '';
+      const scenesNeedingImages = videoPreviewScenes.length - multiImages.length;
+      if (scenesNeedingImages <= 0) {
+        setAiImageGenerating(false);
+        return;
+      }
+      const prompts: string[] = [];
+      for (let i = 0; i < videoPreviewScenes.length; i++) {
+        const scene = videoPreviewScenes[i];
+        if (i < multiImages.length) continue;
+        const promptMap: Record<string, string> = {
+          curiosity: `Professional product photography of ${productName}, clean studio lighting, minimalist background, hero shot angle`,
+          shock: `Dramatic close-up shot of ${productName}, high contrast lighting, bold composition, premium product photography`,
+          empathy: `Lifestyle scene with ${productName} being used naturally, warm ambient lighting, authentic moment, soft focus background`,
+          desire: `Luxurious product shot of ${productName}, golden hour lighting, shallow depth of field, aspirational mood, premium aesthetic`,
+          action: `Dynamic product shot of ${productName} with bold colored background, vibrant energy, call-to-action mood, commercial advertising style`,
+        };
+        const prompt = promptMap[scene.emotion] || `Professional product photography of ${productName}, ${productDesc}`;
+        prompts.push(prompt);
+      }
+      const generated: string[] = [];
+      for (const prompt of prompts.slice(0, 4)) {
+        try {
+          const resp = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL || ''}/functions/v1/generate-image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, size: '1024x1024', quality: 'hd', style: 'vivid' }),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.image) {
+              generated.push(`data:image/png;base64,${data.image}`);
+            }
+          }
+        } catch { /* skip failed generation */ }
+      }
+      setAiSceneImages(generated);
+    } catch {
+      // AI generation is optional — video can still use user images
+    } finally {
+      setAiImageGenerating(false);
     }
   };
 
@@ -782,19 +874,48 @@ export default function AffiliateScreen() {
     renderProgress.value = 0;
 
     try {
-      let img: HTMLImageElement | null = null;
-      if (imagePreviewUri) {
+      // Load all available images: user multi-angle photos + AI-generated scene images
+      const allImageUris = [...multiImages.map((m) => m.uri), ...aiSceneImages];
+      const sceneImgs: (HTMLImageElement | null)[] = [];
+
+      if (allImageUris.length > 0 && sceneImageMap) {
+        const uniqueUris = [...new Set(allImageUris)];
+        const loadedImgs = await Promise.all(
+          uniqueUris.map(async (uri): Promise<HTMLImageElement | null> => {
+            try {
+              const { urlToDataUrl } = await import('@/lib/base64');
+              const safeUri = await urlToDataUrl(uri);
+              return await new Promise<HTMLImageElement>((resolve, reject) => {
+                const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+                el.onload = () => resolve(el);
+                el.onerror = () => reject(new Error('이미지 로드 실패'));
+                el.src = safeUri;
+              });
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const uriToImg = new Map(uniqueUris.map((uri, i) => [uri, loadedImgs[i]]));
+        for (const uri of allImageUris) {
+          sceneImgs.push(uriToImg.get(uri) ?? null);
+        }
+      }
+
+      // Fallback: load single image if no multi-images
+      let fallbackImg: HTMLImageElement | null = null;
+      if (sceneImgs.length === 0 && imagePreviewUri) {
         try {
           const { urlToDataUrl } = await import('@/lib/base64');
           const safeImageUrl = await urlToDataUrl(imagePreviewUri);
-          img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          fallbackImg = await new Promise<HTMLImageElement>((resolve, reject) => {
             const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
             el.onload = () => resolve(el);
             el.onerror = () => reject(new Error('이미지 로드 실패'));
             el.src = safeImageUrl;
           });
         } catch {
-          img = null;
+          fallbackImg = null;
         }
       }
 
@@ -831,13 +952,14 @@ export default function AffiliateScreen() {
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
       recorder.start();
 
-      let baseW = W, baseH = H;
-      if (img) {
-        const imgAspect = img.naturalWidth / img.naturalHeight;
+      // Compute base dimensions for each scene image
+      const getBaseDims = (imgEl: HTMLImageElement | null) => {
+        if (!imgEl) return { baseW: W, baseH: H };
+        const imgAspect = imgEl.naturalWidth / imgEl.naturalHeight;
         const canvasAspect = W / H;
-        if (imgAspect > canvasAspect) { baseW = W; baseH = W / imgAspect; }
-        else { baseH = H; baseW = H * imgAspect; }
-      }
+        if (imgAspect > canvasAspect) return { baseW: W, baseH: W / imgAspect };
+        return { baseH: H, baseW: H * imgAspect };
+      };
 
       const scenes = videoPreviewScenes;
       const totalScenes = scenes.length;
@@ -850,7 +972,7 @@ export default function AffiliateScreen() {
       };
       const resetFilter = () => { ctx.filter = 'none'; };
 
-      const getMotionTransform = (motionType: PsychScene['motionType'], t: number) => {
+      const getMotionTransform = (motionType: PsychScene['motionType'], t: number, baseW: number, baseH: number) => {
         switch (motionType) {
           case 'zoom-in': return { scale: 1.0 + t * 0.35, offsetX: 0, offsetY: 0 };
           case 'zoom-out': return { scale: 1.35 - t * 0.35, offsetX: 0, offsetY: 0 };
@@ -869,14 +991,16 @@ export default function AffiliateScreen() {
         return H * 0.72;
       };
 
-      // Scene transition: fade-in at start, fade-out at end of each scene
-      const getSceneTransitionAlpha = (localT: number) => {
-        const fadeIn = Math.min(localT * 6, 1);
-        const fadeOut = Math.min((1 - localT) * 6, 1);
-        return fadeIn * fadeOut;
+      // TV commercial style: quick cross-fade between scenes with beat-synced cuts
+      const getSceneTransitionAlpha = (localT: number, sceneIdx: number) => {
+        const fadeIn = Math.min(localT * 8, 1);
+        const fadeOut = Math.min((1 - localT) * 8, 1);
+        // Add a quick flash at scene boundaries (TV commercial cut effect)
+        const cutFlash = localT < 0.05 ? 1 - localT * 20 : 0;
+        return Math.min(fadeIn * fadeOut + cutFlash * 0.3, 1);
       };
 
-      // Emotion-specific overlay rendering
+      // Emotion-specific overlay rendering — TV commercial style
       const drawEmotionOverlay = (
         emotion: PsychScene['emotion'],
         localT: number,
@@ -884,7 +1008,6 @@ export default function AffiliateScreen() {
       ) => {
         switch (emotion) {
           case 'curiosity': {
-            // Subtle spotlight reveal effect
             const spotR = W * (0.3 + localT * 0.25);
             const spotGrad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, spotR);
             spotGrad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -894,7 +1017,6 @@ export default function AffiliateScreen() {
             break;
           }
           case 'shock': {
-            // Quick red flash + shake vignette
             const flashIntensity = Math.max(0, 1 - localT * 3) * 0.4;
             ctx.fillStyle = `rgba(255,40,40,${flashIntensity})`;
             ctx.fillRect(0, 0, W, H);
@@ -906,7 +1028,6 @@ export default function AffiliateScreen() {
             break;
           }
           case 'empathy': {
-            // Warm golden glow + soft gradient
             const warmth = 0.15 + Math.sin(localT * Math.PI) * 0.1;
             const warmGrad = ctx.createLinearGradient(0, H * 0.3, 0, H);
             warmGrad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -917,7 +1038,6 @@ export default function AffiliateScreen() {
             break;
           }
           case 'desire': {
-            // Dark edges with glowing center (spotlight on product)
             const desireGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.1, W / 2, H / 2, W * 0.65);
             desireGrad.addColorStop(0, 'rgba(0,0,0,0)');
             desireGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
@@ -927,7 +1047,6 @@ export default function AffiliateScreen() {
             break;
           }
           case 'action': {
-            // Pulsing accent border + urgency gradient
             const pulse = Math.sin(localT * Math.PI * 4) * 0.5 + 0.5;
             const borderW = 8 + pulse * 6;
             ctx.strokeStyle = color.accent;
@@ -945,14 +1064,7 @@ export default function AffiliateScreen() {
         }
       };
 
-      // Determine whether scene should show product image or text-only story frame
-      const isTextOnlyScene = (emotion: PsychScene['emotion'], idx: number) => {
-        // First scene (curiosity hook) and action scene are text-driven
-        // Empathy scene uses story-first approach (no product image)
-        return emotion === 'empathy' || (emotion === 'curiosity' && idx === 0);
-      };
-
-      // Draw decorative particles/elements for text-only scenes
+      // Draw decorative particles for text-only scenes
       const drawDecorativeElements = (
         emotion: PsychScene['emotion'],
         localT: number,
@@ -975,6 +1087,23 @@ export default function AffiliateScreen() {
         ctx.globalAlpha = 1;
       };
 
+      // TV commercial style: draw a quick brand bumper between scenes
+      const drawBrandBumper = (alpha: number) => {
+        if (alpha <= 0) return;
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.fillStyle = '#0a0f1e';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 64px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 20;
+        ctx.fillText(productMeta?.productName || 'CHECK THIS OUT', W / 2, H / 2);
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = 1;
+      };
+
       const drawFrame = () => {
         const elapsed = performance.now() - startTime;
         const globalT = Math.min(elapsed / durationMs, 1);
@@ -984,17 +1113,30 @@ export default function AffiliateScreen() {
         const sceneIdx = Math.min(Math.floor(globalT * totalScenes), totalScenes - 1);
         const scene = scenes[sceneIdx];
         const sceneLocalT = (globalT * totalScenes) - sceneIdx;
-        const transitionAlpha = getSceneTransitionAlpha(sceneLocalT);
+        const transitionAlpha = getSceneTransitionAlpha(sceneLocalT, sceneIdx);
 
         ctx.fillStyle = '#0a0f1e';
         ctx.fillRect(0, 0, W, H);
 
         if (scene) {
-          const showProductImage = img && !isTextOnlyScene(scene.emotion, sceneIdx);
+          // Determine which image to use for this scene
+          let sceneImg: HTMLImageElement | null = null;
+          if (sceneImageMap && sceneImgs.length > 0) {
+            const imgIdx = sceneImageMap[sceneIdx] ?? 0;
+            sceneImg = sceneImgs[imgIdx] ?? null;
+          } else if (fallbackImg) {
+            sceneImg = fallbackImg;
+          }
 
-          if (showProductImage) {
-            // Product image scene with motion
-            const motion = getMotionTransform(scene.motionType, sceneLocalT);
+          // TV commercial: show brand bumper at start of first scene
+          if (sceneIdx === 0 && sceneLocalT < 0.08) {
+            drawBrandBumper(1 - sceneLocalT * 12);
+          }
+
+          if (sceneImg) {
+            // Multi-angle / AI-generated image scene with motion
+            const { baseW, baseH } = getBaseDims(sceneImg);
+            const motion = getMotionTransform(scene.motionType, sceneLocalT, baseW, baseH);
             const drawW = baseW * motion.scale;
             const drawH = baseH * motion.scale;
             const drawX = (W - drawW) / 2 + motion.offsetX;
@@ -1006,7 +1148,7 @@ export default function AffiliateScreen() {
               cg.contrast * 0.005,
               cg.saturation * 0.005,
             );
-            ctx.drawImage(img!, drawX, drawY, drawW, drawH);
+            ctx.drawImage(sceneImg, drawX, drawY, drawW, drawH);
             resetFilter();
             ctx.globalAlpha = 1;
           } else {
@@ -1046,14 +1188,14 @@ export default function AffiliateScreen() {
           ctx.fillStyle = vignetteGrad;
           ctx.fillRect(0, 0, W, H);
 
-          // Scene text with transition fade
+          // Scene text with transition fade — TV commercial style bold text
           ctx.globalAlpha = transitionAlpha;
           ctx.fillStyle = '#fff';
-          ctx.font = `700 ${scene.fontSize}px sans-serif`;
+          ctx.font = `900 ${scene.fontSize}px sans-serif`;
           ctx.textBaseline = 'top';
           ctx.textAlign = 'center';
-          ctx.shadowColor = 'rgba(0,0,0,0.9)';
-          ctx.shadowBlur = 16;
+          ctx.shadowColor = 'rgba(0,0,0,0.95)';
+          ctx.shadowBlur = 20;
           ctx.shadowOffsetY = 4;
 
           const textY = getTextY(scene.textPosition);
@@ -1062,9 +1204,9 @@ export default function AffiliateScreen() {
             ctx.fillText(line, W / 2, textY + i * (scene.fontSize + 12));
           });
 
-          ctx.font = `400 ${scene.subFontSize}px sans-serif`;
-          ctx.fillStyle = scene.colorTheme.accent + 'CC';
-          ctx.shadowBlur = 8;
+          ctx.font = `600 ${scene.subFontSize}px sans-serif`;
+          ctx.fillStyle = scene.colorTheme.accent + 'DD';
+          ctx.shadowBlur = 10;
           const descLines = scene.subtext.match(/.{1,24}/g) || [scene.subtext];
           const descY = textY + lines.length * (scene.fontSize + 12) + 16;
           descLines.slice(0, 3).forEach((line, i) => {
@@ -1144,7 +1286,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText]);
+  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -1858,6 +2000,77 @@ export default function AffiliateScreen() {
                   </View>
                 </View>
               ))}
+
+              {/* Multi-angle image upload for TV commercial style */}
+              {videoPreviewScenes && (
+                <View style={styles.multiImageSection}>
+                  <Text style={styles.multiImageTitle}>다각도 사진으로 TV광고풍 영상 만들기</Text>
+                  <Text style={styles.multiImageHint}>
+                    상품을 여러 각도에서 촬영한 사진을 업로드하면 각 장면에 맞춰 배정됩니다. 부족한 장면은 AI가 자동 생성합니다.
+                  </Text>
+                  <View style={styles.multiImageRow}>
+                    {multiImages.map((img, idx) => (
+                      <View key={idx} style={styles.multiImageThumb}>
+                        <Image source={{ uri: img.uri }} style={styles.multiImageThumbImg} resizeMode="cover" />
+                        <TouchableOpacity
+                          style={styles.multiImageRemoveBtn}
+                          onPress={() => handleRemoveMultiImage(idx)}
+                          activeOpacity={0.7}
+                        >
+                          <X size={12} color="#fff" strokeWidth={2.5} />
+                        </TouchableOpacity>
+                        <Text style={styles.multiImageLabel}>{idx + 1}번</Text>
+                      </View>
+                    ))}
+                    {multiImages.length < 4 && (
+                      <TouchableOpacity
+                        style={styles.multiImageAddBtn}
+                        onPress={handlePickFromGallery}
+                        disabled={mediaLoading}
+                        activeOpacity={0.85}
+                      >
+                        {mediaLoading ? (
+                          <Loader size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                        ) : (
+                          <Plus size={20} color={theme.colors.accent[400]} strokeWidth={2} />
+                        )}
+                        <Text style={styles.multiImageAddText}>사진 추가</Text>
+                        <Text style={styles.multiImageAddSub}>{multiImages.length}/4</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {multiImages.length > 0 && multiImages.length < videoPreviewScenes.length && (
+                    <TouchableOpacity
+                      style={[styles.aiGenBtn, aiImageGenerating && styles.aiGenBtnDisabled]}
+                      onPress={handleGenerateAiSceneImages}
+                      disabled={aiImageGenerating}
+                      activeOpacity={0.85}
+                    >
+                      {aiImageGenerating ? (
+                        <Loader size={14} color="#fff" strokeWidth={2} />
+                      ) : (
+                        <Sparkles size={14} color="#fff" strokeWidth={2} />
+                      )}
+                      <Text style={styles.aiGenBtnText}>
+                        {aiImageGenerating ? 'AI가 장면 이미지 생성 중...' : `AI로 남은 ${videoPreviewScenes.length - multiImages.length}개 장면 이미지 생성`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {aiSceneImages.length > 0 && (
+                    <View style={styles.aiSceneImagesRow}>
+                      <Text style={styles.aiSceneImagesLabel}>AI 생성 이미지 ({aiSceneImages.length})</Text>
+                      <View style={styles.aiSceneImagesThumbs}>
+                        {aiSceneImages.map((uri, idx) => (
+                          <View key={idx} style={styles.multiImageThumb}>
+                            <Image source={{ uri }} style={styles.multiImageThumbImg} resizeMode="cover" />
+                            <Text style={styles.multiImageLabel}>AI</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* Render video from storyboard button */}
               <TouchableOpacity
@@ -3301,6 +3514,121 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: theme.spacing.md,
     marginTop: theme.spacing.sm,
+  },
+  multiImageSection: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  multiImageTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
+    marginBottom: 4,
+  },
+  multiImageHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginBottom: theme.spacing.sm,
+  },
+  multiImageRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  multiImageThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+  },
+  multiImageThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  multiImageRemoveBtn: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  multiImageLabel: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  multiImageAddBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '50',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  multiImageAddText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  multiImageAddSub: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  aiGenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    marginTop: theme.spacing.sm,
+  },
+  aiGenBtnDisabled: {
+    opacity: 0.6,
+  },
+  aiGenBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  aiSceneImagesRow: {
+    marginTop: theme.spacing.sm,
+  },
+  aiSceneImagesLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.primary[300],
+    marginBottom: 6,
+  },
+  aiSceneImagesThumbs: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   renderVideoBtnDisabled: {
     opacity: 0.6,
