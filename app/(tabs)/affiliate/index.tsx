@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -269,6 +269,9 @@ export default function AffiliateScreen() {
   const videoPreviewProgress = useSharedValue(0);
   const [videoRendering, setVideoRendering] = useState(false);
   const [videoRenderComplete, setVideoRenderComplete] = useState(false);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [renderedVideoMime, setRenderedVideoMime] = useState<string>('video/webm');
+  const [renderError, setRenderError] = useState<string | null>(null);
   const renderProgress = useSharedValue(0);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
@@ -693,6 +696,145 @@ export default function AffiliateScreen() {
       : null,
     [selectedImage, mediaType, selectedImageMime],
   );
+
+  const generatePreviewVideo = useCallback(async () => {
+    if (Platform.OS !== 'web') return;
+    if (!imagePreviewUri || !videoPreviewScenes) return;
+    setVideoRendering(true);
+    setVideoRenderComplete(false);
+    setRenderError(null);
+    setRenderedVideoUrl(null);
+    renderProgress.value = 0;
+
+    try {
+      const { urlToDataUrl } = await import('@/lib/base64');
+      const safeImageUrl = await urlToDataUrl(imagePreviewUri);
+
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('이미지를 불러올 수 없습니다.'));
+        el.src = safeImageUrl;
+      });
+
+      const W = 1080, H = 1920, FPS = 30, DURATION = 5;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('캔버스를 생성할 수 없습니다.');
+
+      const stream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(FPS);
+      const codecCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      let mimeType = '';
+      for (const c of codecCandidates) {
+        try {
+          if (MediaRecorder.isTypeSupported(c)) { mimeType = c; break; }
+        } catch { /* try next */ }
+      }
+      if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
+
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
+      recorder.start();
+
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const canvasAspect = W / H;
+      let baseW: number, baseH: number;
+      if (imgAspect > canvasAspect) { baseW = W; baseH = W / imgAspect; }
+      else { baseH = H; baseW = H * imgAspect; }
+
+      const startTime = performance.now();
+      const durationMs = DURATION * 1000;
+      const totalScenes = videoPreviewScenes.length;
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, 'rgba(10,15,30,0.2)');
+      grad.addColorStop(0.5, 'rgba(10,15,30,0.5)');
+      grad.addColorStop(1, 'rgba(10,15,30,0.9)');
+
+      const drawFrame = () => {
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(elapsed / durationMs, 1);
+        const pct = Math.round(t * 100);
+        renderProgress.value = t;
+
+        ctx.fillStyle = '#0a0f1e';
+        ctx.fillRect(0, 0, W, H);
+
+        const scale = 1.0 + t * 0.3;
+        const drawW = baseW * scale;
+        const drawH = baseH * scale;
+        const drawX = (W - drawW) / 2;
+        const drawY = (H - drawH) / 2 + (1 - t) * 40;
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
+        const sceneIdx = Math.min(Math.floor(t * totalScenes), totalScenes - 1);
+        const scene = videoPreviewScenes[sceneIdx];
+        if (scene) {
+          const sceneLocalT = (t * totalScenes) - sceneIdx;
+          const fadeAlpha = Math.min(sceneLocalT * 4, 1) * Math.min((1 - sceneLocalT) * 4, 1);
+          ctx.globalAlpha = fadeAlpha;
+          ctx.fillStyle = '#fff';
+          ctx.font = '700 36px sans-serif';
+          ctx.textBaseline = 'top';
+          ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0,0,0,0.85)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 3;
+          const lines = scene.hook.match(/.{1,18}/g) || [scene.hook];
+          lines.slice(0, 3).forEach((line, i) => {
+            ctx.fillText(line, W / 2, H * 0.7 + i * 48);
+          });
+          ctx.font = '400 22px sans-serif';
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          const descLines = scene.desc.match(/.{1,28}/g) || [scene.desc];
+          descLines.slice(0, 2).forEach((line, i) => {
+            ctx.fillText(line, W / 2, H * 0.7 + 144 + i * 30);
+          });
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.textAlign = 'left';
+          ctx.globalAlpha = 1;
+        }
+
+        ctx.globalAlpha = Math.min(t * 5, 1);
+        ctx.fillStyle = theme.colors.accent[400];
+        ctx.font = '700 20px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`${pct}%`, W - 30, 30);
+        ctx.textAlign = 'left';
+        ctx.globalAlpha = 1;
+
+        if (t < 1) {
+          requestAnimationFrame(drawFrame);
+        } else {
+          setTimeout(() => {
+            if (recorder.state === 'recording') recorder.stop();
+          }, 100);
+        }
+      };
+      requestAnimationFrame(drawFrame);
+
+      await done;
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      setRenderedVideoUrl(url);
+      setRenderedVideoMime(mimeType);
+      setVideoRenderComplete(true);
+    } catch (err) {
+      setRenderError(err instanceof Error ? err.message : '영상 생성에 실패했습니다.');
+    } finally {
+      setVideoRendering(false);
+      renderProgress.value = 1;
+    }
+  }, [imagePreviewUri, videoPreviewScenes, renderProgress]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -1304,18 +1446,7 @@ export default function AffiliateScreen() {
                 style={[styles.renderVideoBtn, videoRendering && styles.renderVideoBtnDisabled]}
                 onPress={() => {
                   if (videoRendering || videoRenderComplete) return;
-                  setVideoRendering(true);
-                  setVideoRenderComplete(false);
-                  renderProgress.value = 0;
-                  renderProgress.value = withTiming(1, {
-                    duration: 3000,
-                    easing: Easing.inOut(Easing.ease),
-                  }, (finished) => {
-                    if (finished) {
-                      runOnJS(setVideoRendering)(false);
-                      runOnJS(setVideoRenderComplete)(true);
-                    }
-                  });
+                  generatePreviewVideo();
                 }}
                 disabled={videoRendering || videoRenderComplete}
                 activeOpacity={0.85}
@@ -1351,6 +1482,63 @@ export default function AffiliateScreen() {
                       ? `심리 자극 요소 ${videoPreviewScenes.length}개 요소가 적용된 이미지가 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`
                       : `심리 자극 요소 ${videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`}
                   </Text>
+                </View>
+              )}
+
+              {renderError && (
+                <View style={styles.renderCompleteBox}>
+                  <Text style={[styles.renderCompleteText, { color: theme.colors.error[400] }]}>
+                    {renderError}
+                  </Text>
+                </View>
+              )}
+
+              {renderedVideoUrl && videoRenderComplete && (
+                <View style={styles.renderedVideoWrap}>
+                  {/* @ts-ignore web-only video element */}
+                  <video
+                    src={renderedVideoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    style={{
+                      width: '100%',
+                      maxHeight: 400,
+                      borderRadius: 12,
+                      backgroundColor: '#000',
+                    }}
+                  />
+                  <View style={styles.renderedVideoActions}>
+                    <TouchableOpacity
+                      style={styles.renderedDownloadBtn}
+                      onPress={() => {
+                        if (Platform.OS === 'web' && renderedVideoUrl) {
+                          const ext = renderedVideoMime.includes('mp4') ? 'mp4' : 'webm';
+                          const a = document.createElement('a');
+                          a.href = renderedVideoUrl;
+                          a.download = `preview-${Date.now()}.${ext}`;
+                          a.click();
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Download size={15} color="#fff" strokeWidth={2} />
+                      <Text style={styles.renderedDownloadBtnText}>다운로드</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.renderedRegenBtn}
+                      onPress={() => {
+                        setRenderedVideoUrl(null);
+                        setVideoRenderComplete(false);
+                        renderProgress.value = 0;
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <RefreshCw size={15} color={theme.colors.dark.text} strokeWidth={2} />
+                      <Text style={styles.renderedRegenBtnText}>다시 생성</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -2687,6 +2875,44 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.success[400],
     lineHeight: 16,
+  },
+  renderedVideoWrap: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  renderedVideoActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  renderedDownloadBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  renderedDownloadBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  renderedRegenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  renderedRegenBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
   },
   analyzeWaitingText: {
     fontSize: 13,
