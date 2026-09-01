@@ -40,7 +40,9 @@ import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/li
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { StockVideoPicker } from '@/components/StockVideoPicker';
 import { VideoEditPlanCard } from '@/components/VideoEditPlanCard';
+import { VideoRenderCard } from '@/components/VideoRenderCard';
 import type { StockVideoClip } from '@/lib/pexelsVideo';
+import type { EditPlan } from '@/lib/videoEditPlan';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -265,6 +267,7 @@ export default function AffiliateScreen() {
   const [renderedVideoMime, setRenderedVideoMime] = useState<string>('video/webm');
   const [renderError, setRenderError] = useState<string | null>(null);
   const [stockVideoClip, setStockVideoClip] = useState<StockVideoClip | null>(null);
+  const [videoEditPlan, setVideoEditPlan] = useState<EditPlan | null>(null);
   const renderProgress = useSharedValue(0);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
@@ -2559,6 +2562,15 @@ export default function AffiliateScreen() {
                 hook={undefined}
                 oneLiner={undefined}
                 hasVideoSelected={stockVideoClip !== null}
+                onPlanGenerated={setVideoEditPlan}
+              />
+
+              <VideoRenderCard
+                clip={stockVideoClip}
+                plan={videoEditPlan}
+                ctaText={videoEditPlan?.copyVariants?.[0]?.cta}
+                disclosureText={videoEditPlan?.copyVariants?.[0]?.disclosure}
+                productName={productMeta?.productName}
               />
             </>
           )}

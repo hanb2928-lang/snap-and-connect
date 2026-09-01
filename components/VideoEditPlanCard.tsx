@@ -40,6 +40,7 @@ interface VideoEditPlanCardProps {
   hook?: string;
   oneLiner?: string;
   hasVideoSelected: boolean;
+  onPlanGenerated?: (plan: EditPlan) => void;
 }
 
 const PSYCHOLOGY_OPTIONS: { key: PsychologyPreset; label: string; desc: string }[] = [
@@ -58,6 +59,7 @@ export function VideoEditPlanCard({
   hook,
   oneLiner,
   hasVideoSelected,
+  onPlanGenerated,
 }: VideoEditPlanCardProps) {
   const [duration, setDuration] = useState<15 | 30>(15);
   const [psychPreset, setPsychPreset] = useState<PsychologyPreset>('auto');
@@ -122,13 +124,14 @@ export function VideoEditPlanCard({
       });
       setPlan(result);
       setExpandedCopy(0);
+      onPlanGenerated?.(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : '편집 계획 생성에 실패했습니다.');
     } finally {
       finishProgress();
       setLoading(false);
     }
-  }, [duration, psychPreset, productName, productCategory, platform, accentColor, hook, oneLiner, startProgress, finishProgress]);
+  }, [duration, psychPreset, productName, productCategory, platform, accentColor, hook, oneLiner, startProgress, finishProgress, onPlanGenerated]);
 
   const copyToClipboard = useCallback(async (text: string, fieldKey: string) => {
     try {
