@@ -247,16 +247,19 @@ export default function MarketingScreen() {
     }, []),
   );
 
+  const canGenerate = storeName.trim().length > 0 || signatureMenu.trim().length > 0;
+
   useEffect(() => {
     if (!pendingVoiceGenRef.current) return;
     if (!customPrompt.trim()) return;
+    if (!canGenerate) return;
     pendingVoiceGenRef.current = false;
     voiceAutoGenTimerRef.current = setTimeout(() => {
       voiceAutoGenTimerRef.current = null;
       lastActionRef.current = 0;
       handleStartGeneration();
     }, 1200);
-  }, [customPrompt, selectedHook]);
+  }, [customPrompt, selectedHook, canGenerate]);
 
   const handleSaveAffiliate = async () => {
     if (!affiliateUrl.trim()) return;
@@ -389,7 +392,7 @@ export default function MarketingScreen() {
         await setItem('marketing_selected_image', voiceImage);
         await setItem('marketing_selected_image_mime', voiceImageMime || 'image/jpeg');
       }
-      router.push('/' as never);
+      router.replace('/(tabs)/');
     } catch {
       // navigation failure — reset so user can retry
     } finally {
@@ -406,8 +409,6 @@ export default function MarketingScreen() {
       setTimeout(() => setStoreSaved(false), 2000);
     } catch {}
   };
-
-  const canGenerate = storeName.trim().length > 0 || signatureMenu.trim().length > 0;
 
   return (
     <View style={styles.container}>

@@ -13,6 +13,7 @@ import {
   Alert,
   Modal,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp } from 'lucide-react-native';
 import { SectionCard } from '@/components/SectionCard';
@@ -1252,7 +1253,9 @@ export default function SettingsScreen() {
               {Platform.OS === 'web' ? (
                 // @ts-ignore img element on web
                 <img src={logoUrl} style={styles.logoPreviewImg as any} />
-              ) : null}
+              ) : (
+                <Image source={{ uri: logoUrl }} style={styles.logoPreviewImg} resizeMode="contain" />
+              )}
               <View style={styles.logoInfo}>
                 <Text style={styles.logoRegisteredText}>로고가 등록되어 있어요</Text>
                 <Text style={styles.logoHintText}>모든 콘텐츠에 자동으로 워터마크가 적용됩니다</Text>

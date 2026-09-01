@@ -166,7 +166,7 @@ export default function EditorScreen() {
           setImageSize(size);
         } catch {
           // size detection will retry — use a safe default so layout doesn't jump
-          setImageSize({ width: imageDisplayWidth, height: imageDisplayWidth });
+          setImageSize({ width: imageDisplayWidth, height: imageDisplayHeight });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다');

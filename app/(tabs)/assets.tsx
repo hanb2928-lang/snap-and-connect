@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -116,7 +116,7 @@ export default function AssetsScreen() {
   const [remixDone, setRemixDone] = useState(false);
   const remixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sortedAssets = useCallback(() => {
+  const sortedAssets = useMemo(() => {
     const sorted = [...assets];
     if (sortMode === 'date') sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     else if (sortMode === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
@@ -575,7 +575,7 @@ export default function AssetsScreen() {
         </View>
       ) : (
         <FlatList
-          data={sortedAssets()}
+          data={sortedAssets}
           keyExtractor={(item) => item.id}
           ref={scrollRef}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary[400]} />}
