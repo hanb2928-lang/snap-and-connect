@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ZoomIn, ZoomOut, Move, Film, Check, Loader, Download, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { buildDataUrl, cleanBase64 } from '@/lib/base64';
+import { buildDataUrl, cleanBase64, urlToDataUrl } from '@/lib/base64';
 import { generateVisualParams, type VisualRandomizationParams } from '@/lib/humanLikeEngine';
 
 type MotionPreset = 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right' | 'tilt-up' | 'cinematic';
@@ -58,13 +58,22 @@ export function MotionZoomVideo({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const dataUrl = useMemo(() =>
-    imageUrl.startsWith('data:')
-      ? imageUrl
-      : imageUrl.startsWith('http')
-        ? imageUrl
-        : buildDataUrl(cleanBase64(imageUrl), 'image/jpeg')
-  , [imageUrl]);
+  const rawImageUrl = imageUrl || '';
+  const [dataUrl, setDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (rawImageUrl.startsWith('data:')) {
+      setDataUrl(rawImageUrl);
+    } else if (rawImageUrl.startsWith('http')) {
+      urlToDataUrl(rawImageUrl).then((d) => { if (!cancelled) setDataUrl(d); }).catch(() => {
+        if (!cancelled) setDataUrl(rawImageUrl);
+      });
+    } else {
+      setDataUrl(buildDataUrl(cleanBase64(rawImageUrl), 'image/jpeg'));
+    }
+    return () => { cancelled = true; };
+  }, [rawImageUrl]);
 
   const videoUrlRef = useRef<string | null>(null);
 
@@ -116,6 +125,10 @@ export function MotionZoomVideo({
 
   const generateVideo = useCallback(async () => {
     if (generating || Platform.OS !== 'web') return;
+    if (!dataUrl) {
+      setError('이미지를 준비하는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
     setGenerating(true);
     setError(null);
     setVideoUrl(null);
@@ -129,9 +142,8 @@ export function MotionZoomVideo({
     try {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-        el.crossOrigin = 'anonymous';
         el.onload = () => resolve(el);
-        el.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
+        el.onerror = () => reject(new Error('이미지를 불러올 수 없습니다. 네트워크 문제일 수 있어요.'));
         el.src = dataUrl;
       });
 
@@ -139,7 +151,6 @@ export function MotionZoomVideo({
       const H = 1920;
       const FPS = 30;
       const DURATION_SEC = 5;
-      const totalFrames = FPS * DURATION_SEC;
 
       const canvas = document.createElement('canvas');
       canvas.width = W;
