@@ -210,15 +210,13 @@ function getBoardMediaType(platform: string | null, board: string | null): 'imag
   return 'video';
 }
 
-type StepKey = 'affiliate' | 'platformSelect' | 'analyze' | 'content' | 'upload';
+type StepKey = 'source' | 'autoEdit' | 'preview';
 
-const STEP_ORDER: StepKey[] = ['affiliate', 'platformSelect', 'content', 'analyze', 'upload'];
+const STEP_ORDER: StepKey[] = ['source', 'autoEdit', 'preview'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
-  affiliate: { num: 1, color: theme.colors.accent[400] },
-  platformSelect: { num: 2, color: theme.colors.warning[400] },
-  content: { num: 3, color: theme.colors.warning[400] },
-  analyze: { num: 4, color: theme.colors.success[400] },
-  upload: { num: 5, color: theme.colors.success[400] },
+  source: { num: 1, color: theme.colors.accent[400] },
+  autoEdit: { num: 2, color: theme.colors.warning[400] },
+  preview: { num: 3, color: theme.colors.success[400] },
 };
 
 export default function AffiliateScreen() {
@@ -235,7 +233,7 @@ export default function AffiliateScreen() {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
-  const [expandedStep, setExpandedStep] = useState<StepKey | null>('affiliate');
+  const [expandedStep, setExpandedStep] = useState<StepKey | null>('source');
 
   // Image for analysis (from product meta or user upload)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -357,7 +355,7 @@ export default function AffiliateScreen() {
 
   useEffect(() => {
     if (selectedUploadPlatform && !PLATFORM_BOARDS[selectedUploadPlatform]) {
-      markCompleted('platformSelect');
+      markCompleted('source');
     }
   }, [selectedUploadPlatform]);
 
@@ -502,14 +500,14 @@ export default function AffiliateScreen() {
           : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${newMeta.platform || '쇼핑몰'} ${newMeta.brand ? `· ${newMeta.brand} ` : ''}정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`;
         setExtractError(searchHint);
         setProductMeta({ ...newMeta, productName: newMeta.platform ? `${newMeta.platform} 상품` : '상품' });
-        markCompleted('affiliate');
+        markCompleted('source');
         return;
       }
       setProductMeta(newMeta);
       if (newMeta.platform && newMeta.platform !== 'Unknown') {
         setSelectedPlatform(newMeta.platform);
       }
-      markCompleted('affiliate');
+      markCompleted('source');
       // Use server-captured base64 image directly — bypasses CORS entirely
       if (newMeta.imageBase64) {
         setSelectedImage(newMeta.imageBase64);
@@ -549,7 +547,7 @@ export default function AffiliateScreen() {
           ? `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 검색 페이지에서 상품을 확인하거나, 사진을 업로드하여 진행할 수 있습니다. 영상 생성은 바로 가능합니다.|||${searchUrl}`
           : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`,
       );
-      markCompleted('affiliate');
+      markCompleted('source');
     } finally {
       setExtracting(false);
     }
@@ -728,7 +726,7 @@ export default function AffiliateScreen() {
       } catch {
         // analysis enhancement is best-effort; scan already saved
       }
-      markCompleted('analyze');
+      markCompleted('autoEdit');
       setLastScanId(scanId);
 
       setAiRecommendLoading(true);
@@ -779,7 +777,7 @@ export default function AffiliateScreen() {
       if (result) {
         setContentSaveSuccess(true);
         setTimeout(() => setContentSaveSuccess(false), 3000);
-        markCompleted('content');
+        markCompleted('autoEdit');
       } else {
         setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
       }
@@ -927,7 +925,7 @@ export default function AffiliateScreen() {
     setUploadPlatform(showUploadConfirm);
     setShowUploadConfirm(null);
     setPendingUploadPlatform(null);
-    markCompleted('upload');
+    markCompleted('preview');
   };
 
   const handleCancelUploadConfirm = () => {
@@ -938,7 +936,7 @@ export default function AffiliateScreen() {
   const handleMarkUploaded = (key: string) => {
     setUploadedPlatforms((prev) => new Set(prev).add(key));
     setUploadPlatform(key);
-    markCompleted('upload');
+    markCompleted('preview');
   };
 
   const handleImportMedia = useCallback(async () => {
@@ -1694,6 +1692,57 @@ export default function AffiliateScreen() {
     }, 100);
   };
 
+  // ── One-click auto-edit pipeline ──
+  // Orchestrates: viral analysis → storyboard generation → high-quality render
+  const [autoEditing, setAutoEditing] = useState(false);
+  const [autoEditStep, setAutoEditStep] = useState<string>('');
+
+  const handleAutoEdit = useCallback(async () => {
+    if (autoEditing) return;
+    setAutoEditing(true);
+    setAutoEditStep('분석 중...');
+    setRenderError(null);
+    setRenderedVideoUrl(null);
+    setVideoRenderComplete(false);
+
+    try {
+      // Step 1: Generate psych analysis + storyboard
+      const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+      setPreviewMediaMode(boardMedia);
+
+      const analysis = generatePsychAnalysis(
+        selectedUploadPlatform ?? 'tiktok',
+        selectedBoard ?? 'reels',
+        affiliateUrl,
+        undefined,
+        {
+          productName: productMeta?.productName,
+          price: productMeta?.price,
+          brand: productMeta?.brand,
+          description: productMeta?.description,
+        },
+      );
+      setViralAnalysisResult(analysis);
+      setAutoEditStep('스토리보드 생성 중...');
+
+      // Step 2: Build scenes
+      videoPreviewProgress.value = 0;
+      videoPreviewProgress.value = withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) });
+      await new Promise<void>((resolve) => setTimeout(resolve, 2200));
+      setVideoPreviewScenes(analysis.scenes);
+
+      // Step 3: Render high-quality video
+      setAutoEditStep('영상 렌더링 중...');
+      await generatePreviewVideo('high');
+      markCompleted('autoEdit');
+    } catch {
+      setRenderError('자동 편집 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setAutoEditing(false);
+      setAutoEditStep('');
+    }
+  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo]);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -1707,36 +1756,35 @@ export default function AffiliateScreen() {
         )}
 
         {loading && !loadError && (
-          <SkeletonList count={4} />
+          <SkeletonList count={3} />
         )}
 
         {!loading && (
           <>
-        {/* Header */}
         <View style={styles.verticalHeader}>
-          <Text style={styles.verticalTitle}>제휴쇼핑 콘텐츠 제작</Text>
+          <Text style={styles.verticalTitle}>제휴쇼핑 숏폼 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            제작 순서대로 아래 카드를 펼쳐 진행하세요
+            소스 불러오기 → AI 자동 편집 → 갤러리 저장
           </Text>
         </View>
 
-        {/* Full-width pill nav cards in production order */}
+        {/* ─────────── STEP 1: 소스/영상 불러오기 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[1] = ref; }}
           collapsable={false}
         />
         <PillNavCard
           icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="제휴 상품 선택하기"
-          subtitle="URL 붙여넣기 · 클립보드 자동 인식 · 상품 정보 추출"
+          title="소스 불러오기"
+          subtitle="제휴 링크 입력 · 상품 사진 · 스톡 영상 선택"
           accentColor={theme.colors.accent[400]}
           iconBg={theme.colors.accent[500] + '22'}
           stepNumber={1}
-          expanded={expandedStep === 'affiliate'}
-          completed={completedSteps.has('affiliate')}
-          onToggle={() => setExpandedStep(expandedStep === 'affiliate' ? null : 'affiliate')}
+          expanded={expandedStep === 'source'}
+          completed={completedSteps.has('source')}
+          onToggle={() => setExpandedStep(expandedStep === 'source' ? null : 'source')}
         >
-          {/* Affiliate URL input — top of card */}
+          {/* Affiliate URL input */}
           <View style={styles.affiliateUrlInputWrap}>
             <View style={styles.affiliateUrlInputRow}>
               <View style={styles.affiliateUrlInputField}>
@@ -1770,7 +1818,7 @@ export default function AffiliateScreen() {
             </View>
           </View>
 
-          {/* Link page open + gallery pick — below URL input */}
+          {/* Gallery pick + link page */}
           {affiliateUrl.trim() && (
             <View style={styles.captureImageRow}>
               <TouchableOpacity
@@ -1809,104 +1857,8 @@ export default function AffiliateScreen() {
               <Text style={styles.captureErrorText}>{captureError}</Text>
             </View>
           )}
-          {affiliateUrl.trim() && !selectedImage && (
-            <View style={styles.captureHintBox}>
-              <Text style={styles.captureHintText}>
-                1. '링크 페이지 열기'로 상품 페이지를 열어 상품 사진을 캡처/저장하세요{'\n'}
-                2. '갤러리에서 불러오기'로 저장한 사진을 선택하면 상품 분석이 진행됩니다
-              </Text>
-            </View>
-          )}
-          <PlatformListSection
-            platforms={PLATFORMS}
-            isConfigured={isConfigured}
-            copiedPlatform={copiedPlatform}
-            onOpenUrl={handleOpenUrl}
-            onCopySignup={handleCopySignup}
-            customPlatforms={customPlatforms}
-            onAddCustomPlatform={(name, url) => {
-              const key = 'custom_' + Date.now();
-              setCustomPlatforms((prev) => [...prev, { key, label: name, url }]);
-            }}
-            onRemoveCustomPlatform={(key) => {
-              setCustomPlatforms((prev) => prev.filter((cp) => cp.key !== key));
-              if (selectedPlatform === key) setSelectedPlatform('');
-            }}
-            onSelectCustomPlatform={(key, url) => {
-              setSelectedPlatform(key);
-              setAffiliateUrl(url);
-            }}
-            selectedPlatform={selectedPlatform}
-          />
 
           {/* Product metadata preview */}
-          {extractError && (
-            <View style={styles.extractErrorBox}>
-              <Text style={styles.extractErrorText}>
-                {extractError.split('|||')[0]}
-              </Text>
-              {extractError.includes('|||') && (
-                <TouchableOpacity
-                  style={styles.extractSearchBtn}
-                  onPress={() => {
-                    const searchUrl = extractError.split('|||')[1];
-                    if (searchUrl) Linking.openURL(searchUrl).catch(() => {});
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <ScanSearch size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-                  <Text style={styles.extractSearchBtnText}>검색 페이지에서 상품 확인</Text>
-                </TouchableOpacity>
-              )}
-              <Text style={styles.extractHintText}>
-                AI가 URL 패턴으로 플랫폼과 브랜드를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능하고, 바로 영상 생성도 가능합니다.
-              </Text>
-              <View style={styles.extractErrorActionRow}>
-                <TouchableOpacity
-                  style={styles.extractRetryBtn}
-                  onPress={handleSaveAffiliate}
-                  disabled={extracting}
-                  activeOpacity={0.7}
-                >
-                  {extracting ? (
-                    <Loader size={12} color={theme.colors.error[400]} strokeWidth={2} />
-                  ) : (
-                    <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
-                  )}
-                  <Text style={styles.extractRetryBtnText}>재시도</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.extractManualBtn}
-                  onPress={() => {
-                    setExtractError(null);
-                    scrollToStep(4);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <ImageIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.extractManualBtnText}>사진 업로드로 진행</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.extractManualBtn, { borderColor: theme.colors.success[400], marginLeft: 8 }]}
-                  onPress={() => {
-                    setExtractError(null);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <ArrowRight size={12} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={[styles.extractManualBtnText, { color: theme.colors.success[400] }]}>그대로 진행</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {urlWarning && !extractError && (
-            <View style={styles.urlWarningBox}>
-              <AlertTriangle size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.urlWarningText}>{urlWarning}</Text>
-            </View>
-          )}
-
           {productMeta && (productMeta.productName || productMeta.price) && (
             <View style={styles.productMetaCard}>
               {imagePreviewUri ? (
@@ -1932,1042 +1884,178 @@ export default function AffiliateScreen() {
                 {productMeta.brand ? (
                   <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
                 ) : null}
-                {productMeta.description ? (
-                  <Text style={styles.productMetaDesc} numberOfLines={3}>{productMeta.description}</Text>
-                ) : null}
               </View>
             </View>
           )}
+
+          {/* Extract error */}
+          {extractError && (
+            <View style={styles.extractErrorBox}>
+              <Text style={styles.extractErrorText}>
+                {extractError.split('|||')[0]}
+              </Text>
+              <View style={styles.extractErrorActionRow}>
+                <TouchableOpacity
+                  style={styles.extractRetryBtn}
+                  onPress={handleSaveAffiliate}
+                  disabled={extracting}
+                  activeOpacity={0.7}
+                >
+                  {extracting ? (
+                    <Loader size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  ) : (
+                    <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  )}
+                  <Text style={styles.extractRetryBtnText}>재시도</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.extractManualBtn, { borderColor: theme.colors.success[400], marginLeft: 8 }]}
+                  onPress={() => setExtractError(null)}
+                  activeOpacity={0.7}
+                >
+                  <ArrowRight size={12} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={[styles.extractManualBtnText, { color: theme.colors.success[400] }]}>그대로 진행</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Pexels stock video picker */}
+          <View style={styles.subAccordionHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subAccordionTitle}>스톡 영상/이미지 선택</Text>
+              <Text style={styles.subAccordionDesc} numberOfLines={1}>
+                {stockVideoClip ? '선택됨' : 'Pexels에서 무료 영상 검색'}
+              </Text>
+            </View>
+          </View>
+          <StockVideoPicker
+            productName={productMeta?.productName}
+            mediaType="video"
+            orientation="portrait"
+            selectedClip={stockVideoClip}
+            onSelectClip={setStockVideoClip}
+          />
+
+          {/* Platform list for affiliate link setup */}
+          <PlatformListSection
+            platforms={PLATFORMS}
+            isConfigured={isConfigured}
+            copiedPlatform={copiedPlatform}
+            onOpenUrl={handleOpenUrl}
+            onCopySignup={handleCopySignup}
+            customPlatforms={customPlatforms}
+            onAddCustomPlatform={(name, url) => {
+              const key = 'custom_' + Date.now();
+              setCustomPlatforms((prev) => [...prev, { key, label: name, url }]);
+            }}
+            onRemoveCustomPlatform={(key) => {
+              setCustomPlatforms((prev) => prev.filter((cp) => cp.key !== key));
+              if (selectedPlatform === key) setSelectedPlatform('');
+            }}
+            onSelectCustomPlatform={(key, url) => {
+              setSelectedPlatform(key);
+              setAffiliateUrl(url);
+            }}
+            selectedPlatform={selectedPlatform}
+          />
+
+          {/* Next button */}
+          <TouchableOpacity
+            style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md }]}
+            onPress={() => markCompleted('source')}
+            activeOpacity={0.85}
+          >
+            <ArrowRight size={20} color="#fff" strokeWidth={2} />
+            <View style={styles.aiOneTapTextWrap}>
+              <Text style={styles.aiOneTapBtnTitle}>다음: AI 자동 편집</Text>
+            </View>
+            <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+          </TouchableOpacity>
         </PillNavCard>
 
-        {/* Platform selection */}
+        {/* ─────────── STEP 2: AI 자동 편집 실행 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[2] = ref; }}
           collapsable={false}
         />
         <PillNavCard
-          icon={<Share2 size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
-          title="플랫폼 선택하기"
-          subtitle="주요 플랫폼 업로드 게시판 선택 · 수동 입력"
+          icon={<Sparkles size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="AI 자동 편집 실행"
+          subtitle="15/30초 타임라인 · 자막 · 비트싱크 · 공정위 문구 · 해시태그 자동 적용"
           accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
           stepNumber={2}
-          completed={completedSteps.has('platformSelect')}
-          expanded={expandedStep === 'platformSelect'}
-          onToggle={() => setExpandedStep(expandedStep === 'platformSelect' ? null : 'platformSelect')}
+          expanded={expandedStep === 'autoEdit'}
+          completed={completedSteps.has('autoEdit')}
+          onToggle={() => setExpandedStep(expandedStep === 'autoEdit' ? null : 'autoEdit')}
         >
-          <Text style={styles.sectionLabel}>주요 플랫폼 (1개 선택)</Text>
-          <View style={styles.uploadGrid}>
-            {UPLOAD_PLATFORMS.map((p) => {
-              const Icon = p.icon;
-              const isSelected = selectedUploadPlatform === p.key;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.uploadCard, isSelected && { borderColor: p.color, backgroundColor: p.color + '15' }]}
-                  onPress={() => {
-                    setSelectedUploadPlatform((prev) => (prev === p.key ? null : p.key));
-                    setSelectedBoard(null);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.uploadIcon, { backgroundColor: p.color + '20' }]}>
-                    <Icon size={20} color={p.color} strokeWidth={2} />
-                  </View>
-                  <Text style={styles.uploadLabel}>{p.label}</Text>
-                  <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: p.color, borderColor: p.color }]}>
-                    {isSelected ? (
-                      <Check size={12} color="#fff" strokeWidth={2.5} />
-                    ) : (
-                      <Plus size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+          <Text style={styles.autoEditDesc}>
+            제품 정보와 소스 영상을 기반으로 AI가 모든 편집을 자동으로 처리합니다. 버튼 한 번이면 됩니다.
+          </Text>
+
+          {/* Auto-applied features list */}
+          <View style={styles.autoFeatureList}>
+            <View style={styles.autoFeatureItem}>
+              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.autoFeatureText}>15초/30초 동적 타임라인 페이싱</Text>
+            </View>
+            <View style={styles.autoFeatureItem}>
+              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.autoFeatureText}>키네틱 타이포그래피 자막 오버레이</Text>
+            </View>
+            <View style={styles.autoFeatureItem}>
+              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.autoFeatureText}>오디오 비트싱크 (Beat-sync)</Text>
+            </View>
+            <View style={styles.autoFeatureItem}>
+              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.autoFeatureText}>공정위 필수 제휴 문구 자동 주입</Text>
+            </View>
+            <View style={styles.autoFeatureItem}>
+              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.autoFeatureText}>최적화 해시태그 자동 생성</Text>
+            </View>
           </View>
 
-          {manualUploadPlatforms.map((mp) => {
-            const isSelected = selectedUploadPlatform === mp.key;
-            return (
-              <TouchableOpacity
-                key={mp.key}
-                style={[styles.manualPlatformRow, isSelected && { borderColor: theme.colors.accent[400] }]}
-                onPress={() => {
-                  setSelectedUploadPlatform((prev) => (prev === mp.key ? null : mp.key));
-                  setSelectedBoard(null);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.uploadIcon, { backgroundColor: theme.colors.accent[400] + '20' }]}>
-                  <Share2 size={18} color={theme.colors.accent[300]} strokeWidth={2} />
-                </View>
-                <Text style={styles.manualPlatformLabel}>{mp.label}</Text>
-                <View style={[styles.platformSelectBadge, isSelected && { backgroundColor: theme.colors.accent[400], borderColor: theme.colors.accent[400] }]}>
-                  {isSelected ? (
-                    <Check size={12} color="#fff" strokeWidth={2.5} />
-                  ) : (
-                    <Plus size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  )}
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    setManualUploadPlatforms((prev) => prev.filter((x) => x.key !== mp.key));
-                    if (isSelected) {
-                      setSelectedUploadPlatform(null);
-                      setSelectedBoard(null);
-                    }
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          })}
-
-          <View style={styles.manualPlatformInputRow}>
-            <TextInput
-              style={styles.manualPlatformInput}
-              value={manualPlatformName}
-              onChangeText={setManualPlatformName}
-              placeholder="플랫폼 이름 입력 (예: 틱톡, 핀터레스트)"
-              placeholderTextColor={theme.colors.dark.textFaint}
-            />
-            <TouchableOpacity
-              style={[styles.manualPlatformAddBtn, !manualPlatformName.trim() && styles.addPlatformConfirmBtnDisabled]}
-              onPress={() => {
-                if (!manualPlatformName.trim()) return;
-                const key = 'manual_' + Date.now();
-                setManualUploadPlatforms((prev) => [...prev, { key, label: manualPlatformName.trim() }]);
-                setManualPlatformName('');
-              }}
-              disabled={!manualPlatformName.trim()}
-              activeOpacity={0.7}
-            >
-              <Plus size={16} color="#fff" strokeWidth={2} />
-              <Text style={styles.manualPlatformAddBtnText}>추가</Text>
-            </TouchableOpacity>
-          </View>
-
-          {selectedUploadPlatform && PLATFORM_BOARDS[selectedUploadPlatform] && (
-            <>
-              <Text style={[styles.sectionLabel, { marginTop: theme.spacing.md }]}>
-                업로드 게시판 선택
-              </Text>
-              <View style={styles.boardListWrap}>
-                {PLATFORM_BOARDS[selectedUploadPlatform].map((b) => {
-                  const isBoardSelected = selectedBoard === b.key;
-                  return (
-                    <TouchableOpacity
-                      key={b.key}
-                      style={[styles.boardChip, isBoardSelected && styles.boardChipActive]}
-                      onPress={() => {
-                        const newBoard = isBoardSelected ? null : b.key;
-                        setSelectedBoard(newBoard);
-                        if (newBoard) {
-                          setPreviewMediaMode(getBoardMediaType(selectedUploadPlatform, newBoard));
-                          markCompleted('platformSelect');
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[styles.boardChipText, isBoardSelected && styles.boardChipTextActive]}
-                      >
-                        {b.label}
-                      </Text>
-                      {isBoardSelected && <Check size={13} color="#fff" strokeWidth={2.5} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {selectedBoard && (() => {
-                const board = PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard);
-                if (!board?.desc) return null;
-                return (
-                  <View style={styles.boardDescBox}>
-                    <Text style={styles.boardDescText}>{board.desc}</Text>
-                  </View>
-                );
-              })()}
-            </>
-          )}
-
-          {selectedUploadPlatform && (!PLATFORM_BOARDS[selectedUploadPlatform]) && (
-            <Text style={[styles.sectionLabel, { marginTop: theme.spacing.md }]}>
-              이 플랫폼은 게시판 선택이 없습니다. 바로 업로드할 수 있습니다.
-            </Text>
-          )}
-
-          {selectedUploadPlatform && (
-            <View style={styles.platformSummaryBox}>
-              <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.platformSummaryText}>
-                {UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label
-                  || manualUploadPlatforms.find((mp) => mp.key === selectedUploadPlatform)?.label
-                  || '플랫폼'} 선택됨
-                {selectedBoard ? ` · ${PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard)?.label ?? ''}` : ''}
-              </Text>
-            </View>
-          )}
-
-          {selectedUploadPlatform && selectedBoard && (
-            <View style={styles.viralAnalysisBox}>
-              <View style={styles.viralAnalysisHeader}>
-                <View style={styles.viralAnalysisIconWrap}>
-                  <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.viralAnalysisTitle}>{getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image' ? '상위 1% 수익화 이미지 분석' : '상위 1% 수익화 영상 분석'}</Text>
-                  <Text style={styles.viralAnalysisSub}>
-                    {UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label ?? ''} ·{' '}
-                    {PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard)?.label ?? ''} 게시판
-                  </Text>
-                </View>
-              </View>
-
-              {viralAnalyzing ? (
-                <View style={styles.viralLoadingWrap}>
-                  <Loader size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.viralLoadingText}>연결 링크 크롤링 · 상위 1% 영상 패턴 분석 중...</Text>
-                </View>
-              ) : viralAnalysisResult ? (
-                <View style={styles.viralResultWrap}>
-                  <View style={styles.viralSpecRow}>
-                    <View style={styles.viralSpecChip}>
-                      <Text style={styles.viralSpecLabel}>화면비</Text>
-                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.ratio}</Text>
-                    </View>
-                    <View style={styles.viralSpecChip}>
-                      <Text style={styles.viralSpecLabel}>해상도</Text>
-                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.resolution}</Text>
-                    </View>
-                    <View style={styles.viralSpecChip}>
-                      <Text style={styles.viralSpecLabel}>최대 길이</Text>
-                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.maxDuration}</Text>
-                    </View>
-                    <View style={styles.viralSpecChip}>
-                      <Text style={styles.viralSpecLabel}>포맷</Text>
-                      <Text style={styles.viralSpecValue}>{viralAnalysisResult.specs.format}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.viralRefBox}>
-                    <Text style={styles.viralRefTitle}>참조: {viralAnalysisResult.topReference.title}</Text>
-                    <View style={styles.viralRefStats}>
-                      <View style={styles.viralRefStat}>
-                        <Text style={styles.viralRefStatValue}>{viralAnalysisResult.topReference.views}</Text>
-                        <Text style={styles.viralRefStatLabel}>조회수</Text>
-                      </View>
-                      <View style={styles.viralRefDivider} />
-                      <View style={styles.viralRefStat}>
-                        <Text style={styles.viralRefStatValue}>{viralAnalysisResult.topReference.revenue}</Text>
-                        <Text style={styles.viralRefStatLabel}>예상 수익</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <Text style={styles.viralHooksLabel}>플랫폼 심리 분석 결과</Text>
-                  {viralAnalysisResult.platformPsychology && (
-                    <View style={styles.viralHookRow}>
-                      <View style={[styles.viralHookNumber, { backgroundColor: theme.colors.warning[500] }]}>
-                        <Text style={styles.viralHookNumberText}>★</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.viralHookTitle}>시선 패턴: {viralAnalysisResult.platformPsychology.attentionPattern}</Text>
-                        <Text style={styles.viralHookDesc}>핵심 드라이브: {viralAnalysisResult.platformPsychology.primaryDrive} · 평균 시청 {viralAnalysisResult.platformPsychology.avgWatchTime} · 최적 후크 {viralAnalysisResult.platformPsychology.optimalHookSec}초</Text>
-                      </View>
-                    </View>
-                  )}
-                  {viralAnalysisResult.psychologicalTriggers.map((trigger, i) => (
-                    <View key={i} style={styles.viralHookRow}>
-                      <View style={styles.viralHookNumber}>
-                        <Text style={styles.viralHookNumberText}>{i + 1}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.viralHookTitle}>{trigger.name}</Text>
-                        <Text style={styles.viralHookDesc}>{trigger.description}</Text>
-                      </View>
-                    </View>
-                  ))}
-
-                  <View style={styles.viralPreviewBtnWrap}>
-                    <TouchableOpacity
-                      style={styles.viralPreviewBtn}
-                      onPress={() => {
-                        if (!viralAnalysisResult) return;
-                        setVideoPreviewGenerating(true);
-                        setVideoPreviewScenes(null);
-                        setVideoRenderComplete(false);
-                        setPreviewMediaMode(viralAnalysisResult.mediaMode);
-                        videoPreviewProgress.value = 0;
-                        videoPreviewProgress.value = withTiming(1, {
-                          duration: 2200,
-                          easing: Easing.inOut(Easing.ease),
-                        });
-                        setExpandedStep('analyze');
-                        setTimeout(() => {
-                          setVideoPreviewScenes(viralAnalysisResult.scenes);
-                          setVideoPreviewGenerating(false);
-                        }, 2200);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      {videoPreviewGenerating ? (
-                        <Loader size={16} color="#fff" strokeWidth={2} />
-                      ) : (
-                        <ScanSearch size={16} color="#fff" strokeWidth={2} />
-                      )}
-                      <Text style={styles.viralPreviewBtnText}>
-                        {videoPreviewGenerating
-                          ? (viralAnalysisResult.mediaMode === 'image' ? '이미지 생성 중...' : '미리보기 생성 중...')
-                          : (viralAnalysisResult.mediaMode === 'image' ? '분석 이미지 미리보기 생성하기' : '분석 영상 미리보기 생성하기')}
-                      </Text>
-                      <ArrowRight size={14} color="#fff" strokeWidth={2} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.viralStartBtn}
-                  onPress={() => {
-                    setViralAnalyzing(true);
-                    const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                    setPreviewMediaMode(boardMedia);
-                    setTimeout(() => {
-                      setViralAnalyzing(false);
-                      setViralAnalysisResult(
-                        generatePsychAnalysis(
-                          selectedUploadPlatform,
-                          selectedBoard,
-                          affiliateUrl,
-                          undefined,
-                          {
-                            productName: productMeta?.productName,
-                            price: productMeta?.price,
-                            brand: productMeta?.brand,
-                            description: productMeta?.description,
-                          },
-                        ),
-                      );
-                    }, 1800);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                  <Text style={styles.viralStartBtnText}>
-                    {getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image' ? '심리 자극 이미지 분석 시작' : '심리 자극 영상 분석 시작'}
-                  </Text>
-                  <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </PillNavCard>
-
-        {/* STEP 3: Content & Template Editing */}
-        <View
-          ref={(ref) => { stepRefs.current[3] = ref; }}
-          collapsable={false}
-        />
-        <PillNavCard
-          icon={<Palette size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
-          title="콘텐츠 및 템플릿 편집"
-          subtitle={previewMediaMode === 'image' ? 'AI 자동 추천 · 스타일·해시태그 설정 · 이미지용 문구 입력' : 'AI 자동 추천 · 스타일·음성·해시태그 설정 · 문구 입력'}
-          accentColor={theme.colors.warning[400]}
-          iconBg={theme.colors.warning[500] + '22'}
-          stepNumber={3}
-          completed={completedSteps.has('content')}
-          expanded={expandedStep === 'content'}
-          onToggle={() => setExpandedStep(expandedStep === 'content' ? null : 'content')}
-        >
-          {/* AI one-tap auto-recommend button */}
-          {lastScanId && completedSteps.has('analyze') && (
-            <TouchableOpacity
-              style={styles.aiOneTapBtn}
-              onPress={() => router.push({ pathname: '/result/[id]', params: { id: lastScanId } })}
-              activeOpacity={0.85}
-            >
+          {/* Auto-edit button */}
+          <TouchableOpacity
+            style={[styles.aiOneTapBtn, autoEditing && { opacity: 0.7 }]}
+            onPress={handleAutoEdit}
+            disabled={autoEditing}
+            activeOpacity={0.85}
+          >
+            {autoEditing ? (
+              <Loader size={20} color="#fff" strokeWidth={2} />
+            ) : (
               <Sparkles size={20} color="#fff" strokeWidth={2} />
-              <View style={styles.aiOneTapTextWrap}>
-                <Text style={styles.aiOneTapBtnTitle}>AI 자동 추천으로 바로 만들기</Text>
-                <Text style={styles.aiOneTapBtnSub}>
-                  {aiBundle
-                    ? aiBundle.summary
-                    : 'AI가 최적의 스타일·음성·해시태그를 자동으로 설정했어요'}
-                </Text>
-              </View>
+            )}
+            <View style={styles.aiOneTapTextWrap}>
+              <Text style={styles.aiOneTapBtnTitle}>
+                {autoEditing ? autoEditStep : 'AI 자동 편집 실행'}
+              </Text>
+              <Text style={styles.aiOneTapBtnSub}>
+                {autoEditing ? '잠시만 기다려주세요...' : '클릭 한 번으로 모든 편집이 자동 완료됩니다'}
+              </Text>
+            </View>
+            {!autoEditing && (
               <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-            </TouchableOpacity>
-          )}
-
-          {/* ── Sub-accordion: ① 원소재 선택 ── */}
-          <TouchableOpacity
-            style={styles.subAccordionHeader}
-            onPress={() => setContentSubStep(contentSubStep === 0 ? null : 0)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.subAccordionLeft}>
-              <View style={[styles.subAccordionNum, contentSubStep === 0 && styles.subAccordionNumActive]}>
-                <Text style={[styles.subAccordionNumText, contentSubStep === 0 && styles.subAccordionNumTextActive]}>1</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>소재 선택</Text>
-                <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {previewMediaMode === 'video'
-                    ? stockVideoClip ? 'Pexels 영상 선택됨' : '가로 스크롤로 무료 영상을 선택하세요'
-                    : stockVideoClip ? 'Pexels 이미지 선택됨' : '가로 스크롤로 무료 이미지를 선택하세요'}
-                </Text>
-              </View>
-            </View>
-            {contentSubStep === 0 ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
             )}
           </TouchableOpacity>
 
-          {contentSubStep === 0 && (
-            <View style={styles.subAccordionBody}>
-              {previewMediaMode === 'video' && (
-                <>
-                  <StockVideoPicker
-                    productName={productMeta?.productName}
-                    productCategory={undefined}
-                    mediaType="video"
-                    orientation={(() => {
-                      const specs = selectedUploadPlatform && selectedBoard
-                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                        : null;
-                      if (!specs) return 'portrait';
-                      return specs.ratio.includes('9:16') ? 'portrait'
-                        : specs.ratio.includes('16:9') ? 'landscape'
-                        : 'square';
-                    })()}
-                    selectedClip={stockVideoClip}
-                    onSelectClip={setStockVideoClip}
-                  />
-
-                  {stockVideoClip && (
-                    <View style={styles.subStepHintBox}>
-                      <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                      <Text style={styles.subStepHintText}>영상이 선택되었습니다.</Text>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {previewMediaMode === 'image' && (
-                <>
-                  <StockVideoPicker
-                    productName={productMeta?.productName}
-                    productCategory={undefined}
-                    mediaType="image"
-                    orientation={(() => {
-                      const specs = selectedUploadPlatform && selectedBoard
-                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                        : null;
-                      if (!specs) return 'portrait';
-                      return specs.ratio.includes('9:16') ? 'portrait'
-                        : specs.ratio.includes('16:9') ? 'landscape'
-                        : 'square';
-                    })()}
-                    selectedClip={stockVideoClip}
-                    onSelectClip={setStockVideoClip}
-                  />
-
-                  {stockVideoClip ? (
-                    <View style={styles.subStepHintBox}>
-                      <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                      <Text style={styles.subStepHintText}>이미지가 선택되었습니다. AI 자동 추천 버튼을 누르면 스타일까지 한 번에 적용됩니다.</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.subStepHintBox}>
-                      <ImageIcon size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.subStepHintText}>
-                        제품과 관련된 무료 이미지를 검색하여 선택하거나, AI 분석 후 자동으로 이미지가 사용됩니다.
-                      </Text>
-                    </View>
-                  )}
-                </>
-              )}
-
-              <TouchableOpacity
-                style={styles.subNextBtn}
-                onPress={() => setContentSubStep(1)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.subNextBtnText}>다음: 스타일 및 문구</Text>
-                <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ── Sub-accordion: ② 스타일 & 카피 설정 ── */}
-          <TouchableOpacity
-            style={styles.subAccordionHeader}
-            onPress={() => setContentSubStep(contentSubStep === 1 ? null : 1)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.subAccordionLeft}>
-              <View style={[styles.subAccordionNum, contentSubStep === 1 && styles.subAccordionNumActive]}>
-                <Text style={[styles.subAccordionNumText, contentSubStep === 1 && styles.subAccordionNumTextActive]}>2</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>편집 길이 및 스타일</Text>
-                <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {videoEditPlan ? `${videoEditPlan.duration}초 편집 계획 적용됨` : '15초/30초 중 선택하세요'}
-                </Text>
-              </View>
-            </View>
-            {contentSubStep === 1 ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-
-          {contentSubStep === 1 && (
-            <View style={styles.subAccordionBody}>
-              {previewMediaMode === 'video' && (
-                <VideoEditPlanCard
-                  productName={productMeta?.productName}
-                  productCategory={undefined}
-                  platform={selectedUploadPlatform || undefined}
-                  accentColor={undefined}
-                  hook={undefined}
-                  oneLiner={undefined}
-                  hasVideoSelected={stockVideoClip !== null}
-                  onPlanGenerated={setVideoEditPlan}
-                  hideCopyVariants
-                />
-              )}
-
-              {/* Collapsible custom options */}
-              <TouchableOpacity
-                style={styles.customToggle}
-                onPress={() => setSimpleMode(!simpleMode)}
-                activeOpacity={0.7}
-              >
-                <SettingsIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={styles.customToggleText}>
-                  {simpleMode ? '직접 스타일 선택하기' : '접기'}
-                </Text>
-                {simpleMode ? (
-                  <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                ) : (
-                  <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-
-              {!simpleMode && (
-                <>
-                  {/* AI Recommendation badge */}
-                  {aiRecommendation && (
-                    <View style={styles.aiRecommendCard}>
-                      <Sparkles size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                      <View style={styles.aiRecommendCardBody}>
-                        <Text style={styles.aiRecommendCardTitle}>AI 추천 스타일</Text>
-                        <Text style={styles.aiRecommendCardDesc}>
-                          이 상품 사진에는 '{aiRecommendation}'이(가) 가장 잘 어울립니다. 아래 버튼을 누르면 바로 적용됩니다.
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.aiRecommendApplyBtn}
-                        onPress={() => {
-                          const match = TEMPLATE_STYLES.find((t) => aiRecommendation?.includes(t.label));
-                          if (match) setSelectedTemplate(match.key);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Check size={14} color="#fff" strokeWidth={2.5} />
-                        <Text style={styles.aiRecommendApplyBtnText}>적용</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Template style selection */}
-                  <Text style={styles.sectionLabel}>템플릿 스타일</Text>
-                  <View style={styles.templateRow}>
-                {TEMPLATE_STYLES
-                  .filter((t) => {
-                    const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                    if (t.mediaType === 'both') return true;
-                    return t.mediaType === boardMedia;
-                  })
-                  .map((t) => {
-                  const Icon = t.icon;
-                  const isActive = selectedTemplate === t.key;
-                  const isRecommended = aiRecommendation?.includes(t.label);
-                  return (
-                    <TouchableOpacity
-                      key={t.key}
-                      style={[styles.templateChip, isActive && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' }]}
-                      onPress={() => setSelectedTemplate(t.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Icon size={16} color={isActive ? theme.colors.warning[400] : theme.colors.dark.textDim} strokeWidth={2} />
-                      <View style={styles.templateTextWrap}>
-                        <Text style={[styles.templateChipLabel, isActive && { color: theme.colors.warning[400] }]}>{t.label}</Text>
-                        <Text style={styles.templateChipDesc}>{t.desc}</Text>
-                      </View>
-                      {isRecommended && (
-                        <View style={styles.recommendBadge}>
-                          <Sparkles size={9} color="#fff" strokeWidth={2.5} />
-                          <Text style={styles.recommendBadgeText}>추천</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-                  {/* Content type selection */}
-                  <Text style={styles.sectionLabel}>콘텐츠 유형</Text>
-                  <View style={styles.contentTypeRow}>
-                    {CONTENT_TYPES.map((t) => {
-                      const Icon = t.icon;
-                      const isActive = contentType === t.key;
-                      return (
-                        <TouchableOpacity
-                          key={t.key}
-                          style={[styles.contentTypeChip, isActive && { borderColor: t.color, backgroundColor: t.color + '15' }]}
-                          onPress={() => setContentType(t.key)}
-                          activeOpacity={0.7}
-                        >
-                          <Icon size={14} color={t.color} strokeWidth={2} />
-                          <Text style={[styles.contentTypeText, isActive && { color: t.color }]}>{t.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={styles.contentHint}>
-                    {(() => {
-                      const ct = CONTENT_TYPES.find((t) => t.key === contentType);
-                      if (!ct) return '';
-                      const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                      return boardMedia === 'image' ? ct.hintImage : ct.hintVideo;
-                    })()}
-                  </Text>
-                </>
-              )}
-
-              {/* TTS Voice Picker — collapsed by default to reduce cognitive overload */}
-              <TouchableOpacity
-                style={styles.customToggle}
-                onPress={() => setShowVoicePicker(!showVoicePicker)}
-                activeOpacity={0.7}
-              >
-                <Music2 size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={styles.customToggleText}>
-                  {showVoicePicker ? '성우 선택 접기' : '성우 선택 펼치기'}
-                </Text>
-                {showVoicePicker ? (
-                  <ChevronUp size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                ) : (
-                  <ChevronDown size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-
-              {showVoicePicker && (
-                <>
-              {recommendedVoiceKey && (
-                <View style={styles.voiceRecommendBadge}>
-                  <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                  <Text style={styles.voiceRecommendText}>
-                    AI 추천: {TTS_VOICES.find((v) => v.key === recommendedVoiceKey)?.label ?? ''}
-                  </Text>
-                  {selectedVoiceKey !== recommendedVoiceKey && (
-                    <TouchableOpacity
-                      style={styles.voiceRecommendApplyBtn}
-                      onPress={() => setSelectedVoiceKey(recommendedVoiceKey)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.voiceRecommendApplyBtnText}>적용</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-
-              {/* Category filter chips */}
-              <View style={styles.voiceCategoryRow}>
-                <TouchableOpacity
-                  style={[styles.voiceCategoryChip, voiceCategoryFilter === 'all' && styles.voiceCategoryChipActive]}
-                  onPress={() => setVoiceCategoryFilter('all')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.voiceCategoryChipText, voiceCategoryFilter === 'all' && styles.voiceCategoryChipTextActive]}>전체</Text>
-                </TouchableOpacity>
-                {(Object.keys(VOICE_CATEGORIES) as VoiceCategory[]).map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.voiceCategoryChip, voiceCategoryFilter === cat && styles.voiceCategoryChipActive]}
-                    onPress={() => setVoiceCategoryFilter(cat)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.voiceCategoryChipText, voiceCategoryFilter === cat && styles.voiceCategoryChipTextActive]}>
-                      {VOICE_CATEGORIES[cat].label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Voice list */}
-              <View style={styles.voiceList}>
-                {TTS_VOICES
-                  .filter((v) => voiceCategoryFilter === 'all' || v.category === voiceCategoryFilter)
-                  .map((v) => {
-                    const isSelected = selectedVoiceKey === v.key;
-                    const isRecommended = recommendedVoiceKey === v.key;
-                    return (
-                      <TouchableOpacity
-                        key={v.key}
-                        style={[
-                          styles.voiceChip,
-                          isSelected && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' },
-                        ]}
-                        onPress={() => setSelectedVoiceKey(v.key)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.voiceChipLeft}>
-                          <Text style={[styles.voiceChipLabel, isSelected && { color: theme.colors.warning[400] }]}>{v.label}</Text>
-                          <Text style={styles.voiceChipDesc}>{v.desc}</Text>
-                        </View>
-                        {isRecommended && (
-                          <View style={styles.recommendBadge}>
-                            <Sparkles size={9} color="#fff" strokeWidth={2.5} />
-                            <Text style={styles.recommendBadgeText}>추천</Text>
-                          </View>
-                        )}
-                        {isSelected && !isRecommended && (
-                          <Check size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-                </>
-              )}
-
-              {!showVoicePicker && selectedVoiceKey && (
-                <View style={styles.subStepHintBox}>
-                  <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={styles.subStepHintText}>
-                    선택된 성우: {TTS_VOICES.find((v) => v.key === selectedVoiceKey)?.label ?? ''}
-                  </Text>
-                </View>
-              )}
-
-              {!showVoicePicker && !selectedVoiceKey && recommendedVoiceKey && (
-                <View style={styles.subStepHintBox}>
-                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.subStepHintText}>
-                    AI 추천 성우: {TTS_VOICES.find((v) => v.key === recommendedVoiceKey)?.label ?? ''} · 펼치면 직접 선택 가능
-                  </Text>
-                </View>
-              )}
-
-              <TextInput
-                value={contentText}
-                onChangeText={setContentText}
-                placeholder={(() => {
-                  const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-                  if (simpleMode) {
-                    return boardMedia === 'image'
-                      ? "이미지에 넣을 마케팅 문구를 자유롭게 적어보세요..."
-                      : "영상에 넣을 마케팅 문구를 자유롭게 적어보세요...";
-                  }
-                  return boardMedia === 'image'
-                    ? "여기에 이미지용 마케팅 문구를 입력하세요..."
-                    : "여기에 영상용 마케팅 문구를 입력하세요...";
-                })()}
-                placeholderTextColor={theme.colors.dark.textFaint}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
+          {/* Render progress */}
+          {videoRendering && (
+            <View style={styles.renderProgressBarWrap}>
+              <Animated.View
+                style={[styles.renderProgressBarFill, animatedRenderStyle]}
               />
-
-              <View style={styles.contentActionRow}>
-                <TouchableOpacity
-                  style={[styles.contentSaveBtn, contentSaving && styles.contentSaveBtnDisabled]}
-                  onPress={handleSaveContent}
-                  activeOpacity={0.7}
-                  disabled={!contentText.trim() || contentSaving}
-                >
-                  {contentSaving ? (
-                    <Loader size={16} color="#fff" strokeWidth={2} />
-                  ) : contentSaveSuccess ? (
-                    <Check size={16} color="#fff" strokeWidth={2.5} />
-                  ) : (
-                    <Check size={16} color="#fff" strokeWidth={2} />
-                  )}
-                  <Text style={styles.contentSaveBtnText}>
-                    {contentSaving ? '저장 중...' : contentSaveSuccess ? '저장됨' : '소재 저장'}
-                  </Text>
-                </TouchableOpacity>
-
-                {contentSaveError && (
-                  <Text style={{ fontSize: 11, color: theme.colors.error[400], marginTop: 4, fontFamily: theme.typography.fontFamily.regular }}>
-                    {contentSaveError}
-                  </Text>
-                )}
-
-                <TouchableOpacity
-                  style={styles.contentTemplateBtn}
-                  onPress={() => router.push('/affiliate/assets')}
-                  activeOpacity={0.7}
-                >
-                  <FileText size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={styles.contentTemplateBtnText}>보관함 보기</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.subNextBtn, { marginTop: 8 }]}
-                onPress={() => setContentSubStep(2)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.subNextBtnText}>다음: 카피 및 발행</Text>
-                <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-              </TouchableOpacity>
             </View>
           )}
 
-          {/* ── Sub-accordion: ③ 최종 확인 ── */}
-          <TouchableOpacity
-            style={styles.subAccordionHeader}
-            onPress={() => setContentSubStep(contentSubStep === 2 ? null : 2)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.subAccordionLeft}>
-              <View style={[styles.subAccordionNum, contentSubStep === 2 && styles.subAccordionNumActive]}>
-                <Text style={[styles.subAccordionNumText, contentSubStep === 2 && styles.subAccordionNumTextActive]}>3</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>카피 및 발행</Text>
-                <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {contentText.trim() ? 'A/B 카피 입력됨 · 플랫폼 선택 후 발행' : '카피 변형과 발행 플랫폼을 확인하세요'}
-                </Text>
-              </View>
-            </View>
-            {contentSubStep === 2 ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-
-          {contentSubStep === 2 && (
-            <View style={styles.subAccordionBody}>
-              <View style={styles.subSummaryBox}>
-                <View style={styles.subSummaryRow}>
-                  <Text style={styles.subSummaryLabel}>템플릿</Text>
-                  <Text style={styles.subSummaryValue}>
-                    {TEMPLATE_STYLES.find((t) => t.key === selectedTemplate)?.label || '미선택'}
-                  </Text>
-                </View>
-                <View style={styles.subSummaryRow}>
-                  <Text style={styles.subSummaryLabel}>콘텐츠 유형</Text>
-                  <Text style={styles.subSummaryValue}>
-                    {CONTENT_TYPES.find((t) => t.key === contentType)?.label || '미선택'}
-                  </Text>
-                </View>
-                <View style={styles.subSummaryRow}>
-                  <Text style={styles.subSummaryLabel}>TTS 성우</Text>
-                  <Text style={styles.subSummaryValue}>
-                    {TTS_VOICES.find((v) => v.key === selectedVoiceKey)?.label || '미선택'}
-                  </Text>
-                </View>
-                {previewMediaMode === 'video' && (
-                  <View style={styles.subSummaryRow}>
-                    <Text style={styles.subSummaryLabel}>원본 영상</Text>
-                    <Text style={styles.subSummaryValue}>
-                      {stockVideoClip ? '선택됨' : '미선택'}
-                    </Text>
-                  </View>
-                )}
-                {previewMediaMode === 'video' && videoEditPlan && (
-                  <View style={styles.subSummaryRow}>
-                    <Text style={styles.subSummaryLabel}>편집 계획</Text>
-                    <Text style={styles.subSummaryValue}>
-                      {videoEditPlan.duration}초 · {videoEditPlan.segments.length}컷
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.subSummaryRow}>
-                  <Text style={styles.subSummaryLabel}>마케팅 문구</Text>
-                  <Text style={styles.subSummaryValue} numberOfLines={2}>
-                    {contentText.trim() ? contentText.trim() : '미입력'}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.subFinishBtn}
-                onPress={() => {
-                  setContentSubStep(null);
-                  setExpandedStep('upload');
-                  setTimeout(() => stepRefs.current[5]?.measureInWindow((x, y) => {
-                    if (typeof window !== 'undefined') window.scrollTo({ top: y, behavior: 'smooth' });
-                  }), 100);
-                }}
-                activeOpacity={0.8}
-              >
-                <PenLine size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.subFinishBtnText}>플랫폼 선택 후 발행으로 이동</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </PillNavCard>
-
-        {/* STEP 4: AI Analysis & Image */}
-        <View
-          ref={(ref) => { stepRefs.current[4] = ref; }}
-          collapsable={false}
-        />
-        <PillNavCard
-          icon={<ScanSearch size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title={previewMediaMode === 'image' ? '분석 이미지 미리보기' : '분석 영상 미리보기'}
-          subtitle={previewMediaMode === 'image' ? '상위 1% 수익화 이미지 분석 · 심리 자극 요소 추출 · 미리보기 생성' : '상위 1% 수익화 영상 분석 · 심리 자극 요소 추출 · 미리보기 생성'}
-          accentColor={theme.colors.success[400]}
-          iconBg={theme.colors.success[500] + '22'}
-          stepNumber={4}
-          completed={completedSteps.has('analyze')}
-          expanded={expandedStep === 'analyze'}
-          onToggle={() => setExpandedStep(expandedStep === 'analyze' ? null : 'analyze')}
-        >
-          {/* Video preview area */}
-          <View style={styles.videoPreviewWrap}>
-            {imagePreviewUri ? (
-              <Image
-                source={{ uri: imagePreviewUri }}
-                style={styles.videoPreviewThumb}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.videoPreviewPlaceholderBg} />
-            )}
-
-            <View style={styles.videoPreviewOverlay}>
-              {videoPreviewGenerating ? (
-                <View style={styles.videoPreviewGenWrap}>
-                  <Loader size={28} color="#fff" strokeWidth={2} />
-                  <Text style={styles.videoPreviewGenText}>
-                    {previewMediaMode === 'image'
-                      ? '심리 자극 요소 기반 이미지 스토리보드 생성 중...'
-                      : '심리 자극 요소 기반 스토리보드 생성 중...'}
-                  </Text>
-                </View>
-              ) : videoRendering ? (
-                <View style={styles.videoPreviewGenWrap}>
-                  <Loader size={28} color="#fff" strokeWidth={2} />
-                  <Text style={styles.videoPreviewGenText}>
-                    {previewMediaMode === 'image' ? '스토리보드 기반 이미지 렌더링 중...' : '스토리보드 기반 영상 렌더링 중...'}
-                  </Text>
-                </View>
-              ) : videoRenderComplete && renderedVideoUrl ? (
-                <View style={styles.videoSceneWrap}>
-                  {previewMediaMode === 'video' ? (
-                    // @ts-ignore web-only video element
-                    <video
-                      src={renderedVideoUrl}
-                      controls
-                      autoPlay
-                      loop
-                      style={{ width: '100%', maxHeight: 300, borderRadius: 12, backgroundColor: '#000' }}
-                    />
-                  ) : (
-                    <Image
-                      source={{ uri: renderedVideoUrl }}
-                      style={{ width: '100%', maxHeight: 300, borderRadius: 12, backgroundColor: '#000' }}
-                      resizeMode="contain"
-                    />
-                  )}
-                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료 · 재생 가능'}</Text>
-                </View>
-              ) : videoRenderComplete ? (
-                <View style={styles.videoSceneWrap}>
-                  {previewMediaMode === 'image'
-                    ? <ImageIcon size={28} color="#fff" strokeWidth={2} />
-                    : <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />}
-                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료'}</Text>
-                </View>
-              ) : videoPreviewScenes ? (
-                <View style={styles.videoSceneWrap}>
-                  <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 스토리보드 미리보기' : '스토리보드 미리보기'}</Text>
-                </View>
-              ) : imagePreviewUri ? (
-                <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85} onPress={() => scrollToStep(2)}>
-                  {previewMediaMode === 'image'
-                    ? <ImageIcon size={28} color="#fff" strokeWidth={2} />
-                    : <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />}
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.videoPreviewEmptyInline}>
-                  {previewMediaMode === 'image'
-                    ? <ImageIcon size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />
-                    : <Clapperboard size={28} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />}
-                  <Text style={styles.videoPreviewEmptyInlineText}>
-                    {previewMediaMode === 'image'
-                      ? '미리보기 생성 버튼을 눌러 이미지 스토리보드를 만들어보세요'
-                      : '미리보기 생성 버튼을 눌러 영상 스토리보드를 만들어보세요'}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.videoSpecBadge}>
-              {previewMediaMode === 'image'
-                ? <ImageIcon size={11} color="#fff" strokeWidth={2} />
-                : <Clapperboard size={11} color="#fff" strokeWidth={2} />}
-              <Text style={styles.videoSpecBadgeText}>
-                {viralAnalysisResult
-                  ? `${viralAnalysisResult.specs.ratio} · ${viralAnalysisResult.specs.maxDuration}`
-                  : selectedUploadPlatform && selectedBoard
-                    ? `${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.ratio ?? '16:9'} · ${BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]?.maxDuration ?? '60초'}`
-                    : '9:16 · 60초'}
-              </Text>
-            </View>
-
-            {previewMediaMode === 'video' && (
-              <>
-                <View style={styles.videoTimelineBar}>
-                  <Animated.View
-                    style={[styles.videoTimelineProgress, animatedProgressStyle]}
-                  />
-                </View>
-                <View style={styles.videoTimelineLabels}>
-                  <Text style={styles.videoTimelineLabel}>0:00</Text>
-                  <Text style={styles.videoTimelineLabel}>
-                    {viralAnalysisResult?.specs.maxDuration ?? '0:60'}
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* Storyboard scenes from viral hooks */}
-          {videoPreviewScenes && videoPreviewScenes.length > 0 && (
+          {/* Storyboard preview while rendering */}
+          {videoPreviewScenes && videoPreviewScenes.length > 0 && !videoRenderComplete && (
             <View style={styles.videoStoryboardWrap}>
-              <Text style={styles.videoStoryboardTitle}>
-                {previewMediaMode === 'image' ? '심리 자극 요소 기반 이미지 스토리보드' : '심리 자극 요소 기반 스토리보드'}
-              </Text>
-              <Text style={styles.videoStoryboardDesc}>
-                {previewMediaMode === 'image'
-                  ? '상위 1% 수익화 이미지 패턴을 적용한 장면 구성'
-                  : '상위 1% 수익화 영상 패턴을 적용한 장면 구성'}
-              </Text>
-
-              {autoDisclosure && disclosureText ? (
-                <View style={styles.storyboardDisclosureBadge}>
-                  <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
-                    공정위 제휴 문구 자동 삽입: {disclosureText}
-                  </Text>
-                </View>
-              ) : null}
+              <Text style={styles.videoStoryboardTitle}>스토리보드</Text>
               {videoPreviewScenes.map((scene, i) => (
                 <View key={i} style={styles.videoSceneCard}>
                   <View style={[styles.videoSceneTimeBadge, { backgroundColor: scene.colorTheme.primary }]}>
@@ -2976,659 +2064,151 @@ export default function AffiliateScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.videoSceneHookText}>{scene.textOverlay}</Text>
                     <Text style={styles.videoSceneDescText} numberOfLines={2}>{scene.subtext}</Text>
-                    <Text style={[styles.videoSceneDescText, { color: scene.colorTheme.accent, fontSize: 10, marginTop: 4 }]}>
-                      {scene.emotion} · {scene.motionType}
-                    </Text>
                   </View>
                   <View style={styles.videoSceneNumber}>
                     <Text style={styles.videoSceneNumberText}>{i + 1}</Text>
                   </View>
                 </View>
               ))}
-
-              {/* Multi-angle image upload for TV commercial style */}
-              {videoPreviewScenes && (
-                <View style={styles.multiImageSection}>
-                  <Text style={styles.multiImageTitle}>다각도 사진으로 TV광고풍 영상 만들기</Text>
-                  <Text style={styles.multiImageHint}>
-                    상품을 여러 각도에서 촬영한 사진을 업로드하면 각 장면에 맞춰 배정됩니다. 부족한 장면은 AI가 자동 생성합니다.
-                  </Text>
-                  <View style={styles.multiImageRow}>
-                    {multiImages.map((img, idx) => (
-                      <View key={idx} style={styles.multiImageThumb}>
-                        <Image source={{ uri: img.uri }} style={styles.multiImageThumbImg} resizeMode="cover" />
-                        <TouchableOpacity
-                          style={styles.multiImageRemoveBtn}
-                          onPress={() => handleRemoveMultiImage(idx)}
-                          activeOpacity={0.7}
-                        >
-                          <X size={12} color="#fff" strokeWidth={2.5} />
-                        </TouchableOpacity>
-                        <Text style={styles.multiImageLabel}>{idx + 1}번</Text>
-                      </View>
-                    ))}
-                    {multiImages.length < 4 && (
-                      <TouchableOpacity
-                        style={styles.multiImageAddBtn}
-                        onPress={handlePickFromGallery}
-                        disabled={mediaLoading}
-                        activeOpacity={0.85}
-                      >
-                        {mediaLoading ? (
-                          <Loader size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-                        ) : (
-                          <Plus size={20} color={theme.colors.accent[400]} strokeWidth={2} />
-                        )}
-                        <Text style={styles.multiImageAddText}>사진 추가</Text>
-                        <Text style={styles.multiImageAddSub}>{multiImages.length}/4</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {multiImages.length > 0 && multiImages.length < videoPreviewScenes.length && (
-                    <TouchableOpacity
-                      style={[styles.aiGenBtn, aiImageGenerating && styles.aiGenBtnDisabled]}
-                      onPress={handleGenerateAiSceneImages}
-                      disabled={aiImageGenerating}
-                      activeOpacity={0.85}
-                    >
-                      {aiImageGenerating ? (
-                        <Loader size={14} color="#fff" strokeWidth={2} />
-                      ) : (
-                        <Sparkles size={14} color="#fff" strokeWidth={2} />
-                      )}
-                      <Text style={styles.aiGenBtnText}>
-                        {aiImageGenerating ? 'AI가 장면 이미지 생성 중...' : `AI로 남은 ${videoPreviewScenes.length - multiImages.length}개 장면 이미지 생성`}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {aiSceneImages.length > 0 && (
-                    <View style={styles.aiSceneImagesRow}>
-                      <Text style={styles.aiSceneImagesLabel}>AI 생성 이미지 ({aiSceneImages.length})</Text>
-                      <View style={styles.aiSceneImagesThumbs}>
-                        {aiSceneImages.map((uri, idx) => (
-                          <View key={idx} style={styles.multiImageThumb}>
-                            <Image source={{ uri }} style={styles.multiImageThumbImg} resizeMode="cover" />
-                            <Text style={styles.multiImageLabel}>AI</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Render video from storyboard — two-tier: quick preview + high-quality */}
-              <View style={styles.renderBtnRow}>
-                <TouchableOpacity
-                  style={[styles.renderVideoBtn, { flex: 1, marginRight: 8 }, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
-                  onPress={() => {
-                    if (videoRendering || videoRenderComplete) return;
-                    generatePreviewVideo('preview');
-                  }}
-                  disabled={videoRendering || videoRenderComplete}
-                  activeOpacity={0.85}
-                >
-                  {videoRendering ? (
-                    <Loader size={16} color="#fff" strokeWidth={2} />
-                  ) : (
-                    previewMediaMode === 'image' ? <ImageIcon size={16} color="#fff" strokeWidth={2} /> : <Film size={16} color="#fff" strokeWidth={2} />
-                  )}
-                  <Text style={styles.renderVideoBtnText}>
-                    {videoRendering
-                      ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '빠른 미리보기 생성 중...')
-                      : (previewMediaMode === 'image' ? '빠른 이미지 미리보기' : '빠른 미리보기 (540p)')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.renderVideoBtn, { flex: 1, marginLeft: 8, backgroundColor: theme.colors.accent[500] }, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
-                  onPress={() => {
-                    if (videoRendering || videoRenderComplete) return;
-                    generatePreviewVideo('high');
-                  }}
-                  disabled={videoRendering || videoRenderComplete}
-                  activeOpacity={0.85}
-                >
-                  {videoRendering ? (
-                    <Loader size={16} color="#fff" strokeWidth={2} />
-                  ) : videoRenderComplete ? (
-                    <Check size={16} color="#fff" strokeWidth={2.5} />
-                  ) : (
-                    <Sparkles size={16} color="#fff" strokeWidth={2} />
-                  )}
-                  <Text style={styles.renderVideoBtnText}>
-                    {videoRendering
-                      ? (previewMediaMode === 'image' ? '이미지 렌더링 중...' : '고품질 렌더링 중...')
-                      : videoRenderComplete
-                        ? (previewMediaMode === 'image' ? '이미지 생성 완료' : '영상 생성 완료')
-                        : (previewMediaMode === 'image' ? '고품질 이미지 만들기' : '고품질 영상 만들기 (1080p)')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {videoRendering && (
-                <View style={styles.renderProgressBarWrap}>
-                  <Animated.View
-                    style={[styles.renderProgressBarFill, animatedRenderStyle]}
-                  />
-                </View>
-              )}
-
-              {videoRenderComplete && (
-                <View style={styles.renderCompleteBox}>
-                  <Text style={styles.renderCompleteText}>
-                    {previewMediaMode === 'image'
-                      ? `심리 자극 요소 ${videoPreviewScenes.length}개 요소가 적용된 이미지가 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`
-                      : `심리 자극 요소 ${videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`}
-                  </Text>
-                </View>
-              )}
-
-              {renderError && (
-                <View style={styles.renderCompleteBox}>
-                  <Text style={[styles.renderCompleteText, { color: theme.colors.error[400] }]}>
-                    {renderError}
-                  </Text>
-                </View>
-              )}
-
-              {renderedVideoUrl && videoRenderComplete && (
-                <View style={styles.renderedVideoWrap}>
-                  {previewMediaMode === 'video' ? (
-                    <>
-                      {/* @ts-ignore web-only video element */}
-                      <video
-                        src={renderedVideoUrl}
-                        controls
-                        autoPlay
-                        loop
-                        style={{
-                          width: '100%',
-                          maxHeight: 400,
-                          borderRadius: 12,
-                          backgroundColor: '#000',
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <Image
-                      source={{ uri: renderedVideoUrl }}
-                      style={{
-                        width: '100%',
-                        maxHeight: 400,
-                        borderRadius: 12,
-                        backgroundColor: '#000',
-                      }}
-                      resizeMode="contain"
-                    />
-                  )}
-                  <View style={styles.renderedVideoActions}>
-                    <TouchableOpacity
-                      style={styles.renderedDownloadBtn}
-                      onPress={handleSaveRenderedVideo}
-                      disabled={savingVideo}
-                      activeOpacity={0.7}
-                    >
-                      {savingVideo ? (
-                        <Loader size={15} color="#fff" strokeWidth={2} />
-                      ) : videoSaved ? (
-                        <Check size={15} color="#fff" strokeWidth={2.5} />
-                      ) : (
-                        <Download size={15} color="#fff" strokeWidth={2} />
-                      )}
-                      <Text style={styles.renderedDownloadBtnText}>
-                        {savingVideo ? '저장 중...' : videoSaved ? '갤러리에 저장됨' : '갤러리에 저장'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.renderedRegenBtn}
-                      onPress={() => {
-                        setRenderedVideoUrl(null);
-                        setVideoRenderComplete(false);
-                        renderProgress.value = 0;
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <RefreshCw size={15} color={theme.colors.dark.text} strokeWidth={2} />
-                      <Text style={styles.renderedRegenBtnText}>다시 생성</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
             </View>
           )}
 
-          {/* AI 분석 시작 */}
-          <TouchableOpacity
-            style={[styles.analyzeBtn, (!selectedImage && !affiliateUrl.trim()) && styles.analyzeBtnDisabled]}
-            onPress={() => {
-              if (selectedImage) {
-                handleAnalyzePhoto();
-              } else if (affiliateUrl.trim()) {
-                handlePickPhoto();
-              }
-            }}
-            disabled={analyzing || (!selectedImage && !affiliateUrl.trim())}
-            activeOpacity={0.85}
-          >
-            {analyzing ? (
-              <Loader size={18} color="#fff" strokeWidth={2} />
-            ) : (
-              <ScanSearch size={18} color="#fff" strokeWidth={2} />
-            )}
-            <Text style={styles.analyzeBtnText}>
-              {analyzing
-                ? 'AI 분석 중...'
-                : selectedImage
-                  ? 'AI 분석 시작하기'
-                  : affiliateUrl.trim()
-                    ? '상품 사진을 업로드하고 AI 분석 시작하기'
-                    : '제휴 링크를 먼저 연결해주세요'}
-            </Text>
-          </TouchableOpacity>
-
-          {analyzeError && (
-            <View style={styles.analyzeErrorBox}>
-              <Text style={styles.analyzeErrorText}>{analyzeError}</Text>
+          {/* Disclosure badge */}
+          {autoDisclosure && disclosureText && (
+            <View style={styles.storyboardDisclosureBadge}>
+              <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
+                공정위 제휴 문구 자동 삽입: {disclosureText}
+              </Text>
             </View>
           )}
 
-          {(completedSteps.has('analyze') || aiRecommendLoading) && (
-            aiRecommendLoading ? (
-              <View style={styles.aiRecommendBadge}>
-                <Loader size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.aiRecommendText}>AI가 최적의 스타일을 분석하는 중...</Text>
-              </View>
-            ) : aiBundle ? (
-              <View style={styles.aiRecommendBundleBox}>
-                <View style={styles.aiRecommendBadge}>
-                  <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.aiRecommendText}>
-                    AI 추천: {aiBundle.templateLabel} · {aiBundle.style.cardStyle} · {aiBundle.style.duration}초
-                  </Text>
-                </View>
-                <Text style={styles.aiRecommendDetail}>{aiBundle.summary}</Text>
-                <Text style={styles.aiRecommendReason}>{aiBundle.style.reason}</Text>
-              </View>
-            ) : aiRecommendation ? (
-              <View style={styles.aiRecommendBadge}>
-                <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.aiRecommendText}>
-                  AI 추천: 이 상품에는 '{aiRecommendation}' 스타일이 가장 잘 어울려요!
-                </Text>
-              </View>
-            ) : null
+          {renderError && (
+            <View style={styles.renderCompleteBox}>
+              <Text style={[styles.renderCompleteText, { color: theme.colors.error[400] }]}>
+                {renderError}
+              </Text>
+            </View>
           )}
         </PillNavCard>
 
-        {/* STEP 5: Platform Upload */}
+        {/* ─────────── STEP 3: 미리보기 및 갤러리 저장 ─────────── */}
         <View
-          ref={(ref) => { stepRefs.current[5] = ref; }}
+          ref={(ref) => { stepRefs.current[3] = ref; }}
           collapsable={false}
         />
         <PillNavCard
-          icon={<Share2 size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="최종 확인 후 업로드"
-          subtitle="생성 이미지 최종 확인·수정 · 게시판 연결 후 직접 업로드"
+          icon={<Download size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
+          title="미리보기 및 갤러리 저장"
+          subtitle="완성된 영상 확인 · 기기에 저장"
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
-          stepNumber={5}
-          completed={completedSteps.has('upload')}
-          expanded={expandedStep === 'upload'}
-          onToggle={() => setExpandedStep(expandedStep === 'upload' ? null : 'upload')}
+          stepNumber={3}
+          expanded={expandedStep === 'preview'}
+          completed={completedSteps.has('preview')}
+          onToggle={() => setExpandedStep(expandedStep === 'preview' ? null : 'preview')}
         >
-          {/* Link summary */}
-          {affiliateUrl.trim() ? (
-            <View style={styles.linkSummaryBox}>
-              <Link2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.linkSummaryText} numberOfLines={2}>{affiliateUrl}</Text>
-            </View>
-          ) : (
-            <View style={styles.linkEmptyBox}>
-              <Text style={styles.linkEmptyText}>1단계에서 제휴 링크를 먼저 입력해주세요</Text>
-            </View>
-          )}
-
-          {affiliateUrl.trim() && (
-            <ShortLinkCopyBar url={affiliateUrl.trim()} label="제휴 단축 링크" />
-          )}
-
-          <Text style={styles.uploadHint}>
-            {(() => {
-              const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
-              const platformLabel = selectedUploadPlatform
-                ? UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label
-                  || manualUploadPlatforms.find((mp) => mp.key === selectedUploadPlatform)?.label
-                  || ''
-                : '';
-              const boardLabel = selectedBoard
-                ? PLATFORM_BOARDS[selectedUploadPlatform!]?.find((b) => b.key === selectedBoard)?.label ?? ''
-                : '';
-              if (!selectedUploadPlatform) {
-                return '2단계에서 플랫폼과 게시판을 먼저 선택해주세요.';
-              }
-              return boardMedia === 'image'
-                ? `${platformLabel}${boardLabel ? ` · ${boardLabel}` : ''} 게시판에 업로드할 이미지를 불러와서 업로드하세요.`
-                : `${platformLabel}${boardLabel ? ` · ${boardLabel}` : ''} 게시판에 업로드할 영상을 불러와서 업로드하세요.`;
-            })()}
-          </Text>
-
-          {/* Media import section */}
-          {selectedUploadPlatform && (
-            <View style={styles.mediaImportSection}>
-              <TouchableOpacity
-                style={styles.mediaImportBtn}
-                onPress={handleImportMedia}
-                disabled={importing}
-                activeOpacity={0.7}
-              >
-                {importing ? (
-                  <Loader size={18} color="#fff" strokeWidth={2} />
-                ) : (
-                  <Download size={18} color="#fff" strokeWidth={2} />
-                )}
-                <Text style={styles.mediaImportBtnText}>
-                  {importing
-                    ? '불러오는 중...'
-                    : getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image'
-                      ? '이미지 불러오기'
-                      : '영상 불러오기'}
-                </Text>
-              </TouchableOpacity>
-
-              {importError && (
-                <Text style={styles.mediaImportError}>{importError}</Text>
-              )}
-
-              {importedMedia && (
-                <View style={styles.importedPreviewBox}>
-                  {importedMedia.type === 'video' ? (
-                    <View style={styles.importedVideoPlaceholder}>
-                      <Film size={32} color={theme.colors.success[400]} strokeWidth={2} />
-                      <Text style={styles.importedMediaName} numberOfLines={1}>{importedMedia.name}</Text>
-                      <Text style={styles.importedMediaTypeLabel}>동영상 파일</Text>
-                    </View>
-                  ) : (
-                    <Image
-                      source={{ uri: importedMedia.uri }}
-                      style={styles.importedImagePreview}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.importedActions}>
-                    <TouchableOpacity
-                      style={styles.importedOpenBtn}
-                      onPress={() => {
-                        if (!selectedUploadPlatform) return;
-                        handleOneTapCopyAndOpen(selectedUploadPlatform);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <ExternalLink size={14} color="#fff" strokeWidth={2} />
-                      <Text style={styles.importedOpenBtnText}>
-                        {selectedUploadPlatform
-                          ? `${UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label ?? ''} 열기`
-                          : '플랫폼 열기'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.importedRemoveBtn}
-                      onPress={() => setImportedMedia(null)}
-                      activeOpacity={0.7}
-                    >
-                      <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.importedRemoveBtnText}>취소</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Auto-disclosure toggle */}
-          <TouchableOpacity
-            style={styles.disclosureToggleRow}
-            onPress={() => setAutoDisclosure(!autoDisclosure)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.disclosureToggleInfo}>
-              <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
-              <View style={styles.disclosureToggleTextWrap}>
-                <Text style={styles.disclosureToggleTitle}>공정위 문구 자동 추가</Text>
-                <Text style={styles.disclosureToggleDesc}>
-                  업로드 시 제휴 문구가 자동으로 포함됩니다. 위치는 아래에서 선택하세요.
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.toggleSwitch, autoDisclosure && styles.toggleSwitchActive]}>
-              <View style={[styles.toggleKnob, autoDisclosure && styles.toggleKnobActive]} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Disclosure placement selector */}
-          {autoDisclosure && (
-            <View style={styles.disclosurePlacementRow}>
-              <TouchableOpacity
-                style={[styles.placementBtn, disclosurePlacement === 'body' && styles.placementBtnActive]}
-                onPress={() => setDisclosurePlacement('body')}
-                activeOpacity={0.7}
-              >
-                <FileText size={12} color={disclosurePlacement === 'body' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={[styles.placementBtnText, disclosurePlacement === 'body' && styles.placementBtnTextActive]}>본문에 포함</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.placementBtn, disclosurePlacement === 'comment' && styles.placementBtnActive]}
-                onPress={() => setDisclosurePlacement('comment')}
-                activeOpacity={0.7}
-              >
-                <MessageSquare size={12} color={disclosurePlacement === 'comment' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={[styles.placementBtnText, disclosurePlacement === 'comment' && styles.placementBtnTextActive]}>댓글로 복사</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Caption preview with disclosure */}
-          {autoDisclosure && disclosureText && (contentText || affiliateUrl).trim() && (
-            <View style={styles.captionPreviewBox}>
-              <Text style={styles.captionPreviewLabel}>기본 캡션 미리보기</Text>
-              {disclosurePlacement === 'body' && (
-                <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
-              )}
-              <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
-              <Text style={styles.captionPreviewContent}>
-                {contentText || (previewMediaMode === 'image' ? '이미지용 마케팅 문구를 입력하면 여기에 표시됩니다.' : '마케팅 문구를 입력하면 여기에 표시됩니다.')}
+          {!renderedVideoUrl && !videoRendering && (
+            <View style={styles.videoPreviewEmptyInline}>
+              <Clapperboard size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+              <Text style={styles.videoPreviewEmptyInlineText}>
+                2단계에서 AI 자동 편집을 실행하면 여기에 결과물이 표시됩니다
               </Text>
-              {affiliateUrl.trim() && (
-                <Text style={styles.captionPreviewLink}>{affiliateUrl.trim()}</Text>
-              )}
-              {disclosurePlacement === 'comment' && (
+            </View>
+          )}
+
+          {videoRendering && !renderedVideoUrl && (
+            <View style={styles.videoPreviewGenWrap}>
+              <Loader size={28} color="#fff" strokeWidth={2} />
+              <Text style={styles.videoPreviewGenText}>영상 렌더링 중...</Text>
+            </View>
+          )}
+
+          {renderedVideoUrl && videoRenderComplete && (
+            <View style={styles.renderedVideoWrap}>
+              {previewMediaMode === 'video' ? (
                 <>
-                  <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
-                  <Text style={styles.captionPreviewLabel}>댓글용 공정위 문구 (별도 복사)</Text>
-                  <Text style={styles.captionPreviewDisclosure}>{disclosureText}</Text>
+                  {/* @ts-ignore web-only video element */}
+                  <video
+                    src={renderedVideoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    style={{
+                      width: '100%',
+                      maxHeight: 400,
+                      borderRadius: 12,
+                      backgroundColor: '#000',
+                    }}
+                  />
                 </>
+              ) : (
+                <Image
+                  source={{ uri: renderedVideoUrl }}
+                  style={{
+                    width: '100%',
+                    maxHeight: 400,
+                    borderRadius: 12,
+                    backgroundColor: '#000',
+                  }}
+                  resizeMode="contain"
+                />
+              )}
+              <View style={styles.renderedVideoActions}>
+                <TouchableOpacity
+                  style={styles.renderedDownloadBtn}
+                  onPress={handleSaveRenderedVideo}
+                  disabled={savingVideo}
+                  activeOpacity={0.7}
+                >
+                  {savingVideo ? (
+                    <Loader size={15} color="#fff" strokeWidth={2} />
+                  ) : videoSaved ? (
+                    <Check size={15} color="#fff" strokeWidth={2.5} />
+                  ) : (
+                    <Download size={15} color="#fff" strokeWidth={2} />
+                  )}
+                  <Text style={styles.renderedDownloadBtnText}>
+                    {savingVideo ? '저장 중...' : videoSaved ? '갤러리에 저장됨' : '갤러리에 저장'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.renderedRegenBtn}
+                  onPress={() => {
+                    setRenderedVideoUrl(null);
+                    setVideoRenderComplete(false);
+                    setCompletedSteps((prev) => {
+                      const next = new Set(prev);
+                      next.delete('preview');
+                      next.delete('autoEdit');
+                      return next;
+                    });
+                    renderProgress.value = 0;
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <RefreshCw size={15} color={theme.colors.dark.text} strokeWidth={2} />
+                  <Text style={styles.renderedRegenBtnText}>다시 생성</Text>
+                </TouchableOpacity>
+              </View>
+
+              {videoSaved && (
+                <View style={styles.renderCompleteBox}>
+                  <Text style={styles.renderCompleteText}>
+                    갤러리에 저장되었습니다. 저장된 영상을 각 플랫폼에 직접 업로드하시면 됩니다.
+                  </Text>
+                </View>
               )}
             </View>
           )}
 
-          <View style={styles.uploadGrid}>
-            {UPLOAD_PLATFORMS.filter((p) => selectedUploadPlatform ? p.key === selectedUploadPlatform : true).map((p) => {
-              const Icon = p.icon;
-              const isUploaded = uploadedPlatforms.has(p.key);
-              const isActive = uploadPlatform === p.key;
-              const dl = getDeepLink(p.key as UploadPlatformKey);
-              const tmpl = getCaptionTemplate(p.key as UploadPlatformKey);
-              const built = buildPlatformCaption(
-                p.key as UploadPlatformKey,
-                contentText,
-                affiliateUrl,
-                selectedPlatform ? [selectedPlatform] : [],
-                autoDisclosure,
-                disclosurePlacement,
-              );
-              return (
-                <View key={p.key} style={[styles.uploadCardWrap, isActive && { borderColor: p.color }]}>
-                  <TouchableOpacity
-                    style={[styles.uploadCard, isUploaded && { borderColor: p.color, backgroundColor: p.color + '12' }]}
-                    onPress={() => handleUploadToPlatform(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.uploadIcon, { backgroundColor: p.color + '20' }]}>
-                      <Icon size={22} color={p.color} strokeWidth={2} />
-                    </View>
-                    <Text style={styles.uploadLabel}>{p.label}</Text>
-                    {isUploaded ? (
-                      <View style={[styles.uploadDoneBadge, { backgroundColor: p.color }]}>
-                        <Check size={10} color="#fff" strokeWidth={2.5} />
-                        <Text style={styles.uploadDoneText}>완료</Text>
-                      </View>
-                    ) : (
-                      <Text style={styles.uploadBtn}>업로드</Text>
-                    )}
-                  </TouchableOpacity>
-
-                  {/* One-Tap Copy & Open — copies full script to clipboard then opens the app */}
-                  <TouchableOpacity
-                    style={[styles.oneTapBtn, { backgroundColor: p.color + '15', borderColor: p.color + '60' }]}
-                    onPress={() => handleOneTapCopyAndOpen(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    {copyFeedback === p.key ? (
-                      <Check size={12} color={p.color} strokeWidth={2.5} />
-                    ) : (
-                      <Copy size={12} color={p.color} strokeWidth={2} />
-                    )}
-                    <Text style={[styles.oneTapBtnText, { color: p.color }]}>
-                      {copyFeedback === p.key ? '복사 완료! 앱 열기...' : '원탭 복사 & 앱 열기'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Deep link button — opens the platform app directly */}
-                  <TouchableOpacity
-                    style={[styles.deepLinkBtn, { borderColor: p.color + '40' }]}
-                    onPress={() => handleOpenDeepLink(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    <ExternalLink size={12} color={p.color} strokeWidth={2} />
-                    <Text style={[styles.deepLinkBtnText, { color: p.color }]}>
-                      {deepLinkFeedback === p.key ? '앱 여는 중...' : dl.label}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Caption style description */}
-                  <Text style={styles.captionStyleDesc}>{tmpl.captionStyle}</Text>
-
-                  {/* Platform-specific hashtags */}
-                  <Text style={styles.platformHashtags} numberOfLines={1}>
-                    {tmpl.hashtagSet.join(' ')}
-                  </Text>
-
-                  {/* Comment disclosure copy button — only when placement is 'comment' */}
-                  {disclosurePlacement === 'comment' && built.commentText && (
-                    <TouchableOpacity
-                      style={styles.commentCopyBtn}
-                      onPress={async () => {
-                        try {
-                          if (Platform.OS === 'web') {
-                            await navigator.clipboard.writeText(built.commentText);
-                          } else {
-                            const { default: Clipboard } = await import('expo-clipboard');
-                            await Clipboard.setStringAsync(built.commentText);
-                          }
-                        } catch {
-                          // clipboard failed
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <MessageSquare size={10} color={theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={styles.commentCopyText}>댓글용 문구 복사</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Mark as uploaded — manual tracking */}
-                  {!isUploaded && (
-                    <TouchableOpacity
-                      style={styles.markUploadedBtn}
-                      onPress={() => handleMarkUploaded(p.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
-                      <Text style={styles.markUploadedText}>업로드 완료로 표시</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Per-platform algorithm-aware caption optimizer */}
-          <Text style={styles.optimizerSectionTitle}>플랫폼별 최적화 캡션</Text>
-          <Text style={styles.optimizerSectionDesc}>
-            각 플랫폼에 맞춰 제목·본문·해시태그·공정위 문구를 자동 배치합니다. 섹션별 복사 가능.
-          </Text>
-          {UPLOAD_PLATFORMS.filter((p) => selectedUploadPlatform ? p.key === selectedUploadPlatform : true).map((p) => (
-            <PlatformCaptionOptimizer
-              key={p.key}
-              platformKey={p.key as UploadPlatformKey}
-              platformLabel={p.label}
-              platformColor={p.color}
-              contentText={contentText}
-              affiliateUrl={affiliateUrl}
-              disclosurePlatforms={selectedPlatform ? [selectedPlatform] : []}
-              autoDisclosure={autoDisclosure}
-              disclosurePlacement={disclosurePlacement}
-              isActive={uploadPlatform === p.key}
-              onCopy={handleCopyText}
-            />
-          ))}
-
-          {/* Upload checklist */}
-          {uploadedPlatforms.size > 0 && (
-            <View style={styles.uploadChecklistBox}>
-              <Text style={styles.uploadChecklistTitle}>업로드 체크리스트</Text>
-              {UPLOAD_PLATFORMS.filter((p) => uploadedPlatforms.has(p.key)).map((p) => {
-                const Icon = p.icon;
-                return (
-                  <View key={p.key} style={styles.checklistItem}>
-                    <View style={[styles.checklistIcon, { backgroundColor: p.color + '20' }]}>
-                      <Icon size={12} color={p.color} strokeWidth={2} />
-                    </View>
-                    <Text style={styles.checklistLabel}>{p.label}</Text>
-                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  </View>
-                );
-              })}
-              <Text style={styles.checklistHint}>
-                제작물 탭에서 해당 콘텐츠의 발행 상태가 '업로드 완료'로 표시됩니다.
-              </Text>
-            </View>
-          )}
-
-          {uploadPlatform && uploadedPlatforms.has(uploadPlatform) && (
-            <View style={styles.uploadSuccessBox}>
-              <Check size={16} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={styles.uploadSuccessText}>
-                {UPLOAD_PLATFORMS.find((p) => p.key === uploadPlatform)?.label}에 업로드가 완료되었습니다. 제휴 링크를 통해 수익이 발생하면 '분석' 탭에서 확인할 수 있습니다.
-            </Text>
+          {/* Short link copy bar */}
+          {affiliateUrl.trim() && renderedVideoUrl && (
+            <View style={{ marginTop: theme.spacing.md }}>
+              <ShortLinkCopyBar url={affiliateUrl.trim()} label="제휴 단축 링크" />
             </View>
           )}
         </PillNavCard>
-
-        {/* Global Localization — multilingual caption & TTS translation */}
-        {(contentText || productMeta?.productName) && (
-          <View style={styles.globalLocalizerWrap}>
-            <GlobalLocalizer
-              hook={contentText.slice(0, 100) || productMeta?.productName || ''}
-              title={productMeta?.productName || ''}
-              caption={contentText || ''}
-              hashtags={[]}
-              productName={productMeta?.productName || ''}
-              productCategory={productMeta?.description || ''}
-              narrationText={contentText.slice(0, 200)}
-              affiliateUrl={affiliateUrl}
-            />
-          </View>
-        )}
 
         {/* Recent revenue */}
         <Text style={styles.sectionTitle}>최근 수익 기록</Text>
@@ -3656,19 +2236,11 @@ export default function AffiliateScreen() {
             ))}
           </View>
         )}
-
-        {/* Tip */}
-        <View style={styles.tipBox}>
-          <ShoppingBag size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-          <Text style={styles.tipText}>
-            팁: 카메라 탭에서 촬영 후 결과 화면의 '쇼핑커넥트'에서도 제휴 링크를 바로 추가할 수 있습니다. 정기적으로 콘텐츠를 올리면 노출이 늘어납니다.
-          </Text>
-        </View>
         </>
         )}
       </ScrollView>
 
-      {/* CapturePreviewModal — same as camera tab */}
+      {/* CapturePreviewModal */}
       {previewCapture && (
         <CapturePreviewModal
           visible={!!previewCapture}
@@ -3679,52 +2251,12 @@ export default function AffiliateScreen() {
         />
       )}
 
-      {/* Upload preview modal */}
-      <UploadPreviewModal
-        visible={!!previewUpload}
-        data={previewUpload}
-        onConfirm={handleConfirmUpload}
-        onClose={() => setPreviewUpload(null)}
-      />
-
       {/* URL validation toast */}
       {urlToast && (
         <View style={styles.urlToastContainer}>
           <View style={styles.urlToastBox}>
             <AlertTriangle size={16} color="#fff" strokeWidth={2} />
             <Text style={styles.urlToastText}>{urlToast}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Upload completion confirm popup — shown after returning from platform app */}
-      {showUploadConfirm && (
-        <View style={styles.uploadConfirmOverlay}>
-          <View style={styles.uploadConfirmModal}>
-            <View style={styles.uploadConfirmIcon}>
-              <Check size={28} color={theme.colors.success[400]} strokeWidth={2} />
-            </View>
-            <Text style={styles.uploadConfirmTitle}>게시판에서 업로드하셨나요?</Text>
-            <Text style={styles.uploadConfirmDesc}>
-              최종 확인·수정한 콘텐츠를 {UPLOAD_PLATFORMS.find((p) => p.key === showUploadConfirm)?.label} 게시판에서 직접 업로드해주세요. 업로드를 마친 뒤 완료를 누르면 발행 상태가 기록됩니다.
-            </Text>
-            <View style={styles.uploadConfirmBtnRow}>
-              <TouchableOpacity
-                style={styles.uploadConfirmCancelBtn}
-                onPress={handleCancelUploadConfirm}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.uploadConfirmCancelText}>아직이에요</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.uploadConfirmDoneBtn}
-                onPress={handleConfirmUploadComplete}
-                activeOpacity={0.7}
-              >
-                <Check size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.uploadConfirmDoneText}>업로드 완료</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       )}
@@ -4166,6 +2698,27 @@ const styles = StyleSheet.create({
     color: '#fff' + 'CC',
     marginTop: 3,
     lineHeight: 15,
+  },
+  autoEditDesc: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 19,
+    marginBottom: theme.spacing.md,
+  },
+  autoFeatureList: {
+    gap: 10,
+    marginBottom: theme.spacing.md,
+  },
+  autoFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  autoFeatureText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
   },
   customToggle: {
     flexDirection: 'row',
