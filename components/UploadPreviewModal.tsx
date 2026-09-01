@@ -68,7 +68,7 @@ export function UploadPreviewModal({ visible, data, onConfirm, onClose }: Upload
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>업로드 미리보기</Text>
+          <Text style={styles.headerTitle}>{data.mediaType === 'photo' ? '이미지 최종 확인' : '영상 최종 확인'}</Text>
           <View style={styles.modeToggle}>
             <TouchableOpacity
               style={[styles.modeBtn, mode === 'preview' && styles.modeBtnActive]}
@@ -106,6 +106,10 @@ export function UploadPreviewModal({ visible, data, onConfirm, onClose }: Upload
           {/* Media preview */}
           {data.mediaUri ? (
             <View style={styles.mediaWrap}>
+              <View style={styles.finalCheckBadge}>
+                <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
+                <Text style={styles.finalCheckBadgeText}>게시 전 최종 확인</Text>
+              </View>
               {data.mediaType === 'video' ? (
                 <View style={styles.videoPlaceholder}>
                   <Film size={40} color={theme.colors.dark.textDim} strokeWidth={1.5} />
@@ -166,7 +170,7 @@ export function UploadPreviewModal({ visible, data, onConfirm, onClose }: Upload
             activeOpacity={0.8}
           >
             <Share2 size={18} color="#fff" strokeWidth={2} />
-            <Text style={styles.uploadBtnText}>{data.platformLabel}에 업로드</Text>
+            <Text style={styles.uploadBtnText}>저장 후 {data.platformLabel} 게시판 열기</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -187,7 +191,7 @@ function PreviewMode({
 }) {
   return (
     <View style={styles.previewSection}>
-      <Text style={styles.previewSectionLabel}>캡션 미리보기</Text>
+      <Text style={styles.previewSectionLabel}>{data.mediaType === 'photo' ? '생성 이미지와 문구 최종 확인' : '생성 영상과 문구 최종 확인'}</Text>
       <View style={styles.captionCard}>
         {autoDisclosure && data.disclosureText ? (
           <>
@@ -246,7 +250,7 @@ function EditMode({
 }) {
   return (
     <View style={styles.editSection}>
-      <Text style={styles.editLabel}>마케팅 문구 수정</Text>
+      <Text style={styles.editLabel}>{'마케팅 문구 수정'}</Text>
       <TextInput
         style={styles.captionInput}
         value={caption}
@@ -390,6 +394,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: theme.spacing.md,
     position: 'relative',
+  },
+  finalCheckBadge: {
+    position: 'absolute',
+    zIndex: 2,
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'rgba(10, 15, 30, 0.82)',
+  },
+  finalCheckBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   mediaImage: {
     width: '100%',

@@ -659,13 +659,15 @@ export default function AffiliateScreen() {
 
   const handleConfirmUpload = (edited: { caption: string; affiliateUrl: string; autoDisclosure: boolean }) => {
     if (!previewUpload) return;
+    const platformKey = previewUpload.platformKey;
     setContentText(edited.caption);
     setAffiliateUrl(edited.affiliateUrl);
     setAutoDisclosure(edited.autoDisclosure);
-    setUploadPlatform(previewUpload.platformKey);
-    setUploadedPlatforms((prev) => new Set(prev).add(previewUpload.platformKey));
+    setUploadPlatform(platformKey);
     setPreviewUpload(null);
-    markCompleted('upload');
+    setPendingUploadPlatform(platformKey);
+    setShowUploadConfirm(platformKey);
+    setTimeout(() => handleOpenDeepLink(platformKey), 300);
   };
 
   const handleOpenDeepLink = (key: string) => {
@@ -2067,8 +2069,8 @@ export default function AffiliateScreen() {
         />
         <PillNavCard
           icon={<Share2 size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="플랫폼 업로드 및 공정위 문구"
-          subtitle="릴스·쇼츠·틱톡·블로그 업로드 · 공정위 문구 자동 추가"
+          title="최종 확인 후 업로드"
+          subtitle="생성 이미지 최종 확인·수정 · 게시판 연결 후 직접 업로드"
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
           stepNumber={4}
@@ -2438,9 +2440,9 @@ export default function AffiliateScreen() {
             <View style={styles.uploadConfirmIcon}>
               <Check size={28} color={theme.colors.success[400]} strokeWidth={2} />
             </View>
-            <Text style={styles.uploadConfirmTitle}>업로드를 완료하셨나요?</Text>
+            <Text style={styles.uploadConfirmTitle}>게시판에서 업로드하셨나요?</Text>
             <Text style={styles.uploadConfirmDesc}>
-              {UPLOAD_PLATFORMS.find((p) => p.key === showUploadConfirm)?.label}에 업로드를 마치셨다면 '완료'를 눌러 발행 상태를 기록하세요. 클릭 수와 제휴 전환 수수료가 자동으로 추적됩니다.
+              최종 확인·수정한 콘텐츠를 {UPLOAD_PLATFORMS.find((p) => p.key === showUploadConfirm)?.label} 게시판에서 직접 업로드해주세요. 업로드를 마친 뒤 완료를 누르면 발행 상태가 기록됩니다.
             </Text>
             <View style={styles.uploadConfirmBtnRow}>
               <TouchableOpacity
