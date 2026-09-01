@@ -328,6 +328,8 @@ export async function extractProductMeta(
   productName: string;
   description: string;
   price: string;
+  originPrice: string;
+  discountRate: string;
   currency: string;
   image: string;
   imageBase64: string;

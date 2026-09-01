@@ -286,6 +286,8 @@ export default function AffiliateScreen() {
     productName: string;
     description: string;
     price: string;
+    originPrice: string;
+    discountRate: string;
     image: string;
     imageBase64: string;
     imageMimeType: string;
@@ -494,6 +496,8 @@ export default function AffiliateScreen() {
         productName: meta.productName || '',
         description: meta.description || '',
         price: meta.price || '',
+        originPrice: meta.originPrice || '',
+        discountRate: meta.discountRate || '',
         image: meta.image || '',
         imageBase64: meta.imageBase64 || '',
         imageMimeType: meta.imageMimeType || '',
@@ -541,6 +545,8 @@ export default function AffiliateScreen() {
         productName: platformKey ? `${platformKey} 상품` : '상품',
         description: '',
         price: '',
+        originPrice: '',
+        discountRate: '',
         image: '',
         imageBase64: '',
         imageMimeType: '',
@@ -1865,10 +1871,28 @@ export default function AffiliateScreen() {
             ctx.fillStyle = '#fbbf24';
             ctx.fillText(priceText, W - 30, 60);
 
-            // "오늘만 특가" badge above price
+            // Discount rate badge above price
+            const discountLabel = productMeta.discountRate
+              ? `${productMeta.discountRate} 할인`
+              : '오늘만 특가';
             ctx.font = '700 16px sans-serif';
             ctx.fillStyle = '#ef4444';
-            ctx.fillText('오늘만 특가', W - 30, 40);
+            ctx.fillText(discountLabel, W - 30, 40);
+
+            // Original price (strikethrough) if available
+            if (productMeta.originPrice) {
+              ctx.font = '500 18px sans-serif';
+              ctx.fillStyle = 'rgba(255,255,255,0.5)';
+              ctx.fillText(productMeta.originPrice, W - 30, 96);
+              // Strikethrough line
+              const opWidth = ctx.measureText(productMeta.originPrice).width;
+              ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(W - 30 - opWidth, 105);
+              ctx.lineTo(W - 30, 105);
+              ctx.stroke();
+            }
           }
 
           // Rocket delivery badge (bottom-left)
@@ -1880,8 +1904,12 @@ export default function AffiliateScreen() {
           ctx.fillStyle = '#3b82f6';
           ctx.fillText('🚀 로켓배송', 30, H - 50);
 
-          // Discount highlight (if price contains numbers, estimate discount)
-          if (productMeta.price) {
+          // Discount highlight with actual rate
+          if (productMeta.discountRate) {
+            ctx.font = '700 22px sans-serif';
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText(`${productMeta.discountRate} 할인 특가`, 30, H - 80);
+          } else if (productMeta.price) {
             ctx.font = '700 22px sans-serif';
             ctx.fillStyle = '#ef4444';
             ctx.fillText('할인 특가', 30, H - 80);

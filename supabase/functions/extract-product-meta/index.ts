@@ -10,6 +10,8 @@ interface ProductMeta {
   productName: string;
   description: string;
   price: string;
+  originPrice: string;
+  discountRate: string;
   currency: string;
   image: string;
   imageBase64: string;
@@ -58,6 +60,8 @@ Deno.serve(async (req: Request) => {
             productName: "",
             description: "",
             price: "",
+            originPrice: "",
+            discountRate: "",
             currency: "KRW",
             image: "",
             imageBase64: imagesBase64[0]?.base64 || "",
@@ -87,6 +91,8 @@ Deno.serve(async (req: Request) => {
         productName: "",
         description: "",
         price: "",
+        originPrice: "",
+        discountRate: "",
         currency: "KRW",
         image: "",
         imageBase64: "",
@@ -305,6 +311,8 @@ function parseHtml(html: string, url: string): ProductMeta {
   const siteName = getMeta("og:site_name") || "";
 
   let price = extractPrice(html, platform);
+  let originPrice = extractOriginPrice(html, platform);
+  let discountRate = extractDiscountRate(html, platform);
   let currency = "KRW";
   let availability = extractAvailability(html);
   let brand = extractBrand(html, siteName);
@@ -316,6 +324,8 @@ function parseHtml(html: string, url: string): ProductMeta {
     productName,
     description: description.slice(0, 500),
     price,
+    originPrice,
+    discountRate,
     currency,
     image,
     imageBase64: "",
@@ -390,6 +400,56 @@ function extractPrice(html: string, platform: string): string {
 
 function formatPrice(num: number): string {
   return num.toLocaleString("ko-KR") + "원";
+}
+
+function extractOriginPrice(html: string, platform: string): string {
+  const patterns: RegExp[] = [];
+  if (platform === "Coupang") {
+    patterns.push(
+      /"originalPrice"\s*:\s*(\d+)/i,
+      /"originPrice"\s*:\s*(\d+)/i,
+      /class=["'][^"']*original[^"']*["'][^>]*>.*?(\d[\d,]+)\s*원/si,
+    );
+  }
+  patterns.push(
+    /<meta[^>]+property=["']og:price:original_amount["'][^>]+content=["']([^"']+)["']/i,
+    /"originalPrice"\s*:\s*"?(\d[\d,]*)"?/i,
+    /"originPrice"\s*:\s*"?(\d[\d,]*)"?/i,
+    /"listPrice"\s*:\s*"?(\d[\d,]*)"?/i,
+  );
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) {
+      const raw = m[1].replace(/,/g, "");
+      const num = parseInt(raw, 10);
+      if (num > 0) return formatPrice(num);
+    }
+  }
+  return "";
+}
+
+function extractDiscountRate(html: string, platform: string): string {
+  const patterns: RegExp[] = [];
+  if (platform === "Coupang") {
+    patterns.push(
+      /"discountRate"\s*:\s*(\d+)/i,
+      /"discount"\s*:\s*(\d+)/i,
+    );
+  }
+  patterns.push(
+    /<meta[^>]+property=["']og:price:discount["'][^>]+content=["']([^"']+)["']/i,
+    /"discountRate"\s*:\s*"?(\d+)"?/i,
+    /"discountPercent"\s*:\s*"?(\d+)"?/i,
+    /(\d+)\s*%\s*할인/i,
+  );
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) {
+      const num = parseInt(m[1], 10);
+      if (num > 0 && num < 100) return num + "%";
+    }
+  }
+  return "";
 }
 
 function extractAvailability(html: string): string {
