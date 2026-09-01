@@ -26,9 +26,9 @@ export const SMARTSTORE_DISCLOSURE_SHORT =
   '네이버 커넥트 활동의 일환으로 수수료를 제공받을 수 있습니다.';
 
 export const GENERIC_DISCLOSURE =
-  '이 포스팅은 네이버 커넥트 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.';
+  '이 포스팅은 제휴 마케팅 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.';
 
-export const GENERIC_DISCLOSURE_SHORT = '네이버 커넥트 활동의 일환으로 수수료를 제공받을 수 있습니다.';
+export const GENERIC_DISCLOSURE_SHORT = '제휴 마케팅 활동의 일환으로 수수료를 제공받을 수 있습니다.';
 
 const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
   Coupang: {
@@ -108,9 +108,67 @@ const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
   },
 };
 
+const PLATFORM_ALIASES: Record<string, string> = {
+  coupang: 'Coupang',
+  '쿠팡': 'Coupang',
+  '쿠팡파트너스': 'Coupang',
+  naver: 'BrandConnect',
+  'navershopping': 'NaverShopping',
+  'smartstore': 'NaverShopping',
+  '스마트스토어': 'NaverShopping',
+  '네이버쇼핑': 'NaverShopping',
+  '네이버스마트스토어': 'NaverShopping',
+  brandconnect: 'BrandConnect',
+  '네이버브랜드커넥트': 'BrandConnect',
+  '브랜드커넥트': 'BrandConnect',
+  '네이버커넥트': 'BrandConnect',
+  toss: 'Toss',
+  '토스': 'Toss',
+  '토스쉐어링크': 'Toss',
+  oliveyoung: 'OliveYoung',
+  '올리브영': 'OliveYoung',
+  zigzag: 'Zigzag',
+  '지그재그': 'Zigzag',
+  todayhouse: 'TodayHouse',
+  '오늘의집': 'TodayHouse',
+  kurly: 'Kurly',
+  '컬리': 'Kurly',
+  '마켓컬리': 'Kurly',
+  aliexpress: 'AliExpress',
+  '알리익스프레스': 'AliExpress',
+  '알리': 'AliExpress',
+  amazon: 'Amazon',
+  '아마존': 'Amazon',
+  shopee: 'Shopee',
+  '쇼피': 'Shopee',
+  myrealtrip: 'MyRealTrip',
+  '마이리얼트립': 'MyRealTrip',
+  klook: 'Klook',
+  '클룩': 'Klook',
+  '11st': '11st',
+  '11번가': '11st',
+  '스마일배송': '11st',
+  gmarket: 'Gmarket',
+  'g마켓': 'Gmarket',
+  '지마켓': 'Gmarket',
+  '옥션': 'Gmarket',
+};
+
+function normalizePlatformKey(platform: string): string {
+  const trimmed = platform.trim();
+  const lower = trimmed.toLowerCase();
+  if (PLATFORM_ALIASES[trimmed]) return PLATFORM_ALIASES[trimmed];
+  if (PLATFORM_ALIASES[lower]) return PLATFORM_ALIASES[lower];
+  for (const key of Object.keys(PLATFORM_DISCLOSURES)) {
+    if (key.toLowerCase() === lower) return key;
+  }
+  return trimmed;
+}
+
 export function getPlatformDisclosure(platform: string): PlatformDisclosure {
-  return PLATFORM_DISCLOSURES[platform] || {
-    platform,
+  const normalized = normalizePlatformKey(platform);
+  return PLATFORM_DISCLOSURES[normalized] || {
+    platform: normalized,
     short: GENERIC_DISCLOSURE_SHORT,
     full: GENERIC_DISCLOSURE,
   };
