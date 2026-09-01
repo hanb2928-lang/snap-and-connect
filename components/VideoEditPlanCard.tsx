@@ -21,6 +21,9 @@ import {
   ChevronUp,
   Sparkles,
   Info,
+  Shuffle,
+  Volume2,
+  Zap,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '@/lib/theme';
@@ -61,10 +64,12 @@ export function VideoEditPlanCard({
   const [plan, setPlan] = useState<EditPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedCopy, setExpandedCopy] = useState<number | null>(null);
+  const [copyIndex, setCopyIndex] = useState(0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [showDetailGuide, setShowDetailGuide] = useState(false);
+  const [audioDucking, setAudioDucking] = useState(true);
+  const [shuffling, setShuffling] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -119,7 +124,7 @@ export function VideoEditPlanCard({
         psychologyPreset: psychPreset,
       });
       setPlan(result);
-      setExpandedCopy(0);
+      setCopyIndex(0);
       onPlanGenerated?.(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : '편집 계획 생성에 실패했습니다.');
@@ -262,7 +267,7 @@ export function VideoEditPlanCard({
             })}
           </View>
 
-          {/* Music & motion */}
+          {/* Music & motion + audio ducking toggle */}
           <View style={styles.metaRow}>
             <View style={styles.metaChip}>
               <Music size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
@@ -272,6 +277,23 @@ export function VideoEditPlanCard({
               <Camera size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={styles.metaChipText}>{plan.motionPreset}</Text>
             </View>
+            <View style={styles.metaChip}>
+              <Zap size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={[styles.metaChipText, { color: theme.colors.success[400] }]}>최적화 적용됨</Text>
+            </View>
+          </View>
+
+          {/* Audio ducking toggle */}
+          <View style={styles.duckRow}>
+            <Volume2 size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.duckLabel}>배경음악 자동 조절 (오디오 더킹)</Text>
+            <TouchableOpacity
+              style={[styles.duckToggle, audioDucking && styles.duckToggleOn]}
+              onPress={() => setAudioDucking(!audioDucking)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.duckKnob, audioDucking && styles.duckKnobOn]} />
+            </TouchableOpacity>
           </View>
 
           {/* Collapsible detail guide */}
@@ -324,33 +346,34 @@ export function VideoEditPlanCard({
             </>
           )}
 
-          {/* Copy variants */}
-          {!hideCopyVariants && (
-          <Text style={styles.sectionLabel}>AI 추천 카피</Text>
-          )}
-          {!hideCopyVariants && plan.copyVariants.slice(0, 2).map((variant, i) => {
-            const isExpanded = expandedCopy === i;
+          {/* AI recommended copy — single card with shuffle */}
+          {!hideCopyVariants && plan.copyVariants.length > 0 && (() => {
+            const variant = plan.copyVariants[copyIndex % plan.copyVariants.length];
+            const copyKey = `copy-${copyIndex}`;
+            const handleShuffle = () => {
+              if (plan.copyVariants.length <= 1) return;
+              setShuffling(true);
+              setTimeout(() => {
+                setCopyIndex((prev) => (prev + 1) % plan.copyVariants.length);
+                setShuffling(false);
+              }, 200);
+            };
             return (
-              <View key={i} style={styles.copyCard}>
-                <TouchableOpacity
-                  style={styles.copyHeader}
-                  onPress={() => setExpandedCopy(isExpanded ? null : i)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.copyHeaderLeft}>
-                    <View style={styles.copyBadge}>
-                      <Text style={styles.copyBadgeText}>A/B {i + 1}</Text>
-                    </View>
-                    <Text style={styles.copyHookPreview} numberOfLines={1}>{variant.hook}</Text>
-                  </View>
-                  {isExpanded ? (
-                    <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  ) : (
-                    <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <>
+                <View style={styles.copyHeaderRow}>
+                  <Text style={styles.sectionLabel}>AI 추천 카피</Text>
+                  {plan.copyVariants.length > 1 && (
+                    <TouchableOpacity
+                      style={styles.shuffleBtn}
+                      onPress={handleShuffle}
+                      activeOpacity={0.7}
+                    >
+                      <Shuffle size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+                      <Text style={styles.shuffleBtnText}>다른 스타일로 바꾸기</Text>
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
-
-                {isExpanded && (
+                </View>
+                <View key={copyKey} style={[styles.copyCard, shuffling && styles.copyCardShuffling]}>
                   <View style={styles.copyBody}>
                     <View style={styles.copyField}>
                       <Text style={styles.copyFieldLabel}>후킹</Text>
@@ -374,10 +397,10 @@ export function VideoEditPlanCard({
                     </View>
                     <TouchableOpacity
                       style={styles.copyAllBtn}
-                      onPress={() => copyFullVariant(variant, i)}
+                      onPress={() => copyFullVariant(variant, copyIndex)}
                       activeOpacity={0.7}
                     >
-                      {copiedField === `variant-${i}` ? (
+                      {copiedField === `variant-${copyIndex}` ? (
                         <>
                           <Check size={13} color="#fff" strokeWidth={2.5} />
                           <Text style={styles.copyAllBtnText}>복사됨!</Text>
@@ -390,10 +413,10 @@ export function VideoEditPlanCard({
                       )}
                     </TouchableOpacity>
                   </View>
-                )}
-              </View>
+                </View>
+              </>
             );
-          })}
+          })()}
         </ScrollView>
       )}
     </View>
@@ -673,6 +696,71 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
+  duckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  duckLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  duckToggle: {
+    width: 34,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  duckToggleOn: {
+    backgroundColor: theme.colors.success[400],
+  },
+  duckKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignSelf: 'flex-start',
+  },
+  duckKnobOn: {
+    alignSelf: 'flex-end',
+  },
+  copyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  shuffleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.warning[400] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  shuffleBtnText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  copyCardShuffling: {
+    opacity: 0.4,
+  },
   copyCard: {
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.md,
@@ -680,35 +768,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
-  },
-  copyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  copyHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  copyBadge: {
-    backgroundColor: theme.colors.warning[400] + '20',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  copyBadgeText: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.warning[400],
-  },
-  copyHookPreview: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.text,
-    flex: 1,
   },
   copyBody: {
     padding: 10,
