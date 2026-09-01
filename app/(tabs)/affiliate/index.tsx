@@ -1118,21 +1118,21 @@ export default function AffiliateScreen() {
       }
 
       // Load stock video clip as background layer (upper tile)
+      // Load directly via URL — Pexels CDN supports CORS, so canvas can draw frames
       let stockVid: HTMLVideoElement | null = null;
       if (stockVideoClip?.videoUrl) {
         try {
-          const { urlToDataUrl } = await import('@/lib/base64');
-          const safeVideoUrl = await urlToDataUrl(stockVideoClip.videoUrl);
           stockVid = await new Promise<HTMLVideoElement>((resolve, reject) => {
             const el = document.createElement('video');
             el.crossOrigin = 'anonymous';
             el.muted = true;
             el.loop = true;
             el.playsInline = true;
-            el.onloadeddata = () => { el.play().then(() => resolve(el)).catch(() => resolve(el)); };
+            el.preload = 'auto';
+            el.oncanplay = () => { el.play().then(() => resolve(el)).catch(() => resolve(el)); };
             el.onerror = () => reject(new Error('스톡 영상 로드 실패'));
-            el.src = safeVideoUrl;
-            setTimeout(() => reject(new Error('스톡 영상 로드 시간 초과')), 12000);
+            el.src = stockVideoClip!.videoUrl;
+            setTimeout(() => reject(new Error('스톡 영상 로드 시간 초과')), 20000);
           });
         } catch {
           stockVid = null;
