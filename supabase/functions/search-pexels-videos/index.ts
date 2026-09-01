@@ -149,8 +149,13 @@ Deno.serve(async (req: Request) => {
 
     if (!resp.ok) {
       const errText = await resp.text();
+      const isAuthError = resp.status === 401 || resp.status === 403;
       return new Response(
-        JSON.stringify({ error: `Pexels API 오류: ${resp.status} - ${errText}` }),
+        JSON.stringify({
+          error: isAuthError
+            ? "Pexels API 키가 유효하지 않습니다. 설정에서 올바른 키를 입력해주세요."
+            : `Pexels API 오류: ${resp.status} - ${errText}`,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

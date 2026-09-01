@@ -34,6 +34,7 @@ const fullSettings: UserSettings = {
   naver_shopping_id: 'navershop456',
   toss_share_id: 'tossshare789',
   openai_api_key: null,
+  pexels_api_key: null,
   logo_url: null,
   default_video_duration: null,
   default_tts_voice: null,

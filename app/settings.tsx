@@ -79,6 +79,7 @@ export default function SettingsScreen() {
   const [revNote, setRevNote] = useState('');
   const [revSaving, setRevSaving] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
+  const [pexelsKey, setPexelsKey] = useState('');
   const [savingKey, setSavingKey] = useState(false);
   const [savedKey, setSavedKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -150,6 +151,7 @@ export default function SettingsScreen() {
       setTossId(data?.toss_share_id || '');
       setLogoUrl(data?.logo_url || null);
       setOpenaiKey(data?.openai_api_key || '');
+      setPexelsKey(data?.pexels_api_key || '');
       setDefaultVideoDuration(data?.default_video_duration || '15s');
       setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
       setTtsSpeed(data?.tts_speed ?? 1.0);
@@ -495,6 +497,7 @@ export default function SettingsScreen() {
             { label: t('settings.naver'), value: naverId, color: '#03C75A', icon: 'N' },
             { label: t('settings.toss'), value: tossId, color: '#0064FF', icon: 'T' },
             { label: 'OpenAI', value: openaiKey, color: theme.colors.primary[400], icon: 'AI' },
+            { label: 'Pexels', value: pexelsKey, color: theme.colors.success[400], icon: 'PX' },
           ].map((item, i) => {
             const isSet = item.value && item.value.trim().length > 0;
             return (
@@ -2191,7 +2194,7 @@ export default function SettingsScreen() {
             setSavingKey(true);
             setSavedKey(false);
             try {
-              await updateUserSettings({ openai_api_key: openaiKey || null });
+              await updateUserSettings({ openai_api_key: openaiKey || null, pexels_api_key: pexelsKey || null });
               setSavedKey(true);
               setTimeout(() => setSavedKey(false), 2500);
             } catch (err) {
@@ -2216,6 +2219,30 @@ export default function SettingsScreen() {
             </>
           )}
         </TouchableOpacity>
+
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.success[500] + '20' }]}>
+              <Film size={18} color={theme.colors.success[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>Pexels API Key</Text>
+              <TextInput
+                style={styles.idInput}
+                value={pexelsKey}
+                onChangeText={setPexelsKey}
+                placeholder="영상 검색용 Pexels 키"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!showApiKey}
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginTop: 8, lineHeight: 16 }}>
+            pexels.com에서 발급받은 키를 입력하면 제품 테마 영상 검색이 활성화됩니다.
+          </Text>
+        </View>
       </View>
 
       <View style={styles.section}>
