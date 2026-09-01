@@ -230,7 +230,7 @@ export default function AffiliateScreen() {
   const [previewCapture, setPreviewCapture] = useState<{ base64: string; mimeType: string } | null>(null);
   const [imageSource, setImageSource] = useState<'product' | 'user' | null>(null);
 
-  // Step 1: Affiliate link
+  // Step 1: Affiliate link & product selection
   const [affiliateUrl, setAffiliateUrl] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [customPlatforms, setCustomPlatforms] = useState<{ key: string; label: string; url: string }[]>([]);
@@ -272,7 +272,7 @@ export default function AffiliateScreen() {
     searchUrl: string;
   } | null>(null);
 
-  // Step 2: AI Analysis
+  // Step 3: AI Analysis
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [aiGeneratedUrl, setAiGeneratedUrl] = useState<string | null>(null);
@@ -283,7 +283,7 @@ export default function AffiliateScreen() {
     return buildDataUrl(selectedImage, selectedImageMime);
   }, [selectedImage, selectedImageMime, mediaType]);
 
-  // Step 3: Content
+  // Step 4: Content
   const [simpleMode, setSimpleMode] = useState(true);
   const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
   const [aiBundle, setAiBundle] = useState<AiRecommendBundle | null>(null);
@@ -293,7 +293,7 @@ export default function AffiliateScreen() {
   const [contentType, setContentType] = useState<string>('copy');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('shortform');
 
-  // Step 4: Upload
+  // Step 5: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
   const [uploadedPlatforms, setUploadedPlatforms] = useState<Set<string>>(new Set());
   const [autoDisclosure, setAutoDisclosure] = useState(true);
@@ -384,7 +384,7 @@ export default function AffiliateScreen() {
     return false;
   }, [settings]);
 
-  // Step 2: Pick own photo (optional — product image is used by default)
+  // Step 3: Pick own photo (optional — product image is used by default)
   const handlePickPhoto = async () => {
     setMediaLoading(true);
     try {
@@ -631,7 +631,6 @@ export default function AffiliateScreen() {
         setAiRecommendLoading(false);
       }
 
-      markCompleted('content');
       setAnalyzing(false);
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
@@ -639,13 +638,13 @@ export default function AffiliateScreen() {
     }
   };
 
-  // Step 3: Save content
+  // Step 4: Save content
   const handleSaveContent = () => {
     if (!contentText.trim()) return;
     markCompleted('content');
   };
 
-  // Step 4: Open preview before upload
+  // Step 5: Open preview before upload
   const handleUploadToPlatform = (platformKey: string) => {
     const platform = UPLOAD_PLATFORMS.find((p) => p.key === platformKey);
     if (!platform) return;
@@ -1779,8 +1778,8 @@ export default function AffiliateScreen() {
                 <View style={styles.renderCompleteBox}>
                   <Text style={styles.renderCompleteText}>
                     {previewMediaMode === 'image'
-                      ? `심리 자극 요소 ${videoPreviewScenes.length}개 요소가 적용된 이미지가 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`
-                      : `심리 자극 요소 ${videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 3단계에서 스타일과 음성을 설정해주세요.`}
+                      ? `심리 자극 요소 ${videoPreviewScenes.length}개 요소가 적용된 이미지가 생성되었습니다. 4단계에서 스타일과 음성을 설정해주세요.`
+                      : `심리 자극 요소 ${videoPreviewScenes.length}개 장면이 적용된 영상이 생성되었습니다. 4단계에서 스타일과 음성을 설정해주세요.`}
                   </Text>
                 </View>
               )}
