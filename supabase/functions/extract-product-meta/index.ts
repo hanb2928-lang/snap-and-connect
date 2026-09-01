@@ -158,14 +158,14 @@ Deno.serve(async (req: Request) => {
 function detectPlatform(url: string): string {
   const u = url.toLowerCase();
   if (u.includes("coupang.com")) return "Coupang";
-  if (u.includes("smartstore.naver.com") || u.includes("brand.naver.com")) return "Naver";
+  if (u.includes("brand.naver.com")) return "BrandConnect";
+  if (u.includes("smartstore.naver.com")) return "NaverShopping";
   if (u.includes("11st.co.kr")) return "11st";
   if (u.includes("gmarket.com")) return "Gmarket";
   if (u.includes("aliexpress.com")) return "AliExpress";
   if (u.includes("amazon.com")) return "Amazon";
   if (u.includes("toss.to")) return "Toss";
   if (u.includes("shopee.")) return "Shopee";
-  if (u.includes("coupang.com")) return "Coupang";
   return "Unknown";
 }
 
@@ -183,7 +183,8 @@ function extractProductId(url: string, platform: string): string {
         if (productsIdx >= 0 && segments[productsIdx + 1]) return segments[productsIdx + 1];
         break;
       }
-      case "Naver": {
+      case "NaverShopping":
+      case "BrandConnect": {
         const productsIdx = segments.findIndex((s) => s === "products");
         if (productsIdx >= 0 && segments[productsIdx + 1]) return segments[productsIdx + 1];
         break;
@@ -218,7 +219,8 @@ function buildSearchUrl(url: string, platform: string, productId: string): strin
     switch (platform) {
       case "Coupang":
         return `https://www.coupang.com/np/search?q=${productId || ""}`;
-      case "Naver":
+      case "NaverShopping":
+      case "BrandConnect":
         return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(parsed.hostname + " " + (productId || ""))}`;
       case "AliExpress":
         return `https://www.aliexpress.com/wholesale?SearchText=${productId || ""}`;
@@ -240,7 +242,7 @@ function extractBrandFromUrl(url: string, platform: string): string {
   try {
     const parsed = new URL(url);
     if (platform === "Coupang") return "Coupang";
-    if (platform === "Naver") {
+    if (platform === "NaverShopping" || platform === "BrandConnect") {
       const segments = parsed.pathname.split("/").filter(Boolean);
       if (segments[0] === "brands") return segments[1] || "Naver";
       return parsed.hostname.replace("smartstore.", "").replace("brand.", "").split(".")[0];
@@ -342,7 +344,7 @@ function cleanTitle(title: string, platform: string): string {
   let clean = title;
   if (platform === "Coupang") {
     clean = clean.replace(/\s*[-:|]\s*쿠팡.*$/i, "").replace(/\s*쿠팡\s*$/i, "");
-  } else if (platform === "Naver") {
+  } else if (platform === "NaverShopping" || platform === "BrandConnect") {
     clean = clean.replace(/\s*[-:|]\s*네이버.*$/i, "").replace(/\s*네이버\s*$/i, "");
   }
   clean = clean.replace(/\s*\|\s*네이버쇼핑\s*$/i, "");
@@ -360,7 +362,7 @@ function extractPrice(html: string, platform: string): string {
       /"price"\s*:\s*(\d+)/i,
       /class=["'][^"']*price[^"']*["'][^>]*>.*?(\d[\d,]+)\s*원/si,
     );
-  } else if (platform === "Naver") {
+  } else if (platform === "NaverShopping" || platform === "BrandConnect") {
     pricePatterns.push(
       /"salePrice"\s*:\s*(\d+)/i,
       /"lowPrice"\s*:\s*(\d+)/i,

@@ -92,7 +92,8 @@ const PLATFORM_BOARDS: Record<string, { key: string; label: string }[]> = {
 function detectPlatformFromUrl(url: string): string {
   const u = url.toLowerCase();
   if (u.includes('coupang.com')) return 'Coupang';
-  if (u.includes('smartstore.naver.com') || u.includes('brand.naver.com')) return 'Naver';
+  if (u.includes('brand.naver.com')) return 'BrandConnect';
+  if (u.includes('smartstore.naver.com')) return 'NaverShopping';
   if (u.includes('11st.co.kr')) return '11st';
   if (u.includes('gmarket.com')) return 'Gmarket';
   if (u.includes('aliexpress.com')) return 'AliExpress';
@@ -110,7 +111,7 @@ function buildFallbackSearchUrl(url: string, platform: string): string {
     if (platform === 'Coupang') {
       const vpIdx = segments.findIndex((s) => s === 'vp');
       if (vpIdx >= 0 && segments[vpIdx + 1]) productId = segments[vpIdx + 1];
-    } else if (platform === 'Naver') {
+    } else if (platform === 'NaverShopping' || platform === 'BrandConnect') {
       const pIdx = segments.findIndex((s) => s === 'products');
       if (pIdx >= 0 && segments[pIdx + 1]) productId = segments[pIdx + 1];
     } else if (platform === 'AliExpress') {
@@ -125,7 +126,7 @@ function buildFallbackSearchUrl(url: string, platform: string): string {
     }
     switch (platform) {
       case 'Coupang': return `https://www.coupang.com/np/search?q=${productId}`;
-      case 'Naver': return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(parsed.hostname + ' ' + productId)}`;
+      case 'NaverShopping': case 'BrandConnect': return `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(parsed.hostname + ' ' + productId)}`;
       case 'AliExpress': return `https://www.aliexpress.com/wholesale?SearchText=${productId}`;
       case 'Amazon': return `https://www.amazon.com/s?k=${productId}`;
       case '11st': return `https://search.11st.co.kr/Search.tmall?kwd=${productId}`;
@@ -467,6 +468,9 @@ export default function AffiliateScreen() {
         return;
       }
       setProductMeta(newMeta);
+      if (newMeta.platform && newMeta.platform !== 'Unknown') {
+        setSelectedPlatform(newMeta.platform);
+      }
       markCompleted('affiliate');
       // Use server-captured base64 image directly — bypasses CORS entirely
       if (newMeta.imageBase64) {
@@ -501,6 +505,7 @@ export default function AffiliateScreen() {
         brand: platformKey,
         searchUrl,
       });
+      if (platformKey) setSelectedPlatform(platformKey);
       setExtractError(
         searchUrl
           ? `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 검색 페이지에서 상품을 확인하거나, 사진을 업로드하여 진행할 수 있습니다. 영상 생성은 바로 가능합니다.|||${searchUrl}`

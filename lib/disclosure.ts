@@ -96,6 +96,16 @@ const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
     short: '클룩 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
     full: '이 포스팅은 클룩 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
   },
+  '11st': {
+    platform: '11st',
+    short: '11번가 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
+    full: '이 포스팅은 11번가 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
+  },
+  Gmarket: {
+    platform: 'Gmarket',
+    short: 'G마켓 제휴 활동의 일환으로 수수료를 제공받을 수 있습니다.',
+    full: '이 포스팅은 G마켓 제휴 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.',
+  },
 };
 
 export function getPlatformDisclosure(platform: string): PlatformDisclosure {
