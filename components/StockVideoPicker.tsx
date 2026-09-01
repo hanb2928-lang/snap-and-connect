@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
 
@@ -371,6 +372,42 @@ export function StockVideoPicker({
     return () => { stopCameraStream(); };
   }, [stopCameraStream]);
 
+  // ── Image picker (from gallery / file system) ──
+  const [pickingImage, setPickingImage] = useState(false);
+
+  const handlePickImage = useCallback(async () => {
+    if (pickingImage) return;
+    setPickingImage(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+        allowsMultipleSelection: false,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const clip: StockVideoClip = {
+        id: Date.now(),
+        duration: 0,
+        width: asset.width || 1080,
+        height: asset.height || 1920,
+        previewUrl: asset.uri,
+        thumbnailUrl: asset.uri,
+        videoUrl: asset.uri,
+        author: '불러온 이미지',
+        ratio: asset.width && asset.height
+          ? `${asset.width >= asset.height ? '9' : '3'}:${asset.width >= asset.height ? '16' : '4'}`
+          : '9:16',
+        mediaType: 'image',
+      };
+      onSelectClip(clip);
+    } catch {
+      Alert.alert('오류', '이미지를 불러오는 중 문제가 발생했습니다.');
+    } finally {
+      setPickingImage(false);
+    }
+  }, [pickingImage, onSelectClip]);
+
   const initialQuery = productName || productCategory || '';
   const hasSearched = clips.length > 0 || error !== null;
 
@@ -583,18 +620,31 @@ export function StockVideoPicker({
         }
       />
 
-      {/* ── Camera capture section ── */}
+      {/* ── Camera capture & image picker section ── */}
       {!showCamera && !showMobileCamera && (
-        <TouchableOpacity
-          style={styles.captureBtn}
-          onPress={Platform.OS === 'web' ? handleOpenCamera : handleOpenMobileCamera}
-          activeOpacity={0.8}
-        >
-          <Camera size={18} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.captureBtnText}>
-            {Platform.OS === 'web' ? '캡처하기 (웹캠 촬영)' : '캡처하기 (카메라 촬영)'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.captureRow}>
+          <TouchableOpacity
+            style={styles.pickImageBtn}
+            onPress={handlePickImage}
+            disabled={pickingImage}
+            activeOpacity={0.8}
+          >
+            {pickingImage ? (
+              <ActivityIndicator size="small" color={theme.colors.success[400]} />
+            ) : (
+              <ImageIcon size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
+            )}
+            <Text style={styles.pickImageBtnText}>이미지 불러오기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.captureBtn}
+            onPress={Platform.OS === 'web' ? handleOpenCamera : handleOpenMobileCamera}
+            activeOpacity={0.8}
+          >
+            <Camera size={18} color="#fff" strokeWidth={2.5} />
+            <Text style={styles.captureBtnText}>캡처하기</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* ── Web camera (web only) ── */}
@@ -1020,7 +1070,30 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   // ── Camera capture styles ──
+  captureRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: theme.spacing.sm,
+  },
+  pickImageBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.success[400] + '18',
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '40',
+  },
+  pickImageBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
   captureBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1028,7 +1101,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[600],
     borderRadius: theme.radius.md,
     paddingVertical: 12,
-    marginTop: theme.spacing.sm,
   },
   captureBtnText: {
     fontSize: 13,
