@@ -332,6 +332,9 @@ export default function AffiliateScreen() {
   const [disclosurePlacement, setDisclosurePlacement] = useState<DisclosurePlacement>('body');
   const [showUploadConfirm, setShowUploadConfirm] = useState<string | null>(null);
   const [pendingUploadPlatform, setPendingUploadPlatform] = useState<string | null>(null);
+  const [importedMedia, setImportedMedia] = useState<{ uri: string; type: 'video' | 'image'; name: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -937,6 +940,66 @@ export default function AffiliateScreen() {
     setUploadPlatform(key);
     markCompleted('upload');
   };
+
+  const handleImportMedia = useCallback(async () => {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = boardMedia === 'image' ? 'image/*' : 'video/*';
+        input.onchange = () => {
+          const file = input.files?.[0];
+          if (file) {
+            const url = URL.createObjectURL(file);
+            setImportedMedia({
+              uri: url,
+              type: file.type.startsWith('video/') ? 'video' : 'image',
+              name: file.name,
+            });
+          }
+          setImporting(false);
+        };
+        input.click();
+      } else {
+        if (boardMedia === 'image') {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.9,
+          });
+          if (!result.canceled && result.assets[0]) {
+            setImportedMedia({
+              uri: result.assets[0].uri,
+              type: 'image',
+              name: result.assets[0].fileName ?? `imported_${Date.now()}.jpg`,
+            });
+          }
+        } else {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            quality: 0.9,
+          });
+          if (!result.canceled && result.assets[0]) {
+            setImportedMedia({
+              uri: result.assets[0].uri,
+              type: 'video',
+              name: result.assets[0].fileName ?? `imported_${Date.now()}.mp4`,
+            });
+          }
+        }
+      }
+    } catch {
+      setImportError('미디어 불러오기에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      if (Platform.OS === 'web') {
+        // on web, importing is set to false in the onchange callback
+      } else {
+        setImporting(false);
+      }
+    }
+  }, [selectedUploadPlatform, selectedBoard]);
 
   const imagePreviewUri = useMemo(
     () => selectedImage
@@ -3232,11 +3295,94 @@ export default function AffiliateScreen() {
           <Text style={styles.uploadHint}>
             {(() => {
               const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+              const platformLabel = selectedUploadPlatform
+                ? UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label
+                  || manualUploadPlatforms.find((mp) => mp.key === selectedUploadPlatform)?.label
+                  || ''
+                : '';
+              const boardLabel = selectedBoard
+                ? PLATFORM_BOARDS[selectedUploadPlatform!]?.find((b) => b.key === selectedBoard)?.label ?? ''
+                : '';
+              if (!selectedUploadPlatform) {
+                return '2단계에서 플랫폼과 게시판을 먼저 선택해주세요.';
+              }
               return boardMedia === 'image'
-                ? '업로드할 플랫폼을 선택하세요. 이미지에 맞는 형식으로 자동 변환됩니다.'
-                : '업로드할 플랫폼을 선택하세요. 각 플랫폼에 맞는 영상 형식으로 자동 변환됩니다.';
+                ? `${platformLabel}${boardLabel ? ` · ${boardLabel}` : ''} 게시판에 업로드할 이미지를 불러와서 업로드하세요.`
+                : `${platformLabel}${boardLabel ? ` · ${boardLabel}` : ''} 게시판에 업로드할 영상을 불러와서 업로드하세요.`;
             })()}
           </Text>
+
+          {/* Media import section */}
+          {selectedUploadPlatform && (
+            <View style={styles.mediaImportSection}>
+              <TouchableOpacity
+                style={styles.mediaImportBtn}
+                onPress={handleImportMedia}
+                disabled={importing}
+                activeOpacity={0.7}
+              >
+                {importing ? (
+                  <Loader size={18} color="#fff" strokeWidth={2} />
+                ) : (
+                  <Download size={18} color="#fff" strokeWidth={2} />
+                )}
+                <Text style={styles.mediaImportBtnText}>
+                  {importing
+                    ? '불러오는 중...'
+                    : getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image'
+                      ? '이미지 불러오기'
+                      : '영상 불러오기'}
+                </Text>
+              </TouchableOpacity>
+
+              {importError && (
+                <Text style={styles.mediaImportError}>{importError}</Text>
+              )}
+
+              {importedMedia && (
+                <View style={styles.importedPreviewBox}>
+                  {importedMedia.type === 'video' ? (
+                    <View style={styles.importedVideoPlaceholder}>
+                      <Film size={32} color={theme.colors.success[400]} strokeWidth={2} />
+                      <Text style={styles.importedMediaName} numberOfLines={1}>{importedMedia.name}</Text>
+                      <Text style={styles.importedMediaTypeLabel}>동영상 파일</Text>
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: importedMedia.uri }}
+                      style={styles.importedImagePreview}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <View style={styles.importedActions}>
+                    <TouchableOpacity
+                      style={styles.importedOpenBtn}
+                      onPress={() => {
+                        if (!selectedUploadPlatform) return;
+                        handleOneTapCopyAndOpen(selectedUploadPlatform);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <ExternalLink size={14} color="#fff" strokeWidth={2} />
+                      <Text style={styles.importedOpenBtnText}>
+                        {selectedUploadPlatform
+                          ? `${UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label ?? ''} 열기`
+                          : '플랫폼 열기'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.importedRemoveBtn}
+                      onPress={() => setImportedMedia(null)}
+                      activeOpacity={0.7}
+                    >
+                      <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.importedRemoveBtnText}>취소</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Auto-disclosure toggle */}
           <TouchableOpacity
@@ -3305,7 +3451,7 @@ export default function AffiliateScreen() {
           )}
 
           <View style={styles.uploadGrid}>
-            {UPLOAD_PLATFORMS.map((p) => {
+            {UPLOAD_PLATFORMS.filter((p) => selectedUploadPlatform ? p.key === selectedUploadPlatform : true).map((p) => {
               const Icon = p.icon;
               const isUploaded = uploadedPlatforms.has(p.key);
               const isActive = uploadPlatform === p.key;
@@ -3420,7 +3566,7 @@ export default function AffiliateScreen() {
           <Text style={styles.optimizerSectionDesc}>
             각 플랫폼에 맞춰 제목·본문·해시태그·공정위 문구를 자동 배치합니다. 섹션별 복사 가능.
           </Text>
-          {UPLOAD_PLATFORMS.map((p) => (
+          {UPLOAD_PLATFORMS.filter((p) => selectedUploadPlatform ? p.key === selectedUploadPlatform : true).map((p) => (
             <PlatformCaptionOptimizer
               key={p.key}
               platformKey={p.key as UploadPlatformKey}
@@ -5331,6 +5477,94 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     lineHeight: 17,
     marginBottom: theme.spacing.sm,
+  },
+  mediaImportSection: {
+    marginBottom: theme.spacing.md,
+  },
+  mediaImportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  mediaImportBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  mediaImportError: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    marginTop: 6,
+  },
+  importedPreviewBox: {
+    marginTop: 10,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '40',
+  },
+  importedVideoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 6,
+  },
+  importedMediaName: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  importedMediaTypeLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  importedImagePreview: {
+    width: '100%',
+    aspectRatio: 1.2,
+  },
+  importedActions: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 10,
+  },
+  importedOpenBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500],
+  },
+  importedOpenBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  importedRemoveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  importedRemoveBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
   uploadGrid: {
     flexDirection: 'row',
