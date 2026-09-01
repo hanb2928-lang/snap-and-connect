@@ -925,8 +925,8 @@ export default function AffiliateScreen() {
       const W = isPortrait ? 1080 : 1920;
       const H = isPortrait ? 1920 : 1080;
       const FPS = 30;
-      const totalSec = parseInt(analysis?.specs.maxDuration ?? '15', 10) || 15;
-      const DURATION = Math.min(totalSec, 15);
+      const totalSec = parseInt(analysis?.specs.maxDuration ?? '60', 10) || 60;
+      const DURATION = Math.min(totalSec, 60);
       const cg = analysis?.colorGrading ?? { warm: 10, contrast: 20, saturation: 15, vignette: 30 };
       const bpm = analysis?.pacingBpm ?? 100;
 
@@ -936,8 +936,65 @@ export default function AffiliateScreen() {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('캔버스를 생성할 수 없습니다.');
 
-      const stream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(FPS);
-      const codecCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      // Set up audio context for BGM + TTS voiceover
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const audioDest = audioCtx.createMediaStreamDestination();
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.7;
+      masterGain.connect(audioDest);
+
+      // Generate BGM: platform-specific beat pattern using oscillators
+      const bgmGain = audioCtx.createGain();
+      bgmGain.gain.value = 0.15;
+      bgmGain.connect(masterGain);
+
+      const beatInterval = 60 / bpm; // seconds per beat
+      const bgmOsc = audioCtx.createOscillator();
+      const bgmOscGain = audioCtx.createGain();
+      bgmOsc.type = 'sine';
+      bgmOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 80 : selectedUploadPlatform === 'instagram' ? 60 : 70;
+      bgmOsc.connect(bgmOscGain);
+      bgmOscGain.gain.value = 0;
+      bgmOsc.connect(bgmGain);
+      bgmOsc.start();
+
+      // Schedule beat pulses throughout the video
+      const totalBeats = Math.floor(DURATION / beatInterval);
+      for (let b = 0; b < totalBeats; b++) {
+        const beatTime = b * beatInterval;
+        bgmOscGain.gain.setValueAtTime(0.3, beatTime);
+        bgmOscGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.15);
+      }
+      bgmOscGain.connect(bgmGain);
+
+      // Add a secondary melody oscillator for richness
+      const melodyOsc = audioCtx.createOscillator();
+      const melodyGain = audioCtx.createGain();
+      melodyOsc.type = 'triangle';
+      melodyOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 220 : selectedUploadPlatform === 'instagram' ? 165 : 196;
+      melodyGain.gain.value = 0;
+      melodyOsc.connect(melodyGain);
+      melodyGain.connect(bgmGain);
+      melodyOsc.start();
+
+      // Schedule melody notes on every other beat
+      const melodyNotes = [261.63, 293.66, 329.63, 392.00, 329.63, 293.66];
+      for (let b = 0; b < totalBeats; b += 2) {
+        const noteTime = b * beatInterval;
+        const freq = melodyNotes[(b / 2) % melodyNotes.length];
+        melodyOsc.frequency.setValueAtTime(freq, noteTime);
+        melodyGain.gain.setValueAtTime(0.08, noteTime);
+        melodyGain.gain.exponentialRampToValueAtTime(0.001, noteTime + beatInterval * 1.5);
+      }
+
+      // Combine canvas video stream + audio stream
+      const canvasStream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(FPS);
+      const combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioDest.stream.getAudioTracks(),
+      ]);
+
+      const codecCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
       let mimeType = '';
       for (const c of codecCandidates) {
         try {
@@ -946,7 +1003,7 @@ export default function AffiliateScreen() {
       }
       if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
 
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 6_000_000 });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -966,6 +1023,42 @@ export default function AffiliateScreen() {
       const sceneDuration = DURATION / totalScenes;
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
+
+      // Generate TTS voiceover from scene texts
+      try {
+        const narrationText = scenes.map(s => s.textOverlay).join('. ');
+        if ('speechSynthesis' in window) {
+          const ttsUtterance = new SpeechSynthesisUtterance(narrationText);
+          ttsUtterance.lang = 'ko-KR';
+          ttsUtterance.rate = selectedUploadPlatform === 'tiktok' ? 1.15 : selectedUploadPlatform === 'youtube' ? 0.95 : 1.05;
+          ttsUtterance.pitch = 1.0;
+          const voices = window.speechSynthesis.getVoices();
+          const koreanVoice = voices.find(v => v.lang.startsWith('ko'));
+          if (koreanVoice) ttsUtterance.voice = koreanVoice;
+          setTimeout(() => {
+            window.speechSynthesis.speak(ttsUtterance);
+          }, 200);
+        }
+      } catch { /* TTS is optional */ }
+
+      // Add transition sound effects (whoosh/zip) at scene boundaries
+      const sfxGain = audioCtx.createGain();
+      sfxGain.gain.value = 0.2;
+      sfxGain.connect(masterGain);
+      for (let i = 1; i < totalScenes; i++) {
+        const sfxTime = (DURATION / totalScenes) * i;
+        const sfxOsc = audioCtx.createOscillator();
+        const sfxOscGain = audioCtx.createGain();
+        sfxOsc.type = 'sawtooth';
+        sfxOsc.frequency.setValueAtTime(800, sfxTime);
+        sfxOsc.frequency.exponentialRampToValueAtTime(200, sfxTime + 0.1);
+        sfxOscGain.gain.setValueAtTime(0.15, sfxTime);
+        sfxOscGain.gain.exponentialRampToValueAtTime(0.001, sfxTime + 0.12);
+        sfxOsc.connect(sfxOscGain);
+        sfxOscGain.connect(sfxGain);
+        sfxOsc.start(sfxTime);
+        sfxOsc.stop(sfxTime + 0.15);
+      }
 
       const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
         ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
@@ -991,14 +1084,74 @@ export default function AffiliateScreen() {
         return H * 0.72;
       };
 
-      // TV commercial style: quick cross-fade between scenes with beat-synced cuts
+      // TV commercial style: advanced transitions between scenes
       const getSceneTransitionAlpha = (localT: number, sceneIdx: number) => {
         const fadeIn = Math.min(localT * 8, 1);
         const fadeOut = Math.min((1 - localT) * 8, 1);
-        // Add a quick flash at scene boundaries (TV commercial cut effect)
         const cutFlash = localT < 0.05 ? 1 - localT * 20 : 0;
         return Math.min(fadeIn * fadeOut + cutFlash * 0.3, 1);
       };
+
+      // Advanced transition effects: whip pan, zoom blur, glitch, match cut
+      const drawTransitionEffect = (
+        transitionType: 'whip-pan' | 'zoom-blur' | 'glitch' | 'match-cut' | 'cross-fade',
+        localT: number,
+        sceneIdx: number,
+      ) => {
+        if (localT > 0.15 && localT < 0.85) return; // Only at boundaries
+
+        const isEnter = localT < 0.15;
+        const t = isEnter ? localT / 0.15 : (1 - localT) / 0.15;
+
+        switch (transitionType) {
+          case 'whip-pan': {
+            const blurX = isEnter ? (1 - t) * 80 : t * 80;
+            ctx.filter = `blur(${blurX}px)`;
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, 0, W, H);
+            ctx.filter = 'none';
+            ctx.globalAlpha = 1;
+            break;
+          }
+          case 'zoom-blur': {
+            const scale = isEnter ? 1 + (1 - t) * 0.3 : 1 + t * 0.3;
+            ctx.filter = `blur(${(1 - t) * 6}px)`;
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(0, 0, W, H);
+            ctx.filter = 'none';
+            ctx.globalAlpha = 1;
+            break;
+          }
+          case 'glitch': {
+            if (t > 0.3) {
+              const glitchY = Math.random() * H;
+              const glitchH = 20 + Math.random() * 40;
+              ctx.globalAlpha = 0.6 * (1 - t);
+              ctx.fillStyle = '#ff0044';
+              ctx.fillRect(0, glitchY, W, glitchH);
+              ctx.fillStyle = '#00ffff';
+              ctx.fillRect(-10 + Math.random() * 20, glitchY, W, glitchH);
+              ctx.globalAlpha = 1;
+            }
+            break;
+          }
+          case 'match-cut': {
+            const flash = isEnter ? (1 - t) * 0.3 : t * 0.3;
+            ctx.fillStyle = `rgba(255,255,255,${flash})`;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+          case 'cross-fade':
+          default: {
+            // Standard cross-fade handled by transitionAlpha
+            break;
+          }
+        }
+      };
+
+      // Assign transition types to scene boundaries (cycling through)
+      const transitionTypes: Array<'whip-pan' | 'zoom-blur' | 'glitch' | 'match-cut' | 'cross-fade'> = ['whip-pan', 'zoom-blur', 'glitch', 'match-cut', 'cross-fade'];
 
       // Emotion-specific overlay rendering — TV commercial style
       const drawEmotionOverlay = (
@@ -1165,6 +1318,12 @@ export default function AffiliateScreen() {
             ctx.globalAlpha = 1;
           }
 
+          // Advanced transition effect at scene boundaries
+          if (sceneIdx > 0) {
+            const transitionType = transitionTypes[sceneIdx % transitionTypes.length];
+            drawTransitionEffect(transitionType, sceneLocalT, sceneIdx);
+          }
+
           // Emotion-specific overlay
           ctx.globalAlpha = transitionAlpha;
           drawEmotionOverlay(scene.emotion, sceneLocalT, scene.colorTheme);
@@ -1188,9 +1347,14 @@ export default function AffiliateScreen() {
           ctx.fillStyle = vignetteGrad;
           ctx.fillRect(0, 0, W, H);
 
-          // Scene text with transition fade — TV commercial style bold text
+          // Kinetic caption animation: word-by-word reveal with bounce
           ctx.globalAlpha = transitionAlpha;
-          ctx.fillStyle = '#fff';
+          const textY = getTextY(scene.textPosition);
+          const words = scene.textOverlay.split(' ');
+          const totalWords = words.length;
+          // Reveal words progressively: each word appears at 1/totalWords of scene duration
+          const wordsRevealed = Math.min(Math.floor(sceneLocalT * totalWords * 1.5) + 1, totalWords);
+
           ctx.font = `900 ${scene.fontSize}px sans-serif`;
           ctx.textBaseline = 'top';
           ctx.textAlign = 'center';
@@ -1198,20 +1362,65 @@ export default function AffiliateScreen() {
           ctx.shadowBlur = 20;
           ctx.shadowOffsetY = 4;
 
-          const textY = getTextY(scene.textPosition);
-          const lines = scene.textOverlay.match(/.{1,14}/g) || [scene.textOverlay];
-          lines.slice(0, 3).forEach((line, i) => {
-            ctx.fillText(line, W / 2, textY + i * (scene.fontSize + 12));
+          // Measure total text width for centering
+          const visibleWords = words.slice(0, wordsRevealed);
+          const fullText = visibleWords.join(' ');
+          const lines = fullText.match(/.{1,14}/g) || [fullText];
+
+          lines.slice(0, 3).forEach((line, lineI) => {
+            const lineWords = line.split(' ');
+            let xOffset = 0;
+            // Measure each word for kinetic positioning
+            const lineWidth = ctx.measureText(line).width;
+            let wordX = (W - lineWidth) / 2;
+
+            lineWords.forEach((word, wordI) => {
+              const globalWordIdx = lines.slice(0, lineI).reduce((sum, l) => sum + l.split(' ').length, 0) + wordI;
+              const wordProgress = Math.min(sceneLocalT * totalWords * 1.5 - globalWordIdx + 1, 1);
+              const wordAlpha = Math.max(0, Math.min(wordProgress, 1));
+              const bounce = wordProgress < 1 ? Math.sin(wordProgress * Math.PI) * 8 : 0;
+              const scale = wordProgress < 1 ? 0.8 + wordProgress * 0.2 : 1;
+
+              ctx.globalAlpha = transitionAlpha * wordAlpha;
+              ctx.save();
+              ctx.translate(wordX + ctx.measureText(word).width / 2, textY + lineI * (scene.fontSize + 12) - bounce);
+              ctx.scale(scale, scale);
+              ctx.fillStyle = '#fff';
+              ctx.fillText(word, 0, 0);
+              ctx.restore();
+
+              wordX += ctx.measureText(word + ' ').width;
+            });
           });
 
+          // Subtext with typewriter effect
           ctx.font = `600 ${scene.subFontSize}px sans-serif`;
           ctx.fillStyle = scene.colorTheme.accent + 'DD';
           ctx.shadowBlur = 10;
           const descLines = scene.subtext.match(/.{1,24}/g) || [scene.subtext];
           const descY = textY + lines.length * (scene.fontSize + 12) + 16;
+          const totalDescChars = scene.subtext.length;
+          const charsRevealed = Math.min(Math.floor(sceneLocalT * totalDescChars * 1.2) + 1, totalDescChars);
+
           descLines.slice(0, 3).forEach((line, i) => {
-            ctx.fillText(line, W / 2, descY + i * (scene.subFontSize + 8));
+            const charsBeforeLine = descLines.slice(0, i).reduce((sum, l) => sum + l.length, 0);
+            const lineChars = Math.max(0, Math.min(charsRevealed - charsBeforeLine, line.length));
+            const visibleLine = line.slice(0, lineChars);
+            if (visibleLine) {
+              ctx.fillText(visibleLine, W / 2, descY + i * (scene.subFontSize + 8));
+            }
           });
+
+          // Blinking cursor at end of typewriter text
+          if (charsRevealed < totalDescChars) {
+            const cursorBlink = Math.sin(elapsed / 100) > 0;
+            if (cursorBlink) {
+              const lastLine = descLines[Math.min(Math.floor(charsRevealed / 24), descLines.length - 1)];
+              const lastLineWidth = ctx.measureText(lastLine.slice(0, charsRevealed % 24)).width;
+              ctx.fillStyle = scene.colorTheme.accent;
+              ctx.fillRect(W / 2 + lastLineWidth / 2 + 4, descY + Math.min(Math.floor(charsRevealed / 24), 2) * (scene.subFontSize + 8), 3, scene.subFontSize);
+            }
+          }
 
           ctx.fillStyle = scene.colorTheme.primary;
           ctx.font = '700 18px sans-serif';
@@ -1269,12 +1478,19 @@ export default function AffiliateScreen() {
         } else {
           setTimeout(() => {
             if (recorder.state === 'recording') recorder.stop();
-          }, 100);
+          }, 200);
         }
       };
       requestAnimationFrame(drawFrame);
 
       await done;
+      // Clean up audio resources
+      try {
+        bgmOsc.stop();
+        melodyOsc.stop();
+        audioCtx.close();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      } catch { /* cleanup best-effort */ }
       const blob = new Blob(chunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
       setRenderedVideoUrl(url);
@@ -1840,6 +2056,13 @@ export default function AffiliateScreen() {
                           selectedUploadPlatform,
                           selectedBoard,
                           affiliateUrl,
+                          undefined,
+                          {
+                            productName: productMeta?.productName,
+                            price: productMeta?.price,
+                            brand: productMeta?.brand,
+                            description: productMeta?.description,
+                          },
                         ),
                       );
                     }, 1800);
@@ -2134,7 +2357,6 @@ export default function AffiliateScreen() {
                         controls
                         autoPlay
                         loop
-                        muted
                         style={{
                           width: '100%',
                           maxHeight: 400,

@@ -228,6 +228,7 @@ export function generatePsychAnalysis(
   board: string,
   _productUrl: string,
   specsIn?: { ratio: string; resolution: string; maxDuration: string; format: string },
+  productMeta?: { productName?: string; price?: string; brand?: string; description?: string },
 ): PsychAnalysis {
   const specs = specsIn ?? { ratio: '16:9', resolution: '1920×1080', maxDuration: '60초', format: 'MP4' };
   const profile = PLATFORM_PROFILES[platform] ?? PLATFORM_PROFILES.tiktok;
@@ -244,20 +245,77 @@ export function generatePsychAnalysis(
 
   const sceneCount = Math.min(triggers.length, Math.max(5, Math.floor(totalSec / 8)));
 
+  const pName = productMeta?.productName?.trim() || '이 제품';
+  const pPrice = productMeta?.price?.trim() || '';
+  const pBrand = productMeta?.brand?.trim() || '';
+  const pDesc = productMeta?.description?.trim() || '';
+  const nameShort = pName.length > 12 ? pName.slice(0, 12) + '...' : pName;
+  const brandPrefix = pBrand ? `${pBrand} ` : '';
+
   const hookTexts: Record<EmotionPhase, string[]> = {
-    curiosity: ['이거 알아?', '잠깐, 이거 봤어?', '이게 왜 1등인지 알아?', '이거 진짜야?', '이거 그냥 넘기지 마'],
-    shock: ['이 가격 실화?', '이거 진짜 미쳤는데', '이거 보고 충격받음', '이거 실화임?', '이거 진짜 충격이야'],
-    empathy: ['이거 쓰면 진짜 편해요', '이거 쓰는 분들 공감 100%', '이거 쓰면 왜 몰랐지 싶음', '이거 쓰면 삶이 바뀜', '이거 진짜 추천'],
-    desire: ['이거 무조건 사야 됨', '이거 지금 안 사면 손해', '이거 재고 떨어지면 끝', '이거 지금이 기회', '이거 진짜 사고 싶음'],
-    action: ['지금 바로 확인', '링크 바로가기', '이거 지금 구매', '댓글로 문의', '지금 안 사면 후회'],
+    curiosity: [
+      `${nameShort} 알아?`,
+      `잠깐, ${nameShort} 봤어?`,
+      `이게 왜 1등인지 알아?`,
+      `${nameShort} 진짜야?`,
+      `${pBrand ? pBrand + ' ' : ''}${nameShort}이 그냥 넘기지 마`,
+    ],
+    shock: [
+      pPrice ? `${nameShort} ${pPrice} 실화?` : `${nameShort} 이 가격 실화?`,
+      `${nameShort} 진짜 미쳤는데`,
+      `${nameShort} 보고 충격받음`,
+      pPrice ? `${pPrice}이라고? 진짜임?` : '이거 실화임?',
+      `${nameShort} 진짜 충격이야`,
+    ],
+    empathy: [
+      `${nameShort} 쓰면 진짜 편해요`,
+      `${nameShort} 쓰는 분들 공감 100%`,
+      `${nameShort} 쓰면 왜 몰랐지 싶음`,
+      `${nameShort} 쓰면 삶이 바뀜`,
+      `${nameShort} 진짜 추천`,
+    ],
+    desire: [
+      `${nameShort} 무조건 사야 됨`,
+      `${nameShort} 지금 안 사면 손해`,
+      `${nameShort} 재고 떨어지면 끝`,
+      `${nameShort} 지금이 기회`,
+      pPrice ? `${nameShort} ${pPrice} 진짜 사고 싶음` : `${nameShort} 진짜 사고 싶음`,
+    ],
+    action: [
+      `${nameShort} 지금 바로 확인`,
+      `${nameShort} 링크 바로가기`,
+      `${nameShort} 지금 구매`,
+      `${nameShort} 댓글로 문의`,
+      `${nameShort} 지금 안 사면 후회`,
+    ],
   };
 
   const subTexts: Record<EmotionPhase, string[]> = {
-    curiosity: ['시선이 멈추는 첫 1초, 호기심 자극으로 시청 지속', '정보 갭을 열어서 끝까지 보게 만드는 후크', '시각적 반전으로 스와이프를 차단하는 기법'],
-    shock: ['예상을 깨는 시각 충격으로 감정 폭발 유발', '도파민 분비를 촉진하는 강렬한 전환 장면', '손실 회피 심리를 자극하는 긴박감 연출'],
-    empathy: ['개인적 경험으로 광고 거부감 제거, 신뢰 구축', '사용 전후 비교로 공감과 욕구를 동시 자극', '실사용 스토리로 뇌가 광고가 아닌 이야기로 인식'],
-    desire: ['사회적 증거와 희소성으로 구매 욕구 극대화', '한정 판매 메시지로 손실 회피를 행동으로 전환', '번들링 효과로 제품이 아닌 라이프스타일을 판매'],
-    action: ['명확한 CTA로 전환율을 극대화하는 마지막 장면', '댓글 유도로 참여율을 높이고 알고리즘 가시성 상승', '제휴 링크 위치 힌트로 클릭률 3배 향상'],
+    curiosity: [
+      `${brandPrefix}${nameShort}으로 시선이 멈추는 첫 1초`,
+      `${nameShort} 정보 갭을 열어 끝까지 보게 만드는 후크`,
+      `시각적 반전으로 스와이프를 차단하는 ${nameShort} 기법`,
+    ],
+    shock: [
+      pPrice ? `${nameShort} ${pPrice} 예상을 깨는 시각 충격` : `${nameShort} 예상을 깨는 시각 충격`,
+      `${nameShort} 도파민 분비를 촉진하는 강렬한 전환`,
+      `${nameShort} 손실 회피 심리를 자극하는 긴박감 연출`,
+    ],
+    empathy: [
+      `${nameShort} 개인적 경험으로 광고 거부감 제거`,
+      `${nameShort} 사용 전후 비교로 공감과 욕구를 동시 자극`,
+      `${nameShort} 실사용 스토리로 뇌가 이야기로 인식`,
+    ],
+    desire: [
+      `${nameShort} 사회적 증거와 희소성으로 구매 욕구 극대화`,
+      pPrice ? `${nameShort} ${pPrice} 한정 판매로 손실 회피를 행동으로` : `${nameShort} 한정 판매로 손실 회피를 행동으로`,
+      `${nameShort} 번들링 효과로 라이프스타일을 판매`,
+    ],
+    action: [
+      `${nameShort} 명확한 CTA로 전환율 극대화`,
+      `${nameShort} 댓글 유도로 참여율 상승`,
+      `${nameShort} 제휴 링크로 클릭률 3배 향상`,
+    ],
   };
 
   const textPositions: PsychScene['textPosition'][] = ['top', 'center', 'bottom'];
