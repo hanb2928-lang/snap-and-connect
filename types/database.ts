@@ -179,6 +179,7 @@ export interface UserSettings {
   toss_share_id: string | null;
   openai_api_key: string | null;
   pexels_api_key: string | null;
+  tts_api_key: string | null;
   logo_url: string | null;
   default_video_duration: string | null;
   default_tts_voice: string | null;

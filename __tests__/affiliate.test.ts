@@ -35,6 +35,7 @@ const fullSettings: UserSettings = {
   toss_share_id: 'tossshare789',
   openai_api_key: null,
   pexels_api_key: null,
+  tts_api_key: null,
   logo_url: null,
   default_video_duration: null,
   default_tts_voice: null,

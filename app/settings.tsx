@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp, Music2 } from 'lucide-react-native';
 import { SectionCard } from '@/components/SectionCard';
 import { theme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -80,6 +80,7 @@ export default function SettingsScreen() {
   const [revSaving, setRevSaving] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [pexelsKey, setPexelsKey] = useState('');
+  const [ttsKey, setTtsKey] = useState('');
   const [savingKey, setSavingKey] = useState(false);
   const [savedKey, setSavedKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -152,6 +153,7 @@ export default function SettingsScreen() {
       setLogoUrl(data?.logo_url || null);
       setOpenaiKey(data?.openai_api_key || '');
       setPexelsKey(data?.pexels_api_key || '');
+      setTtsKey(data?.tts_api_key || '');
       setDefaultVideoDuration(data?.default_video_duration || '15s');
       setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
       setTtsSpeed(data?.tts_speed ?? 1.0);
@@ -498,6 +500,7 @@ export default function SettingsScreen() {
             { label: t('settings.toss'), value: tossId, color: '#0064FF', icon: 'T' },
             { label: 'OpenAI', value: openaiKey, color: theme.colors.primary[400], icon: 'AI' },
             { label: 'Pexels', value: pexelsKey, color: theme.colors.success[400], icon: 'PX' },
+            { label: 'TTS', value: ttsKey, color: theme.colors.accent[400], icon: 'TTS' },
           ].map((item, i) => {
             const isSet = item.value && item.value.trim().length > 0;
             return (
@@ -2194,7 +2197,7 @@ export default function SettingsScreen() {
             setSavingKey(true);
             setSavedKey(false);
             try {
-              await updateUserSettings({ openai_api_key: openaiKey || null, pexels_api_key: pexelsKey || null });
+              await updateUserSettings({ openai_api_key: openaiKey || null, pexels_api_key: pexelsKey || null, tts_api_key: ttsKey || null });
               setSavedKey(true);
               setTimeout(() => setSavedKey(false), 2500);
             } catch (err) {
@@ -2250,6 +2253,40 @@ export default function SettingsScreen() {
             <ExternalLink size={12} color={theme.colors.success[400]} strokeWidth={2} />
             <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.success[400] }}>
               Pexels에서 무료 키 발급받기
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.accent[500] + '20' }]}>
+              <Music2 size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>TTS API Key (ElevenLabs / OpenAI)</Text>
+              <TextInput
+                style={styles.idInput}
+                value={ttsKey}
+                onChangeText={setTtsKey}
+                placeholder="고품질 내레이션용 음성 합성 키"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!showApiKey}
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginTop: 8, lineHeight: 16 }}>
+            ElevenLabs 또는 OpenAI TTS API 키를 입력하면 인간에 가까운 자연스러운 한국어 내레이션이 영상에 포함됩니다. 미입력 시 기본 브라우저 음성이 사용됩니다.
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, alignSelf: 'flex-start' }}
+            onPress={() => Linking.openURL('https://platform.openai.com/api-keys')}
+            activeOpacity={0.7}
+          >
+            <ExternalLink size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.accent[400] }}>
+              OpenAI에서 API 키 발급받기
             </Text>
           </TouchableOpacity>
         </View>
