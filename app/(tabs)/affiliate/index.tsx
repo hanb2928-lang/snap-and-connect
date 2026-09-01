@@ -2612,7 +2612,7 @@ export default function AffiliateScreen() {
                 onPress={() => setContentSubStep(1)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.subNextBtnText}>다음: 전략 및 페이싱</Text>
+                <Text style={styles.subNextBtnText}>다음: 스타일 및 문구</Text>
                 <ChevronDown size={14} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
               </TouchableOpacity>
             </View>
@@ -2629,9 +2629,9 @@ export default function AffiliateScreen() {
                 <Text style={[styles.subAccordionNumText, contentSubStep === 1 && styles.subAccordionNumTextActive]}>2</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.subAccordionTitle}>전략 및 페이싱</Text>
+                <Text style={styles.subAccordionTitle}>편집 길이 및 스타일</Text>
                 <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                  {videoEditPlan ? `${videoEditPlan.duration}초 페이싱 · 전략 적용됨` : '15초/30초와 심리 전략을 선택하세요'}
+                  {videoEditPlan ? `${videoEditPlan.duration}초 편집 계획 적용됨` : '15초/30초 중 선택하세요'}
                 </Text>
               </View>
             </View>
@@ -3241,9 +3241,9 @@ export default function AffiliateScreen() {
           </View>
 
           {/* Per-platform algorithm-aware caption optimizer */}
-          <Text style={styles.optimizerSectionTitle}>플랫폼별 알고리즘 최적화 캡션</Text>
+          <Text style={styles.optimizerSectionTitle}>플랫폼별 최적화 캡션</Text>
           <Text style={styles.optimizerSectionDesc}>
-            각 플랫폼의 추천 알고리즘과 UX에 맞춰 제목, 본문, 해시태그, 공정위 문구 배치를 자동 최적화합니다. 섹션별로 복사할 수 있습니다.
+            각 플랫폼에 맞춰 제목·본문·해시태그·공정위 문구를 자동 배치합니다. 섹션별 복사 가능.
           </Text>
           {UPLOAD_PLATFORMS.map((p) => (
             <PlatformCaptionOptimizer

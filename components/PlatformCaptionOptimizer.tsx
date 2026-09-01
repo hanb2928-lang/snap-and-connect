@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, Copy, Lightbulb, Link2, Hash, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Check, Copy, Link2, Hash, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import {
   buildPlatformCaption,
-  getAlgorithmTips,
   getHashtagStrategy,
   getLinkGuidance,
   getCaptionTemplate,
@@ -48,7 +47,6 @@ export function PlatformCaptionOptimizer({
     autoDisclosure,
     disclosurePlacement,
   );
-  const tips = getAlgorithmTips(platformKey);
   const hashtagStrategy = getHashtagStrategy(platformKey);
   const linkGuidance = getLinkGuidance(platformKey);
   const tmpl = getCaptionTemplate(platformKey);
@@ -201,22 +199,7 @@ export function PlatformCaptionOptimizer({
             </Text>
           </TouchableOpacity>
 
-          {/* Algorithm tips */}
-          <View style={styles.tipsBox}>
-            <View style={styles.tipsHeader}>
-              <Lightbulb size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.tipsTitle}>{platformLabel} 알고리즘 팁</Text>
-            </View>
-            {tips.map((tip, i) => (
-              <View key={i} style={styles.tipItem}>
-                <View style={[styles.tipDot, { backgroundColor: platformColor }]} />
-                <View style={styles.tipContent}>
-                  <Text style={styles.tipLabel}>{tip.label}</Text>
-                  <Text style={styles.tipDesc}>{tip.desc}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+
         </View>
       )}
     </View>
@@ -354,47 +337,5 @@ const styles = StyleSheet.create({
   fullCopyText: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
-  },
-  tipsBox: {
-    backgroundColor: theme.colors.warning[500] + '10',
-    borderRadius: theme.radius.sm,
-    padding: 8,
-    gap: 6,
-  },
-  tipsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  tipsTitle: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.warning[400],
-  },
-  tipItem: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'flex-start',
-  },
-  tipDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 5,
-  },
-  tipContent: {
-    flex: 1,
-    gap: 1,
-  },
-  tipLabel: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  tipDesc: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 13,
   },
 });

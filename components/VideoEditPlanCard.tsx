@@ -11,8 +11,6 @@ import {
 } from 'react-native';
 import {
   Scissors,
-  Brain,
-  ShieldOff,
   ShieldCheck,
   Copy,
   Check,
@@ -45,13 +43,7 @@ interface VideoEditPlanCardProps {
   hideCopyVariants?: boolean;
 }
 
-const PSYCHOLOGY_OPTIONS: { key: PsychologyPreset; label: string; desc: string }[] = [
-  { key: 'auto', label: '자동 추천', desc: 'AI가 제품에 맞는 전략 선택' },
-  { key: 'loss_aversion', label: '손실 회피', desc: '놓치면 후회' },
-  { key: 'curiosity_gap', label: '호기심 갭', desc: '궁금증으로 끝까지' },
-  { key: 'fomo', label: 'FOMO', desc: '다들 쓴다는 압박' },
-  { key: 'social_proof', label: '소셜 증명', desc: '리뷰·평점 신뢰' },
-];
+
 
 export function VideoEditPlanCard({
   productName,
@@ -65,7 +57,7 @@ export function VideoEditPlanCard({
   hideCopyVariants = false,
 }: VideoEditPlanCardProps) {
   const [duration, setDuration] = useState<15 | 30>(15);
-  const [psychPreset, setPsychPreset] = useState<PsychologyPreset>('auto');
+  const psychPreset: PsychologyPreset = 'auto';
   const [plan, setPlan] = useState<EditPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +177,7 @@ export function VideoEditPlanCard({
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>영상 편집 계획 (15초 / 30초)</Text>
           <Text style={styles.subtitle}>
-            알고리즘 최적화 길이로 편집 · 중복 감지 회피 · 심리 후킹 적용
+            AI가 상품에 맞는 최적 편집 계획을 자동 생성합니다
           </Text>
         </View>
       </View>
@@ -221,34 +213,6 @@ export function VideoEditPlanCard({
             </>
           )}
         </TouchableOpacity>
-      </View>
-
-      {/* Psychology strategy selector */}
-      <View style={styles.psychRow}>
-        <View style={styles.psychLabelWrap}>
-          <Brain size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-          <Text style={styles.psychLabel}>심리 전략</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.psychScroll}>
-          {PSYCHOLOGY_OPTIONS.map((opt) => {
-            const isActive = psychPreset === opt.key;
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.psychChip, isActive && styles.psychChipActive]}
-                onPress={() => setPsychPreset(opt.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.psychChipLabel, isActive && styles.psychChipLabelActive]}>
-                  {opt.label}
-                </Text>
-                <Text style={[styles.psychChipDesc, isActive && styles.psychChipDescActive]}>
-                  {opt.desc}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
       {error && (
@@ -348,7 +312,7 @@ export function VideoEditPlanCard({
               {/* Psychology */}
               <View style={styles.infoCard}>
                 <View style={styles.infoCardHeader}>
-                  <Brain size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
                   <Text style={styles.infoCardTitle}>심리학 적용</Text>
                 </View>
                 <Text style={styles.infoCardLabel}>원리: {plan.psychology.principle}</Text>
@@ -356,37 +320,15 @@ export function VideoEditPlanCard({
                 <Text style={styles.infoCardTrigger}>트리거 지점: {plan.psychology.triggerPoint}</Text>
               </View>
 
-              {/* Anti-algorithm */}
-              <View style={styles.infoCardAnti}>
-                <View style={styles.infoCardHeader}>
-                  <ShieldOff size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={styles.infoCardTitle}>알고리즘 중복 회피 전략</Text>
-                </View>
-                <View style={styles.antiItem}>
-                  <Text style={styles.antiLabel}>문구 변형</Text>
-                  <Text style={styles.antiText}>{plan.antiAlgorithm.copyVariation}</Text>
-                </View>
-                <View style={styles.antiItem}>
-                  <Text style={styles.antiLabel}>페이싱</Text>
-                  <Text style={styles.antiText}>{plan.antiAlgorithm.pacingStrategy}</Text>
-                </View>
-                <View style={styles.antiItem}>
-                  <Text style={styles.antiLabel}>비주얼 변경</Text>
-                  <Text style={styles.antiText}>{plan.antiAlgorithm.visualChangeStrategy}</Text>
-                </View>
-                <View style={styles.antiItem}>
-                  <Text style={styles.antiLabel}>오디오 변경</Text>
-                  <Text style={styles.antiText}>{plan.antiAlgorithm.audioChangeStrategy}</Text>
-                </View>
-              </View>
+
             </>
           )}
 
           {/* Copy variants */}
           {!hideCopyVariants && (
-          <Text style={styles.sectionLabel}>카피 변형 (알고리즘 피하기)</Text>
+          <Text style={styles.sectionLabel}>AI 추천 카피</Text>
           )}
-          {!hideCopyVariants && plan.copyVariants.map((variant, i) => {
+          {!hideCopyVariants && plan.copyVariants.slice(0, 2).map((variant, i) => {
             const isExpanded = expandedCopy === i;
             return (
               <View key={i} style={styles.copyCard}>
@@ -535,55 +477,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
-  psychRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: theme.spacing.sm,
-  },
-  psychLabelWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  psychLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[400],
-  },
-  psychScroll: {
-    flex: 1,
-  },
-  psychChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.dark.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    marginRight: 6,
-  },
-  psychChipActive: {
-    backgroundColor: theme.colors.accent[400] + '18',
-    borderColor: theme.colors.accent[400],
-  },
-  psychChipLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  psychChipLabelActive: {
-    color: theme.colors.accent[400],
-  },
-  psychChipDesc: {
-    fontSize: 9,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    marginTop: 1,
-  },
-  psychChipDescActive: {
-    color: theme.colors.dark.textDim,
-  },
   errorBox: {
     backgroundColor: theme.colors.error[400] + '12',
     borderRadius: theme.radius.sm,
@@ -730,14 +623,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
   },
-  infoCardAnti: {
-    backgroundColor: theme.colors.success[400] + '0D',
-    borderRadius: theme.radius.md,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.success[400] + '25',
-  },
   infoCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -766,21 +651,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginTop: 4,
-  },
-  antiItem: {
-    marginBottom: 6,
-  },
-  antiLabel: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.success[400],
-    marginBottom: 1,
-  },
-  antiText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 15,
   },
   metaRow: {
     flexDirection: 'row',
