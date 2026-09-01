@@ -170,7 +170,7 @@ export default function TrendingScreen() {
 
       if (fnError) throw fnError;
 
-      const fetchedCategories: TrendingCategory[] = data.categories || [];
+      const fetchedCategories: TrendingCategory[] = data?.categories || [];
       if (fetchedCategories.length === 0) throw new Error('인기 상품을 불러올 수 없습니다.');
 
       productCache.set(mp, { data: fetchedCategories, ts: Date.now() });

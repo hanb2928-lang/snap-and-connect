@@ -16,7 +16,6 @@ import { supabase } from '@/lib/supabase';
 import type { Scan } from '@/types/database';
 import { useSubTabBarHeight } from '@/hooks/useSubTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
 import { SkeletonList } from '@/components/Skeleton';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
@@ -29,7 +28,6 @@ export default function HistoryScreen() {
   const router = useRouter();
   const tabBarHeight = useSubTabBarHeight();
   const safeTop = useSafeTop();
-  const networkStatus = useNetworkStatus();
   const [scans, setScans] = useState<ScanListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,11 +101,8 @@ export default function HistoryScreen() {
       if (err) {
         setError(err.message);
       } else {
-        setScans((prev) => {
-          const next = prev.filter((s) => s.id !== id);
-          setCached(CACHE_KEY, next);
-          return next;
-        });
+        setScans((prev) => prev.filter((s) => s.id !== id));
+        setCached(CACHE_KEY, scans.filter((s) => s.id !== id));
       }
     } catch {
       setError('삭제 중 오류가 발생했어요');
@@ -249,21 +244,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginTop: 4,
-  },
-  errorBanner: {
-    backgroundColor: theme.colors.error[500] + '20',
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.error[400],
-  },
-  errorText: {
-    color: theme.colors.error[400],
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
   },
   cacheBanner: {
     flexDirection: 'row',
