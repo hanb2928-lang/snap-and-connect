@@ -29,7 +29,7 @@ import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta, updateScanWithAnalysis } from '@/lib/analysis';
+import { saveManualScan, uploadImage, analyzeImage, analyzeImageWithProductContext, extractProductMeta, updateScanWithAnalysis } from '@/lib/analysis';
 import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { setItem } from '@/lib/storage';
@@ -514,9 +514,9 @@ export default function AffiliateScreen() {
       const imageUrl = await uploadImage(selectedImage, selectedImageMime);
       const scanId = await saveManualScan(imageUrl);
       let analysisResult = null;
-      if (productMeta) {
-        try {
-          const dataUrl = selectedImage.startsWith('data:') ? selectedImage : buildDataUrl(selectedImage, selectedImageMime);
+      try {
+        const dataUrl = selectedImage.startsWith('data:') ? selectedImage : buildDataUrl(selectedImage, selectedImageMime);
+        if (productMeta) {
           analysisResult = await analyzeImageWithProductContext(
             dataUrl,
             'scan.jpg',
@@ -530,10 +530,17 @@ export default function AffiliateScreen() {
               platform: productMeta.platform,
             },
           );
-          await updateScanWithAnalysis(scanId, analysisResult);
-        } catch {
-          // analysis enhancement is best-effort; scan already saved
+        } else {
+          analysisResult = await analyzeImage(
+            dataUrl,
+            'scan.jpg',
+            selectedImageMime || 'image/jpeg',
+            'single',
+          );
         }
+        await updateScanWithAnalysis(scanId, analysisResult);
+      } catch {
+        // analysis enhancement is best-effort; scan already saved
       }
       markCompleted('analyze');
       setLastScanId(scanId);
@@ -819,6 +826,9 @@ export default function AffiliateScreen() {
                   <Text style={styles.extractSearchBtnText}>검색 페이지에서 상품 확인</Text>
                 </TouchableOpacity>
               )}
+              <Text style={styles.extractHintText}>
+                상품 사진을 직접 업로드하면 AI가 사진만으로 상품을 분석합니다.
+              </Text>
               <View style={styles.extractErrorActionRow}>
                 <TouchableOpacity
                   style={styles.extractRetryBtn}
@@ -841,8 +851,8 @@ export default function AffiliateScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <ImageIcon size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={styles.extractManualBtnText}>수동 입력으로 진행</Text>
+                  <ImageIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+                  <Text style={styles.extractManualBtnText}>사진 업로드로 진행</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2859,14 +2869,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    backgroundColor: theme.colors.accent[500] + '18',
     borderWidth: 1,
-    borderColor: theme.colors.dark.border,
+    borderColor: theme.colors.accent[400] + '40',
   },
   extractManualBtnText: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+  },
+  extractHintText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+    lineHeight: 15,
+    marginBottom: 8,
   },
   extractSearchBtn: {
     flexDirection: 'row',
