@@ -1,7 +1,9 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag } from 'lucide-react-native';
+import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag, Video, Image as ImageIcon2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
+
+export type MediaType = 'image' | 'video';
 
 interface PlatformTabsProps {
   selected: PlatformKey;
@@ -51,6 +53,72 @@ export function PlatformTabs({ selected, onSelect }: PlatformTabsProps) {
   );
 }
 
+interface BoardTabsProps {
+  platform: PlatformKey;
+  selected: MediaType;
+  onSelect: (media: MediaType) => void;
+}
+
+const PLATFORM_BOARDS: Partial<Record<PlatformKey, MediaType[]>> = {
+  naverBlog: ['image'],
+  shortform: ['video'],
+  instagram: ['image', 'video'],
+  threads: ['image'],
+  twitter: ['image', 'video'],
+  pinterest: ['image'],
+  smartstore: ['image'],
+};
+
+const BOARD_LABELS: Record<MediaType, { label: string; icon: typeof Video }> = {
+  image: { label: '이미지 게시판', icon: ImageIcon2 },
+  video: { label: '동영상 게시판', icon: Video },
+};
+
+export function BoardTabs({ platform, selected, onSelect }: BoardTabsProps) {
+  const boards = PLATFORM_BOARDS[platform] || ['image'];
+
+  if (boards.length <= 1) return null;
+
+  return (
+    <View style={styles.boardContainer}>
+      {boards.map((media) => {
+        const { label, icon: Icon } = BOARD_LABELS[media];
+        const isActive = selected === media;
+        return (
+          <TouchableOpacity
+            key={media}
+            style={[styles.boardTab, isActive && styles.boardTabActive]}
+            onPress={() => onSelect(media)}
+            activeOpacity={0.7}
+          >
+            <Icon
+              size={14}
+              color={isActive ? theme.colors.primary[300] : theme.colors.dark.textDim}
+              strokeWidth={2}
+            />
+            <Text
+              style={[styles.boardTabText, isActive && styles.boardTabTextActive]}
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+export function getPlatformMediaType(platform: PlatformKey): MediaType {
+  const boards = PLATFORM_BOARDS[platform] || ['image'];
+  return boards[0];
+}
+
+export function platformSupportsBoth(platform: PlatformKey): boolean {
+  const boards = PLATFORM_BOARDS[platform] || ['image'];
+  return boards.length > 1;
+}
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
@@ -78,5 +146,35 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
     flexShrink: 1,
+  },
+  boardContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: 2,
+  },
+  boardTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  boardTabActive: {
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderColor: theme.colors.primary[400] + '60',
+  },
+  boardTabText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  boardTabTextActive: {
+    color: theme.colors.primary[300],
+    fontFamily: theme.typography.fontFamily.semiBold,
   },
 });

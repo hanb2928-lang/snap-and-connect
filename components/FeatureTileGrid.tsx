@@ -21,6 +21,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export type ScanMode = 'single' | 'multi' | 'template';
 
+export type MediaType = 'image' | 'video' | 'both';
+
 export type FeatureTile = {
   key: string;
   label: string;
@@ -28,6 +30,7 @@ export type FeatureTile = {
   icon: ReactNode;
   category: string;
   modes?: ScanMode[];
+  mediaType?: MediaType;
   render: () => ReactNode;
 };
 
@@ -42,13 +45,14 @@ type Props = {
   scanMode?: ScanMode;
   focusTileKey?: string | null;
   onFocusConsumed?: () => void;
+  mediaFilter?: MediaType;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_GAP = theme.spacing.sm;
 const CARD_MIN_WIDTH = Math.max(150, (SCREEN_WIDTH - theme.spacing.lg * 2 - CARD_GAP * 2) / 3);
 
-export function FeatureTileGrid({ categories, scanMode, focusTileKey, onFocusConsumed }: Props) {
+export function FeatureTileGrid({ categories, scanMode, focusTileKey, onFocusConsumed, mediaFilter }: Props) {
   const [activeCategory, setActiveCategory] = useState(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const tabScrollRef = useRef<ScrollView>(null);
@@ -66,14 +70,17 @@ export function FeatureTileGrid({ categories, scanMode, focusTileKey, onFocusCon
   }, []);
 
   const filteredCategories = useMemo(() => {
-    if (!scanMode) return categories;
     return categories
       .map((cat) => ({
         ...cat,
-        tiles: cat.tiles.filter((tile) => !tile.modes || tile.modes.includes(scanMode)),
+        tiles: cat.tiles.filter((tile) => {
+          if (scanMode && tile.modes && !tile.modes.includes(scanMode)) return false;
+          if (mediaFilter && tile.mediaType && tile.mediaType !== 'both' && tile.mediaType !== mediaFilter) return false;
+          return true;
+        }),
       }))
       .filter((cat) => cat.tiles.length > 0);
-  }, [categories, scanMode]);
+  }, [categories, scanMode, mediaFilter]);
 
   const currentCategory = filteredCategories[activeCategory] ?? filteredCategories[0];
 

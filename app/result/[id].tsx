@@ -60,7 +60,8 @@ import { ShareBar } from '@/components/ShareBar';
 import { SocialShortFormShare } from '@/components/SocialShortFormShare';
 import { ShoppingMatchCard } from '@/components/ShoppingMatchCard';
 import { ProductSelector } from '@/components/ProductSelector';
-import { PlatformTabs } from '@/components/PlatformTabs';
+import { PlatformTabs, BoardTabs, getPlatformMediaType, platformSupportsBoth } from '@/components/PlatformTabs';
+import type { MediaType as BoardMediaType } from '@/components/PlatformTabs';
 import { ClipGenerator } from '@/components/ClipGenerator';
 import { CarouselGenerator } from '@/components/CarouselGenerator';
 import { MultiPlatformExport } from '@/components/MultiPlatformExport';
@@ -101,7 +102,7 @@ import { AIStyleCard } from '@/components/AIStyleCard';
 import type { StyleRecommendation } from '@/lib/styleRecommend';
 import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
-import type { FeatureCategory, ScanMode } from '@/components/FeatureTileGrid';
+import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
@@ -129,6 +130,7 @@ export default function ResultScreen() {
   const [customAffiliateLinks, setCustomAffiliateLinks] = useState<CustomAffiliateLink[]>([]);
   const [savingLink, setSavingLink] = useState(false);
   const [activePlatform, setActivePlatform] = useState<PlatformKey>('shortform');
+  const [activeBoard, setActiveBoard] = useState<BoardMediaType>('video');
   const [reviewSaving, setReviewSaving] = useState(false);
   const [stickerPosition, setStickerPosition] = useState<StickerPosition>('top-left');
   const [stickerStyle, setStickerStyle] = useState<StickerStyle>('pill');
@@ -347,8 +349,16 @@ export default function ResultScreen() {
   useEffect(() => {
     (async () => {
       const saved = await getItem('preferred_template_style');
-      if (saved) setActivePlatform(saved as PlatformKey);
+      if (saved) {
+        setActivePlatform(saved as PlatformKey);
+        setActiveBoard(getPlatformMediaType(saved as PlatformKey));
+      }
     })();
+  }, []);
+
+  const handlePlatformChange = useCallback((key: PlatformKey) => {
+    setActivePlatform(key);
+    setActiveBoard(getPlatformMediaType(key));
   }, []);
 
   useEffect(() => {
@@ -816,6 +826,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <LayoutTemplate size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          mediaType: 'image',
           render: () => (
             <View>
               {primaryAffiliateUrl ? (
@@ -969,6 +980,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PaletteIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          mediaType: 'image',
           render: () => (
             <AIStyleCard
               productName={activeProductName || scan.product_name || ''}
@@ -992,6 +1004,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <FilmIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <ClipGenerator
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1018,6 +1031,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <TimelineShortGenerator
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1041,6 +1055,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <View>
               <VariantGenerator
@@ -1086,6 +1101,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <SunIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
+          mediaType: 'image',
           render: () => (
             <LightingContextStudio
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1101,6 +1117,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <FilmZoomIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <MotionZoomVideo
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1116,6 +1133,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <ScissorsIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <AICutGenerator
               sourceImage={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1129,6 +1147,7 @@ export default function ResultScreen() {
           category: 'template',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <UploadIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <VideoImportGenerator
               affiliatePlatforms={affiliatePlatforms}
@@ -1150,6 +1169,7 @@ export default function ResultScreen() {
           category: 'commerce',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <ScanTextIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <OcrTextExtractor
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1163,6 +1183,7 @@ export default function ResultScreen() {
           category: 'commerce',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <ShoppingBagIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <ShoppingMatchCard
               matches={activeShoppingMatches}
@@ -1190,6 +1211,7 @@ export default function ResultScreen() {
           category: 'commerce',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <LocalStoreCard
               value={localStoreInfo}
@@ -1213,6 +1235,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'image',
           render: () => (
             <MultiPlatformExport
               imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
@@ -1235,6 +1258,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <ShareBar
               cardRef={cardRef}
@@ -1259,6 +1283,7 @@ export default function ResultScreen() {
           category: 'content',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <PenLine size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <CopyWriter
               productName={activeProductName}
@@ -1278,6 +1303,7 @@ export default function ResultScreen() {
           category: 'content',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <TrendingUpIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <TrendCopyBar
               productName={activeProductName}
@@ -1295,6 +1321,7 @@ export default function ResultScreen() {
           category: 'content',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <HashIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <HashtagCopyBar
               hashtags={allDisplayHashtags}
@@ -1310,6 +1337,7 @@ export default function ResultScreen() {
           category: 'content',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <BookOpen size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <ShortFormGuideCard
               productName={activeProductName}
@@ -1329,6 +1357,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Globe size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <GlobalLocalizer
               hook={activeHook}
@@ -1350,6 +1379,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Share2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <SocialShortFormShare
               shareText={shareText}
@@ -1366,6 +1396,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi', 'template'] as ScanMode[],
           icon: <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <TouchableOpacity
               style={styles.safetyTileBtn}
@@ -1384,6 +1415,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <UserIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => <CreatorPersonaCard />,
         },
         {
@@ -1393,6 +1425,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <SlidersIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => <SnapMixTuner />,
         },
         {
@@ -1402,6 +1435,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <PencilIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => <MicroEditSlot />,
         },
         {
@@ -1411,6 +1445,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <ZapIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <HyperHumanEngineCard
               productName={activeProductName || scan?.product_name || ''}
@@ -1427,6 +1462,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <SparklesIcon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <OriginalityScoreCard
               factors={{
@@ -1447,6 +1483,7 @@ export default function ResultScreen() {
           category: 'optimize',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <ShieldIcon size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <LocalizationSafetyCard
               caption={activeCaption}
@@ -1464,6 +1501,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Link2Icon size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <LinkInBioCard
               scanId={scan.id}
@@ -1478,6 +1516,7 @@ export default function ResultScreen() {
           category: 'export',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <BellRing size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <SmartScheduler
               scanId={scan.id}
@@ -1501,6 +1540,7 @@ export default function ResultScreen() {
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Lightbulb size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          mediaType: 'video',
           render: () => (
             <ShortFormTipsCard
               hook={activeHook}
@@ -1520,6 +1560,7 @@ export default function ResultScreen() {
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Rocket size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <ViralPredictor
               hook={activeHook}
@@ -1542,6 +1583,7 @@ export default function ResultScreen() {
           category: 'commerce',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <TrendingUpIcon size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <TrendMatchCard
               productCategory={selectedProduct?.productCategory || scan?.product_category || ''}
@@ -1558,6 +1600,7 @@ export default function ResultScreen() {
           category: 'insight',
           modes: ['single', 'multi'] as ScanMode[],
           icon: <Users size={16} color={theme.colors.success[400]} strokeWidth={2} />,
+          mediaType: 'both',
           render: () => (
             <PersonaSimulator
               productName={activeProductName || scan.product_name || ''}
@@ -1580,7 +1623,7 @@ export default function ResultScreen() {
           style={styles.iconButton}
           onPress={() => {
             if (activePlatform !== 'shortform') {
-              setActivePlatform('shortform');
+              handlePlatformChange('shortform');
             } else {
               router.back();
             }
@@ -1867,7 +1910,10 @@ export default function ResultScreen() {
                 <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
                 <Text style={styles.sectionLabel}>마케팅 카피</Text>
               </View>
-              <PlatformTabs selected={activePlatform} onSelect={setActivePlatform} />
+              <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
+              {platformSupportsBoth(activePlatform) && (
+                <BoardTabs platform={activePlatform} selected={activeBoard} onSelect={setActiveBoard} />
+              )}
               <View style={styles.captionCard}>
                 {activeHook ? (
                   <View style={styles.hookRow}>
@@ -1973,7 +2019,7 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
-          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} />
+          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
 
           {detectedProducts.length > 1 && (
             <LazySection delayMs={250}>
