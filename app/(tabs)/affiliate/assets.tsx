@@ -99,6 +99,23 @@ export default function AssetsScreen() {
 
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const handleTemplatePress = (tplId: string) => {
+    const tpl = TEMPLATES.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const presets: Record<string, { type: MarketingSnippet['snippet_type']; title: string; content: string }> = {
+      cardnews: { type: 'copy', title: '카드뉴스 제작', content: '[1장] 문제 제기: ___\n[2장] 해결책: ___\n[3장] 상품 특징: ___\n[4장] 사용 전/후 비교: ___\n[5장] CTA: 지금 확인하기 →' },
+      detail: { type: 'copy', title: '상세페이지 문구', content: '상품명: ___\n핵심 특징 3가지:\n1. ___\n2. ___\n3. ___\n실제 사용 후기: ___\n구매 링크: ___' },
+      shortform: { type: 'hook', title: '숏폼 후킹 스크립트', content: '0~3초: "이거 모르면 손해!"\n3~7초: 상품 핵심 매력 한 줄\n7~15초: Before & After 시각적 변화\n15~30초: CTA + 제휴 링크 안내' },
+    };
+    const preset = presets[tplId];
+    if (preset) {
+      setSnippetType(preset.type);
+      setTitle(preset.title);
+      setContent(preset.content);
+      setShowAdd(true);
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return;
     setSaving(true);
@@ -155,7 +172,7 @@ export default function AssetsScreen() {
                 key={tpl.id}
                 style={styles.templateCard}
                 activeOpacity={0.7}
-                onPress={() => {}}
+                onPress={() => handleTemplatePress(tpl.id)}
               >
                 <View style={[styles.templateIcon, { backgroundColor: tpl.color + '20' }]}>
                   <Icon size={22} color={tpl.color} strokeWidth={2} />

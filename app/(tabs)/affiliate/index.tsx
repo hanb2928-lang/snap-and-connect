@@ -30,7 +30,7 @@ import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { saveManualScan, uploadImage, analyzeImage, analyzeImageWithProductContext, extractProductMeta, updateScanWithAnalysis } from '@/lib/analysis';
-import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
+import { validateAffiliateUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
@@ -2167,7 +2167,7 @@ export default function AffiliateScreen() {
                   <Text style={styles.videoSceneBadgeText}>{previewMediaMode === 'image' ? '이미지 스토리보드 미리보기' : '스토리보드 미리보기'}</Text>
                 </View>
               ) : imagePreviewUri ? (
-                <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.videoPlayBtn} activeOpacity={0.85} onPress={() => scrollToStep(2)}>
                   {previewMediaMode === 'image'
                     ? <ImageIcon size={28} color="#fff" strokeWidth={2} />
                     : <Play size={28} color="#fff" strokeWidth={2} fill="#fff" />}
