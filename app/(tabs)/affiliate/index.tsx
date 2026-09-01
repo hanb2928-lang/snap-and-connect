@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, ImageDown } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, Flame, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -504,39 +504,52 @@ export default function AffiliateScreen() {
     }
   };
 
-  const [capturingImage, setCapturingImage] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
-  const handleCaptureProductImage = async () => {
-    if (!affiliateUrl.trim() || capturingImage) return;
-    setCapturingImage(true);
+  const handleOpenLinkPage = () => {
+    if (!affiliateUrl.trim()) return;
+    Linking.openURL(affiliateUrl.trim()).catch(() => {
+      setCaptureError('링크 페이지를 열 수 없습니다. URL을 확인해주세요.');
+    });
+  };
+
+  const handlePickFromGallery = async () => {
     setCaptureError(null);
+    setMediaLoading(true);
     try {
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
-      const response = await fetch(`${supabaseUrl}/functions/v1/extract-product-meta`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({ url: affiliateUrl, captureOnly: true }),
-      });
-      if (!response.ok) throw new Error('이미지 캡처 실패');
-      const data = await response.json();
-      const meta = data.productMeta;
-      if (meta?.imageBase64) {
-        setSelectedImage(meta.imageBase64);
-        setSelectedImageMime(meta.imageMimeType || 'image/jpeg');
+      if (isWebPlatform()) {
+        const images = await pickImageWeb(false, 4);
+        if (images.length === 0) {
+          setMediaLoading(false);
+          return;
+        }
+        const first = images[0];
+        setSelectedImage(cleanBase64(first.base64));
+        setSelectedImageMime(first.mimeType);
         setMediaType('photo');
-        setImageSource('product');
+        setImageSource('user');
       } else {
-        setCaptureError('상품 이미지를 찾을 수 없습니다. 사진을 직접 업로드해주세요.');
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          base64: false,
+          quality: 0.7,
+          selectionLimit: 4,
+          allowsMultipleSelection: true,
+        });
+        if (result.canceled || !result.assets?.[0]?.uri) {
+          setMediaLoading(false);
+          return;
+        }
+        const { base64, mimeType } = await compressImageToBase64(result.assets[0].uri, 1280, 0.7);
+        setSelectedImage(base64);
+        setSelectedImageMime(mimeType);
+        setMediaType('photo');
+        setImageSource('user');
       }
     } catch {
-      setCaptureError('이미지 캡처 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      setCaptureError('이미지를 불러오지 못했습니다. 다시 시도해주세요.');
     } finally {
-      setCapturingImage(false);
+      setMediaLoading(false);
     }
   };
 
@@ -1060,28 +1073,36 @@ export default function AffiliateScreen() {
             </View>
           </View>
 
-          {/* Platform image capture button — below URL input */}
+          {/* Link page open + gallery pick — below URL input */}
           {affiliateUrl.trim() && (
             <View style={styles.captureImageRow}>
               <TouchableOpacity
-                style={[styles.captureImageBtn, capturingImage && styles.captureImageBtnDisabled]}
-                onPress={handleCaptureProductImage}
-                disabled={capturingImage}
+                style={styles.openLinkBtn}
+                onPress={handleOpenLinkPage}
                 activeOpacity={0.85}
               >
-                {capturingImage ? (
+                <ExternalLink size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.openLinkBtnText}>링크 페이지 열기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.captureImageBtn, mediaLoading && styles.captureImageBtnDisabled]}
+                onPress={handlePickFromGallery}
+                disabled={mediaLoading}
+                activeOpacity={0.85}
+              >
+                {mediaLoading ? (
                   <Loader size={14} color={theme.colors.accent[400]} strokeWidth={2} />
                 ) : (
-                  <ImageDown size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
                 )}
                 <Text style={styles.captureImageBtnText}>
-                  {capturingImage ? '캡처 중...' : '플랫폼에서 상품 이미지 캡처'}
+                  {mediaLoading ? '불러오는 중...' : '갤러리에서 불러오기'}
                 </Text>
               </TouchableOpacity>
-              {imageSource === 'product' && selectedImage && (
+              {selectedImage && imageSource === 'user' && (
                 <View style={styles.captureImageDoneBadge}>
                   <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  <Text style={styles.captureImageDoneText}>이미지 캡처됨</Text>
+                  <Text style={styles.captureImageDoneText}>이미지 선택됨</Text>
                 </View>
               )}
             </View>
@@ -1089,6 +1110,14 @@ export default function AffiliateScreen() {
           {captureError && (
             <View style={styles.captureErrorBox}>
               <Text style={styles.captureErrorText}>{captureError}</Text>
+            </View>
+          )}
+          {affiliateUrl.trim() && !selectedImage && (
+            <View style={styles.captureHintBox}>
+              <Text style={styles.captureHintText}>
+                1. '링크 페이지 열기'로 상품 페이지를 열어 상품 사진을 캡처/저장하세요{'\n'}
+                2. '갤러리에서 불러오기'로 저장한 사진을 선택하면 상품 분석이 진행됩니다
+              </Text>
             </View>
           )}
           <PlatformListSection
@@ -3678,6 +3707,23 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: theme.spacing.md,
   },
+  openLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[400] + '12',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+  },
+  openLinkBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
   captureImageBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3719,6 +3765,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
+  },
+  captureHintBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: theme.spacing.md,
+  },
+  captureHintText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
   },
   linkEmptyBox: {
     backgroundColor: theme.colors.dark.surfaceLight,
