@@ -34,6 +34,7 @@ import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from 
 import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
+import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory } from '@/lib/ttsVoices';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
@@ -312,6 +313,9 @@ export default function AffiliateScreen() {
   const [contentText, setContentText] = useState('');
   const [contentType, setContentType] = useState<string>('copy');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('shortform');
+  const [selectedVoiceKey, setSelectedVoiceKey] = useState<string | null>(null);
+  const [recommendedVoiceKey, setRecommendedVoiceKey] = useState<string | null>(null);
+  const [voiceCategoryFilter, setVoiceCategoryFilter] = useState<VoiceCategory | 'all'>('all');
 
   // Step 5: Upload
   const [uploadPlatform, setUploadPlatform] = useState<string | null>(null);
@@ -732,6 +736,8 @@ export default function AffiliateScreen() {
         setAiRecommendation(bundle.templateLabel);
         const match = TEMPLATE_STYLES.find((t) => bundle.templateLabel.includes(t.label));
         if (match) setSelectedTemplate(match.key);
+        setRecommendedVoiceKey(bundle.voice.key);
+        setSelectedVoiceKey(bundle.voice.key);
       } catch {
         setAiRecommendation('웹툰형 만화');
       } finally {
@@ -2758,8 +2764,85 @@ export default function AffiliateScreen() {
                 </>
               )}
 
+              {/* TTS Voice Picker — AI auto-select + manual override */}
+              <Text style={styles.sectionLabel}>TTS 성우 선택</Text>
+              {recommendedVoiceKey && (
+                <View style={styles.voiceRecommendBadge}>
+                  <Sparkles size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                  <Text style={styles.voiceRecommendText}>
+                    AI 추천: {TTS_VOICES.find((v) => v.key === recommendedVoiceKey)?.label ?? ''}
+                  </Text>
+                  {selectedVoiceKey !== recommendedVoiceKey && (
+                    <TouchableOpacity
+                      style={styles.voiceRecommendApplyBtn}
+                      onPress={() => setSelectedVoiceKey(recommendedVoiceKey)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.voiceRecommendApplyBtnText}>적용</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Category filter chips */}
+              <View style={styles.voiceCategoryRow}>
+                <TouchableOpacity
+                  style={[styles.voiceCategoryChip, voiceCategoryFilter === 'all' && styles.voiceCategoryChipActive]}
+                  onPress={() => setVoiceCategoryFilter('all')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.voiceCategoryChipText, voiceCategoryFilter === 'all' && styles.voiceCategoryChipTextActive]}>전체</Text>
+                </TouchableOpacity>
+                {(Object.keys(VOICE_CATEGORIES) as VoiceCategory[]).map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.voiceCategoryChip, voiceCategoryFilter === cat && styles.voiceCategoryChipActive]}
+                    onPress={() => setVoiceCategoryFilter(cat)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.voiceCategoryChipText, voiceCategoryFilter === cat && styles.voiceCategoryChipTextActive]}>
+                      {VOICE_CATEGORIES[cat].label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Voice list */}
+              <View style={styles.voiceList}>
+                {TTS_VOICES
+                  .filter((v) => voiceCategoryFilter === 'all' || v.category === voiceCategoryFilter)
+                  .map((v) => {
+                    const isSelected = selectedVoiceKey === v.key;
+                    const isRecommended = recommendedVoiceKey === v.key;
+                    return (
+                      <TouchableOpacity
+                        key={v.key}
+                        style={[
+                          styles.voiceChip,
+                          isSelected && { borderColor: theme.colors.warning[400], backgroundColor: theme.colors.warning[400] + '15' },
+                        ]}
+                        onPress={() => setSelectedVoiceKey(v.key)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.voiceChipLeft}>
+                          <Text style={[styles.voiceChipLabel, isSelected && { color: theme.colors.warning[400] }]}>{v.label}</Text>
+                          <Text style={styles.voiceChipDesc}>{v.desc}</Text>
+                        </View>
+                        {isRecommended && (
+                          <View style={styles.recommendBadge}>
+                            <Sparkles size={9} color="#fff" strokeWidth={2.5} />
+                            <Text style={styles.recommendBadgeText}>추천</Text>
+                          </View>
+                        )}
+                        {isSelected && !isRecommended && (
+                          <Check size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+
               <TextInput
-                style={styles.contentInput}
                 value={contentText}
                 onChangeText={setContentText}
                 placeholder={(() => {
@@ -2848,6 +2931,12 @@ export default function AffiliateScreen() {
                   <Text style={styles.subSummaryLabel}>콘텐츠 유형</Text>
                   <Text style={styles.subSummaryValue}>
                     {CONTENT_TYPES.find((t) => t.key === contentType)?.label || '미선택'}
+                  </Text>
+                </View>
+                <View style={styles.subSummaryRow}>
+                  <Text style={styles.subSummaryLabel}>TTS 성우</Text>
+                  <Text style={styles.subSummaryValue}>
+                    {TTS_VOICES.find((v) => v.key === selectedVoiceKey)?.label || '미선택'}
                   </Text>
                 </View>
                 {previewMediaMode === 'video' && (
@@ -3853,6 +3942,87 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  voiceRecommendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.warning[400] + '12',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  voiceRecommendText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.warning[400],
+  },
+  voiceRecommendApplyBtn: {
+    backgroundColor: theme.colors.warning[400],
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  voiceRecommendApplyBtnText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  voiceCategoryRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
+  },
+  voiceCategoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  voiceCategoryChipActive: {
+    backgroundColor: theme.colors.warning[400] + '22',
+    borderColor: theme.colors.warning[400],
+  },
+  voiceCategoryChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  voiceCategoryChipTextActive: {
+    color: theme.colors.warning[400],
+  },
+  voiceList: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  voiceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  voiceChipLeft: {
+    flex: 1,
+  },
+  voiceChipLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  voiceChipDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 1,
   },
   analyzeWaitingBox: {
     alignItems: 'center',
