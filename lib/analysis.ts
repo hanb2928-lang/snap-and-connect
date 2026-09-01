@@ -241,6 +241,11 @@ export async function deleteScan(id: string): Promise<void> {
   if (error) throw new Error(`Failed to delete: ${error.message}`);
 }
 
+function trimText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return text.slice(0, max).trimEnd() + '…';
+}
+
 export async function updateScanWithAnalysis(
   scanId: string,
   analysis: AnalysisResult,
@@ -248,25 +253,38 @@ export async function updateScanWithAnalysis(
   const settings = await getUserSettings();
   const affiliateLinks = generateAffiliateLinks(analysis, settings);
 
+  const td = analysis.templateData;
+  const cleanTemplateData = td ? {
+    priceLabel: td.priceLabel,
+    oneLiner: trimText(td.oneLiner, 80),
+    category: td.category,
+    accentColor: td.accentColor,
+    hook: trimText(td.hook, 60),
+    hashtags: (td.hashtags || []).slice(0, 8),
+    productAdvantages: (td.productAdvantages || []).slice(0, 3).map((a) => trimText(a, 60)),
+    caption: trimText(td.caption, 120),
+    ...(td.platformVariants ? { platformVariants: td.platformVariants } : {}),
+  } : undefined;
+
   const { error } = await supabase.from('scans').update({
-    title: analysis.title,
-    summary: analysis.summary,
+    title: trimText(analysis.title, 40),
+    summary: trimText(analysis.summary, 200),
     contacts: analysis.contacts,
-    tags: analysis.tags,
+    tags: (analysis.tags || []).slice(0, 8),
     product_name: analysis.productName,
     product_category: analysis.productCategory,
     price_estimate: analysis.priceEstimate,
-    one_liner: analysis.oneLiner,
+    one_liner: trimText(analysis.oneLiner, 80),
     shopping_matches: analysis.shoppingMatches,
     affiliate_links: affiliateLinks,
-    template_data: analysis.templateData,
+    ...(cleanTemplateData ? { template_data: cleanTemplateData } : {}),
     detected_products: analysis.detectedProducts,
     scan_source: 'single',
   }).eq('id', scanId);
 
   if (error) throw new Error(`Failed to update scan: ${error.message}`);
 
-  const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
+  const hookText = td?.hook || analysis.oneLiner || '';
   if (hookText) {
     generateAndUploadTTS(scanId, hookText).catch(() => {});
   }
