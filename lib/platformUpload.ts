@@ -1,6 +1,6 @@
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 
-export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter' | 'pinterest';
+export type UploadPlatformKey = 'instagram' | 'blog' | 'tiktok' | 'youtube' | 'twitter' | 'pinterest' | 'naver_clip';
 
 export type DisclosurePlacement = 'body' | 'comment';
 
@@ -40,6 +40,11 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
     appUrl: 'pinterest://',
     webUrl: 'https://www.pinterest.com/pin/create/button/',
     label: '핀터레스트 앱 열기',
+  },
+  naver_clip: {
+    appUrl: 'com.naverapp://open',
+    webUrl: 'https://clip.navercast.com/',
+    label: '네이버 클립 열기',
   },
 };
 
@@ -157,6 +162,22 @@ const CAPTION_TEMPLATES: Record<UploadPlatformKey, PlatformCaptionTemplate> = {
       { label: '공정위 문구', desc: '핀 설명에 포함 — 광고 핀임을 명시' },
     ],
   },
+  naver_clip: {
+    hashtagSet: ['#제휴마케팅', '#광고', '#네이버클립', '#숏클립', '#광고포함'],
+    captionStyle: '검색 최적화 제목 + 본문 단축링크 + 공정위 문구',
+    titleMaxLen: 100,
+    titleHint: '클립 제목 (100자 이내, 검색 키워드 포함)',
+    bodyHint: '클립 설명 (단축 링크 포함)',
+    hashtagStrategy: '네이버 검색 키워드 중심 — 본문 말미에 배치',
+    linkGuidance: '본문에 단축 링크 직접 삽입 가능',
+    disclosureDefault: 'body',
+    algorithmTips: [
+      { label: '검색 최적화', desc: '네이버 클립은 검색 유입이 강함 — 제목에 핵심 키워드 필수' },
+      { label: '세로 영상', desc: '9:16 비율 세로 영상이 권장 — 60초 이내' },
+      { label: '본문 링크', desc: '클립 설명에 단축 링크 직접 삽입 가능' },
+      { label: '공정위 문구', desc: '본문에 포함 — 광고 클립임을 명시' },
+    ],
+  },
 };
 
 export function getCaptionTemplate(key: UploadPlatformKey): PlatformCaptionTemplate {
@@ -231,6 +252,12 @@ export function buildPlatformCaption(
       const linkHint = trimmedUrl ? `\n\n링크에서 확인하세요 👉 ${trimmedUrl}` : '';
       body = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}${linkHint}`;
       fullText = `${body}\n\n${hashtags}`;
+      break;
+    }
+    case 'naver_clip': {
+      title = baseCaption.slice(0, tmpl.titleMaxLen);
+      body = `${disclosureInBody && disclosure ? disclosure + '\n\n' : ''}${baseCaption}${trimmedUrl ? '\n\n단축 링크: ' + trimmedUrl : ''}`;
+      fullText = `${body}${hashtags ? '\n\n' + hashtags : ''}`;
       break;
     }
     default:
