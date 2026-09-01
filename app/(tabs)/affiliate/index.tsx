@@ -175,9 +175,9 @@ type ViralAnalysisResult = PsychAnalysis;
 
 
 const CONTENT_TYPES = [
-  { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hint: '제품을 한 줄로 매력적으로 표현하세요' },
-  { key: 'hashtag', label: '해시태그', icon: Hash, color: theme.colors.accent[400], hint: '관련 키워드를 # 과 함께 나열하세요' },
-  { key: 'hook', label: '후킹 문장', icon: Sparkles, color: theme.colors.warning[400], hint: '시선을 끄는 첫 문장을 만드세요' },
+  { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hintVideo: '제품을 한 줄로 매력적으로 표현하세요', hintImage: '이미지에 어울리는 제품 문구를 작성하세요' },
+  { key: 'hashtag', label: '해시태그', icon: Hash, color: theme.colors.accent[400], hintVideo: '관련 키워드를 # 과 함께 나열하세요', hintImage: '이미지 검색에 잘 걸리는 키워드를 # 과 함께 나열하세요' },
+  { key: 'hook', label: '후킹 문장', icon: Sparkles, color: theme.colors.warning[400], hintVideo: '시선을 끄는 첫 문장을 만드세요', hintImage: '스크롤을 멈추게 하는 첫 문장을 만드세요' },
 ] as const;
 
 const TEMPLATE_STYLES = [
@@ -1562,8 +1562,8 @@ export default function AffiliateScreen() {
         />
         <PillNavCard
           icon={<ScanSearch size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="분석 영상 미리보기"
-          subtitle="상위 1% 수익화 영상 분석 · 심리 자극 요소 추출 · 미리보기 생성"
+          title={previewMediaMode === 'image' ? '분석 이미지 미리보기' : '분석 영상 미리보기'}
+          subtitle={previewMediaMode === 'image' ? '상위 1% 수익화 이미지 분석 · 심리 자극 요소 추출 · 미리보기 생성' : '상위 1% 수익화 영상 분석 · 심리 자극 요소 추출 · 미리보기 생성'}
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
           stepNumber={2}
@@ -1879,7 +1879,7 @@ export default function AffiliateScreen() {
         <PillNavCard
           icon={<Palette size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
           title="콘텐츠 및 템플릿 편집"
-          subtitle="AI 자동 추천 · 스타일·음성·해시태그 설정 · 문구 입력"
+          subtitle={previewMediaMode === 'image' ? 'AI 자동 추천 · 스타일·해시태그 설정 · 이미지용 문구 입력' : 'AI 자동 추천 · 스타일·음성·해시태그 설정 · 문구 입력'}
           accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
           stepNumber={3}
@@ -2007,7 +2007,12 @@ export default function AffiliateScreen() {
               </View>
 
               <Text style={styles.contentHint}>
-                {CONTENT_TYPES.find((t) => t.key === contentType)?.hint}
+                {(() => {
+                  const ct = CONTENT_TYPES.find((t) => t.key === contentType);
+                  if (!ct) return '';
+                  const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+                  return boardMedia === 'image' ? ct.hintImage : ct.hintVideo;
+                })()}
               </Text>
             </>
           )}
@@ -2016,7 +2021,17 @@ export default function AffiliateScreen() {
             style={styles.contentInput}
             value={contentText}
             onChangeText={setContentText}
-            placeholder={simpleMode ? "마케팅 문구를 자유롭게 적어보세요..." : "여기에 마케팅 문구를 입력하세요..."}
+            placeholder={(() => {
+              const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+              if (simpleMode) {
+                return boardMedia === 'image'
+                  ? "이미지에 넣을 마케팅 문구를 자유롭게 적어보세요..."
+                  : "영상에 넣을 마케팅 문구를 자유롭게 적어보세요...";
+              }
+              return boardMedia === 'image'
+                ? "여기에 이미지용 마케팅 문구를 입력하세요..."
+                : "여기에 영상용 마케팅 문구를 입력하세요...";
+            })()}
             placeholderTextColor={theme.colors.dark.textFaint}
             multiline
             numberOfLines={4}
@@ -2078,7 +2093,12 @@ export default function AffiliateScreen() {
           )}
 
           <Text style={styles.uploadHint}>
-            업로드할 플랫폼을 선택하세요. 각 플랫폼에 맞는 형식으로 자동 변환됩니다.
+            {(() => {
+              const boardMedia = getBoardMediaType(selectedUploadPlatform, selectedBoard);
+              return boardMedia === 'image'
+                ? '업로드할 플랫폼을 선택하세요. 이미지에 맞는 형식으로 자동 변환됩니다.'
+                : '업로드할 플랫폼을 선택하세요. 각 플랫폼에 맞는 영상 형식으로 자동 변환됩니다.';
+            })()}
           </Text>
 
           {/* Auto-disclosure toggle */}
@@ -2132,7 +2152,7 @@ export default function AffiliateScreen() {
               )}
               <Text style={styles.captionPreviewDivider}>{"─".repeat(20)}</Text>
               <Text style={styles.captionPreviewContent}>
-                {contentText || '마케팅 문구를 입력하면 여기에 표시됩니다.'}
+                {contentText || (previewMediaMode === 'image' ? '이미지용 마케팅 문구를 입력하면 여기에 표시됩니다.' : '마케팅 문구를 입력하면 여기에 표시됩니다.')}
               </Text>
               {affiliateUrl.trim() && (
                 <Text style={styles.captionPreviewLink}>{affiliateUrl.trim()}</Text>
@@ -2306,7 +2326,7 @@ export default function AffiliateScreen() {
               <Check size={16} color={theme.colors.success[400]} strokeWidth={2} />
               <Text style={styles.uploadSuccessText}>
                 {UPLOAD_PLATFORMS.find((p) => p.key === uploadPlatform)?.label}에 업로드가 완료되었습니다. 제휴 링크를 통해 수익이 발생하면 '분석' 탭에서 확인할 수 있습니다.
-              </Text>
+            </Text>
             </View>
           )}
         </PillNavCard>
