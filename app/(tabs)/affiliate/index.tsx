@@ -1415,7 +1415,7 @@ export default function AffiliateScreen() {
                   <TrendingUp size={16} color={theme.colors.warning[400]} strokeWidth={2.5} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.viralAnalysisTitle}>상위 1% 수익화 영상 분석</Text>
+                  <Text style={styles.viralAnalysisTitle}>{getBoardMediaType(selectedUploadPlatform, selectedBoard) === 'image' ? '상위 1% 수익화 이미지 분석' : '상위 1% 수익화 영상 분석'}</Text>
                   <Text style={styles.viralAnalysisSub}>
                     {UPLOAD_PLATFORMS.find((p) => p.key === selectedUploadPlatform)?.label ?? ''} ·{' '}
                     {PLATFORM_BOARDS[selectedUploadPlatform]?.find((b) => b.key === selectedBoard)?.label ?? ''} 게시판
