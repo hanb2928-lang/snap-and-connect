@@ -1614,19 +1614,164 @@ export default function AffiliateScreen() {
 
         // Auto-insert affiliate disclosure text at the bottom of every frame
         if (disclosureText) {
-          const discFontSize = Math.round(W * 0.022);
-          ctx.globalAlpha = 0.82;
-          ctx.font = `600 ${discFontSize}px sans-serif`;
-          ctx.fillStyle = '#fff';
-          ctx.textAlign = 'center';
+          const elapsedSec = elapsed / 1000;
+          const isCtaPhase = elapsedSec >= DURATION - 2;
+
+          if (isCtaPhase) {
+            // ── LAST 2 SECONDS: Full-screen CTA + mandatory disclosure overlay ──
+            const ctaLocalT = (elapsedSec - (DURATION - 2)) / 2;
+            const ctaFadeIn = Math.min(ctaLocalT * 3, 1);
+
+            // Dark overlay
+            ctx.globalAlpha = ctaFadeIn * 0.85;
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+
+            ctx.globalAlpha = ctaFadeIn;
+
+            // Product name (large, gold)
+            ctx.font = '900 48px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#fbbf24';
+            const pName = productMeta?.productName || '지금 확인하세요';
+            const pNameLines = pName.match(/.{1,12}/g) || [pName];
+            pNameLines.slice(0, 2).forEach((line, i) => {
+              ctx.fillText(line, W / 2, H * 0.25 + i * 56);
+            });
+
+            // CTA pill button
+            const ctaText = '구매하러 가기 →';
+            ctx.font = '700 28px sans-serif';
+            const ctaW = ctx.measureText(ctaText).width + 80;
+            const ctaH = 64;
+            const ctaX = (W - ctaW) / 2;
+            const ctaY = H * 0.45;
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') {
+              ctx.roundRect(ctaX, ctaY - ctaH / 2, ctaW, ctaH, ctaH / 2);
+            } else {
+              ctx.moveTo(ctaX + ctaH / 2, ctaY - ctaH / 2);
+              ctx.arcTo(ctaX + ctaW, ctaY - ctaH / 2, ctaX + ctaW, ctaY + ctaH / 2, ctaH / 2);
+              ctx.arcTo(ctaX + ctaW, ctaY + ctaH / 2, ctaX, ctaY + ctaH / 2, ctaH / 2);
+              ctx.arcTo(ctaX, ctaY + ctaH / 2, ctaX, ctaY - ctaH / 2, ctaH / 2);
+              ctx.arcTo(ctaX, ctaY - ctaH / 2, ctaX + ctaW, ctaY - ctaH / 2, ctaH / 2);
+              ctx.closePath();
+            }
+            ctx.fill();
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillText(ctaText, W / 2, ctaY);
+
+            // Short URL
+            if (affiliateUrl.trim()) {
+              ctx.font = '600 20px sans-serif';
+              ctx.fillStyle = '#fff';
+              ctx.shadowBlur = 8;
+              const urlDisplay = affiliateUrl.trim().length > 40
+                ? affiliateUrl.trim().substring(0, 40) + '...'
+                : affiliateUrl.trim();
+              ctx.fillText(urlDisplay, W / 2, H * 0.56);
+            }
+
+            // Mandatory disclosure — large, high-contrast, bottom third
+            const discY = H * 0.68;
+            ctx.font = '700 22px sans-serif';
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = 'rgba(0,0,0,0.95)';
+            ctx.shadowBlur = 12;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const discLines = disclosureText.match(/.{1,24}/g) || [disclosureText];
+            const discLineH = 30;
+            // Background bar for readability
+            const discBgH = Math.min(discLines.length, 4) * discLineH + 24;
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(0, discY - 12, W, discBgH);
+            // Disclosure text
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 6;
+            discLines.slice(0, 4).forEach((line, i) => {
+              ctx.fillText(line, W / 2, discY + i * discLineH);
+            });
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+          } else {
+            // ── 0-13s: Small disclosure at bottom ──
+            const elapsedSecInner = elapsed / 1000;
+            const isTrustPhase = elapsedSecInner >= 3 && elapsedSecInner < DURATION - 2;
+            const discOpacity = isTrustPhase ? 0.75 : 0.5;
+            const discFontSize = Math.round(W * 0.02);
+
+            ctx.globalAlpha = discOpacity;
+            ctx.font = `600 ${discFontSize}px sans-serif`;
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.shadowColor = 'rgba(0,0,0,0.85)';
+            ctx.shadowBlur = 6;
+            const discLines = disclosureText.match(/.{1,32}/g) || [disclosureText];
+            const discLineH = discFontSize + 6;
+            discLines.slice(0, 1).forEach((line, i) => {
+              ctx.fillText(line, W / 2, H - 12 - (discLines.length - 1 - i) * discLineH);
+            });
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        // ── Product metadata overlays during trust phase (4-12s) ──
+        const elapsedSecMeta = elapsed / 1000;
+        const isTrustPhaseMeta = elapsedSecMeta >= 3 && elapsedSecMeta < DURATION - 2;
+        if (isTrustPhaseMeta && productMeta && (productMeta.price || productMeta.productName)) {
+          const trustLocalT = (elapsedSecMeta - 3) / (DURATION - 5);
+          const metaFadeIn = Math.min(trustLocalT * 4, 1);
+          const metaFadeOut = Math.min((1 - trustLocalT) * 4, 1);
+          const metaAlpha = Math.min(metaFadeIn, metaFadeOut);
+
+          ctx.globalAlpha = metaAlpha;
+
+          // Price badge (top-right)
+          if (productMeta.price) {
+            const priceText = productMeta.price;
+            ctx.font = '900 32px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 16;
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText(priceText, W - 30, 60);
+
+            // "오늘만 특가" badge above price
+            ctx.font = '700 16px sans-serif';
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText('오늘만 특가', W - 30, 40);
+          }
+
+          // Rocket delivery badge (bottom-left)
+          ctx.font = '700 18px sans-serif';
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'bottom';
           ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 6;
-          const discLines = disclosureText.match(/.{1,28}/g) || [disclosureText];
-          const discLineH = discFontSize + 6;
-          discLines.slice(0, 2).forEach((line, i) => {
-            ctx.fillText(line, W / 2, H - 12 - (discLines.length - 1 - i) * discLineH);
-          });
+          ctx.shadowBlur = 8;
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillText('🚀 로켓배송', 30, H - 50);
+
+          // Discount highlight (if price contains numbers, estimate discount)
+          if (productMeta.price) {
+            ctx.font = '700 22px sans-serif';
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText('할인 특가', 30, H - 80);
+          }
+
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
           ctx.globalAlpha = 1;
@@ -1682,7 +1827,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta]);
+  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta, affiliateUrl]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
