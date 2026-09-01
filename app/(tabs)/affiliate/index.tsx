@@ -38,6 +38,8 @@ import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatf
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
+import { StockVideoPicker } from '@/components/StockVideoPicker';
+import type { StockVideoClip } from '@/lib/pexelsVideo';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
 
@@ -261,6 +263,7 @@ export default function AffiliateScreen() {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [renderedVideoMime, setRenderedVideoMime] = useState<string>('video/webm');
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [stockVideoClip, setStockVideoClip] = useState<StockVideoClip | null>(null);
   const renderProgress = useSharedValue(0);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
@@ -2490,6 +2493,25 @@ export default function AffiliateScreen() {
             ) : null
           )}
         </PillNavCard>
+
+        {/* Stock Video Picker — product-themed Pexels video search */}
+        {previewMediaMode === 'video' && completedSteps.has('platformSelect') && (
+          <StockVideoPicker
+            productName={productMeta?.productName}
+            productCategory={undefined}
+            orientation={(() => {
+              const specs = selectedUploadPlatform && selectedBoard
+                ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                : null;
+              if (!specs) return 'portrait';
+              return specs.ratio.includes('9:16') ? 'portrait'
+                : specs.ratio.includes('16:9') ? 'landscape'
+                : 'square';
+            })()}
+            selectedClip={stockVideoClip}
+            onSelectClip={setStockVideoClip}
+          />
+        )}
 
         {/* STEP 4: Content & Template Editing */}
         <View

@@ -49,3 +49,4 @@ export const LOCALIZE_FUNCTION_URL = `${supabaseUrl}/functions/v1/translate-loca
 export const SHORTFORM_GUIDE_URL = `${supabaseUrl}/functions/v1/generate-shortform-guide`;
 export const PERSONA_SIMULATOR_URL = `${supabaseUrl}/functions/v1/persona-simulator`;
 export const TREND_MATCH_URL = `${supabaseUrl}/functions/v1/trend-match`;
+export const PEXELS_VIDEO_SEARCH_URL = `${supabaseUrl}/functions/v1/search-pexels-videos`;
