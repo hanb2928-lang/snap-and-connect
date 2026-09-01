@@ -690,10 +690,6 @@ export default function AffiliateScreen() {
       setRenderError('먼저 스토리보드를 생성해주세요.');
       return;
     }
-    if (!imagePreviewUri) {
-      setRenderError('상품 사진이 필요합니다. 2단계에서 사진을 업로드하거나 상품 링크로 사진을 불러와주세요.');
-      return;
-    }
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -702,17 +698,19 @@ export default function AffiliateScreen() {
 
     try {
       let img: HTMLImageElement | null = null;
-      try {
-        const { urlToDataUrl } = await import('@/lib/base64');
-        const safeImageUrl = await urlToDataUrl(imagePreviewUri);
-        img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-          el.onload = () => resolve(el);
-          el.onerror = () => reject(new Error('이미지 로드 실패'));
-          el.src = safeImageUrl;
-        });
-      } catch {
-        img = null;
+      if (imagePreviewUri) {
+        try {
+          const { urlToDataUrl } = await import('@/lib/base64');
+          const safeImageUrl = await urlToDataUrl(imagePreviewUri);
+          img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('이미지 로드 실패'));
+            el.src = safeImageUrl;
+          });
+        } catch {
+          img = null;
+        }
       }
 
       const analysis = viralAnalysisResult;
@@ -922,7 +920,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [imagePreviewUri, videoPreviewScenes, viralAnalysisResult, renderProgress]);
+  }, [videoPreviewScenes, viralAnalysisResult, renderProgress]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -1547,20 +1545,13 @@ export default function AffiliateScreen() {
               ))}
 
               {/* Render video from storyboard button */}
-              {!imagePreviewUri && (
-                <View style={styles.renderCompleteBox}>
-                  <Text style={[styles.renderCompleteText, { color: theme.colors.warning[400] }]}>
-                    상품 사진이 필요합니다. 위에서 사진을 업로드하거나 상품 링크 입력 후 사진을 불러와주세요.
-                  </Text>
-                </View>
-              )}
               <TouchableOpacity
-                style={[styles.renderVideoBtn, (videoRendering || videoRenderComplete || !imagePreviewUri) && styles.renderVideoBtnDisabled]}
+                style={[styles.renderVideoBtn, (videoRendering || videoRenderComplete) && styles.renderVideoBtnDisabled]}
                 onPress={() => {
-                  if (videoRendering || videoRenderComplete || !imagePreviewUri) return;
+                  if (videoRendering || videoRenderComplete) return;
                   generatePreviewVideo();
                 }}
-                disabled={videoRendering || videoRenderComplete || !imagePreviewUri}
+                disabled={videoRendering || videoRenderComplete}
                 activeOpacity={0.85}
               >
                 {videoRendering ? (
