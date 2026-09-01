@@ -197,13 +197,13 @@ function getBoardMediaType(platform: string | null, board: string | null): 'imag
 
 type StepKey = 'affiliate' | 'platformSelect' | 'analyze' | 'content' | 'upload';
 
-const STEP_ORDER: StepKey[] = ['affiliate', 'analyze', 'content', 'upload'];
+const STEP_ORDER: StepKey[] = ['affiliate', 'platformSelect', 'analyze', 'content', 'upload'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   affiliate: { num: 1, color: theme.colors.accent[400] },
-  platformSelect: { num: 0, color: theme.colors.warning[400] },
-  analyze: { num: 2, color: theme.colors.success[400] },
-  content: { num: 3, color: theme.colors.warning[400] },
-  upload: { num: 4, color: theme.colors.success[400] },
+  platformSelect: { num: 2, color: theme.colors.warning[400] },
+  analyze: { num: 3, color: theme.colors.success[400] },
+  content: { num: 4, color: theme.colors.warning[400] },
+  upload: { num: 5, color: theme.colors.success[400] },
 };
 
 export default function AffiliateScreen() {
@@ -322,6 +322,12 @@ export default function AffiliateScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (selectedUploadPlatform && !PLATFORM_BOARDS[selectedUploadPlatform]) {
+      markCompleted('platformSelect');
+    }
+  }, [selectedUploadPlatform]);
 
   const totalRevenue = useMemo(() => revenue.reduce((sum, r) => sum + (r.amount || 0), 0), [revenue]);
 
@@ -627,7 +633,6 @@ export default function AffiliateScreen() {
 
       markCompleted('content');
       setAnalyzing(false);
-      router.push({ pathname: '/result/[id]', params: { id: scanId } });
     } catch (err) {
       setAnalyzeError(friendlyError(err, 'AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));
       setAnalyzing(false);
@@ -1063,6 +1068,10 @@ export default function AffiliateScreen() {
         </View>
 
         {/* Full-width pill nav cards in production order */}
+        <View
+          ref={(ref) => { stepRefs.current[1] = ref; }}
+          collapsable={false}
+        />
         <PillNavCard
           icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
           title="제휴 상품 선택하기"
@@ -1217,7 +1226,7 @@ export default function AffiliateScreen() {
                   style={styles.extractManualBtn}
                   onPress={() => {
                     setExtractError(null);
-                    scrollToStep(2);
+                    scrollToStep(3);
                   }}
                   activeOpacity={0.7}
                 >
@@ -1279,12 +1288,18 @@ export default function AffiliateScreen() {
         </PillNavCard>
 
         {/* Platform selection */}
+        <View
+          ref={(ref) => { stepRefs.current[2] = ref; }}
+          collapsable={false}
+        />
         <PillNavCard
           icon={<Share2 size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
           title="플랫폼 선택하기"
           subtitle="주요 플랫폼 업로드 게시판 선택 · 수동 입력"
           accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
+          stepNumber={2}
+          completed={completedSteps.has('platformSelect')}
           expanded={expandedStep === 'platformSelect'}
           onToggle={() => setExpandedStep(expandedStep === 'platformSelect' ? null : 'platformSelect')}
         >
@@ -1399,6 +1414,7 @@ export default function AffiliateScreen() {
                         setSelectedBoard(newBoard);
                         if (newBoard) {
                           setPreviewMediaMode(getBoardMediaType(selectedUploadPlatform, newBoard));
+                          markCompleted('platformSelect');
                         }
                       }}
                       activeOpacity={0.7}
@@ -1581,9 +1597,9 @@ export default function AffiliateScreen() {
           )}
         </PillNavCard>
 
-        {/* STEP 2: AI Analysis & Image */}
+        {/* STEP 3: AI Analysis & Image */}
         <View
-          ref={(ref) => { stepRefs.current[2] = ref; }}
+          ref={(ref) => { stepRefs.current[3] = ref; }}
           collapsable={false}
         />
         <PillNavCard
@@ -1592,7 +1608,7 @@ export default function AffiliateScreen() {
           subtitle={previewMediaMode === 'image' ? '상위 1% 수익화 이미지 분석 · 심리 자극 요소 추출 · 미리보기 생성' : '상위 1% 수익화 영상 분석 · 심리 자극 요소 추출 · 미리보기 생성'}
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
-          stepNumber={2}
+          stepNumber={3}
           completed={completedSteps.has('analyze')}
           expanded={expandedStep === 'analyze'}
           onToggle={() => setExpandedStep(expandedStep === 'analyze' ? null : 'analyze')}
@@ -1906,9 +1922,9 @@ export default function AffiliateScreen() {
           )}
         </PillNavCard>
 
-        {/* STEP 3: Content & Template Editing */}
+        {/* STEP 4: Content & Template Editing */}
         <View
-          ref={(ref) => { stepRefs.current[3] = ref; }}
+          ref={(ref) => { stepRefs.current[4] = ref; }}
           collapsable={false}
         />
         <PillNavCard
@@ -1917,7 +1933,7 @@ export default function AffiliateScreen() {
           subtitle={previewMediaMode === 'image' ? 'AI 자동 추천 · 스타일·해시태그 설정 · 이미지용 문구 입력' : 'AI 자동 추천 · 스타일·음성·해시태그 설정 · 문구 입력'}
           accentColor={theme.colors.warning[400]}
           iconBg={theme.colors.warning[500] + '22'}
-          stepNumber={3}
+          stepNumber={4}
           completed={completedSteps.has('content')}
           expanded={expandedStep === 'content'}
           onToggle={() => setExpandedStep(expandedStep === 'content' ? null : 'content')}
@@ -2095,9 +2111,9 @@ export default function AffiliateScreen() {
           </View>
         </PillNavCard>
 
-        {/* STEP 4: Platform Upload */}
+        {/* STEP 5: Platform Upload */}
         <View
-          ref={(ref) => { stepRefs.current[4] = ref; }}
+          ref={(ref) => { stepRefs.current[5] = ref; }}
           collapsable={false}
         />
         <PillNavCard
@@ -2106,7 +2122,7 @@ export default function AffiliateScreen() {
           subtitle="생성 이미지 최종 확인·수정 · 게시판 연결 후 직접 업로드"
           accentColor={theme.colors.success[400]}
           iconBg={theme.colors.success[500] + '22'}
-          stepNumber={4}
+          stepNumber={5}
           completed={completedSteps.has('upload')}
           expanded={expandedStep === 'upload'}
           onToggle={() => setExpandedStep(expandedStep === 'upload' ? null : 'upload')}
