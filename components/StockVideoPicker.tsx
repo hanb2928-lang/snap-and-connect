@@ -18,6 +18,7 @@ import { Search, Film, Check, X, RefreshCw, Settings, Download, Image as ImageIc
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { theme } from '@/lib/theme';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
 
@@ -275,6 +276,97 @@ export function StockVideoPicker({
     setCapturedDataUrl(null);
   }, []);
 
+  // ── Mobile camera capture (expo-camera) ──
+  const [mobileCamPermission, requestMobileCamPermission] = useCameraPermissions();
+  const [showMobileCamera, setShowMobileCamera] = useState(false);
+  const [mobileFacing, setMobileFacing] = useState<CameraType>('back');
+  const mobileCameraRef = useRef<React.ComponentRef<typeof CameraView> | null>(null);
+  const [mobileCapturedUri, setMobileCapturedUri] = useState<string | null>(null);
+  const [mobileCapturing, setMobileCapturing] = useState(false);
+  const [mobileSaveSuccess, setMobileSaveSuccess] = useState(false);
+
+  const handleOpenMobileCamera = useCallback(async () => {
+    if (!mobileCamPermission?.granted) {
+      const result = await requestMobileCamPermission();
+      if (!result.granted) {
+        Alert.alert('권한 필요', '카메라를 사용하려면 카메라 접근 권한이 필요합니다. 설정에서 허용해주세요.', [
+          { text: '설정으로', onPress: () => Linking.openSettings() },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+    }
+    setMobileCapturedUri(null);
+    setShowMobileCamera(true);
+  }, [mobileCamPermission, requestMobileCamPermission]);
+
+  const handleCloseMobileCamera = useCallback(() => {
+    setShowMobileCamera(false);
+    setMobileCapturedUri(null);
+  }, []);
+
+  const handleMobileCapture = useCallback(async () => {
+    if (!mobileCameraRef.current || mobileCapturing) return;
+    setMobileCapturing(true);
+    try {
+      const photo = await mobileCameraRef.current.takePictureAsync({ quality: 0.85, skipProcessing: false });
+      if (photo?.uri) {
+        setMobileCapturedUri(photo.uri);
+      }
+    } catch {
+      Alert.alert('촬영 실패', '사진 촬영 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setMobileCapturing(false);
+    }
+  }, [mobileCapturing]);
+
+  const handleMobileFlipCamera = useCallback(() => {
+    setMobileFacing((f) => (f === 'back' ? 'front' : 'back'));
+  }, []);
+
+  const handleMobileRetake = useCallback(() => {
+    setMobileCapturedUri(null);
+  }, []);
+
+  const handleMobileConfirmCapture = useCallback(async () => {
+    if (!mobileCapturedUri) return;
+    const clip: StockVideoClip = {
+      id: Date.now(),
+      duration: 0,
+      width: 1080,
+      height: 1920,
+      previewUrl: mobileCapturedUri,
+      thumbnailUrl: mobileCapturedUri,
+      videoUrl: mobileCapturedUri,
+      author: '직접 촬영',
+      ratio: '9:16',
+      mediaType: 'image',
+    };
+    onSelectClip(clip);
+    setShowMobileCamera(false);
+    setMobileCapturedUri(null);
+  }, [mobileCapturedUri, onSelectClip]);
+
+  const handleMobileSaveToGallery = useCallback(async () => {
+    if (!mobileCapturedUri) return;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '갤러리에 저장하려면 미디어 접근 권한이 필요합니다. 설정에서 허용해주세요.', [
+          { text: '설정으로', onPress: () => Linking.openSettings() },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+      const asset = await MediaLibrary.createAssetAsync(mobileCapturedUri);
+      await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
+      setMobileSaveSuccess(true);
+      setTimeout(() => setMobileSaveSuccess(false), 3000);
+    } catch {
+      Alert.alert('저장 실패', '갤러리 저장 중 오류가 발생했습니다.');
+    }
+  }, [mobileCapturedUri]);
+
   useEffect(() => {
     return () => { stopCameraStream(); };
   }, [stopCameraStream]);
@@ -492,18 +584,21 @@ export function StockVideoPicker({
       />
 
       {/* ── Camera capture section ── */}
-      {!showCamera && (
+      {!showCamera && !showMobileCamera && (
         <TouchableOpacity
           style={styles.captureBtn}
-          onPress={handleOpenCamera}
+          onPress={Platform.OS === 'web' ? handleOpenCamera : handleOpenMobileCamera}
           activeOpacity={0.8}
         >
           <Camera size={18} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.captureBtnText}>캡처하기 (웹캠 촬영)</Text>
+          <Text style={styles.captureBtnText}>
+            {Platform.OS === 'web' ? '캡처하기 (웹캠 촬영)' : '캡처하기 (카메라 촬영)'}
+          </Text>
         </TouchableOpacity>
       )}
 
-      {showCamera && (
+      {/* ── Web camera (web only) ── */}
+      {showCamera && Platform.OS === 'web' && (
         <View style={styles.cameraSection}>
           <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
           {capturedDataUrl ? (
@@ -582,6 +677,71 @@ export function StockVideoPicker({
                 <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
                 <Text style={styles.cameraCloseText}>닫기</Text>
               </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── Mobile camera (expo-camera, native only) ── */}
+      {showMobileCamera && Platform.OS !== 'web' && (
+        <View style={styles.cameraSection}>
+          {mobileCapturedUri ? (
+            <View style={styles.capturePreviewWrap}>
+              <Image
+                source={{ uri: mobileCapturedUri }}
+                style={{ width: '100%', height: 400, borderRadius: 12 }}
+                resizeMode="contain"
+              />
+              <View style={styles.capturePreviewActions}>
+                <TouchableOpacity style={styles.captureRetakeBtn} onPress={handleMobileRetake} activeOpacity={0.8}>
+                  <RotateCcw size={16} color="#fff" strokeWidth={2} />
+                  <Text style={styles.captureRetakeText}>다시 촬영</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.captureConfirmBtn} onPress={handleMobileConfirmCapture} activeOpacity={0.85}>
+                  <Check size={16} color="#fff" strokeWidth={2.5} />
+                  <Text style={styles.captureConfirmText}>이 사진 사용</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.captureConfirmBtn, { backgroundColor: theme.colors.success[600], marginTop: 4 }]}
+                onPress={handleMobileSaveToGallery}
+                activeOpacity={0.85}
+              >
+                <Download size={16} color="#fff" strokeWidth={2} />
+                <Text style={styles.captureConfirmText}>
+                  {mobileSaveSuccess ? '갤러리 저장됨' : '갤러리에 저장'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.mobileCameraWrap}>
+              <CameraView
+                ref={mobileCameraRef as never}
+                facing={mobileFacing}
+                style={styles.mobileCameraView}
+              />
+              <View style={styles.cameraActions}>
+                <TouchableOpacity style={styles.cameraFlipBtn} onPress={handleMobileFlipCamera} activeOpacity={0.7}>
+                  <RotateCcw size={18} color="#fff" strokeWidth={2} />
+                  <Text style={styles.cameraFlipText}>전환</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cameraShutterBtn}
+                  onPress={handleMobileCapture}
+                  disabled={mobileCapturing}
+                  activeOpacity={0.85}
+                >
+                  {mobileCapturing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Camera size={26} color="#fff" strokeWidth={2.5} />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cameraCloseBtn} onPress={handleCloseMobileCamera} activeOpacity={0.7}>
+                  <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={styles.cameraCloseText}>닫기</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -1008,5 +1168,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  // ── Mobile camera styles ──
+  mobileCameraWrap: {
+    gap: theme.spacing.sm,
+  },
+  mobileCameraView: {
+    width: '100%',
+    height: 400,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
 });
