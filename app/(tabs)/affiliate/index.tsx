@@ -855,6 +855,18 @@ export default function AffiliateScreen() {
         a.click();
         setVideoSaved(true);
         setTimeout(() => setVideoSaved(false), 3000);
+        // Auto-copy short URL + disclosure caption to clipboard
+        if (affiliateUrl.trim()) {
+          const built = buildPlatformCaption(
+            (selectedUploadPlatform ?? 'instagram') as UploadPlatformKey,
+            contentText,
+            affiliateUrl,
+            selectedPlatform ? [selectedPlatform] : [],
+            autoDisclosure,
+            disclosurePlacement,
+          );
+          try { await navigator.clipboard.writeText(built.fullText); } catch { /* clipboard best-effort */ }
+        }
         return;
       }
       const FileSystem = await import('expo-file-system/legacy');
@@ -877,12 +889,27 @@ export default function AffiliateScreen() {
       await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
       setVideoSaved(true);
       setTimeout(() => setVideoSaved(false), 3000);
+      // Auto-copy short URL + disclosure caption to clipboard
+      if (affiliateUrl.trim()) {
+        const built = buildPlatformCaption(
+          (selectedUploadPlatform ?? 'instagram') as UploadPlatformKey,
+          contentText,
+          affiliateUrl,
+          selectedPlatform ? [selectedPlatform] : [],
+          autoDisclosure,
+          disclosurePlacement,
+        );
+        try {
+          const { default: Clipboard } = await import('expo-clipboard');
+          await Clipboard.setStringAsync(built.fullText);
+        } catch { /* clipboard best-effort */ }
+      }
     } catch (err) {
       Alert.alert('저장 실패', err instanceof Error ? err.message : '갤러리 저장 중 오류가 발생했습니다.');
     } finally {
       setSavingVideo(false);
     }
-  }, [renderedVideoUrl, renderedVideoMime]);
+  }, [renderedVideoUrl, renderedVideoMime, affiliateUrl, contentText, selectedUploadPlatform, selectedPlatform, autoDisclosure, disclosurePlacement]);
 
   const handleCopyText = async (text: string) => {
     try {
@@ -1081,6 +1108,28 @@ export default function AffiliateScreen() {
           });
         } catch {
           fallbackImg = null;
+        }
+      }
+
+      // Load stock video clip as background layer (upper tile)
+      let stockVid: HTMLVideoElement | null = null;
+      if (stockVideoClip?.videoUrl) {
+        try {
+          const { urlToDataUrl } = await import('@/lib/base64');
+          const safeVideoUrl = await urlToDataUrl(stockVideoClip.videoUrl);
+          stockVid = await new Promise<HTMLVideoElement>((resolve, reject) => {
+            const el = document.createElement('video');
+            el.crossOrigin = 'anonymous';
+            el.muted = true;
+            el.loop = true;
+            el.playsInline = true;
+            el.onloadeddata = () => { el.play().then(() => resolve(el)).catch(() => resolve(el)); };
+            el.onerror = () => reject(new Error('스톡 영상 로드 실패'));
+            el.src = safeVideoUrl;
+            setTimeout(() => reject(new Error('스톡 영상 로드 시간 초과')), 12000);
+          });
+        } catch {
+          stockVid = null;
         }
       }
 
@@ -1438,11 +1487,22 @@ export default function AffiliateScreen() {
         ctx.globalAlpha = 1;
       };
 
+      // AIDCA phase boundaries (seconds): hook 0-3, trust 4-12, closing 13-15
+      const HOOK_END = Math.min(3, DURATION * 0.2);
+      const CLOSING_START = DURATION - 2;
+      const TRUST_END = CLOSING_START;
+
       const drawFrame = () => {
         const elapsed = performance.now() - startTime;
         const globalT = Math.min(elapsed / durationMs, 1);
         const pct = Math.round(globalT * 100);
         renderProgress.value = globalT;
+        const elapsedSec = elapsed / 1000;
+
+        // AIDCA phase determination
+        const isHookPhase = elapsedSec < HOOK_END;
+        const isClosingPhase = elapsedSec >= CLOSING_START;
+        const isTrustPhase = !isHookPhase && !isClosingPhase;
 
         const sceneIdx = Math.min(Math.floor(globalT * totalScenes), totalScenes - 1);
         const scene = scenes[sceneIdx];
@@ -1451,6 +1511,32 @@ export default function AffiliateScreen() {
 
         ctx.fillStyle = '#0a0f1e';
         ctx.fillRect(0, 0, W, H);
+
+        // ── HYBRID LAYER: Stock video background (upper tile) ──
+        if (stockVid && isHookPhase) {
+          const stockT = (elapsedSec / HOOK_END);
+          const stockZoom = 1.05 + Math.sin(stockT * Math.PI) * 0.08;
+          const sw = W * stockZoom;
+          const sh = H * stockZoom;
+          const sx = (W - sw) / 2;
+          const sy = (H - sh) / 2;
+          ctx.globalAlpha = 0.9;
+          applyColorGrading(1.0 + cg.warm * 0.003, cg.contrast * 0.005, cg.saturation * 0.005);
+          try { ctx.drawImage(stockVid, sx, sy, sw, sh); } catch { /* video not ready */ }
+          resetFilter();
+          ctx.globalAlpha = 1;
+        } else if (stockVid && isTrustPhase) {
+          // Trust phase: stock video as dimmed background, product image on top
+          const trustT = (elapsedSec - HOOK_END) / (TRUST_END - HOOK_END);
+          const stockZoom = 1.1 + trustT * 0.15;
+          const sw = W * stockZoom;
+          const sh = H * stockZoom;
+          const sx = (W - sw) / 2;
+          const sy = (H - sh) / 2 - H * 0.1 * trustT;
+          ctx.globalAlpha = 0.35;
+          try { ctx.drawImage(stockVid, sx, sy, sw, sh); } catch { /* video not ready */ }
+          ctx.globalAlpha = 1;
+        }
 
         if (scene) {
           // Determine which image to use for this scene
@@ -1476,15 +1562,42 @@ export default function AffiliateScreen() {
             const drawX = (W - drawW) / 2 + motion.offsetX;
             const drawY = (H - drawH) / 2 + motion.offsetY;
 
-            ctx.globalAlpha = transitionAlpha;
-            applyColorGrading(
-              1.0 + cg.warm * 0.003,
-              cg.contrast * 0.005,
-              cg.saturation * 0.005,
-            );
-            ctx.drawImage(sceneImg, drawX, drawY, drawW, drawH);
-            resetFilter();
-            ctx.globalAlpha = 1;
+            // During trust phase with stock video: composite product image as lower tile (bottom 60%)
+            if (stockVid && isTrustPhase) {
+              const trustT = (elapsedSec - HOOK_END) / (TRUST_END - HOOK_END);
+              const slideIn = Math.min(trustT * 3, 1);
+              const overlayH = H * 0.6;
+              const overlayY = H * 0.4 + (1 - slideIn) * overlayH;
+              const { baseW: pBaseW, baseH: pBaseH } = getBaseDims(sceneImg);
+              const pScale = Math.min(W / pBaseW, overlayH / pBaseH) * motion.scale;
+              const pDrawW = pBaseW * pScale;
+              const pDrawH = pBaseH * pScale;
+              const pDrawX = (W - pDrawW) / 2 + motion.offsetX * 0.3;
+              const pDrawY = overlayY + (overlayH - pDrawH) / 2;
+
+              // Gradient blend at top of product image
+              const blendGrad = ctx.createLinearGradient(0, overlayY - 20, 0, overlayY + 40);
+              blendGrad.addColorStop(0, 'rgba(10,15,30,0)');
+              blendGrad.addColorStop(1, 'rgba(10,15,30,0.8)');
+              ctx.fillStyle = blendGrad;
+              ctx.fillRect(0, overlayY - 20, W, 60);
+
+              ctx.globalAlpha = transitionAlpha * slideIn;
+              applyColorGrading(1.0 + cg.warm * 0.003, cg.contrast * 0.005, cg.saturation * 0.005);
+              ctx.drawImage(sceneImg, pDrawX, pDrawY, pDrawW, pDrawH);
+              resetFilter();
+              ctx.globalAlpha = 1;
+            } else {
+              ctx.globalAlpha = transitionAlpha;
+              applyColorGrading(
+                1.0 + cg.warm * 0.003,
+                cg.contrast * 0.005,
+                cg.saturation * 0.005,
+              );
+              ctx.drawImage(sceneImg, drawX, drawY, drawW, drawH);
+              resetFilter();
+              ctx.globalAlpha = 1;
+            }
           } else {
             // Text-only story scene: gradient background + decorative elements
             const bgGrad = ctx.createLinearGradient(0, 0, W, H);
@@ -1829,7 +1942,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta, affiliateUrl]);
+  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta, affiliateUrl, stockVideoClip]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -2472,7 +2585,7 @@ export default function AffiliateScreen() {
               {videoSaved && (
                 <View style={styles.renderCompleteBox}>
                   <Text style={styles.renderCompleteText}>
-                    갤러리에 저장되었습니다. 저장된 영상을 각 플랫폼에 직접 업로드하시면 됩니다.
+                    영상이 저장되었습니다. 제휴 단축 링크와 공정위 문구가 클립보드에 자동 복사되었습니다. 플랫폼에 붙여넣기 하시면 됩니다.
                   </Text>
                 </View>
               )}
