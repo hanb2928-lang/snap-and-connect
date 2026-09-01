@@ -256,6 +256,8 @@ export default function AffiliateScreen() {
     description: string;
     price: string;
     image: string;
+    imageBase64: string;
+    imageMimeType: string;
     platform: string;
     brand: string;
     searchUrl: string;
@@ -441,6 +443,8 @@ export default function AffiliateScreen() {
         description: meta.description || '',
         price: meta.price || '',
         image: meta.image || '',
+        imageBase64: meta.imageBase64 || '',
+        imageMimeType: meta.imageMimeType || '',
         platform: meta.platform || '',
         brand: meta.brand || '',
         searchUrl: meta.searchUrl || '',
@@ -456,8 +460,14 @@ export default function AffiliateScreen() {
       }
       setProductMeta(newMeta);
       markCompleted('affiliate');
-      // Auto-set product image as the analysis image
-      if (newMeta.image) {
+      // Use server-captured base64 image directly — bypasses CORS entirely
+      if (newMeta.imageBase64) {
+        setSelectedImage(newMeta.imageBase64);
+        setSelectedImageMime(newMeta.imageMimeType || 'image/jpeg');
+        setMediaType('photo');
+        setImageSource('product');
+      } else if (newMeta.image) {
+        // Fallback: try browser-side fetch (may fail due to CORS)
         try {
           const { urlToDataUrl } = await import('@/lib/base64');
           const dataUrl = await urlToDataUrl(newMeta.image);
@@ -477,6 +487,8 @@ export default function AffiliateScreen() {
         description: '',
         price: '',
         image: '',
+        imageBase64: '',
+        imageMimeType: '',
         platform: platformKey,
         brand: platformKey,
         searchUrl,

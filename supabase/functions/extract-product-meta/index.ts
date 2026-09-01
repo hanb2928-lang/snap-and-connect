@@ -12,6 +12,8 @@ interface ProductMeta {
   price: string;
   currency: string;
   image: string;
+  imageBase64: string;
+  imageMimeType: string;
   url: string;
   platform: string;
   availability: string;
@@ -58,6 +60,8 @@ Deno.serve(async (req: Request) => {
         price: "",
         currency: "KRW",
         image: "",
+        imageBase64: "",
+        imageMimeType: "",
         url,
         platform,
         availability: "",
@@ -66,6 +70,20 @@ Deno.serve(async (req: Request) => {
         productId,
         extractionMethod: "failed",
       };
+    }
+
+    // Server-side image capture: fetch og:image URL and convert to base64
+    // This bypasses browser CORS restrictions entirely
+    if (meta.image) {
+      try {
+        const imgResult = await captureImageAsBase64(meta.image);
+        if (imgResult) {
+          meta.imageBase64 = imgResult.base64;
+          meta.imageMimeType = imgResult.mimeType;
+        }
+      } catch {
+        // image capture failed — not critical, client can still use URL
+      }
     }
 
     if (!meta.productName && !meta.description) {
@@ -255,6 +273,8 @@ function parseHtml(html: string, url: string): ProductMeta {
     price,
     currency,
     image,
+    imageBase64: "",
+    imageMimeType: "",
     url,
     platform,
     availability,
@@ -393,6 +413,8 @@ async function enrichWithAI(url: string, basic: ProductMeta, apiKey: string): Pr
       description: basic.description || String(parsed.description || ""),
       price: basic.price || String(parsed.price || ""),
       brand: basic.brand || String(parsed.brand || ""),
+      imageBase64: basic.imageBase64 || "",
+      imageMimeType: basic.imageMimeType || "",
     };
   } finally {
     clearTimeout(timeoutId);
