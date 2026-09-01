@@ -869,6 +869,112 @@ export default function AffiliateScreen() {
         return H * 0.72;
       };
 
+      // Scene transition: fade-in at start, fade-out at end of each scene
+      const getSceneTransitionAlpha = (localT: number) => {
+        const fadeIn = Math.min(localT * 6, 1);
+        const fadeOut = Math.min((1 - localT) * 6, 1);
+        return fadeIn * fadeOut;
+      };
+
+      // Emotion-specific overlay rendering
+      const drawEmotionOverlay = (
+        emotion: PsychScene['emotion'],
+        localT: number,
+        color: { primary: string; accent: string; overlay: string },
+      ) => {
+        switch (emotion) {
+          case 'curiosity': {
+            // Subtle spotlight reveal effect
+            const spotR = W * (0.3 + localT * 0.25);
+            const spotGrad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, spotR);
+            spotGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            spotGrad.addColorStop(1, color.overlay);
+            ctx.fillStyle = spotGrad;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+          case 'shock': {
+            // Quick red flash + shake vignette
+            const flashIntensity = Math.max(0, 1 - localT * 3) * 0.4;
+            ctx.fillStyle = `rgba(255,40,40,${flashIntensity})`;
+            ctx.fillRect(0, 0, W, H);
+            const shockVignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.2, W / 2, H / 2, W * 0.6);
+            shockVignette.addColorStop(0, 'rgba(0,0,0,0)');
+            shockVignette.addColorStop(1, `rgba(20,0,0,${0.5 + localT * 0.2})`);
+            ctx.fillStyle = shockVignette;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+          case 'empathy': {
+            // Warm golden glow + soft gradient
+            const warmth = 0.15 + Math.sin(localT * Math.PI) * 0.1;
+            const warmGrad = ctx.createLinearGradient(0, H * 0.3, 0, H);
+            warmGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            warmGrad.addColorStop(0.5, `rgba(255,200,100,${warmth * 0.3})`);
+            warmGrad.addColorStop(1, `rgba(255,180,80,${warmth * 0.5})`);
+            ctx.fillStyle = warmGrad;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+          case 'desire': {
+            // Dark edges with glowing center (spotlight on product)
+            const desireGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.1, W / 2, H / 2, W * 0.65);
+            desireGrad.addColorStop(0, 'rgba(0,0,0,0)');
+            desireGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
+            desireGrad.addColorStop(1, `rgba(15,5,0,${0.6 + localT * 0.2})`);
+            ctx.fillStyle = desireGrad;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+          case 'action': {
+            // Pulsing accent border + urgency gradient
+            const pulse = Math.sin(localT * Math.PI * 4) * 0.5 + 0.5;
+            const borderW = 8 + pulse * 6;
+            ctx.strokeStyle = color.accent;
+            ctx.lineWidth = borderW;
+            ctx.globalAlpha = 0.6 + pulse * 0.3;
+            ctx.strokeRect(borderW / 2, borderW / 2, W - borderW, H - borderW);
+            ctx.globalAlpha = 1;
+            const actionGrad = ctx.createLinearGradient(0, H, 0, H * 0.7);
+            actionGrad.addColorStop(0, color.primary + '50');
+            actionGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = actionGrad;
+            ctx.fillRect(0, 0, W, H);
+            break;
+          }
+        }
+      };
+
+      // Determine whether scene should show product image or text-only story frame
+      const isTextOnlyScene = (emotion: PsychScene['emotion'], idx: number) => {
+        // First scene (curiosity hook) and action scene are text-driven
+        // Empathy scene uses story-first approach (no product image)
+        return emotion === 'empathy' || (emotion === 'curiosity' && idx === 0);
+      };
+
+      // Draw decorative particles/elements for text-only scenes
+      const drawDecorativeElements = (
+        emotion: PsychScene['emotion'],
+        localT: number,
+        color: { primary: string; accent: string },
+      ) => {
+        const particleCount = emotion === 'shock' ? 12 : emotion === 'action' ? 8 : 6;
+        for (let i = 0; i < particleCount; i++) {
+          const seed = i * 137.5;
+          const angle = (seed + localT * 180) * (Math.PI / 180);
+          const radius = W * (0.15 + (i % 3) * 0.12) + Math.sin(localT * Math.PI * 2 + seed) * 30;
+          const px = W / 2 + Math.cos(angle) * radius;
+          const py = H / 2 + Math.sin(angle) * radius * 0.6;
+          const size = 3 + Math.sin(localT * Math.PI * 3 + seed) * 2;
+          ctx.globalAlpha = 0.15 + Math.sin(localT * Math.PI * 2 + seed) * 0.1;
+          ctx.fillStyle = i % 2 === 0 ? color.primary : color.accent;
+          ctx.beginPath();
+          ctx.arc(px, py, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      };
+
       const drawFrame = () => {
         const elapsed = performance.now() - startTime;
         const globalT = Math.min(elapsed / durationMs, 1);
@@ -878,57 +984,70 @@ export default function AffiliateScreen() {
         const sceneIdx = Math.min(Math.floor(globalT * totalScenes), totalScenes - 1);
         const scene = scenes[sceneIdx];
         const sceneLocalT = (globalT * totalScenes) - sceneIdx;
+        const transitionAlpha = getSceneTransitionAlpha(sceneLocalT);
 
         ctx.fillStyle = '#0a0f1e';
         ctx.fillRect(0, 0, W, H);
 
         if (scene) {
-          const motion = getMotionTransform(scene.motionType, sceneLocalT);
-          const drawW = baseW * motion.scale;
-          const drawH = baseH * motion.scale;
-          const drawX = (W - drawW) / 2 + motion.offsetX;
-          const drawY = (H - drawH) / 2 + motion.offsetY;
+          const showProductImage = img && !isTextOnlyScene(scene.emotion, sceneIdx);
 
-          if (img) {
+          if (showProductImage) {
+            // Product image scene with motion
+            const motion = getMotionTransform(scene.motionType, sceneLocalT);
+            const drawW = baseW * motion.scale;
+            const drawH = baseH * motion.scale;
+            const drawX = (W - drawW) / 2 + motion.offsetX;
+            const drawY = (H - drawH) / 2 + motion.offsetY;
+
+            ctx.globalAlpha = transitionAlpha;
             applyColorGrading(
               1.0 + cg.warm * 0.003,
               cg.contrast * 0.005,
               cg.saturation * 0.005,
             );
-            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            ctx.drawImage(img!, drawX, drawY, drawW, drawH);
             resetFilter();
+            ctx.globalAlpha = 1;
           } else {
+            // Text-only story scene: gradient background + decorative elements
             const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-            bgGrad.addColorStop(0, scene.colorTheme.primary + '40');
-            bgGrad.addColorStop(0.5, scene.colorTheme.accent + '30');
+            bgGrad.addColorStop(0, scene.colorTheme.primary + '30');
+            bgGrad.addColorStop(0.5, scene.colorTheme.accent + '20');
             bgGrad.addColorStop(1, '#0a0f1e');
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, W, H);
-            const pulseR = 200 + Math.sin(sceneLocalT * Math.PI * 2) * 60;
-            const pulseGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, pulseR);
-            pulseGrad.addColorStop(0, scene.colorTheme.primary + '60');
-            pulseGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = pulseGrad;
-            ctx.fillRect(0, 0, W, H);
+
+            ctx.globalAlpha = transitionAlpha;
+            drawDecorativeElements(scene.emotion, sceneLocalT, scene.colorTheme);
+            ctx.globalAlpha = 1;
           }
 
+          // Emotion-specific overlay
+          ctx.globalAlpha = transitionAlpha;
+          drawEmotionOverlay(scene.emotion, sceneLocalT, scene.colorTheme);
+          ctx.globalAlpha = 1;
+
+          // Standard color overlay
           const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
           const overlayColor = scene.colorTheme.overlay;
           overlayGrad.addColorStop(0, overlayColor);
-          overlayGrad.addColorStop(0.4, 'rgba(10,15,30,0.3)');
+          overlayGrad.addColorStop(0.4, 'rgba(10,15,30,0.2)');
           overlayGrad.addColorStop(1, overlayColor);
           ctx.fillStyle = overlayGrad;
+          ctx.globalAlpha = transitionAlpha * 0.7;
           ctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = 1;
 
+          // Vignette
           const vignetteGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
           vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
           vignetteGrad.addColorStop(1, `rgba(0,0,0,${cg.vignette * 0.01})`);
           ctx.fillStyle = vignetteGrad;
           ctx.fillRect(0, 0, W, H);
 
-          const fadeAlpha = Math.min(sceneLocalT * 4, 1) * Math.min((1 - sceneLocalT) * 4, 1);
-
-          ctx.globalAlpha = fadeAlpha;
+          // Scene text with transition fade
+          ctx.globalAlpha = transitionAlpha;
           ctx.fillStyle = '#fff';
           ctx.font = `700 ${scene.fontSize}px sans-serif`;
           ctx.textBaseline = 'top';
