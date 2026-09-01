@@ -39,6 +39,7 @@ import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer'
 import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { StockVideoPicker } from '@/components/StockVideoPicker';
+import { VideoEditPlanCard } from '@/components/VideoEditPlanCard';
 import type { StockVideoClip } from '@/lib/pexelsVideo';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
@@ -2510,6 +2511,19 @@ export default function AffiliateScreen() {
             })()}
             selectedClip={stockVideoClip}
             onSelectClip={setStockVideoClip}
+          />
+        )}
+
+        {/* Video Edit Plan — 15s/30s cut plan + anti-algorithm + psychology + copy variants */}
+        {previewMediaMode === 'video' && completedSteps.has('platformSelect') && (
+          <VideoEditPlanCard
+            productName={productMeta?.productName}
+            productCategory={undefined}
+            platform={selectedUploadPlatform || undefined}
+            accentColor={undefined}
+            hook={undefined}
+            oneLiner={undefined}
+            hasVideoSelected={stockVideoClip !== null}
           />
         )}
 

@@ -78,3 +78,6 @@ verify_jwt = false
 
 [functions.search-pexels-videos]
 verify_jwt = false
+
+[functions.generate-video-edit-plan]
+verify_jwt = false
