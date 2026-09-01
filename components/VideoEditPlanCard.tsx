@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
+  Animated,
+  Easing,
 } from 'react-native';
 import {
   Scissors,
@@ -64,10 +66,49 @@ export function VideoEditPlanCard({
   const [error, setError] = useState<string | null>(null);
   const [expandedCopy, setExpandedCopy] = useState<number | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgress = useCallback(() => {
+    setProgress(0);
+    progressAnim.setValue(0);
+    if (progressInterval.current) clearInterval(progressInterval.current);
+    progressInterval.current = setInterval(() => {
+      setProgress((prev) => Math.min(prev + Math.random() * 12 + 4, 92));
+    }, 250);
+  }, [progressAnim]);
+
+  const finishProgress = useCallback(() => {
+    if (progressInterval.current) clearInterval(progressInterval.current);
+    setProgress(100);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [progressAnim]);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress / 100,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [progress, progressAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
+    startProgress();
     try {
       const result = await fetchVideoEditPlan({
         productName,
@@ -84,9 +125,10 @@ export function VideoEditPlanCard({
     } catch (err) {
       setError(err instanceof Error ? err.message : '편집 계획 생성에 실패했습니다.');
     } finally {
+      finishProgress();
       setLoading(false);
     }
-  }, [duration, psychPreset, productName, productCategory, platform, accentColor, hook, oneLiner]);
+  }, [duration, psychPreset, productName, productCategory, platform, accentColor, hook, oneLiner, startProgress, finishProgress]);
 
   const copyToClipboard = useCallback(async (text: string, fieldKey: string) => {
     try {
@@ -205,6 +247,23 @@ export function VideoEditPlanCard({
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {loading && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>AI 편집 계획 생성 중...</Text>
+            <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[styles.progressFill, { width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }) }]}
+            />
+          </View>
         </View>
       )}
 
@@ -508,6 +567,36 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     lineHeight: 17,
+  },
+  progressContainer: {
+    marginBottom: theme.spacing.sm,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  progressPercent: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.warning[400],
+    borderRadius: 2,
   },
   planScroll: {
     maxHeight: 600,

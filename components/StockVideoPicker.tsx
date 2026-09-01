@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   TextInput,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Search, Film, Check, X, RefreshCw } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -32,6 +34,47 @@ export function StockVideoPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [progress, setProgress] = useState(0);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgress = useCallback(() => {
+    setProgress(0);
+    progressAnim.setValue(0);
+    if (progressInterval.current) clearInterval(progressInterval.current);
+    progressInterval.current = setInterval(() => {
+      setProgress((prev) => {
+      const next = Math.min(prev + Math.random() * 15 + 5, 90);
+        return next;
+      });
+    }, 200);
+  }, [progressAnim]);
+
+  const finishProgress = useCallback(() => {
+    if (progressInterval.current) clearInterval(progressInterval.current);
+    setProgress(100);
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [progressAnim]);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress / 100,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [progress, progressAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
 
   const buildQuery = useCallback(() => {
     if (searchQuery.trim()) return searchQuery.trim();
@@ -49,6 +92,7 @@ export function StockVideoPicker({
     }
     setLoading(true);
     setError(null);
+    startProgress();
     try {
       const results = await searchStockVideos(query, orientation, 12);
       setClips(results);
@@ -58,9 +102,10 @@ export function StockVideoPicker({
     } catch (err) {
       setError(err instanceof Error ? err.message : '영상 검색에 실패했습니다.');
     } finally {
+      finishProgress();
       setLoading(false);
     }
-  }, [buildQuery, orientation]);
+  }, [buildQuery, orientation, startProgress, finishProgress]);
 
   const initialQuery = productName || productCategory || '';
   const hasSearched = clips.length > 0 || error !== null;
@@ -109,6 +154,23 @@ export function StockVideoPicker({
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {loading && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>영상 다운로드 중...</Text>
+            <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[styles.progressFill, { width: progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }) }]}
+            />
+          </View>
         </View>
       )}
 
@@ -418,5 +480,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  progressContainer: {
+    marginBottom: theme.spacing.sm,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  progressPercent: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.success[400],
+    borderRadius: 2,
   },
 });
