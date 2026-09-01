@@ -619,8 +619,18 @@ export default function AffiliateScreen() {
   );
 
   const generatePreviewVideo = useCallback(async () => {
-    if (Platform.OS !== 'web') return;
-    if (!imagePreviewUri || !videoPreviewScenes) return;
+    if (Platform.OS !== 'web') {
+      setRenderError('웹 브라우저에서만 영상 생성이 가능합니다.');
+      return;
+    }
+    if (!videoPreviewScenes) {
+      setRenderError('먼저 스토리보드를 생성해주세요.');
+      return;
+    }
+    if (!imagePreviewUri) {
+      setRenderError('상품 사진이 필요합니다. 2단계에서 사진을 업로드하거나 상품 링크로 사진을 불러와주세요.');
+      return;
+    }
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -628,15 +638,19 @@ export default function AffiliateScreen() {
     renderProgress.value = 0;
 
     try {
-      const { urlToDataUrl } = await import('@/lib/base64');
-      const safeImageUrl = await urlToDataUrl(imagePreviewUri);
-
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-        el.onload = () => resolve(el);
-        el.onerror = () => reject(new Error('이미지를 불러올 수 없습니다.'));
-        el.src = safeImageUrl;
-      });
+      let img: HTMLImageElement | null = null;
+      try {
+        const { urlToDataUrl } = await import('@/lib/base64');
+        const safeImageUrl = await urlToDataUrl(imagePreviewUri);
+        img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error('이미지 로드 실패'));
+          el.src = safeImageUrl;
+        });
+      } catch {
+        img = null;
+      }
 
       const analysis = viralAnalysisResult;
       const specsRatio = analysis?.specs.ratio ?? '9:16';
@@ -671,11 +685,13 @@ export default function AffiliateScreen() {
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
       recorder.start();
 
-      const imgAspect = img.naturalWidth / img.naturalHeight;
-      const canvasAspect = W / H;
-      let baseW: number, baseH: number;
-      if (imgAspect > canvasAspect) { baseW = W; baseH = W / imgAspect; }
-      else { baseH = H; baseW = H * imgAspect; }
+      let baseW = W, baseH = H;
+      if (img) {
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = W / H;
+        if (imgAspect > canvasAspect) { baseW = W; baseH = W / imgAspect; }
+        else { baseH = H; baseW = H * imgAspect; }
+      }
 
       const scenes = videoPreviewScenes;
       const totalScenes = scenes.length;
@@ -727,13 +743,28 @@ export default function AffiliateScreen() {
           const drawX = (W - drawW) / 2 + motion.offsetX;
           const drawY = (H - drawH) / 2 + motion.offsetY;
 
-          applyColorGrading(
-            1.0 + cg.warm * 0.003,
-            cg.contrast * 0.005,
-            cg.saturation * 0.005,
-          );
-          ctx.drawImage(img, drawX, drawY, drawW, drawH);
-          resetFilter();
+          if (img) {
+            applyColorGrading(
+              1.0 + cg.warm * 0.003,
+              cg.contrast * 0.005,
+              cg.saturation * 0.005,
+            );
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            resetFilter();
+          } else {
+            const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+            bgGrad.addColorStop(0, scene.colorTheme.primary + '40');
+            bgGrad.addColorStop(0.5, scene.colorTheme.accent + '30');
+            bgGrad.addColorStop(1, '#0a0f1e');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, W, H);
+            const pulseR = 200 + Math.sin(sceneLocalT * Math.PI * 2) * 60;
+            const pulseGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, pulseR);
+            pulseGrad.addColorStop(0, scene.colorTheme.primary + '60');
+            pulseGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = pulseGrad;
+            ctx.fillRect(0, 0, W, H);
+          }
 
           const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
           const overlayColor = scene.colorTheme.overlay;
@@ -1443,13 +1474,20 @@ export default function AffiliateScreen() {
               ))}
 
               {/* Render video from storyboard button */}
+              {!imagePreviewUri && (
+                <View style={styles.renderCompleteBox}>
+                  <Text style={[styles.renderCompleteText, { color: theme.colors.warning[400] }]}>
+                    상품 사진이 필요합니다. 위에서 사진을 업로드하거나 상품 링크 입력 후 사진을 불러와주세요.
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity
-                style={[styles.renderVideoBtn, videoRendering && styles.renderVideoBtnDisabled]}
+                style={[styles.renderVideoBtn, (videoRendering || videoRenderComplete || !imagePreviewUri) && styles.renderVideoBtnDisabled]}
                 onPress={() => {
-                  if (videoRendering || videoRenderComplete) return;
+                  if (videoRendering || videoRenderComplete || !imagePreviewUri) return;
                   generatePreviewVideo();
                 }}
-                disabled={videoRendering || videoRenderComplete}
+                disabled={videoRendering || videoRenderComplete || !imagePreviewUri}
                 activeOpacity={0.85}
               >
                 {videoRendering ? (
