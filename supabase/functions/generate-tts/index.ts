@@ -15,6 +15,7 @@ interface TTSRequest {
   speed?: number;
   pitch?: number;
   instructions?: string;
+  ttsApiKey?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -47,7 +48,7 @@ Deno.serve(async (req: Request) => {
     const speedJitter = (Math.random() - 0.5) * 0.16;
     const speed = Math.min(Math.max(baseSpeed + speedJitter, 0.5), 2.0);
 
-    const openaiKey = await resolveOpenAIKey();
+    const openaiKey = body.ttsApiKey?.trim() || await resolveOpenAIKey();
 
     if (!openaiKey) {
       return new Response(

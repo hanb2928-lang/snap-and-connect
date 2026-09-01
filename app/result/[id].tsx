@@ -1570,7 +1570,7 @@ export default function ResultScreen() {
               hashtags={allDisplayHashtags}
               comicStyle="lineart"
               panelCount={1}
-              hasTTS={false}
+              hasTTS={!!scan?.tts_url}
               episodeMode={false}
               trendingKeywords={trendingHashtags}
             />

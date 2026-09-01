@@ -505,64 +505,67 @@ export default function CameraScreen() {
     if (voiceCommandInProgressRef.current) return;
     voiceCommandInProgressRef.current = true;
 
-    // Save voice command data first so marketing screen can pick it up
-    await setItem('marketing_voice_command_prompt', cmd.promptText);
-    await setItem('marketing_voice_command_intent', cmd.intent || '');
-    await setItem('marketing_voice_command_active', 'true');
+    try {
+      // Save voice command data first so marketing screen can pick it up
+      await setItem('marketing_voice_command_prompt', cmd.promptText);
+      await setItem('marketing_voice_command_intent', cmd.intent || '');
+      await setItem('marketing_voice_command_active', 'true');
 
-    // If camera is ready and no image selected yet, auto-capture a photo hands-free
-    if (cameraRef.current && cameraReady && !selectedImage && !previewCapture && !processing) {
-      try {
-        setProcessing(true);
-        setProgressText('음성 명령 감지! 사진 촬영 중...');
-        progressWidth.value = withTiming(0.15, { duration: 200 });
-        fadeAnim.value = 0;
-        fadeIn();
+      // If camera is ready and no image selected yet, auto-capture a photo hands-free
+      if (cameraRef.current && cameraReady && !selectedImage && !previewCapture && !processing) {
+        try {
+          setProcessing(true);
+          setProgressText('음성 명령 감지! 사진 촬영 중...');
+          progressWidth.value = withTiming(0.15, { duration: 200 });
+          fadeAnim.value = 0;
+          fadeIn();
 
-        const photo = await withTimeout(
-          cameraRef.current.takePictureAsync({
-            base64: true,
-            quality: 0.7,
-            shutterSound: false,
-            ...({ mute: true } as Record<string, unknown>),
-          }) as Promise<{ base64?: string; uri: string }>,
-          CAPTURE_TIMEOUT_MS,
-          '음성 자동 촬영',
-        );
-        if (!photo?.base64) throw new Error('auto-capture failed');
-        const cleanB64 = cleanBase64(photo.base64);
-        const compressedDataUrl = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
-          PICK_TIMEOUT_MS,
-          '이미지 압축',
-        );
-        if (!isMountedRef.current) return;
-        const compressedB64 = cleanBase64(compressedDataUrl);
-        const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
+          const photo = await withTimeout(
+            cameraRef.current.takePictureAsync({
+              base64: true,
+              quality: 0.7,
+              shutterSound: false,
+              ...({ mute: true } as Record<string, unknown>),
+            }) as Promise<{ base64?: string; uri: string }>,
+            CAPTURE_TIMEOUT_MS,
+            '음성 자동 촬영',
+          );
+          if (!photo?.base64) throw new Error('auto-capture failed');
+          const cleanB64 = cleanBase64(photo.base64);
+          const compressedDataUrl = await withTimeout(
+            prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, moodFilter as MoodFilterType),
+            PICK_TIMEOUT_MS,
+            '이미지 압축',
+          );
+          if (!isMountedRef.current) return;
+          const compressedB64 = cleanBase64(compressedDataUrl);
+          const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
 
-        // Save captured image so marketing screen can use it
-        await setItem('marketing_voice_captured_image', compressedB64);
-        await setItem('marketing_voice_captured_mime', compressedMime);
-        setProcessing(false);
-      } catch {
-        if (!isMountedRef.current) return;
-        setProcessing(false);
-        // Capture failed — still route to marketing without a photo
+          // Save captured image so marketing screen can use it
+          await setItem('marketing_voice_captured_image', compressedB64);
+          await setItem('marketing_voice_captured_mime', compressedMime);
+          setProcessing(false);
+        } catch {
+          if (!isMountedRef.current) return;
+          setProcessing(false);
+          // Capture failed — still route to marketing without a photo
+        }
       }
+
+      // Clear camera tab state before navigating (marketing owns the image via storage)
+      setSelectedImage(null);
+      setSelectedImageMime('image/jpeg');
+      setPreviewCapture(null);
+      setFunnelStage('idle');
+      setSelectedHook(null);
+      setCustomPrompt('');
+      setMultiAngleShots([]);
+      setCaptureMode('single');
+
+      router.push('/(tabs)/marketing' as never);
+    } finally {
+      voiceCommandInProgressRef.current = false;
     }
-
-    // Clear camera tab state before navigating (marketing owns the image via storage)
-    setSelectedImage(null);
-    setSelectedImageMime('image/jpeg');
-    setPreviewCapture(null);
-    setFunnelStage('idle');
-    setSelectedHook(null);
-    setCustomPrompt('');
-    setMultiAngleShots([]);
-    setCaptureMode('single');
-
-    router.push('/(tabs)/marketing' as never);
-    voiceCommandInProgressRef.current = false;
   }, [router, cameraReady, selectedImage, previewCapture, processing, progressWidth, fadeAnim, fadeIn]);
 
   const moodOverlayColor =

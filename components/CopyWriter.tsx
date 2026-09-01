@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown, Shuffle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { safeFetch } from '@/lib/apiClient';
 import * as Clipboard from 'expo-clipboard';
 import type { PlatformKey } from '@/types/database';
 import { spinCaption, type CaptionVariation } from '@/lib/humanLikeEngine';
@@ -79,7 +80,7 @@ export function CopyWriter({
     setExpandedKey(null);
     setShowOtherVersions(false);
     try {
-      const response = await fetch(COPY_FUNCTION_URL, {
+      const response = await safeFetch(COPY_FUNCTION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,6 +98,7 @@ export function CopyWriter({
           count,
           brandPersona: brandPersona || undefined,
         }),
+        timeoutMs: 115000,
       });
       if (!response.ok) throw new Error('generation failed');
       const data = await response.json();

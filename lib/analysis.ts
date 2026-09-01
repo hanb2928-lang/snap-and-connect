@@ -159,6 +159,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
   let voice = 'alloy';
   let speed = 1.0;
   let pitch = 0;
+  let ttsApiKey: string | null = null;
   try {
     const settings = await getUserSettings();
     if (settings?.default_tts_voice) {
@@ -168,6 +169,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
       speed = params.speed;
     }
     if (settings?.tts_pitch != null) pitch = settings.tts_pitch;
+    ttsApiKey = settings?.tts_api_key ?? null;
   } catch {
     // use defaults
   }
@@ -179,7 +181,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ text, voice, speed, pitch }),
+    body: JSON.stringify({ text, voice, speed, pitch, ttsApiKey }),
     signal: controller.signal,
   });
   clearTimeout(timeoutId);

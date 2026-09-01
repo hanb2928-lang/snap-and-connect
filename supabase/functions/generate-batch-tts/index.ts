@@ -19,6 +19,7 @@ interface BatchTTSItem {
 
 interface BatchTTSRequest {
   items: BatchTTSItem[];
+  ttsApiKey?: string;
 }
 
 interface BatchTTSResult {
@@ -56,7 +57,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const openaiKey = await resolveOpenAIKey();
+    const openaiKey = body.ttsApiKey?.trim() || await resolveOpenAIKey();
     if (!openaiKey) {
       return new Response(
         JSON.stringify({ error: "OpenAI API key not configured. TTS is unavailable." }),

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,11 @@ export function CapturePreviewModal({
   const [cropVisible, setCropVisible] = useState(false);
   const [currentBase64, setCurrentBase64] = useState(imageBase64);
   const [currentMime, setCurrentMime] = useState(mimeType);
+
+  useEffect(() => {
+    setCurrentBase64(imageBase64);
+    setCurrentMime(mimeType);
+  }, [imageBase64, mimeType]);
 
   const dataUrl = useMemo(
     () => buildDataUrl(currentBase64, currentMime),
