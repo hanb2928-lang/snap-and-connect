@@ -47,9 +47,6 @@ export interface StockVideoClip {
 }
 
 async function resolvePexelsKey(): Promise<string | null> {
-  const envKey = Deno.env.get("PEXELS_API_KEY");
-  if (envKey) return envKey;
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -77,7 +74,9 @@ async function resolvePexelsKey(): Promise<string | null> {
       // ignore — no key found
     }
   }
-  return null;
+
+  const envKey = Deno.env.get("PEXELS_API_KEY")?.trim();
+  return envKey || null;
 }
 
 function pickBestFile(files: PexelsVideoFile[], targetOrientation: string): PexelsVideoFile | null {
