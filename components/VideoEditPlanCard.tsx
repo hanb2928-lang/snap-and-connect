@@ -11,6 +11,7 @@ import {
   Scissors,
   Brain,
   ShieldOff,
+  ShieldCheck,
   Copy,
   Check,
   Clock,
@@ -217,17 +218,23 @@ export function VideoEditPlanCard({
           {/* Segments timeline */}
           <Text style={styles.sectionLabel}>컷 편집 타임라인</Text>
           <View style={styles.segmentsWrap}>
-            {plan.segments.map((seg, i) => (
-              <View key={i} style={styles.segmentRow}>
-                <View style={styles.segmentTime}>
-                  <Text style={styles.segmentTimeText}>{seg.startSec}~{seg.endSec}초</Text>
+            {plan.segments.map((seg, i) => {
+              const isCtaSegment = seg.label.includes('CTA') && seg.startSec >= plan.duration - 2;
+              return (
+                <View key={i} style={[styles.segmentRow, isCtaSegment && styles.segmentRowCta]}>
+                  <View style={[styles.segmentTime, isCtaSegment && styles.segmentTimeCta]}>
+                    <Text style={[styles.segmentTimeText, isCtaSegment && styles.segmentTimeTextCta]}>{seg.startSec}~{seg.endSec}초</Text>
+                  </View>
+                  <View style={styles.segmentBody}>
+                    <View style={styles.segmentLabelRow}>
+                      {isCtaSegment && <ShieldCheck size={11} color={theme.colors.success[400]} strokeWidth={2.5} />}
+                      <Text style={[styles.segmentLabel, isCtaSegment && styles.segmentLabelCta]}>{seg.label}</Text>
+                    </View>
+                    <Text style={styles.segmentPurpose}>{seg.purpose}</Text>
+                  </View>
                 </View>
-                <View style={styles.segmentBody}>
-                  <Text style={styles.segmentLabel}>{seg.label}</Text>
-                  <Text style={styles.segmentPurpose}>{seg.purpose}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* Hook timing */}
@@ -535,6 +542,21 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'flex-start',
   },
+  segmentRowCta: {
+    backgroundColor: theme.colors.success[400] + '0D',
+    borderRadius: 6,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  segmentLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  segmentLabelCta: {
+    color: theme.colors.success[400],
+  },
   segmentTime: {
     backgroundColor: theme.colors.warning[400] + '18',
     borderRadius: 6,
@@ -542,10 +564,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     minWidth: 58,
   },
+  segmentTimeCta: {
+    backgroundColor: theme.colors.success[400] + '20',
+  },
   segmentTimeText: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.warning[400],
+  },
+  segmentTimeTextCta: {
+    color: theme.colors.success[400],
   },
   segmentBody: {
     flex: 1,

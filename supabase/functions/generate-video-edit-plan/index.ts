@@ -114,19 +114,25 @@ function fallbackPlan(
   platform: string,
   psychologyPreset: string,
 ): EditPlan {
+  const ctaSegment: CutSegment = {
+    startSec: duration - 2,
+    endSec: duration,
+    label: "제휴 CTA + 공정위 문구",
+    purpose: "제휴 쇼핑몰 매칭 링크 노출 + 공정위 의무 문구 삽입 (마지막 2초 고정)",
+  };
   const segments: CutSegment[] = duration === 15
     ? [
         { startSec: 0, endSec: 3, label: "후킹", purpose: "강렬한 첫 프레임으로 시선 강탈" },
         { startSec: 3, endSec: 8, label: "제품 소개", purpose: "핵심 장점 1~2개를 빠르게 전달" },
-        { startSec: 8, endSec: 12, label: "사용 장면", purpose: "실사용으로 신뢰감 형성" },
-        { startSec: 12, endSec: 15, label: "CTA", purpose: "제휴 링크 클릭 유도" },
+        { startSec: 8, endSec: 13, label: "사용 장면", purpose: "실사용으로 신뢰감 형성" },
+        ctaSegment,
       ]
     : [
         { startSec: 0, endSec: 3, label: "후킹", purpose: "호기심 자극 질문 또는 충격 장면" },
         { startSec: 3, endSec: 10, label: "제품 소개", purpose: "핵심 기능과 차별점 상세 전달" },
         { startSec: 10, endSec: 18, label: "사용 시연", purpose: "before/after 또는 사용 과정 시연" },
         { startSec: 18, endSec: 25, label: "소셜 증명", purpose: "리뷰, 평점, 구매자 수로 신뢰 강화" },
-        { startSec: 25, endSec: 30, label: "CTA", purpose: "제휴 링크 유도 + 마지막 후킹" },
+        ctaSegment,
       ];
 
   return {
@@ -222,6 +228,9 @@ Deno.serve(async (req: Request) => {
       "   - The two variants must use DIFFERENT sentence structures and emotional angles (not just word swaps).\n" +
       "   - Disclosure must be present (Korean FTC-style: '제휴마케팅 포함 광고' or similar).\n" +
       "5. SEGMENTS: Break the " + duration + " seconds into 4-6 cut segments with start/end times and purpose.\n" +
+      "   IMPORTANT: The LAST 2 SECONDS (" + (duration - 2) + "~" + duration + "초) MUST be reserved for the affiliate CTA + FTC disclosure segment.\n" +
+      "   This segment shows the affiliate shopping mall link and the mandatory Korean FTC disclosure text (e.g. '이 포스팅은 제휴마케팅이 포함된 광고입니다').\n" +
+      "   Do NOT use the last 2 seconds for any other content. All other segments must fit within 0~" + (duration - 2) + "초.\n" +
       "6. MUSIC & MOTION: Recommend a music mood and camera motion preset.\n\n" +
       "Return ONLY valid JSON with this exact shape:\n" +
       "{\n" +
@@ -315,7 +324,7 @@ function normalizePlan(
   platform: string,
   psychologyPreset: string,
 ): EditPlan {
-  const segments: CutSegment[] = Array.isArray(raw.segments)
+  const rawSegments: CutSegment[] = Array.isArray(raw.segments)
     ? (raw.segments as Array<Record<string, unknown>>).map((s, i) => ({
         startSec: Number(s.startSec) || i * 3,
         endSec: Number(s.endSec) || (i + 1) * 3,
@@ -323,6 +332,30 @@ function normalizePlan(
         purpose: String(s.purpose || ""),
       }))
     : fallbackPlan(duration, productName, platform, psychologyPreset).segments;
+
+  // Ensure the last 2 seconds are always the affiliate CTA + disclosure segment
+  const ctaSegment: CutSegment = {
+    startSec: duration - 2,
+    endSec: duration,
+    label: "제휴 CTA + 공정위 문구",
+    purpose: "제휴 쇼핑몰 매칭 링크 노출 + 공정위 의무 문구 삽입 (마지막 2초 고정)",
+  };
+  const segments: CutSegment[] = (() => {
+    if (rawSegments.length === 0) return [ctaSegment];
+    const last = rawSegments[rawSegments.length - 1];
+    if (last.endSec >= duration && last.label.includes("CTA")) {
+      // AI already reserved the ending, replace with our mandatory segment
+      return [...rawSegments.slice(0, -1), ctaSegment];
+    }
+    if (last.endSec > duration - 2) {
+      // Last segment overlaps our reserved 2s, trim it
+      const trimmed = [...rawSegments];
+      trimmed[trimmed.length - 1] = { ...last, endSec: duration - 2 };
+      return [...trimmed, ctaSegment];
+    }
+    // Append our mandatory segment
+    return [...rawSegments, ctaSegment];
+  })();
 
   const hookTiming = {
     firstHookSec: Number((raw.hookTiming as Record<string, unknown>)?.firstHookSec) || 0,
