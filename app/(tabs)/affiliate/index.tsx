@@ -37,6 +37,7 @@ import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
+import { generatePsychAnalysis, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
@@ -122,89 +123,9 @@ const BOARD_VIDEO_SPECS: Record<string, Record<string, { ratio: string; resoluti
   },
 };
 
+type ViralAnalysisResult = PsychAnalysis;
+
 type ViralHook = { title: string; desc: string };
-type ViralAnalysisResult = {
-  hooks: ViralHook[];
-  specs: { ratio: string; resolution: string; maxDuration: string; format: string };
-  topReference: { title: string; views: string; revenue: string };
-  mediaMode: 'video' | 'image';
-};
-
-function detectMediaMode(format: string): 'video' | 'image' {
-  const upper = format.toUpperCase();
-  if (upper.includes('JPG') || upper.includes('PNG') || upper.includes('GIF') || upper.includes('정지형')) {
-    return 'image';
-  }
-  return 'video';
-}
-
-function generateViralAnalysis(platform: string, board: string, productUrl: string): ViralAnalysisResult {
-  const specs = BOARD_VIDEO_SPECS[platform]?.[board] ?? { ratio: '16:9', resolution: '1920×1080', maxDuration: '60초', format: 'MP4' };
-
-  const baseHooks: ViralHook[] = [
-    { title: '첫 3초 강렬한 후크', desc: '상위 1% 영상의 90%가 첫 3초 내 시각적 충격 + 질문 던지기로 시청자를 붙잡습니다. 스와이프를 멈추게 하는 반전 요소를 첫 프레임에 배치하세요.' },
-    { title: '손실 회피 심리 자극', desc: '"지금 안 사면 손해"라는 메시지를 스토리텔링으로 삽입. 상위 영상들은 할인 종료, 재고 소진, 한정 판매 등 긴박감을 2~3회 반복 언급합니다.' },
-    { title: '사회적 증거 결합', desc: '"이미 12,000명이 구매했습니다" 형태의 사회적 증거를 중간 지점에 배치. 인간은 타인의 선택을 무의식적으로 따라하는 심리가 있습니다.' },
-    { title: '감정 곡선 설계', desc: '호기심 → 놀람 → 공감 → 갈망 → 행동의 5단계 감정 곡선을 따라 영상 구조를 설계합니다. 상위 1%는 이 흐름을 압축된 시간 안에 배치합니다.' },
-    { title: '행동 유도 최적화', desc: '마지막 3초에 명확한 CTA + 제휴 링크 위치 힌트를 제시. 댓글 유도 질문으로 참여율을 높이고 알고리즘 가시성을 극대화합니다.' },
-  ];
-
-  if (platform === 'tiktok' || platform === 'youtube') {
-    baseHooks.push(
-      { title: '무한 루프 구조', desc: '영상 끝이 시작과 연결되는 무한 루프 구조로 재생 수를 극대화. 짧은 영상에서 특히 효과적인 반복 시청 유도 기법입니다.' },
-    );
-  }
-  if (platform === 'instagram') {
-    baseHooks.push(
-      { title: '스토리 텔링 몰입', desc: '릴스에서는 개인적 스토리로 시작해 제품 자연스러운 노출로 전환. 광고 느낌을 최소화하고 진정성을 강조하세요.' },
-    );
-  }
-  if (platform === 'pinterest') {
-    baseHooks.push(
-      { title: '시각적 임팩트 선행', desc: '핀터레스트는 정지형 이미지가 중심입니다. 제품의 가장 매력적인 각도를 전체 화면으로 배치하고 텍스트 오버레이로 핵심 가치를 한 줄로 전달하세요.' },
-    );
-  }
-  if (board === 'story') {
-    baseHooks.push(
-      { title: '24시간 긴박감 활용', desc: '스토리의 24시간 소멸 특성을 활용해 "오늘만"이라는 메시지로 즉각적 행동을 유도합니다.' },
-    );
-  }
-
-  const referenceMap: Record<string, { title: string; views: string; revenue: string }> = {
-    ig_reels: { title: '인플루언서 릴스 제품 리뷰', views: '2.4M', revenue: '월 480만원' },
-    ig_feed: { title: '카드뉴스 스타일 제품 소개', views: '890K', revenue: '월 120만원' },
-    ig_story: { title: '데일리 스토리 제품 태그', views: '350K', revenue: '월 80만원' },
-    yt_shorts: { title: '쇼츠 제품 언박싱', views: '5.1M', revenue: '월 650만원' },
-    yt_community: { title: '커뮤니티 탭 제품 투표', views: '420K', revenue: '월 90만원' },
-    yt_video: { title: '상세 리뷰 영상', views: '1.2M', revenue: '월 340만원' },
-    blog_category_post: { title: '블로그 상품 리뷰 포스트', views: '450K', revenue: '월 210만원' },
-    blog_review: { title: '블로그 상세 리뷰', views: '320K', revenue: '월 180만원' },
-    blog_promotion: { title: '블로그 프로모션 글', views: '280K', revenue: '월 150만원' },
-    tt_video: { title: '틱톡 바이럴 제품 영상', views: '8.7M', revenue: '월 920만원' },
-    tt_carousel: { title: '틱톡 캐러셀 제품 비교', views: '1.8M', revenue: '월 280만원' },
-    tt_story: { title: '틱톡 스토리 제품', views: '1.1M', revenue: '월 160만원' },
-    pin_pin: { title: '핀터레스트 제품 핀', views: '1.5M', revenue: '월 190만원' },
-    pin_idea_pin: { title: '아이디어 핀 제품 데모', views: '2.2M', revenue: '월 310만원' },
-    pin_board: { title: '핀터레스트 보드 컬렉션', views: '980K', revenue: '월 140만원' },
-    tw_thread: { title: '트위터 제품 스레드', views: '670K', revenue: '월 95만원' },
-    tw_tweet: { title: '트위터 제품 트윗', views: '420K', revenue: '월 65만원' },
-    tw_reply: { title: '트위터 제품 답글', views: '310K', revenue: '월 48만원' },
-  };
-
-  const platformPrefix: Record<string, string> = {
-    instagram: 'ig',
-    youtube: 'yt',
-    blog: 'blog',
-    tiktok: 'tt',
-    pinterest: 'pin',
-    twitter: 'tw',
-  };
-
-  const refKey = `${platformPrefix[platform] ?? platform}_${board}`;
-  const topReference = referenceMap[refKey] ?? { title: '상위 1% 제휴 영상', views: '1M+', revenue: '월 300만원+' };
-
-  return { hooks: baseHooks, specs, topReference, mediaMode: detectMediaMode(specs.format) };
-}
 
 const CONTENT_TYPES = [
   { key: 'copy', label: '마케팅 문구', icon: Type, color: theme.colors.primary[400], hint: '제품을 한 줄로 매력적으로 표현하세요' },
@@ -264,7 +185,7 @@ export default function AffiliateScreen() {
   const [viralAnalyzing, setViralAnalyzing] = useState(false);
   const [viralAnalysisResult, setViralAnalysisResult] = useState<ViralAnalysisResult | null>(null);
   const [videoPreviewGenerating, setVideoPreviewGenerating] = useState(false);
-  const [videoPreviewScenes, setVideoPreviewScenes] = useState<{ time: string; hook: string; desc: string }[] | null>(null);
+  const [videoPreviewScenes, setVideoPreviewScenes] = useState<PsychScene[] | null>(null);
   const [previewMediaMode, setPreviewMediaMode] = useState<'video' | 'image'>('video');
   const videoPreviewProgress = useSharedValue(0);
   const [videoRendering, setVideoRendering] = useState(false);
@@ -717,7 +638,17 @@ export default function AffiliateScreen() {
         el.src = safeImageUrl;
       });
 
-      const W = 1080, H = 1920, FPS = 30, DURATION = 5;
+      const analysis = viralAnalysisResult;
+      const specsRatio = analysis?.specs.ratio ?? '9:16';
+      const isPortrait = specsRatio.includes('9:16') || specsRatio.includes('16:9') === false;
+      const W = isPortrait ? 1080 : 1920;
+      const H = isPortrait ? 1920 : 1080;
+      const FPS = 30;
+      const totalSec = parseInt(analysis?.specs.maxDuration ?? '15', 10) || 15;
+      const DURATION = Math.min(totalSec, 15);
+      const cg = analysis?.colorGrading ?? { warm: 10, contrast: 20, saturation: 15, vignette: 30 };
+      const bpm = analysis?.pacingBpm ?? 100;
+
       const canvas = document.createElement('canvas');
       canvas.width = W;
       canvas.height = H;
@@ -734,7 +665,7 @@ export default function AffiliateScreen() {
       }
       if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
 
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -746,73 +677,136 @@ export default function AffiliateScreen() {
       if (imgAspect > canvasAspect) { baseW = W; baseH = W / imgAspect; }
       else { baseH = H; baseW = H * imgAspect; }
 
+      const scenes = videoPreviewScenes;
+      const totalScenes = scenes.length;
+      const sceneDuration = DURATION / totalScenes;
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
-      const totalScenes = videoPreviewScenes.length;
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, 'rgba(10,15,30,0.2)');
-      grad.addColorStop(0.5, 'rgba(10,15,30,0.5)');
-      grad.addColorStop(1, 'rgba(10,15,30,0.9)');
+
+      const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
+        ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
+      };
+      const resetFilter = () => { ctx.filter = 'none'; };
+
+      const getMotionTransform = (motionType: PsychScene['motionType'], t: number) => {
+        switch (motionType) {
+          case 'zoom-in': return { scale: 1.0 + t * 0.35, offsetX: 0, offsetY: 0 };
+          case 'zoom-out': return { scale: 1.35 - t * 0.35, offsetX: 0, offsetY: 0 };
+          case 'pan-right': return { scale: 1.2, offsetX: -baseW * 0.15 * t, offsetY: 0 };
+          case 'pan-left': return { scale: 1.2, offsetX: baseW * 0.15 * t, offsetY: 0 };
+          case 'tilt-up': return { scale: 1.2, offsetX: 0, offsetY: baseH * 0.15 * t };
+          case 'shake': return { scale: 1.1 + t * 0.1, offsetX: Math.sin(t * Math.PI * 8) * 12, offsetY: Math.cos(t * Math.PI * 6) * 8 };
+          case 'pulse': return { scale: 1.0 + Math.sin(t * Math.PI * 3) * 0.08, offsetX: 0, offsetY: 0 };
+          default: return { scale: 1.0 + t * 0.2, offsetX: 0, offsetY: 0 };
+        }
+      };
+
+      const getTextY = (position: PsychScene['textPosition']) => {
+        if (position === 'top') return H * 0.12;
+        if (position === 'center') return H * 0.42;
+        return H * 0.72;
+      };
 
       const drawFrame = () => {
         const elapsed = performance.now() - startTime;
-        const t = Math.min(elapsed / durationMs, 1);
-        const pct = Math.round(t * 100);
-        renderProgress.value = t;
+        const globalT = Math.min(elapsed / durationMs, 1);
+        const pct = Math.round(globalT * 100);
+        renderProgress.value = globalT;
+
+        const sceneIdx = Math.min(Math.floor(globalT * totalScenes), totalScenes - 1);
+        const scene = scenes[sceneIdx];
+        const sceneLocalT = (globalT * totalScenes) - sceneIdx;
 
         ctx.fillStyle = '#0a0f1e';
         ctx.fillRect(0, 0, W, H);
 
-        const scale = 1.0 + t * 0.3;
-        const drawW = baseW * scale;
-        const drawH = baseH * scale;
-        const drawX = (W - drawW) / 2;
-        const drawY = (H - drawH) / 2 + (1 - t) * 40;
-        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
-
-        const sceneIdx = Math.min(Math.floor(t * totalScenes), totalScenes - 1);
-        const scene = videoPreviewScenes[sceneIdx];
         if (scene) {
-          const sceneLocalT = (t * totalScenes) - sceneIdx;
+          const motion = getMotionTransform(scene.motionType, sceneLocalT);
+          const drawW = baseW * motion.scale;
+          const drawH = baseH * motion.scale;
+          const drawX = (W - drawW) / 2 + motion.offsetX;
+          const drawY = (H - drawH) / 2 + motion.offsetY;
+
+          applyColorGrading(
+            1.0 + cg.warm * 0.003,
+            cg.contrast * 0.005,
+            cg.saturation * 0.005,
+          );
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          resetFilter();
+
+          const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
+          const overlayColor = scene.colorTheme.overlay;
+          overlayGrad.addColorStop(0, overlayColor);
+          overlayGrad.addColorStop(0.4, 'rgba(10,15,30,0.3)');
+          overlayGrad.addColorStop(1, overlayColor);
+          ctx.fillStyle = overlayGrad;
+          ctx.fillRect(0, 0, W, H);
+
+          const vignetteGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
+          vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
+          vignetteGrad.addColorStop(1, `rgba(0,0,0,${cg.vignette * 0.01})`);
+          ctx.fillStyle = vignetteGrad;
+          ctx.fillRect(0, 0, W, H);
+
           const fadeAlpha = Math.min(sceneLocalT * 4, 1) * Math.min((1 - sceneLocalT) * 4, 1);
+
           ctx.globalAlpha = fadeAlpha;
           ctx.fillStyle = '#fff';
-          ctx.font = '700 36px sans-serif';
+          ctx.font = `700 ${scene.fontSize}px sans-serif`;
           ctx.textBaseline = 'top';
           ctx.textAlign = 'center';
-          ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 3;
-          const lines = scene.hook.match(/.{1,18}/g) || [scene.hook];
+          ctx.shadowColor = 'rgba(0,0,0,0.9)';
+          ctx.shadowBlur = 16;
+          ctx.shadowOffsetY = 4;
+
+          const textY = getTextY(scene.textPosition);
+          const lines = scene.textOverlay.match(/.{1,14}/g) || [scene.textOverlay];
           lines.slice(0, 3).forEach((line, i) => {
-            ctx.fillText(line, W / 2, H * 0.7 + i * 48);
+            ctx.fillText(line, W / 2, textY + i * (scene.fontSize + 12));
           });
-          ctx.font = '400 22px sans-serif';
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
-          const descLines = scene.desc.match(/.{1,28}/g) || [scene.desc];
-          descLines.slice(0, 2).forEach((line, i) => {
-            ctx.fillText(line, W / 2, H * 0.7 + 144 + i * 30);
+
+          ctx.font = `400 ${scene.subFontSize}px sans-serif`;
+          ctx.fillStyle = scene.colorTheme.accent + 'CC';
+          ctx.shadowBlur = 8;
+          const descLines = scene.subtext.match(/.{1,24}/g) || [scene.subtext];
+          const descY = textY + lines.length * (scene.fontSize + 12) + 16;
+          descLines.slice(0, 3).forEach((line, i) => {
+            ctx.fillText(line, W / 2, descY + i * (scene.subFontSize + 8));
           });
-          ctx.shadowColor = 'transparent';
+
+          ctx.fillStyle = scene.colorTheme.primary;
+          ctx.font = '700 18px sans-serif';
+          ctx.textAlign = 'left';
           ctx.shadowBlur = 0;
           ctx.shadowOffsetY = 0;
-          ctx.textAlign = 'left';
+          ctx.fillText(`[${scene.emotion.toUpperCase()}]`, 30, textY - 28);
+
+          ctx.shadowColor = 'transparent';
           ctx.globalAlpha = 1;
         }
 
-        ctx.globalAlpha = Math.min(t * 5, 1);
-        ctx.fillStyle = theme.colors.accent[400];
-        ctx.font = '700 20px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'top';
-        ctx.fillText(`${pct}%`, W - 30, 30);
-        ctx.textAlign = 'left';
+        const beatPhase = (elapsed / 1000) * (bpm / 60) * Math.PI * 2;
+        const beatPulse = Math.sin(beatPhase) * 0.5 + 0.5;
+        ctx.globalAlpha = 0.3 + beatPulse * 0.15;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, H - 4, W * globalT, 4);
         ctx.globalAlpha = 1;
 
-        if (t < 1) {
+        ctx.globalAlpha = Math.min(globalT * 5, 1);
+        ctx.fillStyle = scene?.colorTheme.primary ?? theme.colors.accent[400];
+        ctx.font = '700 22px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(`${pct}%`, W - 30, 30);
+        ctx.textAlign = 'left';
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        if (globalT < 1) {
           requestAnimationFrame(drawFrame);
         } else {
           setTimeout(() => {
@@ -834,7 +828,7 @@ export default function AffiliateScreen() {
       setVideoRendering(false);
       renderProgress.value = 1;
     }
-  }, [imagePreviewUri, videoPreviewScenes, renderProgress]);
+  }, [imagePreviewUri, videoPreviewScenes, viralAnalysisResult, renderProgress]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -1240,15 +1234,26 @@ export default function AffiliateScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.viralHooksLabel}>심리 자극 요소 분석</Text>
-                  {viralAnalysisResult.hooks.map((hook, i) => (
+                  <Text style={styles.viralHooksLabel}>플랫폼 심리 분석 결과</Text>
+                  {viralAnalysisResult.platformPsychology && (
+                    <View style={styles.viralHookRow}>
+                      <View style={[styles.viralHookNumber, { backgroundColor: theme.colors.warning[500] }]}>
+                        <Text style={styles.viralHookNumberText}>★</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.viralHookTitle}>시선 패턴: {viralAnalysisResult.platformPsychology.attentionPattern}</Text>
+                        <Text style={styles.viralHookDesc}>핵심 드라이브: {viralAnalysisResult.platformPsychology.primaryDrive} · 평균 시청 {viralAnalysisResult.platformPsychology.avgWatchTime} · 최적 후크 {viralAnalysisResult.platformPsychology.optimalHookSec}초</Text>
+                      </View>
+                    </View>
+                  )}
+                  {viralAnalysisResult.psychologicalTriggers.map((trigger, i) => (
                     <View key={i} style={styles.viralHookRow}>
                       <View style={styles.viralHookNumber}>
                         <Text style={styles.viralHookNumberText}>{i + 1}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.viralHookTitle}>{hook.title}</Text>
-                        <Text style={styles.viralHookDesc}>{hook.desc}</Text>
+                        <Text style={styles.viralHookTitle}>{trigger.name}</Text>
+                        <Text style={styles.viralHookDesc}>{trigger.description}</Text>
                       </View>
                     </View>
                   ))}
@@ -1269,14 +1274,7 @@ export default function AffiliateScreen() {
                         });
                         setExpandedStep('analyze');
                         setTimeout(() => {
-                          const maxDur = viralAnalysisResult.specs.maxDuration ?? '60초';
-                          const totalSec = parseInt(maxDur, 10) || 60;
-                          const scenes = viralAnalysisResult.hooks.map((hook, i) => ({
-                            time: `${Math.floor((totalSec / viralAnalysisResult.hooks.length) * i)}s`,
-                            hook: hook.title,
-                            desc: hook.desc,
-                          }));
-                          setVideoPreviewScenes(scenes);
+                          setVideoPreviewScenes(viralAnalysisResult.scenes);
                           setVideoPreviewGenerating(false);
                         }, 2200);
                       }}
@@ -1304,7 +1302,7 @@ export default function AffiliateScreen() {
                     setTimeout(() => {
                       setViralAnalyzing(false);
                       setViralAnalysisResult(
-                        generateViralAnalysis(
+                        generatePsychAnalysis(
                           selectedUploadPlatform,
                           selectedBoard,
                           affiliateUrl,
@@ -1428,12 +1426,15 @@ export default function AffiliateScreen() {
               </Text>
               {videoPreviewScenes.map((scene, i) => (
                 <View key={i} style={styles.videoSceneCard}>
-                  <View style={styles.videoSceneTimeBadge}>
+                  <View style={[styles.videoSceneTimeBadge, { backgroundColor: scene.colorTheme.primary }]}>
                     <Text style={styles.videoSceneTimeText}>{scene.time}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.videoSceneHookText}>{scene.hook}</Text>
-                    <Text style={styles.videoSceneDescText} numberOfLines={2}>{scene.desc}</Text>
+                    <Text style={styles.videoSceneHookText}>{scene.textOverlay}</Text>
+                    <Text style={styles.videoSceneDescText} numberOfLines={2}>{scene.subtext}</Text>
+                    <Text style={[styles.videoSceneDescText, { color: scene.colorTheme.accent, fontSize: 10, marginTop: 4 }]}>
+                      {scene.emotion} · {scene.motionType}
+                    </Text>
                   </View>
                   <View style={styles.videoSceneNumber}>
                     <Text style={styles.videoSceneNumberText}>{i + 1}</Text>
