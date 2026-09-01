@@ -47,9 +47,9 @@ function SubTabBar() {
               style={styles.pillItem}
               onPress={() => {
                 if (key === 'index') {
-                  router.replace('/affiliate');
+                  router.replace('/(tabs)/affiliate');
                 } else {
-                  router.replace(`/affiliate/${key}`);
+                  router.replace(`/(tabs)/affiliate/${key}`);
                 }
               }}
               activeOpacity={0.65}
@@ -104,8 +104,8 @@ export default function AffiliateLayout() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.glass.surface,
-    borderTopColor: theme.glass.border,
+    backgroundColor: theme.colors.dark.surface,
+    borderTopColor: theme.colors.dark.border,
     borderTopWidth: 1,
     paddingTop: 4,
     position: 'absolute',
