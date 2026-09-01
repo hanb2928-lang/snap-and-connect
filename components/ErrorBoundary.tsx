@@ -35,6 +35,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <Text style={styles.message}>
               예상치 못한 오류가 발생했습니다. 인터넷 연결을 확인하거나 잠시 후 다시 시도해주세요.
             </Text>
+            {this.state.error?.message ? (
+              <Text style={styles.errorDetail} selectable>
+                {this.state.error.message}
+              </Text>
+            ) : null}
             <TouchableOpacity style={styles.button} onPress={this.handleReset} activeOpacity={0.8}>
               <RefreshCw size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.buttonText}>다시 시도</Text>
@@ -83,6 +88,14 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  errorDetail: {
+    maxWidth: 320,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'center',
+    lineHeight: 16,
   },
   button: {
     flexDirection: 'row',
