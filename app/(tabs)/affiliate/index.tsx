@@ -29,7 +29,7 @@ import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { buildDataUrl, cleanBase64 } from '@/lib/base64';
 import { compressImageToBase64 } from '@/lib/imageEdit';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta } from '@/lib/analysis';
+import { saveManualScan, uploadImage, analyzeImageWithProductContext, extractProductMeta, updateScanWithAnalysis } from '@/lib/analysis';
 import { validateAffiliateUrl, isAmazonUrl, isAliExpressUrl, isShopeeUrl } from '@/lib/affiliate';
 import { friendlyError } from '@/lib/errors';
 import { setItem } from '@/lib/storage';
@@ -513,10 +513,11 @@ export default function AffiliateScreen() {
     try {
       const imageUrl = await uploadImage(selectedImage, selectedImageMime);
       const scanId = await saveManualScan(imageUrl);
+      let analysisResult = null;
       if (productMeta) {
         try {
           const dataUrl = selectedImage.startsWith('data:') ? selectedImage : buildDataUrl(selectedImage, selectedImageMime);
-          await analyzeImageWithProductContext(
+          analysisResult = await analyzeImageWithProductContext(
             dataUrl,
             'scan.jpg',
             selectedImageMime || 'image/jpeg',
@@ -529,6 +530,7 @@ export default function AffiliateScreen() {
               platform: productMeta.platform,
             },
           );
+          await updateScanWithAnalysis(scanId, analysisResult);
         } catch {
           // analysis enhancement is best-effort; scan already saved
         }
@@ -539,11 +541,11 @@ export default function AffiliateScreen() {
       setAiRecommendLoading(true);
       try {
         const bundle = await fetchAiRecommendBundle({
-          productName: productMeta?.productName || '',
-          productCategory: productMeta?.platform || '',
-          hook: '',
-          oneLiner: '',
-          fallbackHashtags: [],
+          productName: productMeta?.productName || analysisResult?.productName || '',
+          productCategory: productMeta?.platform || analysisResult?.productCategory || '',
+          hook: analysisResult?.templateData?.hook || '',
+          oneLiner: analysisResult?.oneLiner || '',
+          fallbackHashtags: analysisResult?.templateData?.hashtags || [],
         });
         setAiBundle(bundle);
         setAiRecommendation(bundle.templateLabel);

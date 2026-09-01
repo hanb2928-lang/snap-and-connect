@@ -241,6 +241,37 @@ export async function deleteScan(id: string): Promise<void> {
   if (error) throw new Error(`Failed to delete: ${error.message}`);
 }
 
+export async function updateScanWithAnalysis(
+  scanId: string,
+  analysis: AnalysisResult,
+): Promise<void> {
+  const settings = await getUserSettings();
+  const affiliateLinks = generateAffiliateLinks(analysis, settings);
+
+  const { error } = await supabase.from('scans').update({
+    title: analysis.title,
+    summary: analysis.summary,
+    contacts: analysis.contacts,
+    tags: analysis.tags,
+    product_name: analysis.productName,
+    product_category: analysis.productCategory,
+    price_estimate: analysis.priceEstimate,
+    one_liner: analysis.oneLiner,
+    shopping_matches: analysis.shoppingMatches,
+    affiliate_links: affiliateLinks,
+    template_data: analysis.templateData,
+    detected_products: analysis.detectedProducts,
+    scan_source: 'single',
+  }).eq('id', scanId);
+
+  if (error) throw new Error(`Failed to update scan: ${error.message}`);
+
+  const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
+  if (hookText) {
+    generateAndUploadTTS(scanId, hookText).catch(() => {});
+  }
+}
+
 export async function analyzeImageWithProductContext(
   imageDataUrl: string,
   fileName: string,
