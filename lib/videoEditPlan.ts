@@ -44,6 +44,8 @@ interface EditPlanResponse {
 
 const EDIT_PLAN_URL = `${supabaseUrl}/functions/v1/generate-video-edit-plan`;
 
+export type PsychologyPreset = 'auto' | 'loss_aversion' | 'curiosity_gap' | 'fomo' | 'social_proof';
+
 export async function fetchVideoEditPlan(params: {
   productName?: string;
   productCategory?: string;
@@ -52,6 +54,7 @@ export async function fetchVideoEditPlan(params: {
   accentColor?: string;
   hook?: string;
   oneLiner?: string;
+  psychologyPreset?: PsychologyPreset;
 }): Promise<EditPlan> {
   try {
     const resp = await safeFetch(EDIT_PLAN_URL, {

@@ -25,6 +25,7 @@ import { theme } from '@/lib/theme';
 import {
   EditPlan,
   CopyVariant,
+  PsychologyPreset,
   fetchVideoEditPlan,
 } from '@/lib/videoEditPlan';
 
@@ -38,6 +39,14 @@ interface VideoEditPlanCardProps {
   hasVideoSelected: boolean;
 }
 
+const PSYCHOLOGY_OPTIONS: { key: PsychologyPreset; label: string; desc: string }[] = [
+  { key: 'auto', label: '자동 추천', desc: 'AI가 제품에 맞는 전략 선택' },
+  { key: 'loss_aversion', label: '손실 회피', desc: '놓치면 후회' },
+  { key: 'curiosity_gap', label: '호기심 갭', desc: '궁금증으로 끝까지' },
+  { key: 'fomo', label: 'FOMO', desc: '다들 쓴다는 압박' },
+  { key: 'social_proof', label: '소셜 증명', desc: '리뷰·평점 신뢰' },
+];
+
 export function VideoEditPlanCard({
   productName,
   productCategory,
@@ -48,6 +57,7 @@ export function VideoEditPlanCard({
   hasVideoSelected,
 }: VideoEditPlanCardProps) {
   const [duration, setDuration] = useState<15 | 30>(15);
+  const [psychPreset, setPsychPreset] = useState<PsychologyPreset>('auto');
   const [plan, setPlan] = useState<EditPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +76,7 @@ export function VideoEditPlanCard({
         accentColor,
         hook,
         oneLiner,
+        psychologyPreset: psychPreset,
       });
       setPlan(result);
       setExpandedCopy(0);
@@ -74,7 +85,7 @@ export function VideoEditPlanCard({
     } finally {
       setLoading(false);
     }
-  }, [duration, productName, productCategory, platform, accentColor, hook, oneLiner]);
+  }, [duration, psychPreset, productName, productCategory, platform, accentColor, hook, oneLiner]);
 
   const copyToClipboard = useCallback(async (text: string, fieldKey: string) => {
     try {
@@ -160,6 +171,34 @@ export function VideoEditPlanCard({
             </>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* Psychology strategy selector */}
+      <View style={styles.psychRow}>
+        <View style={styles.psychLabelWrap}>
+          <Brain size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+          <Text style={styles.psychLabel}>심리 전략</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.psychScroll}>
+          {PSYCHOLOGY_OPTIONS.map((opt) => {
+            const isActive = psychPreset === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.psychChip, isActive && styles.psychChipActive]}
+                onPress={() => setPsychPreset(opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.psychChipLabel, isActive && styles.psychChipLabelActive]}>
+                  {opt.label}
+                </Text>
+                <Text style={[styles.psychChipDesc, isActive && styles.psychChipDescActive]}>
+                  {opt.desc}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {error && (
@@ -399,6 +438,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  psychRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  psychLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  psychLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  psychScroll: {
+    flex: 1,
+  },
+  psychChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    marginRight: 6,
+  },
+  psychChipActive: {
+    backgroundColor: theme.colors.accent[400] + '18',
+    borderColor: theme.colors.accent[400],
+  },
+  psychChipLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  psychChipLabelActive: {
+    color: theme.colors.accent[400],
+  },
+  psychChipDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 1,
+  },
+  psychChipDescActive: {
+    color: theme.colors.dark.textDim,
   },
   errorBox: {
     backgroundColor: theme.colors.error[400] + '12',

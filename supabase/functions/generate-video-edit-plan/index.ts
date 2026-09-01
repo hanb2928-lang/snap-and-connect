@@ -85,7 +85,35 @@ async function resolveOpenAIKey(): Promise<string | null> {
   return null;
 }
 
-function fallbackPlan(duration: 15 | 30, productName: string, platform: string): EditPlan {
+const PSYCHOLOGY_LABELS: Record<string, { principle: string; application: string; triggerPoint: string }> = {
+  loss_aversion: {
+    principle: "손실 회피 (Loss Aversion)",
+    application: "'놓치면 후회할 마지막 기회' 뉘앙스로 긴장감 부여",
+    triggerPoint: "CTA 직전 3초",
+  },
+  curiosity_gap: {
+    principle: "호기심 갭 (Curiosity Gap)",
+    application: "정답을 바로 주지 않고 궁금증을 유발하여 끝까지 시청하도록 유도",
+    triggerPoint: "첫 1~3초 후킹 + 중간 1회",
+  },
+  fomo: {
+    principle: "FOMO (Fear Of Missing Out)",
+    application: "'다들 이미 쓰고 있다'는 사회적 압박으로 즉각 행동 촉발",
+    triggerPoint: "소셜 증명 구간 + CTA",
+  },
+  social_proof: {
+    principle: "소셜 증명 (Social Proof)",
+    application: "리뷰, 평점, 구매자 수를 조기 노출하여 신뢰를 선제적으로 구축",
+    triggerPoint: "제품 소개 직후 또는 동시 배치",
+  },
+};
+
+function fallbackPlan(
+  duration: 15 | 30,
+  productName: string,
+  platform: string,
+  psychologyPreset: string,
+): EditPlan {
   const segments: CutSegment[] = duration === 15
     ? [
         { startSec: 0, endSec: 3, label: "후킹", purpose: "강렬한 첫 프레임으로 시선 강탈" },
@@ -106,11 +134,7 @@ function fallbackPlan(duration: 15 | 30, productName: string, platform: string):
     totalSegments: segments.length,
     segments,
     hookTiming: { firstHookSec: 0, reason: "첫 1~3초 내에 시선을 사로잡아야 시청 유지율이 급격히 높아집니다." },
-    psychology: {
-      principle: "손실 회피 (Loss Aversion)",
-      application: "'놓치면 후회할 마지막 기회' 뉘앙스로 긴장감 부여",
-      triggerPoint: "CTA 직전 3초",
-    },
+    psychology: PSYCHOLOGY_LABELS[psychologyPreset] || PSYCHOLOGY_LABELS.loss_aversion,
     antiAlgorithm: {
       copyVariation: "동일 의미, 다른 표현으로 재구성 — 문장 구조/어순/감성 단어 교체",
       pacingStrategy: "3~5초마다 화면 전환 또는 줌 효과로 시각적 리프레시",
@@ -151,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { productName, productCategory, videoDuration, platform, accentColor, hook, oneLiner } = body as {
+    const { productName, productCategory, videoDuration, platform, accentColor, hook, oneLiner, psychologyPreset } = body as {
       productName?: string;
       productCategory?: string;
       videoDuration?: number;
@@ -159,6 +183,7 @@ Deno.serve(async (req: Request) => {
       accentColor?: string;
       hook?: string;
       oneLiner?: string;
+      psychologyPreset?: string;
     };
 
     const duration: 15 | 30 = videoDuration === 30 ? 30 : 15;
@@ -167,12 +192,13 @@ Deno.serve(async (req: Request) => {
     const pPlatform = String(platform || "shortform");
     const pHook = String(hook || "");
     const pOneLiner = String(oneLiner || "");
+    const psychPreset = String(psychologyPreset || "auto");
 
     const openaiKey = await resolveOpenAIKey();
 
     if (!openaiKey) {
       return new Response(
-        JSON.stringify({ plan: fallbackPlan(duration, pName, pPlatform) }),
+        JSON.stringify({ plan: fallbackPlan(duration, pName, pPlatform, psychPreset) }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -182,7 +208,11 @@ Deno.serve(async (req: Request) => {
       "Given a product and a downloaded stock video, create a precise EDIT PLAN for a " + duration + "-second clip.\n\n" +
       "Key principles:\n" +
       "1. HOOK: The first 1-3 seconds MUST grab attention. Suggest the exact timing and what to show.\n" +
-      "2. PSYCHOLOGY: Apply a persuasion principle (loss aversion, social proof, scarcity, curiosity gap, FOMO). Explain how to trigger it.\n" +
+      "2. PSYCHOLOGY: Apply the following persuasion principle: " +
+      (psychPreset === "auto"
+        ? "choose the most effective one for this product (loss aversion, social proof, scarcity, curiosity gap, or FOMO)"
+        : PSYCHOLOGY_LABELS[psychPreset]?.principle || "loss aversion") +
+      ". Explain how to trigger it in the video.\n" +
       "3. ANTI-ALGORITHM: The downloaded video will be re-edited to avoid duplicate-content detection. Specify:\n" +
       "   - Copy variation: how to paraphrase the existing copy so it passes text similarity checks\n" +
       "   - Pacing: visual rhythm changes (cuts, zooms) every 3-5 seconds\n" +
@@ -215,6 +245,7 @@ Deno.serve(async (req: Request) => {
       `타겟 플랫폼: ${pPlatform}`,
       pHook ? `기존 후킹: ${pHook}` : "",
       pOneLiner ? `원라이너: ${pOneLiner}` : "",
+      psychPreset !== "auto" ? `심리 전략: ${PSYCHOLOGY_LABELS[psychPreset]?.principle || psychPreset}` : "",
     ].filter(Boolean).join("\n");
 
     const controller = new AbortController();
@@ -256,12 +287,12 @@ Deno.serve(async (req: Request) => {
         parsed = JSON.parse(stripJsonFence(content));
       } catch {
         return new Response(
-          JSON.stringify({ plan: fallbackPlan(duration, pName, pPlatform) }),
+          JSON.stringify({ plan: fallbackPlan(duration, pName, pPlatform, psychPreset) }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
-      const plan = normalizePlan(parsed, duration, pName, pPlatform);
+      const plan = normalizePlan(parsed, duration, pName, pPlatform, psychPreset);
       return new Response(
         JSON.stringify({ plan }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -282,6 +313,7 @@ function normalizePlan(
   duration: 15 | 30,
   productName: string,
   platform: string,
+  psychologyPreset: string,
 ): EditPlan {
   const segments: CutSegment[] = Array.isArray(raw.segments)
     ? (raw.segments as Array<Record<string, unknown>>).map((s, i) => ({
@@ -290,7 +322,7 @@ function normalizePlan(
         label: String(s.label || `구간 ${i + 1}`),
         purpose: String(s.purpose || ""),
       }))
-    : fallbackPlan(duration, productName, platform).segments;
+    : fallbackPlan(duration, productName, platform, psychologyPreset).segments;
 
   const hookTiming = {
     firstHookSec: Number((raw.hookTiming as Record<string, unknown>)?.firstHookSec) || 0,
@@ -320,7 +352,7 @@ function normalizePlan(
         hashtags: Array.isArray(c.hashtags) ? (c.hashtags as string[]).map(String) : [],
         disclosure: String(c.disclosure || "이 포스팅은 제휴마케팅이 포함된 광고입니다."),
       }))
-    : fallbackPlan(duration, productName, platform).copyVariants;
+    : fallbackPlan(duration, productName, platform, psychologyPreset).copyVariants;
 
   return {
     duration,

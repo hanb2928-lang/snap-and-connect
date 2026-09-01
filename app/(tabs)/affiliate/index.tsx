@@ -2495,38 +2495,6 @@ export default function AffiliateScreen() {
           )}
         </PillNavCard>
 
-        {/* Stock Video Picker — product-themed Pexels video search */}
-        {previewMediaMode === 'video' && completedSteps.has('platformSelect') && (
-          <StockVideoPicker
-            productName={productMeta?.productName}
-            productCategory={undefined}
-            orientation={(() => {
-              const specs = selectedUploadPlatform && selectedBoard
-                ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
-                : null;
-              if (!specs) return 'portrait';
-              return specs.ratio.includes('9:16') ? 'portrait'
-                : specs.ratio.includes('16:9') ? 'landscape'
-                : 'square';
-            })()}
-            selectedClip={stockVideoClip}
-            onSelectClip={setStockVideoClip}
-          />
-        )}
-
-        {/* Video Edit Plan — 15s/30s cut plan + anti-algorithm + psychology + copy variants */}
-        {previewMediaMode === 'video' && completedSteps.has('platformSelect') && (
-          <VideoEditPlanCard
-            productName={productMeta?.productName}
-            productCategory={undefined}
-            platform={selectedUploadPlatform || undefined}
-            accentColor={undefined}
-            hook={undefined}
-            oneLiner={undefined}
-            hasVideoSelected={stockVideoClip !== null}
-          />
-        )}
-
         {/* STEP 4: Content & Template Editing */}
         <View
           ref={(ref) => { stepRefs.current[4] = ref; }}
@@ -2561,6 +2529,38 @@ export default function AffiliateScreen() {
               </View>
               <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
             </TouchableOpacity>
+          )}
+
+          {/* Video source & AI edit plan — integrated into Step 4 */}
+          {previewMediaMode === 'video' && (
+            <>
+              <Text style={styles.sectionLabel}>원소재 영상 선택</Text>
+              <StockVideoPicker
+                productName={productMeta?.productName}
+                productCategory={undefined}
+                orientation={(() => {
+                  const specs = selectedUploadPlatform && selectedBoard
+                    ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                    : null;
+                  if (!specs) return 'portrait';
+                  return specs.ratio.includes('9:16') ? 'portrait'
+                    : specs.ratio.includes('16:9') ? 'landscape'
+                    : 'square';
+                })()}
+                selectedClip={stockVideoClip}
+                onSelectClip={setStockVideoClip}
+              />
+
+              <VideoEditPlanCard
+                productName={productMeta?.productName}
+                productCategory={undefined}
+                platform={selectedUploadPlatform || undefined}
+                accentColor={undefined}
+                hook={undefined}
+                oneLiner={undefined}
+                hasVideoSelected={stockVideoClip !== null}
+              />
+            </>
           )}
 
           {/* Collapsible custom options */}
