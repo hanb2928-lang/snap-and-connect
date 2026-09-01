@@ -34,6 +34,23 @@ interface PexelsVideoResponse {
   videos: PexelsVideoResult[];
 }
 
+interface PexelsPhotoResult {
+  id: number;
+  width: number;
+  height: number;
+  url: string;
+  photographer: string;
+  src: { original: string; large: string; medium: string; small: string; portrait: string; landscape: string; square: string };
+  alt: string;
+}
+
+interface PexelsPhotoResponse {
+  page: number;
+  per_page: number;
+  total_results: number;
+  photos: PexelsPhotoResult[];
+}
+
 export interface StockVideoClip {
   id: number;
   duration: number;
@@ -44,6 +61,7 @@ export interface StockVideoClip {
   videoUrl: string;
   author: string;
   ratio: string;
+  mediaType?: "video" | "image";
 }
 
 async function resolvePexelsKey(): Promise<string | null> {
@@ -109,10 +127,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { query, orientation, perPage } = body as {
+    const { query, orientation, perPage, mediaType } = body as {
       query?: string;
       orientation?: string;
       perPage?: number;
+      mediaType?: "video" | "image";
     };
 
     if (!query || typeof query !== "string" || query.trim().length === 0) {
@@ -130,12 +149,72 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const perPageNum = Math.min(Math.max(perPage ?? 10, 1), 20);
+    const orient = orientation === "portrait" || orientation === "landscape" || orientation === "square" ? orientation : "landscape";
+
+    // ── Photo search (for image-type boards) ──
+    if (mediaType === "image") {
+      const params = new URLSearchParams({
+        query: query.trim(),
+        per_page: String(perPageNum),
+        orientation: orient,
+      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const resp = await fetch(`https://api.pexels.com/v1/search?${params.toString()}`, {
+        headers: { Authorization: apiKey },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        const isAuthError = resp.status === 401 || resp.status === 403;
+        return new Response(
+          JSON.stringify({
+            error: isAuthError
+              ? "Pexels API 키가 유효하지 않습니다. 설정에서 올바른 키를 입력해주세요."
+              : `Pexels API 오류: ${resp.status} - ${errText}`,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const data = (await resp.json()) as PexelsPhotoResponse;
+      const clips: StockVideoClip[] = data.photos.map((p) => {
+        const srcMap: Record<string, string> = {
+          portrait: p.src.portrait,
+          landscape: p.src.landscape,
+          square: p.src.square,
+        };
+        const imageUrl = srcMap[orient] || p.src.large;
+        return {
+          id: p.id,
+          duration: 0,
+          width: p.width,
+          height: p.height,
+          previewUrl: imageUrl,
+          thumbnailUrl: imageUrl,
+          videoUrl: imageUrl,
+          author: p.photographer ?? "Unknown",
+          ratio: buildRatio(p.width, p.height),
+          mediaType: "image" as const,
+        };
+      });
+
+      return new Response(
+        JSON.stringify({ clips, totalResults: data.total_results }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Video search (default) ──
     const params = new URLSearchParams({
       query: query.trim(),
-      per_page: String(Math.min(Math.max(perPage ?? 10, 1), 20)),
+      per_page: String(perPageNum),
     });
-    if (orientation === "portrait" || orientation === "landscape" || orientation === "square") {
-      params.set("orientation", orientation);
+    if (orient) {
+      params.set("orientation", orient);
     }
 
     const controller = new AbortController();
@@ -160,7 +239,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = (await resp.json()) as PexelsVideoResponse;
-    const targetOrientation = params.get("orientation") ?? "landscape";
+    const targetOrientation = orient;
 
     const clips: StockVideoClip[] = data.videos
       .filter((v) => v.video_files && v.video_files.length > 0)
@@ -176,6 +255,7 @@ Deno.serve(async (req: Request) => {
           videoUrl: bestFile?.link ?? v.video_files[0]?.link ?? "",
           author: v.user?.name ?? "Unknown",
           ratio: buildRatio(bestFile?.width ?? v.width, bestFile?.height ?? v.height),
+          mediaType: "video" as const,
         };
       })
       .filter((c) => c.videoUrl.length > 0);

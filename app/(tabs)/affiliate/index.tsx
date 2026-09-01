@@ -2254,7 +2254,7 @@ export default function AffiliateScreen() {
                 <Text style={styles.subAccordionDesc} numberOfLines={1}>
                   {previewMediaMode === 'video'
                     ? stockVideoClip ? 'Pexels 영상 선택됨' : '가로 스크롤로 무료 영상을 선택하세요'
-                    : 'AI 분석 결과를 바탕으로 이미지가 준비됩니다'}
+                    : stockVideoClip ? 'Pexels 이미지 선택됨' : '가로 스크롤로 무료 이미지를 선택하세요'}
                 </Text>
               </View>
             </View>
@@ -2272,6 +2272,7 @@ export default function AffiliateScreen() {
                   <StockVideoPicker
                     productName={productMeta?.productName}
                     productCategory={undefined}
+                    mediaType="video"
                     orientation={(() => {
                       const specs = selectedUploadPlatform && selectedBoard
                         ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
@@ -2295,12 +2296,38 @@ export default function AffiliateScreen() {
               )}
 
               {previewMediaMode === 'image' && (
-                <View style={styles.subStepHintBox}>
-                  <ImageIcon size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={styles.subStepHintText}>
-                    AI 분석 후 이미지가 자동으로 사용됩니다. AI 자동 추천 버튼을 누르면 스타일까지 한 번에 적용됩니다.
-                  </Text>
-                </View>
+                <>
+                  <StockVideoPicker
+                    productName={productMeta?.productName}
+                    productCategory={undefined}
+                    mediaType="image"
+                    orientation={(() => {
+                      const specs = selectedUploadPlatform && selectedBoard
+                        ? BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[selectedBoard]
+                        : null;
+                      if (!specs) return 'portrait';
+                      return specs.ratio.includes('9:16') ? 'portrait'
+                        : specs.ratio.includes('16:9') ? 'landscape'
+                        : 'square';
+                    })()}
+                    selectedClip={stockVideoClip}
+                    onSelectClip={setStockVideoClip}
+                  />
+
+                  {stockVideoClip ? (
+                    <View style={styles.subStepHintBox}>
+                      <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                      <Text style={styles.subStepHintText}>이미지가 선택되었습니다. AI 자동 추천 버튼을 누르면 스타일까지 한 번에 적용됩니다.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.subStepHintBox}>
+                      <ImageIcon size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={styles.subStepHintText}>
+                        제품과 관련된 무료 이미지를 검색하여 선택하거나, AI 분석 후 자동으로 이미지가 사용됩니다.
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
 
               <TouchableOpacity

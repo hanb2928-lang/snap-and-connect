@@ -14,7 +14,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { Search, Film, Check, X, RefreshCw, Settings, Download } from 'lucide-react-native';
+import { Search, Film, Check, X, RefreshCw, Settings, Download, Image as ImageIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -25,6 +25,7 @@ interface StockVideoPickerProps {
   productName?: string;
   productCategory?: string;
   orientation?: 'portrait' | 'landscape' | 'square';
+  mediaType?: 'video' | 'image';
   selectedClip: StockVideoClip | null;
   onSelectClip: (clip: StockVideoClip | null) => void;
 }
@@ -33,6 +34,7 @@ export function StockVideoPicker({
   productName,
   productCategory,
   orientation = 'portrait',
+  mediaType = 'video',
   selectedClip,
   onSelectClip,
 }: StockVideoPickerProps) {
@@ -101,18 +103,18 @@ export function StockVideoPicker({
     setError(null);
     startProgress();
     try {
-      const results = await searchStockVideos(query, orientation, 12);
+      const results = await searchStockVideos(query, orientation, 12, mediaType);
       setClips(results);
       if (results.length === 0) {
-        setError('검색된 영상이 없습니다. 다른 키워드로 시도해보세요.');
+        setError(mediaType === 'image' ? '검색된 이미지가 없습니다. 다른 키워드로 시도해보세요.' : '검색된 영상이 없습니다. 다른 키워드로 시도해보세요.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '영상 검색에 실패했습니다.');
+      setError(err instanceof Error ? err.message : (mediaType === 'image' ? '이미지 검색에 실패했습니다.' : '영상 검색에 실패했습니다.'));
     } finally {
       finishProgress();
       setLoading(false);
     }
-  }, [buildQuery, orientation, startProgress, finishProgress]);
+  }, [buildQuery, orientation, startProgress, finishProgress, mediaType]);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -159,23 +161,29 @@ export function StockVideoPicker({
   const autoSearchedRef = useRef<string | null>(null);
   useEffect(() => {
     const query = productName || productCategory || '';
-    if (query && autoSearchedRef.current !== query && !loading) {
-      autoSearchedRef.current = query;
+    if (query && autoSearchedRef.current !== `${query}:${mediaType}` && !loading) {
+      autoSearchedRef.current = `${query}:${mediaType}`;
       setSearchQuery('');
       handleSearch();
     }
-  }, [productName, productCategory, handleSearch, loading]);
+  }, [productName, productCategory, handleSearch, loading, mediaType]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerIconWrap}>
-          <Film size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          {mediaType === 'image' ? (
+            <ImageIcon size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          ) : (
+            <Film size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>제품 테마 영상 가져오기</Text>
+          <Text style={styles.title}>{mediaType === 'image' ? '제품 테마 이미지 가져오기' : '제품 테마 영상 가져오기'}</Text>
           <Text style={styles.subtitle}>
-            제품과 관련된 무료 재사용 영상을 검색해서 숏폼에 활용하세요
+            {mediaType === 'image'
+              ? '제품과 관련된 무료 재사용 이미지를 검색해서 콘텐츠에 활용하세요'
+              : '제품과 관련된 무료 재사용 영상을 검색해서 숏폼에 활용하세요'}
           </Text>
         </View>
       </View>
@@ -226,7 +234,7 @@ export function StockVideoPicker({
       {loading && (
         <View style={styles.progressContainer}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>영상 다운로드 중...</Text>
+            <Text style={styles.progressLabel}>{mediaType === 'image' ? '이미지 다운로드 중...' : '영상 다운로드 중...'}</Text>
             <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
           </View>
           <View style={styles.progressTrack}>
@@ -249,10 +257,10 @@ export function StockVideoPicker({
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.selectedTitle} numberOfLines={1}>
-              선택된 영상 #{selectedClip.id}
+              {mediaType === 'image' ? '선택된 이미지' : '선택된 영상'} #{selectedClip.id}
             </Text>
             <Text style={styles.selectedMeta}>
-              {selectedClip.ratio} · {selectedClip.duration}초 · {selectedClip.author}
+              {selectedClip.ratio}{selectedClip.duration > 0 ? ` · ${selectedClip.duration}초` : ''} · {selectedClip.author}
             </Text>
             {saveSuccess && (
               <Text style={styles.savedHint}>
@@ -320,16 +328,22 @@ export function StockVideoPicker({
                 resizeMode="cover"
               />
               <View style={styles.clipOverlay}>
-                <View style={styles.clipBadge}>
-                  <Text style={styles.clipBadgeText}>{item.duration}초</Text>
-                </View>
+                {item.duration > 0 && (
+                  <View style={styles.clipBadge}>
+                    <Text style={styles.clipBadgeText}>{item.duration}초</Text>
+                  </View>
+                )}
                 {isSelected && (
                   <View style={styles.clipSelectedBadge}>
                     <Check size={14} color="#fff" strokeWidth={2.5} />
                   </View>
                 )}
                 <View style={styles.clipPlayBadge}>
-                  <Film size={20} color="#fff" strokeWidth={2} />
+                  {item.mediaType === 'image' ? (
+                    <ImageIcon size={20} color="#fff" strokeWidth={2} />
+                  ) : (
+                    <Film size={20} color="#fff" strokeWidth={2} />
+                  )}
                 </View>
               </View>
               <View style={styles.clipMetaBox}>
@@ -342,8 +356,12 @@ export function StockVideoPicker({
         ListEmptyComponent={
           loading ? null : error ? null : (
             <View style={styles.emptyState}>
-              <Film size={24} color={theme.colors.dark.textDim} strokeWidth={1.5} />
-              <Text style={styles.emptyText}>검색 버튼을 눌러 영상을 찾아보세요</Text>
+              {mediaType === 'image' ? (
+                <ImageIcon size={24} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+              ) : (
+                <Film size={24} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+              )}
+              <Text style={styles.emptyText}>검색 버튼을 눌러 {mediaType === 'image' ? '이미지를' : '영상을'} 찾아보세요</Text>
             </View>
           )
         }

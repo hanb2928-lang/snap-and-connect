@@ -11,6 +11,7 @@ export interface StockVideoClip {
   videoUrl: string;
   author: string;
   ratio: string;
+  mediaType?: "video" | "image";
 }
 
 interface SearchResponse {
@@ -24,6 +25,7 @@ export async function searchStockVideos(
   query: string,
   orientation: 'portrait' | 'landscape' | 'square' = 'portrait',
   perPage = 10,
+  mediaType: "video" | "image" = "video",
 ): Promise<StockVideoClip[]> {
   try {
     const resp = await safeFetch(SEARCH_URL, {
@@ -32,7 +34,7 @@ export async function searchStockVideos(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supabaseAnonKey}`,
       },
-      body: JSON.stringify({ query, orientation, perPage }),
+      body: JSON.stringify({ query, orientation, perPage, mediaType }),
       timeoutMs: 20000,
     });
     if (!resp.ok) {
