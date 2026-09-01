@@ -10,9 +10,14 @@ import {
   TextInput,
   Animated,
   Easing,
+  Platform,
+  Linking,
+  Alert,
 } from 'react-native';
-import { Search, Film, Check, X, RefreshCw, Settings } from 'lucide-react-native';
+import { Search, Film, Check, X, RefreshCw, Settings, Download } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { theme } from '@/lib/theme';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
 
@@ -109,6 +114,45 @@ export function StockVideoPicker({
     }
   }, [buildQuery, orientation, startProgress, finishProgress]);
 
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveToGallery = useCallback(async () => {
+    if (!selectedClip) return;
+    setSaving(true);
+    setSaveSuccess(false);
+    try {
+      if (Platform.OS === 'web') {
+        window.open(selectedClip.videoUrl, '_blank');
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+        return;
+      }
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '갤러리에 저장하려면 미디어 접근 권한이 필요합니다. 설정에서 허용해주세요.', [
+          { text: '설정으로', onPress: () => Linking.openSettings() },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+      const fileName = `pexels_${selectedClip.id}.mp4`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const downloadRes = await FileSystem.downloadAsync(selectedClip.videoUrl, fileUri);
+      if (downloadRes.status !== 200) {
+        throw new Error('영상 다운로드에 실패했습니다.');
+      }
+      const asset = await MediaLibrary.createAssetAsync(downloadRes.uri);
+      await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      Alert.alert('저장 실패', err instanceof Error ? err.message : '갤러리 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedClip]);
+
   const initialQuery = productName || productCategory || '';
   const hasSearched = clips.length > 0 || error !== null;
 
@@ -200,14 +244,35 @@ export function StockVideoPicker({
             <Text style={styles.selectedMeta}>
               {selectedClip.ratio} · {selectedClip.duration}초 · {selectedClip.author}
             </Text>
+            {saveSuccess && (
+              <Text style={styles.savedHint}>
+                {Platform.OS === 'web' ? '영상을 새 창에서 열었습니다' : '갤러리에 저장되었습니다'}
+              </Text>
+            )}
           </View>
-          <TouchableOpacity
-            onPress={() => onSelectClip(null)}
-            style={styles.selectedRemoveBtn}
-            activeOpacity={0.7}
-          >
-            <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity
+              onPress={handleSaveToGallery}
+              disabled={saving}
+              style={styles.selectedSaveBtn}
+              activeOpacity={0.7}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color={theme.colors.success[400]} />
+              ) : saveSuccess ? (
+                <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+              ) : (
+                <Download size={16} color={theme.colors.success[400]} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => onSelectClip(null)}
+              style={styles.selectedRemoveBtn}
+              activeOpacity={0.7}
+            >
+              <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -396,6 +461,17 @@ const styles = StyleSheet.create({
   },
   selectedRemoveBtn: {
     padding: 6,
+  },
+  selectedSaveBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: theme.colors.success[400] + '15',
+  },
+  savedHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    marginTop: 2,
   },
   clipGridLabel: {
     flexDirection: 'row',
