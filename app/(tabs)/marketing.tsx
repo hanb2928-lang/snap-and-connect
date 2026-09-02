@@ -43,6 +43,9 @@ import {
   Camera,
   Clapperboard,
   Download,
+  Shirt,
+  Wand2,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -53,6 +56,8 @@ import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings } from '@/lib/settings';
 import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 import { PillNavCard } from '@/components/PillNavCard';
+import { VirtualFitting } from '@/components/VirtualFitting';
+import { AIImageComposite } from '@/components/AIImageComposite';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
@@ -121,6 +126,10 @@ export default function MarketingScreen() {
   const [customPrompt, setCustomPrompt] = useState('');
   const [marketingStep, setMarketingStep] = useState<string | null>('store');
   const [selectedBusinessType, setSelectedBusinessType] = useState<string>('fnb');
+  const [aiVideoGenEnabled, setAiVideoGenEnabled] = useState(false);
+  const [aiFittingEnabled, setAiFittingEnabled] = useState(false);
+  const [aiFittingImage, setAiFittingImage] = useState<string | null>(null);
+  const [aiCompositeImage, setAiCompositeImage] = useState<string | null>(null);
   const lastActionRef = useRef(0);
   const voice = useVoiceRecording();
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
@@ -329,6 +338,14 @@ export default function MarketingScreen() {
         }
       }
       await setItem('marketing_affiliate_priority', 'false');
+      await setItem('marketing_ai_video_gen', aiVideoGenEnabled ? 'true' : 'false');
+      await setItem('marketing_ai_fitting', aiFittingEnabled ? 'true' : 'false');
+      if (aiFittingImage) {
+        await setItem('marketing_ai_fitting_image', aiFittingImage);
+      }
+      if (aiCompositeImage) {
+        await setItem('marketing_ai_composite_image', aiCompositeImage);
+      }
       if (voiceDataUrl) {
         await setItem('marketing_voice_recording', voiceDataUrl);
       } else {
@@ -604,6 +621,59 @@ export default function MarketingScreen() {
                   ? '입력하신 문구가 AI 생성에 반영됩니다'
                   : 'AI가 놓친 가격·할인·강조 내용을 직접 넣으세요'}
               </Text>
+            </View>
+          )}
+
+          {/* AI Source Enhancement Toggle Cards */}
+          <Text style={styles.aiEnhanceLabel}>AI 소스 강화 (선택)</Text>
+
+          {/* AI Virtual Video Generation */}
+          <TouchableOpacity
+            style={[styles.aiToggleCard, aiVideoGenEnabled && styles.aiToggleCardActive]}
+            onPress={() => setAiVideoGenEnabled(!aiVideoGenEnabled)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.aiToggleIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+              <Wand2 size={20} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            </View>
+            <View style={styles.aiToggleBody}>
+              <Text style={styles.aiToggleTitle}>AI 가상영상 생성</Text>
+              <Text style={styles.aiToggleDesc}>촬영 없이 AI가 매장 분위기 영상을 자동 생성해 숏폼 소스로 활용</Text>
+            </View>
+            <View style={[styles.toggleSwitch, aiVideoGenEnabled && styles.toggleSwitchActive]}>
+              <View style={[styles.toggleKnob, aiVideoGenEnabled && styles.toggleKnobActive]} />
+            </View>
+          </TouchableOpacity>
+
+          {/* AI Virtual Fitting */}
+          <TouchableOpacity
+            style={[styles.aiToggleCard, aiFittingEnabled && styles.aiToggleCardActive]}
+            onPress={() => setAiFittingEnabled(!aiFittingEnabled)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.aiToggleIconWrap, { backgroundColor: theme.colors.accent[500] + '20' }]}>
+              <Shirt size={20} color={theme.colors.accent[400]} strokeWidth={2.5} />
+            </View>
+            <View style={styles.aiToggleBody}>
+              <Text style={styles.aiToggleTitle}>AI 가상핏</Text>
+              <Text style={styles.aiToggleDesc}>의류 사진과 모델 사진으로 가상 착장 합성, 뷰티·패션 숏폼에 활용</Text>
+            </View>
+            <View style={[styles.toggleSwitch, aiFittingEnabled && styles.toggleSwitchActive]}>
+              <View style={[styles.toggleKnob, aiFittingEnabled && styles.toggleKnobActive]} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Virtual Fitting Panel */}
+          {aiFittingEnabled && (
+            <View style={styles.aiPanel}>
+              <VirtualFitting onResult={(imgBase64: string) => setAiFittingImage(imgBase64)} />
+            </View>
+          )}
+
+          {/* AI Image Composite Panel */}
+          {aiVideoGenEnabled && (
+            <View style={styles.aiPanel}>
+              <AIImageComposite onResult={(imgBase64: string) => setAiCompositeImage(imgBase64)} />
             </View>
           )}
         </PillNavCard>
@@ -1441,5 +1511,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  aiEnhanceLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
+  },
+  aiToggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    marginBottom: 8,
+  },
+  aiToggleCardActive: {
+    borderColor: theme.colors.primary[400] + '60',
+    backgroundColor: theme.colors.primary[500] + '08',
+  },
+  aiToggleIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiToggleBody: {
+    flex: 1,
+    gap: 2,
+  },
+  aiToggleTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  aiToggleDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  aiPanel: {
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
   },
 });
