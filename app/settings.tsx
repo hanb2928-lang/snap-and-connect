@@ -524,6 +524,55 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* Latest Updates */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>최근 업데이트</Text>
+        <Text style={styles.sectionDesc}>
+          최근 개선된 기능과 수정된 오류를 확인하세요
+        </Text>
+        <View style={styles.card}>
+          <View style={styles.updateRow}>
+            <View style={[styles.updateIconWrap, { backgroundColor: theme.colors.success[400] + '20' }]}>
+              <Check size={18} color={theme.colors.success[400]} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.updateTitle}>영상 생성 안정성 강화</Text>
+              <Text style={styles.updateDesc}>중복 터치 방지 가드, 60초 인코딩 타임아웃, 렌더링 타임아웃 시 레코더 안전 중지로 영상 생성이 멈추지 않고 완료됩니다</Text>
+            </View>
+          </View>
+          <Divider />
+          <View style={styles.updateRow}>
+            <View style={[styles.updateIconWrap, { backgroundColor: theme.colors.primary[400] + '20' }]}>
+              <Film size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.updateTitle}>CDN 이미지 CORS 처리</Text>
+              <Text style={styles.updateDesc}>외부 제휴 상품 이미지와 스톡 비디오를 불러올 때 crossOrigin 설정으로 캔버스 합성 오류(Tainted canvas)를 방지합니다</Text>
+            </View>
+          </View>
+          <Divider />
+          <View style={styles.updateRow}>
+            <View style={[styles.updateIconWrap, { backgroundColor: theme.colors.accent[400] + '20' }]}>
+              <Sparkles size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.updateTitle}>TTS 오디오 싱크 개선</Text>
+              <Text style={styles.updateDesc}>감정 곡선(후킹→신뢰→클로징) 구간별 TTS 속도를 자동 조정하여 영상 타이밍과 내레이션이 정확히 맞춰집니다. 배치 TTS에 캐시와 재시도 로직이 추가되었습니다</Text>
+            </View>
+          </View>
+          <Divider />
+          <View style={styles.updateRow}>
+            <View style={[styles.updateIconWrap, { backgroundColor: theme.colors.warning[400] + '20' }]}>
+              <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.updateTitle}>진행률 표시 최적화</Text>
+              <Text style={styles.updateDesc}>영상 렌더링 중 진행률 업데이트를 초당 5회로 제한하여 UI 과부하로 인한 멈춤을 방지합니다</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
       {/* Interactive Onboarding Tutorial */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.tutorial')}</Text>
@@ -3480,6 +3529,32 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.accent[500],
+  },
+  updateRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  updateIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  updateTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+  },
+  updateDesc: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
   },
   tutorialBtnText: {
     fontSize: theme.typography.caption,
