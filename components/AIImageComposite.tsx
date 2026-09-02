@@ -9,8 +9,9 @@ import {
   ActivityIndicator,
   Platform,
   ViewStyle,
+  TextInput,
 } from 'react-native';
-import { Lightbulb, Check, Sun, Moon, Sparkles, Camera, Store, Palette, Upload, RefreshCw, CircleAlert as AlertCircle, Image as ImageIcon } from 'lucide-react-native';
+import { Lightbulb, Check, Sun, Moon, Sparkles, Camera, Store, Palette, Upload, RefreshCw, CircleAlert as AlertCircle, Image as ImageIcon, ChevronDown, PenLine, Trees, Waves, Building2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { captureRef } from 'react-native-view-shot';
 import { theme } from '@/lib/theme';
@@ -53,6 +54,15 @@ const BACKGROUND_PRESETS: {
   { id: 'gradient', label: '그라디언트', desc: '감성 그라데이션', gradient: ['#e0f2f1', '#80cbc4'] },
 ];
 
+const MOOD_PRESET_TAGS = [
+  { key: 'daily_casual', label: '데일리 캐주얼', desc: '밝고 발랄한 일상', icon: Sun, gradient: ['#e8f5e9', '#a5d6a7'] as [string, string] },
+  { key: 'street_hip', label: '힙한 스트릿', desc: '도심 거리 시크', icon: Building2, gradient: ['#37474f', '#263238'] as [string, string] },
+  { key: 'studio_minimal', label: '미니멀 스튜디오', desc: '깔끔한 핏', icon: Camera, gradient: ['#f8f8f8', '#e0e0e0'] as [string, string] },
+  { key: 'sunset_warm', label: '선셋 무드', desc: '따뜻한 노을', icon: Sun, gradient: ['#fff3e0', '#ffcc80'] as [string, string] },
+  { key: 'nature_park', label: '자연 야외', desc: '초록 자연', icon: Trees, gradient: ['#e8f5e9', '#81c784'] as [string, string] },
+  { key: 'beach_sea', label: '해변 무드', desc: '시원한 바다', icon: Waves, gradient: ['#e3f2fd', '#90caf9'] as [string, string] },
+] as const;
+
 interface AIImageCompositeProps {
   onResult?: (imageBase64: string, mimeType: string) => void;
 }
@@ -66,6 +76,9 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mobileGradient, setMobileGradient] = useState<[string, string]>(['#ffffff', '#f0f0f0']);
+  const [selectedMoodTag, setSelectedMoodTag] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [promptOpen, setPromptOpen] = useState(false);
   const compositeRef = useRef<View>(null);
   const captureImageLoadedRef = useRef(false);
 
@@ -102,7 +115,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
   }, []);
 
   const handleComposite = useCallback(
-    async (presetId: LightingPreset | BackgroundStyle) => {
+    async (presetId: LightingPreset | BackgroundStyle | '__mood__') => {
       if (!sourceImage) return;
       setStep('processing');
       setError(null);
@@ -112,7 +125,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         let result: string | null = null;
 
         if (Platform.OS === 'web') {
-          if (mode === 'lighting') {
+          if (mode === 'lighting' && presetId !== '__mood__') {
             const preset = LIGHTING_PRESETS.find((p) => p.id === presetId);
             result = await compositeWithLightingWeb(
               buildDataUrl(sourceImage, 'image/jpeg'),
@@ -120,17 +133,29 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
               preset?.gradient ?? ['#ffffff', '#f0f0f0'],
             );
           } else {
-            const bg = BACKGROUND_PRESETS.find((b) => b.id === presetId);
+            let gradient: [string, string] = ['#ffffff', '#f0f0f0'];
+            if (presetId === '__mood__' && selectedMoodTag) {
+              const moodTag = MOOD_PRESET_TAGS.find((m) => m.key === selectedMoodTag);
+              if (moodTag) gradient = moodTag.gradient;
+            } else if (presetId !== '__mood__') {
+              const bg = BACKGROUND_PRESETS.find((b) => b.id === presetId);
+              if (bg) gradient = bg.gradient;
+            }
             result = await compositeWithBackgroundWeb(
               buildDataUrl(sourceImage, 'image/jpeg'),
-              bg?.gradient ?? ['#ffffff', '#f0f0f0'],
+              gradient,
             );
           }
         } else {
-          const gradient: [string, string] =
-            mode === 'lighting'
-              ? (LIGHTING_PRESETS.find((p) => p.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'])
-              : (BACKGROUND_PRESETS.find((b) => b.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0']);
+          let gradient: [string, string] = ['#ffffff', '#f0f0f0'];
+          if (presetId === '__mood__' && selectedMoodTag) {
+            const moodTag = MOOD_PRESET_TAGS.find((m) => m.key === selectedMoodTag);
+            if (moodTag) gradient = moodTag.gradient;
+          } else if (mode === 'lighting' && presetId !== '__mood__') {
+            gradient = LIGHTING_PRESETS.find((p) => p.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'];
+          } else if (presetId !== '__mood__') {
+            gradient = BACKGROUND_PRESETS.find((b) => b.id === presetId)?.gradient ?? ['#ffffff', '#f0f0f0'];
+          }
           setMobileGradient(gradient);
           captureImageLoadedRef.current = false;
           await new Promise((resolve) => setTimeout(resolve, 200));
@@ -163,7 +188,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         setStep('error');
       }
     },
-    [sourceImage, mode, onResult, mobileGradient],
+    [sourceImage, mode, onResult, mobileGradient, selectedMoodTag],
   );
 
   const handleReset = useCallback(() => {
@@ -222,6 +247,79 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
             <RefreshCw size={11} color={theme.colors.dark.textDim} strokeWidth={2} />
             <Text style={styles.sourceChangeText}>사진 변경</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Smart Mood Preset Tags — one-touch */}
+      {sourceImage && step !== 'processing' && step !== 'done' && (
+        <View style={styles.presetGroup}>
+          <Text style={styles.presetGroupLabel}>원터치 스마트 프리셋</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetList}>
+            {MOOD_PRESET_TAGS.map((tag) => {
+              const Icon = tag.icon;
+              const isActive = selectedMoodTag === tag.key;
+              return (
+                <TouchableOpacity
+                  key={tag.key}
+                  style={[styles.moodTagCard, isActive && styles.moodTagCardActive]}
+                  onPress={() => {
+                    setSelectedMoodTag(isActive ? null : tag.key);
+                    if (!isActive) {
+                      setMode('background');
+                      setSelectedBackground(null);
+                      setSelectedPreset(null);
+                      handleComposite(tag.gradient as unknown as LightingPreset);
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.moodTagIconBox, { backgroundColor: tag.gradient[0] }]}>
+                    <Icon size={14} color={tag.gradient[1] > '#888' ? theme.colors.dark.text : '#fff'} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.moodTagLabel, isActive && styles.moodTagLabelActive]}>{tag.label}</Text>
+                  <Text style={styles.moodTagDesc}>{tag.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Custom Prompt Accordion */}
+      {sourceImage && step !== 'processing' && step !== 'done' && (
+        <View style={styles.promptAccordionWrap}>
+          <TouchableOpacity
+            style={styles.promptAccordionToggle}
+            onPress={() => setPromptOpen(!promptOpen)}
+            activeOpacity={0.7}
+          >
+            <PenLine size={14} color={mode === 'lighting' ? theme.colors.accent[400] : theme.colors.primary[400]} strokeWidth={2} />
+            <Text style={styles.promptAccordionLabel}>커스텀 프롬프트 (전문가용)</Text>
+            <ChevronDown
+              size={16}
+              color={theme.colors.dark.textDim}
+              strokeWidth={2}
+              style={{ transform: [{ rotate: promptOpen ? '180deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+          {promptOpen && (
+            <View style={styles.promptInputWrap}>
+              <TextInput
+                style={styles.promptInput}
+                placeholder="예: 제주도 해변을 배경으로 자연광 속에서 걷는 핏, 바람에 날리는 머릿결"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                value={customPrompt}
+                onChangeText={setCustomPrompt}
+                multiline
+                maxLength={300}
+              />
+              {customPrompt.length > 0 && (
+                <TouchableOpacity onPress={() => setCustomPrompt('')} activeOpacity={0.7} style={styles.promptClearBtn}>
+                  <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -577,6 +675,84 @@ const styles = StyleSheet.create({
   presetList: {
     gap: 6,
     paddingVertical: 2,
+  },
+  moodTagCard: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    minWidth: 80,
+  },
+  moodTagCardActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '12',
+  },
+  moodTagIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moodTagLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  moodTagLabelActive: {
+    color: theme.colors.accent[400],
+  },
+  moodTagDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'center',
+  },
+  promptAccordionWrap: {
+    gap: 8,
+  },
+  promptAccordionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  promptAccordionLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  promptInputWrap: {
+    position: 'relative',
+  },
+  promptInput: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    paddingRight: 36,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    minHeight: 60,
+    maxHeight: 100,
+  },
+  promptClearBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 4,
   },
   presetCard: {
     flexDirection: 'row',

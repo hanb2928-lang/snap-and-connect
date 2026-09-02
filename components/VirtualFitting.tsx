@@ -7,8 +7,9 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
-import { Shirt, Upload, Sparkles, Check, RefreshCw, Image as ImageIcon, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Shirt, Upload, Sparkles, Check, RefreshCw, Image as ImageIcon, CircleAlert as AlertCircle, ChevronDown, PenLine, Sun, Building2, Trees, Waves, Camera } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { friendlyError } from '@/lib/errors';
 import { compressImageToBase64, prepareImageForApi } from '@/lib/imageEdit';
@@ -34,6 +35,23 @@ const MODEL_POSES = [
   { key: 'natural', label: '자연스러운' },
 ] as const;
 
+const MOOD_PRESETS = [
+  { key: 'daily_casual', label: '데일리 캐주얼', desc: '밝고 발랄한 일상 무드', icon: Sun },
+  { key: 'street_hip', label: '힙한 스트릿', desc: '도심 거리 시크한 연출', icon: Building2 },
+  { key: 'studio_minimal', label: '미니멀 스튜디오', desc: '깔끔한 스튜디오 핏', icon: Camera },
+  { key: 'sunset_warm', label: '선셋 무드', desc: '따뜻한 노을 감성', icon: Sun },
+  { key: 'natural_outdoor', label: '자연광 야외', desc: '자연스러운 야외 필름', icon: Trees },
+] as const;
+
+const SCENE_PRESETS = [
+  { key: 'studio_white', label: '스튜디오', desc: '화이트 배경', icon: Camera },
+  { key: 'urban_street', label: '도심 거리', desc: '시크한 도시 배경', icon: Building2 },
+  { key: 'cafe_interior', label: '카페 내부', desc: '감성 카페 배경', icon: Sparkles },
+  { key: 'beach_outdoor', label: '해변', desc: '시원한 바다 배경', icon: Waves },
+  { key: 'nature_park', label: '공원', desc: '초록 자연 배경', icon: Trees },
+  { key: 'retail_shop', label: '매장', desc: '쇼핑몰 매장 배경', icon: Building2 },
+] as const;
+
 interface VirtualFittingProps {
   onResult?: (imageBase64: string, mimeType: string) => void;
 }
@@ -47,6 +65,10 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [bodyType, setBodyType] = useState<string>('standard');
   const [pose, setPose] = useState<string>('front');
+  const [mood, setMood] = useState<string | null>(null);
+  const [sceneStyle, setSceneStyle] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [promptOpen, setPromptOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handlePickProduct = useCallback(async () => {
@@ -128,6 +150,9 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
           modelImage,
           bodyType,
           pose,
+          mood: mood ?? undefined,
+          sceneStyle: sceneStyle ?? undefined,
+          customPrompt: customPrompt.trim() || undefined,
         }),
         signal: controller.signal,
       });
@@ -158,7 +183,7 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
     } finally {
       abortRef.current = null;
     }
-  }, [productImage, modelImage, bodyType, pose, onResult, t]);
+  }, [productImage, modelImage, bodyType, pose, mood, sceneStyle, customPrompt, onResult, t]);
 
   useEffect(() => {
     return () => {
@@ -172,6 +197,9 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
     setModelImage(null);
     setResultImage(null);
     setError(null);
+    setMood(null);
+    setSceneStyle(null);
+    setCustomPrompt('');
   }, []);
 
   return (
@@ -305,6 +333,98 @@ export function VirtualFitting({ onResult }: VirtualFittingProps) {
               ))}
             </View>
           </View>
+        </View>
+      )}
+
+      {/* Smart Mood Preset Cards */}
+      {productImage && modelImage && step !== 'processing' && step !== 'done' && (
+        <View style={styles.optionsWrap}>
+          <Text style={styles.presetSectionLabel}>원터치 스마트 무드 프리셋</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetList}>
+            {MOOD_PRESETS.map((m) => {
+              const Icon = m.icon;
+              const isActive = mood === m.key;
+              return (
+                <TouchableOpacity
+                  key={m.key}
+                  style={[styles.moodPresetCard, isActive && styles.moodPresetCardActive]}
+                  onPress={() => setMood(isActive ? null : m.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.moodPresetIconBox, isActive && styles.moodPresetIconBoxActive]}>
+                    <Icon size={14} color={isActive ? '#fff' : theme.colors.accent[400]} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.moodPresetLabel, isActive && styles.moodPresetLabelActive]}>{m.label}</Text>
+                  <Text style={styles.moodPresetDesc}>{m.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Scene Style Preset Cards */}
+      {productImage && modelImage && step !== 'processing' && step !== 'done' && (
+        <View style={styles.optionsWrap}>
+          <Text style={styles.presetSectionLabel}>배경 무드 프리셋</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetList}>
+            {SCENE_PRESETS.map((s) => {
+              const Icon = s.icon;
+              const isActive = sceneStyle === s.key;
+              return (
+                <TouchableOpacity
+                  key={s.key}
+                  style={[styles.moodPresetCard, isActive && styles.moodPresetCardActive]}
+                  onPress={() => setSceneStyle(isActive ? null : s.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.moodPresetIconBox, isActive && styles.moodPresetIconBoxActive]}>
+                    <Icon size={14} color={isActive ? '#fff' : theme.colors.primary[400]} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.moodPresetLabel, isActive && styles.moodPresetLabelActive]}>{s.label}</Text>
+                  <Text style={styles.moodPresetDesc}>{s.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Custom Prompt Accordion */}
+      {productImage && modelImage && step !== 'processing' && step !== 'done' && (
+        <View style={styles.promptAccordionWrap}>
+          <TouchableOpacity
+            style={styles.promptAccordionToggle}
+            onPress={() => setPromptOpen(!promptOpen)}
+            activeOpacity={0.7}
+          >
+            <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.promptAccordionLabel}>커스텀 프롬프트 (전문가용)</Text>
+            <ChevronDown
+              size={16}
+              color={theme.colors.dark.textDim}
+              strokeWidth={2}
+              style={{ transform: [{ rotate: promptOpen ? '180deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+          {promptOpen && (
+            <View style={styles.promptInputWrap}>
+              <TextInput
+                style={styles.promptInput}
+                placeholder="예: 제주도 해변을 배경으로 자연광 속에서 걷는 핏, 바람에 날리는 머릿결"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                value={customPrompt}
+                onChangeText={setCustomPrompt}
+                multiline
+                maxLength={300}
+              />
+              {customPrompt.length > 0 && (
+                <TouchableOpacity onPress={() => setCustomPrompt('')} activeOpacity={0.7} style={styles.promptClearBtn}>
+                  <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -473,6 +593,97 @@ const styles = StyleSheet.create({
   },
   optionGroup: {
     gap: 6,
+  },
+  presetSectionLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  presetList: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  moodPresetCard: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    minWidth: 80,
+  },
+  moodPresetCardActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '12',
+  },
+  moodPresetIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent[500] + '18',
+  },
+  moodPresetIconBoxActive: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  moodPresetLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  moodPresetLabelActive: {
+    color: theme.colors.accent[400],
+  },
+  moodPresetDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'center',
+  },
+  promptAccordionWrap: {
+    gap: 8,
+  },
+  promptAccordionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  promptAccordionLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  promptInputWrap: {
+    position: 'relative',
+  },
+  promptInput: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    paddingRight: 36,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    minHeight: 60,
+    maxHeight: 100,
+  },
+  promptClearBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 4,
   },
   optionLabel: {
     fontSize: 11,
