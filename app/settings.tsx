@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp, Music2 } from 'lucide-react-native';
 import { SectionCard } from '@/components/SectionCard';
-import { theme } from '@/lib/theme';
+import { theme as staticTheme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import type { ThemePreset } from '@/lib/theme';
 import { getItem, setItem } from '@/lib/storage';
@@ -58,15 +58,19 @@ import {
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { t, language, setLanguage } = useI18n();
-  const { setPreset: applyThemePreset, setMode: applyThemeMode } = useAppTheme();
+  const { setPreset: applyThemePreset, setMode: applyThemeMode, colors: dynamicColors, baseTheme: dynamicBaseTheme, spacing: dynamicSpacing, typography: dynamicTypography, presetColors } = useAppTheme();
+  const theme = {
+    ...dynamicBaseTheme,
+    colors: { ...dynamicBaseTheme.colors, dark: dynamicColors, light: dynamicColors, primary: presetColors.primary, accent: presetColors.accent },
+    spacing: dynamicSpacing,
+    typography: dynamicTypography,
+  };
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [coupangId, setCoupangId] = useState('');
   const [naverId, setNaverId] = useState('');
   const [tossId, setTossId] = useState('');
-  const [savingIds, setSavingIds] = useState(false);
-  const [savedIds, setSavedIds] = useState(false);
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -139,7 +143,6 @@ export default function SettingsScreen() {
   const [newAffId, setNewAffId] = useState('');
   const [newAffParam, setNewAffParam] = useState('');
   const [addingAffiliate, setAddingAffiliate] = useState(false);
-  const [pendingCustomPlatforms, setPendingCustomPlatforms] = useState<{ name: string; id: string }[]>([]);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const router = useRouter();
 
@@ -294,34 +297,6 @@ export default function SettingsScreen() {
         },
       },
     ]);
-  };
-
-  const handleSaveIds = async () => {
-    setSavingIds(true);
-    setSavedIds(false);
-    try {
-      await updateUserSettings({
-        coupang_partners_id: coupangId || null,
-        naver_shopping_id: naverId || null,
-        toss_share_id: tossId || null,
-      });
-      for (const cp of pendingCustomPlatforms) {
-        if (cp.name.trim()) {
-          await addCustomAffiliatePlatform({
-            label: cp.name.trim(),
-            partnersId: cp.id.trim(),
-            trackingParam: '',
-          });
-        }
-      }
-      setPendingCustomPlatforms([]);
-      setSavedIds(true);
-      setTimeout(() => setSavedIds(false), 2500);
-      await loadAffiliatePlatforms();
-    } catch (err) {
-      Alert.alert('저장 실패', err instanceof Error ? err.message : '알 수 없는 오류');
-    }
-    setSavingIds(false);
   };
 
   const handleSaveAffiliateId = async (id: string) => {
@@ -878,165 +853,6 @@ export default function SettingsScreen() {
         }}
         onPurchased={() => loadCredits()}
       />
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>제휴 파트너스 ID 설정</Text>
-        <Text style={styles.sectionDesc}>
-          각 플랫폼의 파트너스 ID를 입력하면 상품 분석 시 자동으로 수수료 링크가 생성됩니다. ID는 안전하게 저장됩니다.
-        </Text>
-        <View style={styles.card}>
-          <View style={styles.idInputRow}>
-            <View style={[styles.idIconWrap, { backgroundColor: '#FF3E3E20' }]}>
-              <Text style={[styles.idIconText, { color: '#FF3E3E' }]}>C</Text>
-            </View>
-            <View style={styles.idInputBody}>
-              <Text style={styles.idInputLabel}>쿠팡 파트너스 ID</Text>
-              <TextInput
-                style={styles.idInput}
-                value={coupangId}
-                onChangeText={setCoupangId}
-                placeholder="예: ATTP1234567"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-          <Divider />
-          <View style={styles.idInputRow}>
-            <View style={[styles.idIconWrap, { backgroundColor: '#03C75A20' }]}>
-              <Text style={[styles.idIconText, { color: '#03C75A' }]}>N</Text>
-            </View>
-            <View style={styles.idInputBody}>
-              <Text style={styles.idInputLabel}>네이버 쇼핑 ID</Text>
-              <TextInput
-                style={styles.idInput}
-                value={naverId}
-                onChangeText={setNaverId}
-                placeholder="예: naver_shop_123"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-          <Divider />
-          <View style={styles.idInputRow}>
-            <View style={[styles.idIconWrap, { backgroundColor: '#0064FF20' }]}>
-              <Text style={[styles.idIconText, { color: '#0064FF' }]}>T</Text>
-            </View>
-            <View style={styles.idInputBody}>
-              <Text style={styles.idInputLabel}>토스 쉐어링크 ID</Text>
-              <TextInput
-                style={styles.idInput}
-                value={tossId}
-                onChangeText={setTossId}
-                placeholder="예: toss_share_abc"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.tossSignupLink}
-                onPress={() => {
-                  const tossUrl = 'https://business.toss.im/account/sign-in?client_id=ajvm9wq2t0p1ttet13y3qzb3rvjxhacn&redirect_uri=https%3A%2F%2Fsharelink.toss.im%2Fsignup-start';
-                  if (Platform.OS === 'web') {
-                    window.open(tossUrl, '_blank');
-                  } else {
-                    Linking.openURL(tossUrl).catch(() => {});
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <ExternalLink size={13} color="#0064FF" strokeWidth={2} />
-                <Text style={styles.tossSignupLinkText}>토스 제휴링크 가입하기</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {pendingCustomPlatforms.length > 0 && (
-            <View style={styles.customAffDividerWrap}>
-              <Divider />
-              <Text style={styles.customAffSectionLabel}>수동 추가 제휴 플랫폼</Text>
-            </View>
-          )}
-
-          {pendingCustomPlatforms.map((cp, idx) => (
-            <View key={`pending-aff-${idx}`}>
-              <View style={styles.idInputRow}>
-                <View style={[styles.idIconWrap, { backgroundColor: theme.colors.primary[400] + '20' }]}>
-                  <Text style={[styles.idIconText, { color: theme.colors.primary[400], fontSize: 11 }]}>
-                    {cp.name.trim().charAt(0).toUpperCase() || '+'}
-                  </Text>
-                </View>
-                <View style={styles.idInputBody}>
-                  <TextInput
-                    style={styles.idInput}
-                    value={cp.name}
-                    onChangeText={(text) => setPendingCustomPlatforms((prev) =>
-                      prev.map((p, i) => i === idx ? { ...p, name: text } : p)
-                    )}
-                    placeholder="플랫폼 이름 (예: 알리익스프레스)"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                    maxLength={20}
-                  />
-                  <View style={{ height: 8 }} />
-                  <TextInput
-                    style={styles.idInput}
-                    value={cp.id}
-                    onChangeText={(text) => setPendingCustomPlatforms((prev) =>
-                      prev.map((p, i) => i === idx ? { ...p, id: text } : p)
-                    )}
-                    placeholder="파트너스 ID / 코드"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-                <TouchableOpacity
-                  style={styles.customAffDeleteBtn}
-                  onPress={() => setPendingCustomPlatforms((prev) => prev.filter((_, i) => i !== idx))}
-                  activeOpacity={0.7}
-                  hitSlop={12}
-                >
-                  <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-              {idx < pendingCustomPlatforms.length - 1 && <Divider />}
-            </View>
-          ))}
-
-          <TouchableOpacity
-            style={styles.customAffAddBtn}
-            onPress={() => setPendingCustomPlatforms((prev) => [...prev, { name: '', id: '' }])}
-            activeOpacity={0.8}
-          >
-            <Plus size={18} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.customAffAddBtnText}>제휴 플랫폼 수동 추가</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.saveIdButton, savedIds && styles.saveIdButtonDone]}
-          onPress={handleSaveIds}
-          disabled={savingIds}
-          activeOpacity={0.8}
-        >
-          {savingIds ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : savedIds ? (
-            <>
-              <Check size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.saveIdButtonText}>저장됨</Text>
-            </>
-          ) : (
-            <>
-              <Check size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.saveIdButtonText}>파트너스 ID 저장</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
 
       {/* Marketing Platform Management */}
       <View style={styles.section}>
@@ -2454,11 +2270,11 @@ function Divider() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.dark.bg,
+    backgroundColor: staticTheme.colors.dark.bg,
   },
   centerContainer: {
     flex: 1,
-    backgroundColor: theme.colors.dark.bg,
+    backgroundColor: staticTheme.colors.dark.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2468,38 +2284,38 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   section: {
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
+    paddingHorizontal: staticTheme.spacing.lg,
+    marginBottom: staticTheme.spacing.xl,
   },
   sectionTitle: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    marginBottom: theme.spacing.sm,
+    marginBottom: staticTheme.spacing.sm,
   },
   sectionDesc: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 20,
-    marginBottom: theme.spacing.md,
+    marginBottom: staticTheme.spacing.md,
   },
   analyticsShortcutCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.card,
+    gap: staticTheme.spacing.md,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    ...staticTheme.shadows.card,
   },
   analyticsShortcutIconWrap: {
     width: 48,
     height: 48,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500] + '15',
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.success[500] + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2507,64 +2323,64 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   analyticsShortcutTitle: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   analyticsShortcutDesc: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 3,
     lineHeight: 16,
   },
   card: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.card,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    ...staticTheme.shadows.card,
   },
   featureRow: {
     flexDirection: 'row',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: staticTheme.spacing.sm,
   },
   featureIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureBody: {
     flex: 1,
-    marginLeft: theme.spacing.md,
+    marginLeft: staticTheme.spacing.md,
   },
   featureTitle: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   featureDesc: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 20,
     marginTop: 4,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.dark.border,
-    marginVertical: theme.spacing.sm,
+    backgroundColor: staticTheme.colors.dark.border,
+    marginVertical: staticTheme.spacing.sm,
   },
   usageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: staticTheme.spacing.sm,
   },
   usageSteps: {
     paddingLeft: 48,
-    paddingBottom: theme.spacing.sm,
+    paddingBottom: staticTheme.spacing.sm,
     gap: 8,
   },
   usageStepRow: {
@@ -2576,38 +2392,38 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: theme.colors.primary[500] + '20',
+    backgroundColor: staticTheme.colors.primary[500] + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
   },
   usageStepNum: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primary[400],
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.primary[400],
   },
   usageStepText: {
     flex: 1,
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 20,
   },
   flowContainer: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.card,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    ...staticTheme.shadows.card,
   },
   flowStep: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: theme.spacing.md,
+    gap: staticTheme.spacing.md,
   },
   flowStepIcon: {
     width: 44,
     height: 44,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2616,44 +2432,44 @@ const styles = StyleSheet.create({
   },
   flowStepNum: {
     fontSize: 9,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.textFaint,
     letterSpacing: 1,
   },
   flowStepTitle: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
     marginTop: 2,
   },
   flowStepDesc: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 18,
     marginTop: 4,
   },
   flowConnector: {
     width: 2,
     height: 20,
-    backgroundColor: theme.colors.dark.border,
+    backgroundColor: staticTheme.colors.dark.border,
     marginLeft: 21,
     marginVertical: 2,
   },
   aiBuiltInCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    ...theme.shadows.card,
+    gap: staticTheme.spacing.md,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    ...staticTheme.shadows.card,
   },
   aiBuiltInIcon: {
     width: 44,
     height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.success[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2661,40 +2477,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   aiBuiltInTitle: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   aiBuiltInDesc: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 20,
     marginTop: 2,
   },
   footer: {
     textAlign: 'center',
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
   },
   guideCard: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.card,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    marginBottom: staticTheme.spacing.md,
+    ...staticTheme.shadows.card,
   },
   guideStepTitle: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-    marginBottom: theme.spacing.sm,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
+    marginBottom: staticTheme.spacing.sm,
   },
   guideStepText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 22,
   },
   guideLinkButton: {
@@ -2702,76 +2518,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '15',
-    marginBottom: theme.spacing.md,
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500] + '15',
+    marginBottom: staticTheme.spacing.md,
   },
   guideLinkText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[400],
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[400],
   },
   noticeCard: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.warning[500] + '10',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
+    gap: staticTheme.spacing.sm,
+    backgroundColor: staticTheme.colors.warning[500] + '10',
+    borderRadius: staticTheme.radius.md,
+    padding: staticTheme.spacing.md,
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.warning[400],
+    borderLeftColor: staticTheme.colors.warning[400],
   },
   noticeText: {
     flex: 1,
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 20,
   },
   feedbackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: staticTheme.spacing.sm,
   },
   idInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: staticTheme.spacing.sm,
   },
   idIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   idIconText: {
     fontSize: 18,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: staticTheme.typography.fontFamily.bold,
   },
   idInputBody: {
     flex: 1,
-    marginLeft: theme.spacing.md,
+    marginLeft: staticTheme.spacing.md,
   },
   idInputLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
     marginBottom: 4,
   },
   idInput: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.spacing.md,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.text,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.sm,
+    paddingHorizontal: staticTheme.spacing.md,
     paddingVertical: 8,
   },
   charCount: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     textAlign: 'right',
     marginTop: 4,
   },
@@ -2783,27 +2599,27 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: theme.radius.sm,
+    borderRadius: staticTheme.radius.sm,
     backgroundColor: '#0064FF10',
   },
   tossSignupLinkText: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
     color: '#0064FF',
   },
   customAffDividerWrap: {
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    marginTop: staticTheme.spacing.md,
+    marginBottom: staticTheme.spacing.sm,
   },
   customAffSectionLabel: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
-    marginTop: theme.spacing.sm,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[300],
+    marginTop: staticTheme.spacing.sm,
     letterSpacing: 0.5,
   },
   customAffDeleteBtn: {
-    padding: theme.spacing.sm,
+    padding: staticTheme.spacing.sm,
     alignSelf: 'flex-start',
     marginTop: 2,
   },
@@ -2812,35 +2628,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '12',
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500] + '12',
     borderWidth: 1.5,
-    borderColor: theme.colors.primary[400] + '30',
+    borderColor: staticTheme.colors.primary[400] + '30',
     borderStyle: 'dashed',
-    marginTop: theme.spacing.md,
+    marginTop: staticTheme.spacing.md,
   },
   customAffAddBtnText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[300],
   },
   saveIdButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[600],
-    marginTop: theme.spacing.md,
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[600],
+    marginTop: staticTheme.spacing.md,
   },
   saveIdButtonDone: {
-    backgroundColor: theme.colors.success[500],
+    backgroundColor: staticTheme.colors.success[500],
   },
   saveIdButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
     color: '#fff',
   },
   logoPreviewWrap: {
@@ -2851,22 +2667,22 @@ const styles = StyleSheet.create({
   logoPreviewImg: {
     width: 60,
     height: 60,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     objectFit: 'contain',
-    backgroundColor: theme.colors.dark.bg,
+    backgroundColor: staticTheme.colors.dark.bg,
   },
   logoInfo: {
     flex: 1,
   },
   logoRegisteredText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   logoHintText: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   logoRemoveBtn: {
@@ -2875,36 +2691,36 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.error[500] + '15',
+    borderRadius: staticTheme.radius.sm,
+    backgroundColor: staticTheme.colors.error[500] + '15',
   },
   logoRemoveText: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.error[400],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.error[400],
   },
   logoEmptyWrap: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.md,
+    paddingVertical: staticTheme.spacing.md,
   },
   logoEmptyIcon: {
     width: 56,
     height: 56,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   logoEmptyText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
   },
   logoEmptyHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     marginTop: 2,
   },
   logoUploadBtn: {
@@ -2912,86 +2728,86 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '15',
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500] + '15',
     borderWidth: 1.5,
-    borderColor: theme.colors.primary[400] + '30',
-    marginTop: theme.spacing.sm,
+    borderColor: staticTheme.colors.primary[400] + '30',
+    marginTop: staticTheme.spacing.sm,
   },
   logoUploadBtnText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[300],
   },
   addRevenueButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.success[500],
   },
   addRevenueButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
     color: '#fff',
   },
   revenueList: {
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.sm,
+    marginTop: staticTheme.spacing.md,
+    gap: staticTheme.spacing.sm,
   },
   revenueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.md,
+    padding: staticTheme.spacing.md,
   },
   revenueInfo: {
     flex: 1,
   },
   revenuePlatform: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
   },
   revenueAmount: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.success[400],
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.success[400],
     marginTop: 2,
   },
   revenueMeta: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     marginTop: 2,
   },
   revenueDeleteBtn: {
-    padding: theme.spacing.sm,
+    padding: staticTheme.spacing.sm,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.lg,
+    padding: staticTheme.spacing.lg,
   },
   modalContainer: {
     width: '100%',
     maxHeight: '85%',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.xl,
+    padding: staticTheme.spacing.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.md,
+    marginBottom: staticTheme.spacing.md,
   },
   modalHeaderLeft: {
     flexDirection: 'row',
@@ -2999,21 +2815,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalTitle: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.heading,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
   },
   modalCloseText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
   },
   modalLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
     marginBottom: 6,
-    marginTop: theme.spacing.sm,
+    marginTop: staticTheme.spacing.sm,
   },
   platformPickerRow: {
     flexDirection: 'row',
@@ -3022,15 +2838,15 @@ const styles = StyleSheet.create({
   },
   ttsCategoryLabel: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 10,
     marginBottom: 6,
   },
   sliderValueText: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[300],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.accent[300],
     marginBottom: 8,
   },
   sliderRow: {
@@ -3041,21 +2857,21 @@ const styles = StyleSheet.create({
   },
   sliderLabel: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
   },
   sliderTrack: {
     flex: 1,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     position: 'relative',
   },
   sliderFill: {
     position: 'absolute',
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.accent[500],
+    backgroundColor: staticTheme.colors.accent[500],
   },
   sliderThumb: {
     position: 'absolute',
@@ -3080,90 +2896,90 @@ const styles = StyleSheet.create({
   sliderChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.full,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   sliderChipActive: {
-    backgroundColor: theme.colors.accent[500],
-    borderColor: theme.colors.accent[500],
+    backgroundColor: staticTheme.colors.accent[500],
+    borderColor: staticTheme.colors.accent[500],
   },
   sliderChipText: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
   },
   sliderChipTextActive: {
     color: '#fff',
   },
   platformChip: {
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: staticTheme.spacing.md,
     paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.full,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   platformChipActive: {
-    backgroundColor: theme.colors.primary[600],
-    borderColor: theme.colors.primary[600],
+    backgroundColor: staticTheme.colors.primary[600],
+    borderColor: staticTheme.colors.primary[600],
   },
   platformChipText: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.micro,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
   },
   platformChipTextActive: {
     color: '#fff',
   },
   modalInput: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.text,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    paddingHorizontal: staticTheme.spacing.md,
     paddingVertical: 10,
   },
   modalSaveButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
-    marginTop: theme.spacing.lg,
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.success[500],
+    marginTop: staticTheme.spacing.lg,
   },
   modalSaveButtonText: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.bold,
     color: '#fff',
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    gap: theme.spacing.md,
+    paddingVertical: staticTheme.spacing.sm,
+    gap: staticTheme.spacing.md,
   },
   toggleSwitch: {
     width: 48,
     height: 28,
     borderRadius: 14,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
     justifyContent: 'center',
     paddingHorizontal: 2,
   },
   toggleSwitchActive: {
-    backgroundColor: theme.colors.success[500],
-    borderColor: theme.colors.success[500],
+    backgroundColor: staticTheme.colors.success[500],
+    borderColor: staticTheme.colors.success[500],
   },
   toggleKnob: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: theme.colors.dark.textDim,
+    backgroundColor: staticTheme.colors.dark.textDim,
     marginLeft: 0,
   },
   toggleKnobActive: {
@@ -3171,12 +2987,12 @@ const styles = StyleSheet.create({
     marginLeft: 22,
   },
   planCard: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md + 4,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md + 4,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   planHeader: {
     flexDirection: 'row',
@@ -3198,23 +3014,23 @@ const styles = StyleSheet.create({
   },
   planName: {
     fontSize: 18,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
   },
   planBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: theme.radius.full,
+    borderRadius: staticTheme.radius.full,
   },
   planBadgeText: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: staticTheme.typography.fontFamily.bold,
     color: '#fff',
   },
   planTagline: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   planRadio: {
@@ -3222,7 +3038,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3234,17 +3050,17 @@ const styles = StyleSheet.create({
   },
   planPrice: {
     fontSize: 24,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: staticTheme.typography.fontFamily.bold,
   },
   planPriceUnit: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
   },
   planQuota: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
     marginBottom: 10,
   },
   planFeatureList: {
@@ -3258,8 +3074,8 @@ const styles = StyleSheet.create({
   planFeatureText: {
     flex: 1,
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 18,
   },
   subscribeBtn: {
@@ -3268,13 +3084,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500],
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500],
     marginBottom: 12,
   },
   subscribeBtnText: {
     fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontFamily: staticTheme.typography.fontFamily.bold,
     color: '#fff',
   },
   tokenPackToggle: {
@@ -3282,15 +3098,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 12,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    paddingHorizontal: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
   },
   tokenPackToggleText: {
     flex: 1,
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   tokenPackContainer: {
     marginTop: 10,
@@ -3300,10 +3116,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.lg,
+    padding: staticTheme.spacing.md,
+    marginBottom: staticTheme.spacing.md,
   },
   creditBalanceLeft: {
     flexDirection: 'row',
@@ -3313,54 +3129,54 @@ const styles = StyleSheet.create({
   creditBalanceIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.warning[500] + '18',
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.warning[500] + '18',
     justifyContent: 'center',
     alignItems: 'center',
   },
   creditBalanceLabel: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
   },
   creditBalanceValue: {
     fontSize: 24,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
   },
   creditBalanceStats: {
     alignItems: 'flex-end',
   },
   creditBalanceStatLabel: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
   },
   creditBalanceStatValue: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
   },
   creditWebNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm + 2,
-    marginTop: theme.spacing.sm,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    padding: staticTheme.spacing.sm + 2,
+    marginTop: staticTheme.spacing.sm,
   },
   creditWebNoteText: {
     flex: 1,
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 16,
   },
   tokenPackHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     lineHeight: 16,
   },
   tokenPackCard: {
@@ -3368,40 +3184,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surface,
+    paddingHorizontal: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   tokenPackName: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   tokenPackQuota: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   tokenPackPrice: {
     fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.warning[400],
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.warning[400],
   },
   tokenPackBuyBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.warning[400] + '20',
+    borderRadius: staticTheme.radius.full,
+    backgroundColor: staticTheme.colors.warning[400] + '20',
     borderWidth: 1.5,
-    borderColor: theme.colors.warning[400],
+    borderColor: staticTheme.colors.warning[400],
   },
   tokenPackBuyBtnText: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.warning[400],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.warning[400],
   },
   progressStyleRow: {
     flexDirection: 'row',
@@ -3414,14 +3230,14 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
     paddingHorizontal: 6,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   progressStyleCardActive: {
-    backgroundColor: theme.colors.primary[600] + '15',
-    borderColor: theme.colors.primary[500],
+    backgroundColor: staticTheme.colors.primary[600] + '15',
+    borderColor: staticTheme.colors.primary[500],
   },
   progressStyleIcon: {
     width: 40,
@@ -3429,40 +3245,40 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.dark.surface,
+    backgroundColor: staticTheme.colors.dark.surface,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   progressStyleIconActive: {
-    backgroundColor: theme.colors.primary[500],
-    borderColor: theme.colors.primary[500],
+    backgroundColor: staticTheme.colors.primary[500],
+    borderColor: staticTheme.colors.primary[500],
   },
   progressStyleName: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
     textAlign: 'center',
   },
   progressStyleNameActive: {
-    color: theme.colors.primary[300],
+    color: staticTheme.colors.primary[300],
   },
   progressStyleDesc: {
     fontSize: 9,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     textAlign: 'center',
   },
   mascotSavingHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     textAlign: 'center',
     marginTop: 8,
   },
   mascotSavedHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.success[400],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.success[400],
     textAlign: 'center',
     marginTop: 8,
   },
@@ -3477,16 +3293,16 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     borderWidth: 1.5,
   },
   healthBadgeOk: {
-    backgroundColor: theme.colors.success[500] + '0D',
-    borderColor: theme.colors.success[500] + '40',
+    backgroundColor: staticTheme.colors.success[500] + '0D',
+    borderColor: staticTheme.colors.success[500] + '40',
   },
   healthBadgeErr: {
-    backgroundColor: theme.colors.error[500] + '08',
-    borderColor: theme.colors.error[500] + '30',
+    backgroundColor: staticTheme.colors.error[500] + '08',
+    borderColor: staticTheme.colors.error[500] + '30',
   },
   healthBadgeIcon: {
     width: 20,
@@ -3497,26 +3313,26 @@ const styles = StyleSheet.create({
   },
   healthBadgeLabel: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
   },
   healthBadgeStatus: {
     fontSize: 9,
-    fontFamily: theme.typography.fontFamily.medium,
+    fontFamily: staticTheme.typography.fontFamily.medium,
   },
   healthBadgeStatusOk: {
-    color: theme.colors.success[400],
+    color: staticTheme.colors.success[400],
   },
   healthBadgeStatusErr: {
-    color: theme.colors.error[400],
+    color: staticTheme.colors.error[400],
   },
   modalClose: {
     position: "absolute",
-    top: theme.spacing.md,
-    right: theme.spacing.md,
+    top: staticTheme.spacing.md,
+    right: staticTheme.spacing.md,
     width: 32,
     height: 32,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.full,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
@@ -3526,9 +3342,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent[500],
+    paddingVertical: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.accent[500],
   },
   updateRow: {
     flexDirection: 'row',
@@ -3539,52 +3355,52 @@ const styles = StyleSheet.create({
   updateIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
   },
   updateTitle: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
     marginBottom: 4,
   },
   updateDesc: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 18,
   },
   tutorialBtnText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
     color: '#fff',
   },
   guideLinkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surface,
+    paddingVertical: staticTheme.spacing.md,
+    paddingHorizontal: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surface,
     marginTop: 10,
   },
   guideLinkBtnText: {
     flex: 1,
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   tutorialModalContent: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.xl,
+    padding: staticTheme.spacing.lg,
     position: 'relative',
-    ...theme.shadows.elevated,
+    ...staticTheme.shadows.elevated,
   },
   tutorialStepWrap: {
     alignItems: 'center',
@@ -3599,56 +3415,56 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
   },
   tutorialDotActive: {
-    backgroundColor: theme.colors.primary[400],
+    backgroundColor: staticTheme.colors.primary[400],
   },
   tutorialDotDone: {
-    backgroundColor: theme.colors.success[400],
+    backgroundColor: staticTheme.colors.success[400],
   },
   tutorialIconWrap: {
     width: 64,
     height: 64,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.lg,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tutorialStepTitle: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.heading,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
     textAlign: 'center',
   },
   tutorialStepDesc: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     textAlign: 'center',
     lineHeight: 20,
   },
   tutorialMockCard: {
     width: '100%',
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
     padding: 14,
     gap: 10,
   },
   tutorialMockLabel: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
   },
   tutorialMockProduct: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
   },
   tutorialMockPrice: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.success[400],
+    fontSize: staticTheme.typography.caption,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.success[400],
   },
   tutorialMockLinkRow: {
     flexDirection: 'row',
@@ -3657,18 +3473,18 @@ const styles = StyleSheet.create({
   tutorialMockInput: {
     flex: 1,
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    backgroundColor: theme.colors.dark.bg,
-    borderRadius: theme.radius.sm,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.text,
+    backgroundColor: staticTheme.colors.dark.bg,
+    borderRadius: staticTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   tutorialMockBtn: {
     width: 36,
     height: 36,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.success[500],
+    borderRadius: staticTheme.radius.sm,
+    backgroundColor: staticTheme.colors.success[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3679,28 +3495,28 @@ const styles = StyleSheet.create({
   },
   tutorialMockAiText: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.text,
   },
   tutorialDisclosureBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: theme.colors.success[500] + '10',
-    borderRadius: theme.radius.sm,
+    backgroundColor: staticTheme.colors.success[500] + '10',
+    borderRadius: staticTheme.radius.sm,
     padding: 10,
   },
   tutorialDisclosureText: {
     flex: 1,
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     lineHeight: 16,
   },
   tutorialCompleteHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.success[400],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.success[400],
     textAlign: 'center',
   },
   tutorialNextBtn: {
@@ -3710,12 +3526,12 @@ const styles = StyleSheet.create({
     gap: 6,
     width: '100%',
     paddingVertical: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500],
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500],
   },
   tutorialNextBtnText: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
     color: '#fff',
   },
   tutorialCompleteBtn: {
@@ -3724,12 +3540,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500],
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.success[500],
   },
   tutorialCompleteBtnText: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: staticTheme.typography.body,
+    fontFamily: staticTheme.typography.fontFamily.bold,
     color: '#fff',
   },
   langTriggerRow: {
@@ -3737,48 +3553,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 14,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.dark.surface,
-    ...theme.shadows.card,
+    paddingHorizontal: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.lg,
+    backgroundColor: staticTheme.colors.dark.surface,
+    ...staticTheme.shadows.card,
   },
   langTriggerBody: {
     flex: 1,
   },
   langTriggerLabel: {
     fontSize: 16,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   langTriggerSub: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   langModalContainer: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.md,
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: staticTheme.radius.xl,
+    padding: staticTheme.spacing.md,
     maxHeight: '80%',
     width: '90%',
     maxWidth: 420,
     alignSelf: 'center',
   },
   langModalScroll: {
-    marginTop: theme.spacing.sm,
+    marginTop: staticTheme.spacing.sm,
   },
   langModalItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 14,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
+    paddingHorizontal: staticTheme.spacing.md,
+    borderRadius: staticTheme.radius.md,
     marginBottom: 4,
   },
   langModalItemActive: {
-    backgroundColor: theme.colors.primary[500] + '15',
+    backgroundColor: staticTheme.colors.primary[500] + '15',
   },
   langModalFlag: {
     fontSize: 24,
@@ -3788,16 +3604,16 @@ const styles = StyleSheet.create({
   },
   langModalItemLabel: {
     fontSize: 15,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   langModalItemLabelActive: {
-    color: theme.colors.primary[400],
+    color: staticTheme.colors.primary[400],
   },
   langModalItemSub: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   platformMgmtRow: {
@@ -3808,24 +3624,24 @@ const styles = StyleSheet.create({
   },
   platformMgmtRowBorder: {
     borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
+    borderTopColor: staticTheme.colors.dark.border,
   },
   platformMgmtIcon: {
     width: 36,
     height: 36,
-    borderRadius: theme.radius.md,
+    borderRadius: staticTheme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   platformMgmtLabel: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   platformMgmtMeta: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 2,
   },
   platformMgmtDelete: {
@@ -3837,16 +3653,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '15',
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.primary[500] + '15',
     borderWidth: 1.5,
-    borderColor: theme.colors.primary[400] + '40',
+    borderColor: staticTheme.colors.primary[400] + '40',
     borderStyle: 'dashed',
   },
   addPlatformBtnText: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[300],
   },
   addPlatformActions: {
     flexDirection: 'row',
@@ -3860,13 +3676,13 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
   },
   addPlatformCancelText: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.textDim,
   },
   affPlatformRow: {
     flexDirection: 'row',
@@ -3876,33 +3692,33 @@ const styles = StyleSheet.create({
   },
   affPlatformRowBorder: {
     borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
+    borderTopColor: staticTheme.colors.dark.border,
   },
   affPlatformLabel: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   affCustomBadge: {
-    backgroundColor: theme.colors.primary[500] + '20',
+    backgroundColor: staticTheme.colors.primary[500] + '20',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   affCustomBadgeText: {
     fontSize: 9,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[300],
   },
   affIdText: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
   },
   affParamText: {
     fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     marginTop: 2,
   },
   affEditRow: {
@@ -3912,39 +3728,39 @@ const styles = StyleSheet.create({
   },
   affEditInput: {
     flex: 1,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.sm,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.text,
     borderWidth: 1,
-    borderColor: theme.colors.dark.border,
+    borderColor: staticTheme.colors.dark.border,
   },
   affEditSaveBtn: {
     width: 32,
     height: 32,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.success[500],
+    borderRadius: staticTheme.radius.sm,
+    backgroundColor: staticTheme.colors.success[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
   affParamHint: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textFaint,
     marginTop: 4,
   },
   accordionLabel: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   accordionDesc: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 4,
     lineHeight: 17,
   },
@@ -3960,23 +3776,23 @@ const styles = StyleSheet.create({
   toneChip: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: staticTheme.radius.md,
+    backgroundColor: staticTheme.colors.dark.surfaceLight,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   toneChipActive: {
-    backgroundColor: theme.colors.primary[600] + '15',
-    borderColor: theme.colors.primary[500],
+    backgroundColor: staticTheme.colors.primary[600] + '15',
+    borderColor: staticTheme.colors.primary[500],
   },
   toneChipText: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textDim,
   },
   toneChipTextActive: {
-    color: theme.colors.primary[400],
-    fontFamily: theme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.primary[400],
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
   },
   watermarkStatusRow: {
     flexDirection: 'row',
@@ -3986,21 +3802,21 @@ const styles = StyleSheet.create({
   },
   watermarkStatusActive: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.success[400],
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.success[400],
   },
   watermarkStatusInactive: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textFaint,
+    fontFamily: staticTheme.typography.fontFamily.medium,
+    color: staticTheme.colors.dark.textFaint,
   },
   toggleBody: {
     flex: 1,
   },
   toggleLabel: {
     fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: staticTheme.typography.fontFamily.semiBold,
+    color: staticTheme.colors.dark.text,
   },
   toggleLabelRow: {
     flexDirection: 'row',
@@ -4009,14 +3825,14 @@ const styles = StyleSheet.create({
   },
   toggleDesc: {
     fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
     marginTop: 3,
     lineHeight: 15,
   },
   toggleDivider: {
     height: 1,
-    backgroundColor: theme.colors.dark.border,
+    backgroundColor: staticTheme.colors.dark.border,
     marginVertical: 8,
   },
 });
