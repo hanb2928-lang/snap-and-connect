@@ -39,6 +39,8 @@ import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommen
 import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory, getOpenAiVoiceParams } from '@/lib/ttsVoices';
 import { generateEmotionCurve, splitTextForEmotionCurve } from '@/lib/ttsEmotionCurve';
 import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
+import { recordProsodyOutcome, type ProsodyGenerationMeta } from '@/lib/prosodyLearning';
+import { AidcaProgressTracker } from '@/components/AidcaProgressTracker';
 import { BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
@@ -275,14 +277,12 @@ export default function AffiliateScreen() {
   const [videoEditPlan, setVideoEditPlan] = useState<EditPlan | null>(null);
   const renderProgress = useSharedValue(0);
   const masterGainRef = useRef<GainNode | null>(null);
+  const prosodyMetaRef = useRef<ProsodyGenerationMeta | null>(null);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${videoPreviewProgress.value * 100}%`,
   }));
 
-  const animatedRenderStyle = useAnimatedStyle(() => ({
-    width: `${renderProgress.value * 100}%`,
-  }));
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [productMeta, setProductMeta] = useState<{
@@ -864,6 +864,15 @@ export default function AffiliateScreen() {
         a.click();
         setVideoSaved(true);
         setTimeout(() => setVideoSaved(false), 3000);
+        if (prosodyMetaRef.current) {
+          recordProsodyOutcome({
+            generationMeta: prosodyMetaRef.current,
+            completed: true,
+            retried: false,
+            shared: true,
+            durationSec: 0,
+          }).catch(() => {});
+        }
         // Auto-copy short URL + disclosure caption to clipboard
         if (affiliateUrl.trim()) {
           const built = buildPlatformCaption(
@@ -898,6 +907,15 @@ export default function AffiliateScreen() {
       await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
       setVideoSaved(true);
       setTimeout(() => setVideoSaved(false), 3000);
+      if (prosodyMetaRef.current) {
+        recordProsodyOutcome({
+          generationMeta: prosodyMetaRef.current,
+          completed: true,
+          retried: false,
+          shared: true,
+          durationSec: 0,
+        }).catch(() => {});
+      }
       // Auto-copy short URL + disclosure caption to clipboard
       if (affiliateUrl.trim()) {
         const built = buildPlatformCaption(
@@ -1276,6 +1294,15 @@ export default function AffiliateScreen() {
             voiceParams.instructions,
             prosodyProfile,
           );
+          const prosodyMeta: ProsodyGenerationMeta = {
+            voiceKey,
+            prosodyProfileId: prosodyProfile.id,
+            phase: 'full',
+            speed: segments[0]?.speed ?? 1.0,
+            timestamp: Date.now(),
+            textLength: narrationText.length,
+          };
+          prosodyMetaRef.current = prosodyMeta;
           const batchItems = segments.map((seg) => ({
             languageCode: 'ko',
             text: seg.text,
@@ -2004,8 +2031,36 @@ export default function AffiliateScreen() {
       setRenderedVideoUrl(url);
       setRenderedVideoMime(mimeType);
       setVideoRenderComplete(true);
+      recordProsodyOutcome({
+        generationMeta: prosodyMetaRef.current ?? {
+          voiceKey: 'bright_female_1',
+          prosodyProfileId: 'energetic_reviewer',
+          phase: 'full',
+          speed: 1.0,
+          timestamp: Date.now(),
+          textLength: 0,
+        },
+        completed: true,
+        retried: false,
+        shared: false,
+        durationSec: DURATION,
+      }).catch(() => {});
     } catch (err) {
       setRenderError(err instanceof Error ? err.message : '영상 생성에 실패했습니다.');
+      recordProsodyOutcome({
+        generationMeta: prosodyMetaRef.current ?? {
+          voiceKey: 'bright_female_1',
+          prosodyProfileId: 'energetic_reviewer',
+          phase: 'full',
+          speed: 1.0,
+          timestamp: Date.now(),
+          textLength: 0,
+        },
+        completed: false,
+        retried: true,
+        shared: false,
+        durationSec: 0,
+      }).catch(() => {});
     } finally {
       setVideoRendering(false);
       renderProgress.value = 1;
@@ -2464,13 +2519,9 @@ export default function AffiliateScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Render progress */}
+          {/* AIDCA timeline-synchronized render progress */}
           {videoRendering && (
-            <View style={styles.renderProgressBarWrap}>
-              <Animated.View
-                style={[styles.renderProgressBarFill, animatedRenderStyle]}
-              />
-            </View>
+            <AidcaProgressTracker progressSV={renderProgress} totalDurationSec={selectedPacing === '30s' ? 30 : 15} />
           )}
 
           {/* Storyboard preview while rendering */}
@@ -4225,18 +4276,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
-  },
-  renderProgressBarWrap: {
-    height: 4,
-    backgroundColor: theme.colors.dark.border,
-    borderRadius: 2,
-    marginTop: 8,
-    overflow: 'hidden',
-  },
-  renderProgressBarFill: {
-    height: '100%',
-    backgroundColor: theme.colors.success[400],
-    borderRadius: 2,
   },
   renderCompleteBox: {
     backgroundColor: theme.colors.success[500] + '15',
