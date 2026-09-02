@@ -47,6 +47,7 @@ export function MotionZoomVideo({
 }: MotionZoomVideoProps) {
   const [selectedMotion, setSelectedMotion] = useState<MotionPreset>('zoom-in');
   const [generating, setGenerating] = useState(false);
+  const generatingRef = useRef(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMime, setVideoMime] = useState<string>('video/webm');
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,8 @@ export function MotionZoomVideo({
   }, []);
 
   const generateVideo = useCallback(async () => {
-    if (generating || Platform.OS !== 'web') return;
+    if (generatingRef.current || generating || Platform.OS !== 'web') return;
+    generatingRef.current = true;
     if (!dataUrl) {
       setError('이미지를 준비하는 중입니다. 잠시 후 다시 시도해주세요.');
       return;
@@ -142,6 +144,7 @@ export function MotionZoomVideo({
     try {
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
+        el.crossOrigin = 'anonymous';
         el.onload = () => resolve(el);
         el.onerror = () => reject(new Error('이미지를 불러올 수 없습니다. 네트워크 문제일 수 있어요.'));
         el.src = dataUrl;
@@ -190,8 +193,10 @@ export function MotionZoomVideo({
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      const done = new Promise<void>((resolve) => {
-        recorder.onstop = () => resolve();
+      const done = new Promise<void>((resolve, reject) => {
+        const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 60000);
+        recorder.onstop = () => { clearTimeout(stopTimeout); resolve(); };
+        recorder.onerror = () => { clearTimeout(stopTimeout); reject(new Error('영상 인코딩 중 오류')); };
       });
 
       recorder.start();
@@ -278,6 +283,7 @@ export function MotionZoomVideo({
     } catch (err) {
       setError(err instanceof Error ? err.message : '영상 생성 실패');
     } finally {
+      generatingRef.current = false;
       setGenerating(false);
       setProgress(0);
     }

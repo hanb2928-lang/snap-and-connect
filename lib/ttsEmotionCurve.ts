@@ -153,9 +153,20 @@ export function splitTextForEmotionCurve(
   const sentences = fullText.split(/(?<=[.!?。！？])\s+/).filter((s) => s.trim());
   const totalChars = sentences.reduce((sum, s) => sum + s.length, 0) || 1;
 
-  return curve.segments.map((segment) => {
-    const startRatio = segment.startSec / curve.totalDurationSec;
-    const endRatio = segment.endSec / curve.totalDurationSec;
+  // Adjust phase boundaries based on speed: faster phases consume text quicker,
+  // so they need fewer characters per unit time.
+  const speedAdjustedRatios = curve.segments.map((seg) => {
+    const duration = seg.endSec - seg.startSec;
+    const adjustedDuration = duration / seg.speed;
+    return adjustedDuration;
+  });
+  const totalAdjusted = speedAdjustedRatios.reduce((sum, r) => sum + r, 0) || 1;
+
+  return curve.segments.map((segment, idx) => {
+    const adjustedRatio = speedAdjustedRatios[idx] / totalAdjusted;
+    const startRatio = idx === 0 ? 0 :
+      speedAdjustedRatios.slice(0, idx).reduce((s, r) => s + r, 0) / totalAdjusted;
+    const endRatio = startRatio + adjustedRatio;
     const startChar = Math.floor(startRatio * totalChars);
     const endChar = Math.floor(endRatio * totalChars);
 

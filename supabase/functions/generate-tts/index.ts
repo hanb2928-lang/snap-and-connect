@@ -57,9 +57,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ─── Content Cache: check for cached TTS by text hash ──────────────
+    // ─── Content Cache: check for cached TTS by text+voice+speed hash ─────
     // TTS for the same text+voice+speed produces identical audio — no need
-    // to call OpenAI again. 30-day TTL.
+    // to call OpenAI again. 30-day TTL. Speed jitter is excluded from the
+    // cache key so the same baseSpeed reuses cached audio.
     const ttsCacheKey = `generate-tts:${contentHashTts(`${text}|${voice}|${baseSpeed}`)}`;
     const cachedTts = await checkTtsCache(ttsCacheKey);
     if (cachedTts) {
@@ -67,7 +68,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           audioBase64: cachedTts,
           mimeType: "audio/mpeg",
-          duration: estimateDuration(text, speed),
+          duration: estimateDuration(text, baseSpeed),
           cached: true,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -120,7 +121,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         audioBase64: base64Audio,
         mimeType: "audio/mpeg",
-        duration: estimateDuration(text, speed),
+        duration: estimateDuration(text, baseSpeed),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

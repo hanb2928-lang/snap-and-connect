@@ -38,7 +38,9 @@ export function VideoRenderCard({
   productName,
 }: VideoRenderCardProps) {
   const [rendering, setRendering] = useState(false);
+  const renderingRef = useRef(false);
   const [progress, setProgress] = useState(0);
+  const lastProgressUpdateRef = useRef(0);
   const [result, setResult] = useState<RenderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -56,6 +58,8 @@ export function VideoRenderCard({
 
   const handleRender = useCallback(async () => {
     if (!clip || !plan) return;
+    if (renderingRef.current) return;
+    renderingRef.current = true;
     setRendering(true);
     setError(null);
     setResult(null);
@@ -67,13 +71,20 @@ export function VideoRenderCard({
         ctaText,
         disclosureText,
         productName,
-        onProgress: (p) => setProgress(p * 100),
+        onProgress: (p) => {
+        const now = performance.now();
+        if (now - lastProgressUpdateRef.current > 200) {
+          lastProgressUpdateRef.current = now;
+          setProgress(p * 100);
+        }
+      },
       });
       setResult(res);
       setProgress(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : '영상 렌더링에 실패했습니다.');
     } finally {
+      renderingRef.current = false;
       setRendering(false);
     }
   }, [clip, plan, ctaText, disclosureText, productName]);

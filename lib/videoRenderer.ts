@@ -188,9 +188,9 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   video.loop = true;
 
   await new Promise<void>((resolve, reject) => {
-    video.onloadeddata = () => resolve();
-    video.onerror = () => reject(new Error('원본 영상을 불러올 수 없습니다.'));
-    setTimeout(() => reject(new Error('영상 로딩 시간 초과')), 15000);
+    const loadTimeout = setTimeout(() => reject(new Error('영상 로딩 시간 초과')), 15000);
+    video.onloadeddata = () => { clearTimeout(loadTimeout); resolve(); };
+    video.onerror = () => { clearTimeout(loadTimeout); reject(new Error('원본 영상을 불러올 수 없습니다.')); };
   });
 
   // Setup MediaRecorder
@@ -211,15 +211,23 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const donePromise = new Promise<Blob>((resolve) => {
+  const donePromise = new Promise<Blob>((resolve, reject) => {
+    const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 60000);
     recorder.onstop = () => {
+      clearTimeout(stopTimeout);
       resolve(new Blob(chunks, { type: mimeType }));
+    };
+    recorder.onerror = () => {
+      clearTimeout(stopTimeout);
+      reject(new Error('영상 인코딩 중 오류가 발생했습니다.'));
     };
   });
 
   // Start playback + recording
   video.currentTime = 0;
-  await video.play().catch(() => {});
+  await video.play().catch((playErr) => {
+    throw new Error(`영상 재생을 시작할 수 없습니다: ${playErr instanceof Error ? playErr.message : '알 수 없는 오류'}`);
+  });
   recorder.start(100);
 
   const startTime = performance.now();
@@ -232,9 +240,14 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
       const elapsedSec = elapsed / 1000;
 
       if (elapsed >= totalMs) {
-        recorder.stop();
+        if (recorder.state === 'recording') recorder.stop();
         video.pause();
         resolve();
+        return;
+      }
+
+      if (video.paused || video.readyState < 2) {
+        requestAnimationFrame(renderFrame);
         return;
       }
 
