@@ -354,7 +354,7 @@ type ComicBuildParams = {
   title: string;
   hashtags: string[];
   accentColor: string;
-  shortUrl: string;
+  shortUrl: string | null;
   moodTemplate: MoodTemplate;
   panelLayout: PanelLayout;
   disclosureText: string;
@@ -375,9 +375,10 @@ type ComicBuildParams = {
 };
 
 function toJavaScriptLiteral(value: unknown): string {
+  if (value === undefined) return 'null';
   return JSON.stringify(value)
-    .replace(/\u2028/g, '\\\\u2028')
-    .replace(/\u2029/g, '\\\\u2029');
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 function buildComicScriptBody(params: ComicBuildParams): string {
@@ -1452,8 +1453,16 @@ export function ComicShortGenerator({
           showToast('이미지 로드 시간이 초과됐어요. 다시 시도해주세요');
         } else if (errMsg.includes('image load')) {
           showToast('이미지를 불러올 수 없어요. 다시 시도해주세요');
+        } else if (errMsg.includes('image blob read') || errMsg.includes('CORS')) {
+          showToast('이미지 보안 정책(CORS) 문제로 불러오지 못했어요');
+        } else if (errMsg.includes('frame render')) {
+          showToast('영상 렌더링 중 오류가 발생했어요. 다시 시도해주세요');
+        } else if (errMsg.includes('recorder') || errMsg.includes('recording')) {
+          showToast('영상 녹화 중 오류가 발생했어요. 다시 시도해주세요');
+        } else if (errMsg.includes('blob read') || errMsg.includes('canvas toDataURL')) {
+          showToast('영상 변환 중 오류가 발생했어요. 다시 시도해주세요');
         } else {
-          showToast('만화 숏폼 생성에 실패했어요. 다시 시도해주세요');
+          showToast(errMsg ? '만화 숏폼 오류: ' + errMsg.slice(0, 60) : '만화 숏폼 생성에 실패했어요. 다시 시도해주세요');
         }
       }
     } catch {
@@ -1489,26 +1498,14 @@ export function ComicShortGenerator({
       handleWebViewMessage({ nativeEvent: { data: rawMsg } } as WebViewMessageEvent);
     };
 
-    let scriptError: Error | null = null;
-    try {
-      const fn = new Function(scriptBody);
-      fn();
-    } catch (e) {
-      scriptError = e as Error;
-    }
-
-    if (scriptError) {
-      handleWebViewMessage({
-        nativeEvent: { data: JSON.stringify({ type: 'error', genId: genIdRef.current, data: { msg: '스크립트 문법 오류: ' + (scriptError.message || 'unknown') } }) },
-      } as WebViewMessageEvent);
-      (window as any).__comicPostMsg = prevCallback;
-      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-      return;
-    }
+    const scriptEl = document.createElement('script');
+    scriptEl.textContent = scriptBody;
+    document.body.appendChild(scriptEl);
 
     webGenCleanupRef.current = () => {
       (window as any).__comicPostMsg = prevCallback;
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
     };
   }, [handleWebViewMessage]);
 
@@ -1707,32 +1704,39 @@ export function ComicShortGenerator({
     setScenarioPanels(panels);
 
     if (Platform.OS === 'web') {
-      const scriptBody = buildComicScriptBody({
-        imageUrl: finalImageUrl,
-        hook,
-        title,
-        hashtags,
-        accentColor,
-        shortUrl,
-        moodTemplate: finalMood,
-        panelLayout: finalPanelLayout,
-        disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
-        stickerPosition,
-        stickerStyle,
-        stickerSize,
-        panels,
-        duration: finalDuration,
-        episodeMode,
-        narrationAudioDataUrl: finalNarrationAudioDataUrl,
-        punchMarkers: punchAudioDataUrl ? punchMarkers : [],
-        punchAudioDataUrl,
-        mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
-        emotionOverlay,
-        localStoreInfo,
-        genId: currentGenId,
-        babyImgUrl: babyImgDataUrl,
-      });
-      runWebComicGeneration(scriptBody);
+      try {
+        const scriptBody = buildComicScriptBody({
+          imageUrl: finalImageUrl,
+          hook,
+          title,
+          hashtags,
+          accentColor,
+          shortUrl: shortUrl || null,
+          moodTemplate: finalMood,
+          panelLayout: finalPanelLayout,
+          disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
+          stickerPosition,
+          stickerStyle,
+          stickerSize,
+          panels,
+          duration: finalDuration,
+          episodeMode,
+          narrationAudioDataUrl: finalNarrationAudioDataUrl,
+          punchMarkers: punchAudioDataUrl ? punchMarkers : [],
+          punchAudioDataUrl: punchAudioDataUrl || null,
+          mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
+          emotionOverlay,
+          localStoreInfo,
+          genId: currentGenId,
+          babyImgUrl: babyImgDataUrl,
+        });
+        runWebComicGeneration(scriptBody);
+      } catch (e) {
+        generatingLockRef.current = false;
+        if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+        setState('error');
+        showToast('만화 스크립트 생성 오류: ' + ((e as Error)?.message || 'unknown').slice(0, 80));
+      }
     } else {
       setWebviewKey((k) => k + 1);
     }
@@ -2025,7 +2029,7 @@ export function ComicShortGenerator({
     title,
     hashtags,
     accentColor,
-    shortUrl,
+    shortUrl: shortUrl || null,
     moodTemplate,
     panelLayout,
     disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
@@ -2041,7 +2045,7 @@ export function ComicShortGenerator({
     episodeMode,
     narrationAudioDataUrl,
     punchMarkers: punchAudioDataUrl ? punchMarkers : [],
-    punchAudioDataUrl,
+    punchAudioDataUrl: punchAudioDataUrl || null,
     mbtiCommentary: mbtiMode ? mbtiCommentary : [],
     emotionOverlay,
     localStoreInfo,
