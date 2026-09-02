@@ -1899,6 +1899,7 @@ const styles = StyleSheet.create({
   shutterRow: {
     alignItems: 'center',
     paddingVertical: theme.spacing.sm,
+    marginTop: 30,
   },
   galleryThumb: {
     width: 52,
