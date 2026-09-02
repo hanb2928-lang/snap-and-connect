@@ -792,7 +792,6 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     if(narrationAudioDataUrl){
       try{
         narrationAudio=new Audio(narrationAudioDataUrl);
-        narrationAudio.play().catch(function(){});
       }catch(e){}
     }
     if(punchAudioDataUrl){
@@ -1609,7 +1608,7 @@ export function ComicShortGenerator({
     if (ttsEnabled && narrationText) {
       setTtsLoading(true);
       try {
-        let resolvedVoiceKey = ttsVoice;
+        let resolvedVoiceKey = selectedVoiceKey || ttsVoice;
         let resolvedSpeed: number | null = ttsSpeed;
         let resolvedPitch: number | null = ttsPitch;
         if (!resolvedVoiceKey) {
