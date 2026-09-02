@@ -1057,36 +1057,6 @@ export default function CameraScreen() {
           </View>
         </View>
 
-        {/* Top row: Gallery (left) | Grid (right, template only) */}
-        <View style={styles.bottomControlsRow}>
-          <TouchableOpacity
-            style={styles.galleryThumb}
-            onPress={handlePickImage}
-            disabled={processing || isRecording}
-            activeOpacity={0.8}
-          >
-            <ImageIcon size={22} color={isRecording ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
-          </TouchableOpacity>
-
-          {cameraRole !== 'video' ? (
-            <TouchableOpacity
-              style={styles.gridToggleBtn}
-              onPress={() => setGridVisible((g) => !g)}
-              activeOpacity={0.7}
-            >
-              {gridVisible ? (
-                <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-              ) : (
-                <Grid3x3 size={24} color="#fff" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.gridToggleBtn} pointerEvents="none">
-              <Video size={24} color={theme.colors.error[400]} strokeWidth={2} />
-            </View>
-          )}
-        </View>
-
         {/* Recording timer indicator */}
         {isRecording && (
           <View style={styles.recordingIndicatorMobile}>
@@ -1098,8 +1068,17 @@ export default function CameraScreen() {
           </View>
         )}
 
-        {/* Shutter button (centered, one step below) */}
+        {/* Shutter row: Gallery (left) | Shutter (center) | Grid (right) */}
         <View style={styles.shutterRow}>
+          <TouchableOpacity
+            style={styles.galleryThumb}
+            onPress={handlePickImage}
+            disabled={processing || isRecording}
+            activeOpacity={0.8}
+          >
+            <ImageIcon size={22} color={isRecording ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.shutterBtn,
@@ -1128,6 +1107,24 @@ export default function CameraScreen() {
               <Camera size={30} color="#fff" strokeWidth={2.5} />
             )}
           </TouchableOpacity>
+
+          {cameraRole !== 'video' ? (
+            <TouchableOpacity
+              style={styles.gridToggleBtn}
+              onPress={() => setGridVisible((g) => !g)}
+              activeOpacity={0.7}
+            >
+              {gridVisible ? (
+                <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+              ) : (
+                <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.gridToggleBtn} pointerEvents="none">
+              <Video size={24} color={theme.colors.error[400]} strokeWidth={2} />
+            </View>
+          )}
         </View>
 
         {/* Generate hint text */}
@@ -1830,7 +1827,7 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     backgroundColor: 'rgba(5, 8, 18, 0.85)',
-    paddingTop: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
     paddingHorizontal: theme.spacing.xl,
   },
   errorBanner: {
@@ -1848,7 +1845,6 @@ const styles = StyleSheet.create({
   },
   modeSegmentWrap: {
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
   },
   modeSegment: {
     flexDirection: 'row',
@@ -1890,15 +1886,11 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
-  bottomControlsRow: {
+  shutterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing.sm,
-  },
-  shutterRow: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
   },
   galleryThumb: {
     width: 52,
