@@ -38,6 +38,7 @@ import { addSnippet } from '@/lib/marketingSnippets';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
 import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory, getOpenAiVoiceParams } from '@/lib/ttsVoices';
 import { generateEmotionCurve, splitTextForEmotionCurve } from '@/lib/ttsEmotionCurve';
+import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
@@ -1266,12 +1267,14 @@ export default function AffiliateScreen() {
         if (narrationText.trim()) {
           const voiceKey = selectedVoiceKey ?? settings?.default_tts_voice ?? 'bright_female_1';
           const voiceParams = getOpenAiVoiceParams(voiceKey, settings?.tts_speed ?? null);
-          const emotionCurve = generateEmotionCurve(DURATION);
+          const prosodyProfile = mapVoiceKeyToProsody(voiceKey);
+          const emotionCurve = generateEmotionCurve(DURATION, prosodyProfile);
           const segments = splitTextForEmotionCurve(
             narrationText,
             emotionCurve,
             voiceParams.voice,
             voiceParams.instructions,
+            prosodyProfile,
           );
           const batchItems = segments.map((seg) => ({
             languageCode: 'ko',
@@ -1287,7 +1290,7 @@ export default function AffiliateScreen() {
               Authorization: `Bearer ${supabaseAnonKey}`,
               apikey: supabaseAnonKey,
             },
-            body: JSON.stringify({ items: batchItems }),
+            body: JSON.stringify({ items: batchItems, ttsApiKey: settings?.tts_api_key ?? undefined }),
           });
           if (ttsResp.ok) {
             const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };

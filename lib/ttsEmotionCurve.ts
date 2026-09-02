@@ -1,4 +1,6 @@
-export type EmotionPhase = 'doubt' | 'surprise' | 'conviction';
+import { type ProsodyProfile, getProsodyAdjustedSpeed, buildProsodyInstructions, insertBreathMarkers, insertMicroPauses } from '@/lib/prosodyProfile';
+
+export type EmotionPhase = 'attention' | 'interest' | 'desire' | 'conviction' | 'action';
 
 export interface EmotionSegment {
   phase: EmotionPhase;
@@ -9,66 +11,111 @@ export interface EmotionSegment {
   pauseSec: number;
   styleExaggeration: number;
   description: string;
+  instructions: string;
 }
 
 export interface EmotionCurve {
   segments: EmotionSegment[];
   totalDurationSec: number;
   voiceCloningReady: boolean;
+  prosodyProfileId: string;
 }
 
-export const EMOTION_PHASES: Record<EmotionPhase, Omit<EmotionSegment, 'startSec' | 'endSec'>> = {
-  doubt: {
-    phase: 'doubt',
-    speed: 1.1,
-    pitch: 1.05,
+export const EMOTION_PHASES: Record<EmotionPhase, Omit<EmotionSegment, 'startSec' | 'endSec' | 'instructions'>> = {
+  attention: {
+    phase: 'attention',
+    speed: 1.15,
+    pitch: 1.08,
     pauseSec: 0,
-    styleExaggeration: 0,
-    description: '의구심 — 호기심 자극을 위한 약간 빠른 속도와 상승 톤',
+    styleExaggeration: 0.1,
+    description: '어텐션 — 후킹 멘트, 호기심 자극을 위한 빠르고 높은 톤',
   },
-  surprise: {
-    phase: 'surprise',
-    speed: 0.95,
-    pitch: 0.92,
-    pauseSec: 0.3,
+  interest: {
+    phase: 'interest',
+    speed: 1.0,
+    pitch: 1.02,
+    pauseSec: 0.15,
     styleExaggeration: 0.05,
-    description: '놀람 — 0.3초 쉼표 후 낮아지는 톤으로 진지함과 공감 유발',
+    description: '관심 — 문제 제기, 약간 느려지며 공감 형성',
+  },
+  desire: {
+    phase: 'desire',
+    speed: 0.95,
+    pitch: 0.98,
+    pauseSec: 0.25,
+    styleExaggeration: 0.1,
+    description: '욕구 — 제품 이점 어필, 진지하고 따뜻한 톤으로 신뢰 구축',
   },
   conviction: {
     phase: 'conviction',
     speed: 1.05,
     pitch: 1.0,
-    pauseSec: 0,
+    pauseSec: 0.1,
     styleExaggeration: 0.15,
-    description: '확신 — 스타일 강조 +15% 또렷한 톤으로 구매 욕구 자극',
+    description: '확신 — 사회적 증거, 또렷하고 설득력 있는 톤',
+  },
+  action: {
+    phase: 'action',
+    speed: 1.1,
+    pitch: 1.03,
+    pauseSec: 0,
+    styleExaggeration: 0.2,
+    description: '액션 — CTA, 강하고 명확한 마무리로 구매 유도',
   },
 };
 
-export function generateEmotionCurve(totalDurationSec: number): EmotionCurve {
-  const openingEnd = Math.min(3, totalDurationSec * 0.25);
-  const problemEnd = Math.min(7, totalDurationSec * 0.6);
-  const finalEnd = totalDurationSec;
+const PHASE_GUIDES: Record<EmotionPhase, string> = {
+  attention: 'Start with a punchy, attention-grabbing hook. Speak slightly faster with a rising, curious pitch. Make the listener stop scrolling.',
+  interest: 'Slow down slightly to explain the problem. Add a brief pause before key insights. Sound genuinely interested and empathetic.',
+  desire: 'Shift to a warm, intimate tone to convey the product\'s benefits. Let your voice convey desire and aspiration. Pause meaningfully before revealing the key benefit.',
+  conviction: 'Speak with clear, confident conviction. Cite evidence or social proof naturally. Increase style exaggeration to sound persuasive without being pushy.',
+  action: 'End with a strong, clear call-to-action. Speak with urgency and conviction. Make the listener feel compelled to act now.',
+};
+
+const PHASE_RATIOS: Record<EmotionPhase, number> = {
+  attention: 0.15,
+  interest: 0.25,
+  desire: 0.3,
+  conviction: 0.2,
+  action: 0.1,
+};
+
+export function generateEmotionCurve(
+  totalDurationSec: number,
+  prosodyProfile?: ProsodyProfile,
+): EmotionCurve {
+  const phases: EmotionPhase[] = ['attention', 'interest', 'desire', 'conviction', 'action'];
+  let acc = 0;
+  const segments: EmotionSegment[] = phases.map((phase) => {
+    const ratio = PHASE_RATIOS[phase];
+    const start = acc;
+    const end = Math.min(acc + totalDurationSec * ratio, totalDurationSec);
+    acc = end;
+    const base = EMOTION_PHASES[phase];
+    const speed = prosodyProfile
+      ? getProsodyAdjustedSpeed(prosodyProfile, base.speed)
+      : base.speed;
+    const instructions = prosodyProfile
+      ? buildProsodyInstructions(prosodyProfile, {
+          increaseEnergy: phase === 'attention' || phase === 'action',
+          increaseWarmth: phase === 'desire',
+          increaseClarity: phase === 'conviction',
+        })
+      : PHASE_GUIDES[phase];
+    return {
+      ...base,
+      speed,
+      instructions: `${PHASE_GUIDES[phase]}\n${instructions}`,
+      startSec: start,
+      endSec: end,
+    };
+  });
 
   return {
-    segments: [
-      {
-        ...EMOTION_PHASES.doubt,
-        startSec: 0,
-        endSec: openingEnd,
-      },
-      {
-        ...EMOTION_PHASES.surprise,
-        startSec: openingEnd,
-        endSec: problemEnd,
-      },
-      {
-        ...EMOTION_PHASES.conviction,
-        startSec: problemEnd,
-        endSec: finalEnd,
-      },
-    ],
+    segments,
     totalDurationSec,
-    voiceCloningReady: false,
+    voiceCloningReady: !!prosodyProfile,
+    prosodyProfileId: prosodyProfile?.id ?? 'default',
   };
 }
 
@@ -80,14 +127,7 @@ export function buildTtsInstructionsForPhase(
   phase: EmotionPhase,
   baseInstructions?: string,
 ): string {
-  const phaseConfig = EMOTION_PHASES[phase];
-  const phaseGuide: Record<EmotionPhase, string> = {
-    doubt: 'Start with a questioning, curious tone. Speak slightly faster with a rising pitch as if wondering about something. Engage the listener\'s curiosity.',
-    surprise: 'Shift to a more serious, empathetic tone. Add a brief pause (0.3s) before key points. Lower your pitch slightly to convey sincerity and genuine surprise.',
-    conviction: 'End with confident, clear conviction. Increase style exaggeration by about 15%. Speak clearly and persuasively to drive action.',
-  };
-
-  const parts = [phaseGuide[phase]];
+  const parts = [PHASE_GUIDES[phase]];
   if (baseInstructions) {
     parts.push(baseInstructions);
   }
@@ -108,10 +148,10 @@ export function splitTextForEmotionCurve(
   curve: EmotionCurve,
   voice: string,
   baseInstructions?: string,
+  prosodyProfile?: ProsodyProfile,
 ): TtsSegmentRequest[] {
   const sentences = fullText.split(/(?<=[.!?。！？])\s+/).filter((s) => s.trim());
   const totalChars = sentences.reduce((sum, s) => sum + s.length, 0) || 1;
-  let charAccum = 0;
 
   return curve.segments.map((segment) => {
     const startRatio = segment.startSec / curve.totalDurationSec;
@@ -128,13 +168,22 @@ export function splitTextForEmotionCurve(
       charCount += sentence.length;
     }
 
-    charAccum += segmentSentences.join(' ').length;
+    let segmentText = segmentSentences.join(' ') || fullText.slice(startChar, endChar);
+
+    if (prosodyProfile) {
+      segmentText = insertMicroPauses(segmentText, prosodyProfile.vector.microPauseFrequency, prosodyProfile.vector.microPauseDurationSec);
+      segmentText = insertBreathMarkers(segmentText, prosodyProfile.vector.breathMarkerFrequency);
+    }
+
+    const instructions = baseInstructions
+      ? `${segment.instructions}\n${baseInstructions}`
+      : segment.instructions;
 
     return {
-      text: segmentSentences.join(' ') || fullText.slice(startChar, endChar),
+      text: segmentText,
       voice,
       speed: segment.speed,
-      instructions: buildTtsInstructionsForPhase(segment.phase, baseInstructions),
+      instructions,
       startSec: segment.startSec,
       endSec: segment.endSec,
     };
@@ -147,18 +196,22 @@ export function enableVoiceCloning(curve: EmotionCurve): EmotionCurve {
 
 export function getPhaseLabel(phase: EmotionPhase): string {
   const labels: Record<EmotionPhase, string> = {
-    doubt: '의구심',
-    surprise: '놀람',
+    attention: '어텐션',
+    interest: '관심',
+    desire: '욕구',
     conviction: '확신',
+    action: '액션',
   };
   return labels[phase];
 }
 
 export function getPhaseEmoji(phase: EmotionPhase): string {
   const emojis: Record<EmotionPhase, string> = {
-    doubt: '🤔',
-    surprise: '😱',
+    attention: '👀',
+    interest: '🤔',
+    desire: '✨',
     conviction: '💪',
+    action: '🔥',
   };
   return emojis[phase];
 }
