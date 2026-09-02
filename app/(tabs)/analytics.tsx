@@ -52,6 +52,8 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { QuestCard } from '@/components/QuestCard';
 import { TierBadge } from '@/components/TierBadge';
 import { LeaderboardCard } from '@/components/LeaderboardCard';
+import { VariabilityEngineCard } from '@/components/VariabilityEngineCard';
+import { PerformanceReportCard } from '@/components/PerformanceReportCard';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useI18n } from '@/hooks/useI18n';
@@ -708,6 +710,16 @@ export default function AnalyticsScreen() {
           )}
         </>
       )}
+
+      {/* Performance Report — views, clicks, conversion tracking */}
+      <View style={styles.section}>
+        <PerformanceReportCard />
+      </View>
+
+      {/* Variability Engine — anti-shadowban randomization */}
+      <View style={styles.section}>
+        <VariabilityEngineCard />
+      </View>
 
       {/* Tier Badge */}
       <View style={styles.section}>
