@@ -704,7 +704,7 @@ export default function MarketingScreen() {
       </ScrollView>
 
       {/* Sticky Generate Button */}
-      <View style={[styles.stickyGenerate, { bottom: tabBarHeight + theme.spacing.sm }]}>
+      <View style={[styles.stickyGenerate, { bottom: tabBarHeight + theme.spacing.xl }]}>
         <TouchableOpacity
           style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
           onPress={handleStartGeneration}
