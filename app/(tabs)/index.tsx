@@ -581,6 +581,11 @@ export default function CameraScreen() {
     setMoodFilter('none');
     setError(null);
     setMultiAngleShots([]);
+    if (mode === 'video') {
+      setCameraRole('video');
+    } else if (cameraRole === 'video') {
+      setCameraRole('template');
+    }
     if (mode === 'multi') {
       setMultiAngleVisible(true);
     }
@@ -919,22 +924,6 @@ export default function CameraScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.topBarBtn, cameraRole === 'video' && styles.topBarBtnActive]}
-            onPress={() => {
-              const next = cameraRole === 'video' ? 'template' : 'video';
-              setCameraRole(next);
-              setCaptureMode(next === 'video' ? 'video' : 'oneclick');
-              setItem('marketing_production_mode', next);
-            }}
-            activeOpacity={0.7}
-          >
-            {cameraRole === 'video' ? (
-              <Video size={20} color={theme.colors.error[400]} strokeWidth={2} />
-            ) : (
-              <Video size={20} color="#fff" strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
             style={styles.topBarBtn}
             onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
             activeOpacity={0.7}
@@ -1043,7 +1032,6 @@ export default function CameraScreen() {
               )}
             </TouchableOpacity>
             )}
-            {cameraRole === 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'video' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('video')}
@@ -1053,7 +1041,6 @@ export default function CameraScreen() {
               <Video size={13} color={captureMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'video' && styles.modeSegmentTextActive]}>동영상</Text>
             </TouchableOpacity>
-            )}
           </View>
         </View>
 
@@ -1108,23 +1095,17 @@ export default function CameraScreen() {
             )}
           </TouchableOpacity>
 
-          {cameraRole !== 'video' ? (
-            <TouchableOpacity
-              style={styles.gridToggleBtn}
-              onPress={() => setGridVisible((g) => !g)}
-              activeOpacity={0.7}
-            >
-              {gridVisible ? (
-                <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-              ) : (
-                <Grid3x3 size={24} color="#fff" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.gridToggleBtn} pointerEvents="none">
-              <Video size={24} color={theme.colors.error[400]} strokeWidth={2} />
-            </View>
-          )}
+          <TouchableOpacity
+            style={styles.gridToggleBtn}
+            onPress={() => setGridVisible((g) => !g)}
+            activeOpacity={0.7}
+          >
+            {gridVisible ? (
+              <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+            ) : (
+              <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Generate hint text */}
