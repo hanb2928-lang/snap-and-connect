@@ -75,7 +75,7 @@ function buildFittingPrompt(bodyType?: string, pose?: string): string {
   const body = bodyDesc[bodyType ?? "standard"] ?? bodyDesc.standard;
   const poseStr = poseDesc[pose ?? "front"] ?? poseDesc.front;
 
-  return `You are given two images. The first image is a clothing/product garment photo. The second image is a model photo.\n\nCreate a realistic virtual fitting result: dress the model in the clothing from the first image. The model should be wearing the garment naturally, with the clothing fitting properly on their body.\n\nRequirements:\n- Keep the model's face, skin tone, and hair exactly the same\n- The model has a ${body}\n- The model should be in a ${poseStr} pose\n- The clothing should look realistic, with natural wrinkles, folds, and fabric texture matching the original product\n- Maintain the original color, pattern, and style of the garment\n- The result should look like a professional fashion photograph\n- Use a clean, neutral studio background\n- High quality, photorealistic output`;
+  return `You are given two images. The first image is a clothing/product garment photo. The second image is a model photo.\n\nCreate a realistic virtual fitting result: dress the model in the clothing from the first image. The model should be wearing the garment naturally, with the clothing fitting properly on their body.\n\nCRITICAL — DO NOT DISTORT THE PRODUCT:\n- Preserve the EXACT shape, proportions, and silhouette of the original garment from the product photo\n- Do NOT stretch, warp, skew, bend, or morph the garment's shape in any way\n- Maintain the EXACT original color, pattern, print, texture, and fabric weight of the garment\n- Preserve all logos, labels, buttons, zippers, stitching, and hardware exactly as they appear in the product photo\n- Do NOT invent or hallucinate new patterns, colors, or design elements that are not in the original product\n- The garment's design details (collars, cuffs, hems, pockets) must match the product photo precisely\n- If the product has a specific graphic or text print, reproduce it exactly without alteration\n\nModel requirements:\n- Keep the model's face, skin tone, and hair exactly the same\n- The model has a ${body}\n- The model should be in a ${poseStr} pose\n- The clothing should look realistic, with natural wrinkles, folds, and fabric texture matching the original product\n- The result should look like a professional fashion photograph\n- Use a clean, neutral studio background\n- High quality, photorealistic output`;
 }
 
 async function callImageEdit(
@@ -95,6 +95,7 @@ async function callImageEdit(
   formData.append("prompt", prompt);
   formData.append("size", "1024x1024");
   formData.append("quality", "medium");
+  formData.append("output_format", "png");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 120000);

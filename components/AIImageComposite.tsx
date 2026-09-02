@@ -378,6 +378,9 @@ async function compositeWithLightingWeb(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
   const grad = ctx.createLinearGradient(0, 0, size, size);
   grad.addColorStop(0, gradient[0]);
   grad.addColorStop(1, gradient[1]);
@@ -412,10 +415,10 @@ async function compositeWithLightingWeb(
   }
 
   const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight) * 0.82;
-  const w = img.naturalWidth * scale;
-  const h = img.naturalHeight * scale;
-  const x = (size - w) / 2;
-  const y = (size - h) / 2;
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  const x = Math.round((size - w) / 2);
+  const y = Math.round((size - h) / 2);
 
   ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
   ctx.shadowBlur = 25;
@@ -441,6 +444,9 @@ async function compositeWithBackgroundWeb(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
   const grad = ctx.createLinearGradient(0, 0, size, size);
   grad.addColorStop(0, gradient[0]);
   grad.addColorStop(1, gradient[1]);
@@ -448,10 +454,10 @@ async function compositeWithBackgroundWeb(
   ctx.fillRect(0, 0, size, size);
 
   const scale = Math.min(size / img.naturalWidth, size / img.naturalHeight) * 0.78;
-  const w = img.naturalWidth * scale;
-  const h = img.naturalHeight * scale;
-  const x = (size - w) / 2;
-  const y = (size - h) / 2;
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  const x = Math.round((size - w) / 2);
+  const y = Math.round((size - h) / 2);
 
   ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
   ctx.shadowBlur = 30;

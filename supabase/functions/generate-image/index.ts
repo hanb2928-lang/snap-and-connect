@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
 });
 
 function enhancePrompt(prompt: string): string {
-  return `${prompt}. High quality, professional product photography style, clean composition, vibrant colors, detailed.`;
+  return `${prompt}. High quality, professional product photography style, clean composition, vibrant colors, detailed. CRITICAL: Do NOT distort, warp, stretch, or morph the product's original shape, proportions, colors, patterns, or text. Preserve the product exactly as it appears — maintain exact shape, color accuracy, pattern integrity, and all labels/logos/text without alteration or hallucination.`;
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {
