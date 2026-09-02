@@ -900,20 +900,38 @@ export default function CameraScreen() {
           <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
         </View>
         <View style={styles.topBarRight}>
+          {cameraRole !== 'video' && (
+            <TouchableOpacity
+              style={styles.topBarBtn}
+              onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
+              activeOpacity={0.7}
+            >
+              {flash === 'on' ? (
+                <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2} />
+              ) : flash === 'auto' ? (
+                <View style={styles.flashAutoWrap}>
+                  <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.flashAutoLabel}>A</Text>
+                </View>
+              ) : (
+                <ZapOff size={20} color="#fff" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={styles.topBarBtn}
-            onPress={() => setFlash((f) => (f === 'off' ? 'auto' : f === 'auto' ? 'on' : 'off'))}
+            style={[styles.topBarBtn, cameraRole === 'video' && styles.topBarBtnActive]}
+            onPress={() => {
+              const next = cameraRole === 'video' ? 'template' : 'video';
+              setCameraRole(next);
+              setCaptureMode(next === 'video' ? 'video' : 'oneclick');
+              setItem('marketing_production_mode', next);
+            }}
             activeOpacity={0.7}
           >
-            {flash === 'on' ? (
-              <Zap size={20} color={theme.colors.warning[400]} strokeWidth={2} />
-            ) : flash === 'auto' ? (
-              <View style={styles.flashAutoWrap}>
-                <Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.flashAutoLabel}>A</Text>
-              </View>
+            {cameraRole === 'video' ? (
+              <Video size={20} color={theme.colors.error[400]} strokeWidth={2} />
             ) : (
-              <ZapOff size={20} color="#fff" strokeWidth={2} />
+              <Video size={20} color="#fff" strokeWidth={2} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -1039,28 +1057,34 @@ export default function CameraScreen() {
           </View>
         </View>
 
-        {/* Top row: Gallery (left) | Grid (right) */}
+        {/* Top row: Gallery (left) | Grid (right, template only) */}
         <View style={styles.bottomControlsRow}>
           <TouchableOpacity
             style={styles.galleryThumb}
             onPress={handlePickImage}
-            disabled={processing}
+            disabled={processing || isRecording}
             activeOpacity={0.8}
           >
-            <ImageIcon size={22} color="#fff" strokeWidth={2} />
+            <ImageIcon size={22} color={isRecording ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.gridToggleBtn}
-            onPress={() => setGridVisible((g) => !g)}
-            activeOpacity={0.7}
-          >
-            {gridVisible ? (
-              <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-            ) : (
-              <Grid3x3 size={24} color="#fff" strokeWidth={2} />
-            )}
-          </TouchableOpacity>
+          {cameraRole !== 'video' ? (
+            <TouchableOpacity
+              style={styles.gridToggleBtn}
+              onPress={() => setGridVisible((g) => !g)}
+              activeOpacity={0.7}
+            >
+              {gridVisible ? (
+                <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+              ) : (
+                <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.gridToggleBtn} pointerEvents="none">
+              <Video size={24} color={theme.colors.error[400]} strokeWidth={2} />
+            </View>
+          )}
         </View>
 
         {/* Recording timer indicator */}
@@ -1107,9 +1131,17 @@ export default function CameraScreen() {
         </View>
 
         {/* Generate hint text */}
-        {hasImage && (
+        {hasImage ? (
           <Text style={styles.shutterHintText}>홍보 만들기 시작</Text>
-        )}
+        ) : captureMode === 'video' && !isRecording ? (
+          <Text style={styles.shutterHintText}>버튼을 눌러 현장감 넘치는 영상을 녹화하세요 (최대 60초)</Text>
+        ) : captureMode === 'oneclick' ? (
+          <Text style={styles.shutterHintText}>탭 한 번으로 순간을 잡아 숏폼 소스로 즉시 태우세요</Text>
+        ) : captureMode === 'single' ? (
+          <Text style={styles.shutterHintText}>흔들림 없이 상품을 한 장 완벽하게 담아내세요</Text>
+        ) : captureMode === 'multi' ? (
+          <Text style={styles.shutterHintText}>전면, 측면, 디테일을 연달아 촬영해 역동적인 전환을 만드세요</Text>
+        ) : null}
       </View>
 
       {/* Preview Modal */}
@@ -1715,6 +1747,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  topBarBtnActive: {
+    backgroundColor: theme.colors.error[500] + '25',
+  },
   cameraPreviewWrap: {
     flex: 1,
     position: 'relative',
@@ -1864,7 +1899,6 @@ const styles = StyleSheet.create({
   shutterRow: {
     alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-    marginBottom: 30,
   },
   galleryThumb: {
     width: 52,
