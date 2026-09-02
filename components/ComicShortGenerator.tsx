@@ -374,16 +374,9 @@ type ComicBuildParams = {
   babyImgUrl?: string;
 };
 
-function toJavaScriptLiteral(value: unknown): string {
-  if (value === undefined) return 'null';
-  return JSON.stringify(value)
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-}
-
 function buildComicScriptBody(params: ComicBuildParams): string {
-  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null, genId = 0, babyImgUrl } = params;
-  const hashtagStr = hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
+  const { moodTemplate, accentColor, stickerSize, episodeMode, emotionOverlay = false, genId = 0, babyImgUrl } = params;
+  const hashtagStr = params.hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
 
   const mood = MOOD_TEMPLATES[moodTemplate] || MOOD_TEMPLATES['energetic-popart'];
   const mc = mood.config;
@@ -392,39 +385,77 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   const filterCode = mc.filter;
   const overlayColor = mc.overlayColor;
 
+  const dataPayload = {
+    hook: params.hook,
+    title: params.title,
+    hashtagStr,
+    accentColor,
+    shortUrl: params.shortUrl,
+    disclosureText: params.disclosureText,
+    filterCode,
+    overlayColor,
+    duration: params.duration,
+    moodTemplate,
+    moodConfig: mc,
+    effectiveAccent,
+    panelLayout: params.panelLayout,
+    stickerPosition: params.stickerPosition,
+    stickerStyle: params.stickerStyle,
+    stickerSize,
+    episodeMode,
+    narrationAudioDataUrl: params.narrationAudioDataUrl,
+    punchMarkers: params.punchMarkers,
+    punchAudioDataUrl: params.punchAudioDataUrl,
+    mbtiCommentary: params.mbtiCommentary,
+    emotionOverlay,
+    localStoreInfo: params.localStoreInfo ?? null,
+    imageUrl: params.imageUrl,
+    genId,
+    panelEmotions: params.panels.map(p => p.emotion || ''),
+    panels: params.panels,
+    babyImgUrl: babyImgUrl ?? null,
+  };
+
+  const jsonStr = JSON.stringify(dataPayload);
+  const b64 = typeof btoa !== 'undefined'
+    ? btoa(unescape(encodeURIComponent(jsonStr)))
+    : Buffer.from(jsonStr, 'utf-8').toString('base64');
+
   return `(function(){
-  window.onerror=function(message,source,lineno,colno,error){postMsg('error',{msg:'render script error: '+String(message)+(lineno?' (line '+lineno+')':'')});};
+  try{
   var W=${W}, H=${H};
   var canvas=document.getElementById('cv');
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
-  var hook=${toJavaScriptLiteral(hook)};
-  var title=${toJavaScriptLiteral(title)};
-  var hashtagStr=${toJavaScriptLiteral(hashtagStr)};
-  var accentColor=${toJavaScriptLiteral(accentColor)};
-  var shortUrl=${toJavaScriptLiteral(shortUrl)};
-  var disclosureText=${toJavaScriptLiteral(disclosureText)};
-  var filterCode=${toJavaScriptLiteral(filterCode)};
-  var overlayColor=${toJavaScriptLiteral(overlayColor)};
-  var duration=${params.duration};
+  var P=JSON.parse(decodeURIComponent(escape(atob("${b64}"))));
+  var hook=P.hook;
+  var title=P.title;
+  var hashtagStr=P.hashtagStr;
+  var accentColor=P.accentColor;
+  var shortUrl=P.shortUrl;
+  var disclosureText=P.disclosureText;
+  var filterCode=P.filterCode;
+  var overlayColor=P.overlayColor;
+  var duration=P.duration;
   var FPS=${FPS};
-  var moodTemplate=${toJavaScriptLiteral(moodTemplate)};
-  var moodConfig=${toJavaScriptLiteral(mc)};
-  var effectiveAccent=${toJavaScriptLiteral(effectiveAccent)};
-  var panelLayout=${toJavaScriptLiteral(panelLayout)};
-  var stickerPosition=${toJavaScriptLiteral(stickerPosition)};
-  var stickerStyle=${toJavaScriptLiteral(stickerStyle)};
-  var stickerSize=${stickerSize};
-  var episodeMode=${episodeMode};
-  var narrationAudioDataUrl=${toJavaScriptLiteral(narrationAudioDataUrl)};
-  var punchMarkers=${toJavaScriptLiteral(punchMarkers)};
-  var punchAudioDataUrl=${toJavaScriptLiteral(punchAudioDataUrl)};
-  var mbtiCommentary=${toJavaScriptLiteral(mbtiCommentary)};
-  var emotionOverlay=${emotionOverlay};
-  var localStoreInfo=${toJavaScriptLiteral(localStoreInfo)};
-  var imageUrl=${toJavaScriptLiteral(imageUrl)};
-  var genId=${genId};
-  var panelEmotions=${toJavaScriptLiteral(panels.map(p => p.emotion || ''))};
+  var moodTemplate=P.moodTemplate;
+  var moodConfig=P.moodConfig;
+  var effectiveAccent=P.effectiveAccent;
+  var panelLayout=P.panelLayout;
+  var stickerPosition=P.stickerPosition;
+  var stickerStyle=P.stickerStyle;
+  var stickerSize=P.stickerSize;
+  var episodeMode=P.episodeMode;
+  var narrationAudioDataUrl=P.narrationAudioDataUrl;
+  var punchMarkers=P.punchMarkers;
+  var punchAudioDataUrl=P.punchAudioDataUrl;
+  var mbtiCommentary=P.mbtiCommentary;
+  var emotionOverlay=P.emotionOverlay;
+  var localStoreInfo=P.localStoreInfo;
+  var imageUrl=P.imageUrl;
+  var genId=P.genId;
+  var panels=P.panels;
+  var panelEmotions=P.panelEmotions;
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
   var emotionColors={'\uACE0\uBBFC':'#FFD600','\uB188\uB78C':'#FF6B6B','\uD589\uBCF5':'#10B981','\uD655\uC2E0':'#3B82F6','\uC124\uB808':'#EC4899','\uC2AC\uD544':'#6366F1','\uBD84\uB178':'#F59E0B','\uB3C4\uC804':'#EF4444','\uD589\uB3D9':'#8B5CF6','\uC9C0\uB8CC':'#64748B','\uC218\uB2E4':'#06B6D4','\uAC10\uB3D9':'#F43F5E'};
   var mbtiColors={'INTJ':'#8b5cf6','ENFP':'#f59e0b','ISTP':'#06b3d4','ENFJ':'#10b981'};
@@ -761,9 +792,9 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   }
 
   var panelCount=panelLayout==='single'?1:panelLayout==='split-2'?2:3;
-  var panelSpeeches=${toJavaScriptLiteral(panels.map(p => p.speech))};
-  var panelSfx=${toJavaScriptLiteral(panels.map(p => p.sfx || 'KWAANG!'))};
-  var panelLabels=${toJavaScriptLiteral(panels.map(p => p.episodeLabel || ''))};
+  var panelSpeeches=panels.map(function(p){return p.speech;});
+  var panelSfx=panels.map(function(p){return p.sfx||'KWAANG!';});
+  var panelLabels=panels.map(function(p){return p.episodeLabel||'';});
 
 
   function drawImageInPanel(ctx,img,px,py,pw,ph,filter,panScale){
@@ -1174,6 +1205,9 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         }
       },duration+500);
     }
+  }
+  }catch(e){
+    postMsg('error',{msg:'render script error: '+(e&&e.message||'unknown')});
   }
 })();
 `;
