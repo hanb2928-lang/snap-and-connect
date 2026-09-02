@@ -14,7 +14,7 @@ import {
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe } from 'lucide-react-native';
+import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe, Eye, EyeOff } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
@@ -1188,6 +1188,7 @@ export function ComicShortGenerator({
   const [previewingVoiceKey, setPreviewingVoiceKey] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [editingPanels, setEditingPanels] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [editablePanels, setEditablePanels] = useState<ComicPanel[]>([]);
   const tpl = useHybridTemplate(
     { category: productCategory, platform: 'shorts', productName, fallbackHook: hook, fallbackHashtags: hashtags, fallbackAccentColor: theme.colors.accent[400], fallbackCardStyle: 'bold' },
@@ -2260,7 +2261,15 @@ export function ComicShortGenerator({
       )}
 
       {state === 'generating' && (
-        <VideoProgressIndicator progress={progress} label={ttsEnabled ? 'AI 내레이션 만화 변환 중...' : '만화 변환 중...'} color={theme.colors.accent[400]} />
+        <View style={styles.generatingWrap}>
+          <View style={styles.hProgressBarContainer}>
+            <View style={styles.hProgressBarTrack}>
+              <View style={[styles.hProgressBarFill, { width: `${Math.max(2, progress)}%`, backgroundColor: theme.colors.accent[400] }]} />
+            </View>
+            <Text style={styles.hProgressBarPct}>{Math.round(progress)}%</Text>
+          </View>
+          <VideoProgressIndicator progress={progress} label={ttsEnabled ? 'AI 내레이션 만화 변환 중...' : '만화 변환 중...'} color={theme.colors.accent[400]} />
+        </View>
       )}
 
       {state === 'done' && resultUri && !editingPanels && (
@@ -2362,15 +2371,30 @@ export function ComicShortGenerator({
 
       {state === 'done' && resultUri && (
         <View style={styles.resultWrap}>
-          <Text style={styles.doneNotice}>
-            {resultMime.includes('png')
-              ? '만화 숏폼 이미지가 완성됐어요. 미리보기 후 저장하세요.'
-              : narrationAudioDataUrl
-                ? 'AI 내레이션 만화 숏폼이 완성됐어요. 미리보기 후 저장하세요.'
-                : '만화 숏폼 동영상이 완성됐어요. 미리보기 후 저장하세요.'}
-          </Text>
+          <View style={styles.doneHeaderRow}>
+            <Text style={styles.doneNotice}>
+              {resultMime.includes('png')
+                ? '만화 숏폼 이미지가 완성됐어요.'
+                : narrationAudioDataUrl
+                  ? 'AI 내레이션 만화 숏폼이 완성됐어요.'
+                  : '만화 숏폼 동영상이 완성됐어요.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.previewToggleBtn}
+              onPress={() => setShowPreview(!showPreview)}
+              activeOpacity={0.7}
+            >
+              {showPreview ? (
+                <EyeOff size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+              ) : (
+                <Eye size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+              )}
+              <Text style={styles.previewToggleText}>{showPreview ? '미리보기 숨기기' : '미리보기'}</Text>
+            </TouchableOpacity>
+          </View>
 
-          <View style={styles.previewWrap}>
+          {showPreview && (
+            <View style={styles.previewWrap}>
             <VideoPreview
               uri={resultUri}
               mimeType={resultMime}
@@ -2392,6 +2416,7 @@ export function ComicShortGenerator({
               </View>
             )}
           </View>
+          )}
 
           <View style={styles.directShareBox}>
             <Text style={styles.directShareLabel}>SNS 원터치 공유</Text>
@@ -2888,6 +2913,55 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.success[400],
     lineHeight: 20,
+    flex: 1,
+  },
+  doneHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  previewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '15',
+    flexShrink: 0,
+  },
+  previewToggleText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  generatingWrap: {
+    gap: 10,
+  },
+  hProgressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  hProgressBarTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    overflow: 'hidden',
+  },
+  hProgressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  hProgressBarPct: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[400],
+    minWidth: 40,
+    textAlign: 'right',
   },
   resultButtons: {
     flexDirection: 'row',

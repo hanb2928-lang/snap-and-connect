@@ -1049,52 +1049,6 @@ export default function ResultScreen() {
           ),
         },
         {
-          key: 'comicShort',
-          label: '코믹 숏폼',
-          description: '만화 컷 형식으로 제품 후기와 스토리를 풀어내는 콘텐츠',
-          category: 'template',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <View>
-              <VariantGenerator
-                productName={activeProductName || scan.product_name || ''}
-                productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-                priceEstimate={activePriceEstimate || ''}
-                oneLiner={activeOneLiner || ''}
-                productAdvantages={td?.productAdvantages || []}
-                hook={activeHook}
-                brandPersona={settings?.brand_persona}
-                selectedTone={selectedVariant?.tone}
-                onSelectVariant={(v) => setSelectedVariant(v)}
-              />
-            <ComicShortGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.accent[400]}
-              fileName={`snap-connect-comic-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-              stickerPosition={stickerPosition}
-              stickerStyle={stickerStyle}
-              stickerSize={stickerSize}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              priceEstimate={activePriceEstimate || ''}
-              oneLiner={activeOneLiner || ''}
-              productAdvantages={td?.productAdvantages || []}
-              localStoreInfo={localStoreInfo}
-              brandPersona={settings?.brand_persona}
-              preloadedVariant={selectedVariant}
-            />
-            </View>
-          ),
-        },
-        {
           key: 'lightingStudio',
           label: '조명 & 배경 스튜디오',
           description: '제품 원본은 그대로, 배경과 조명만 AI로 다채롭게 변경',
@@ -2019,6 +1973,38 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
+          <View style={styles.section}>
+            <View style={styles.comicTileHeader}>
+              <Wand2 size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.comicTileTitle}>AI 만화 숏폼</Text>
+                <Text style={styles.comicTileDesc}>상품 사진 한 장으로 만화 컷 숏폼 자동 생성</Text>
+              </View>
+            </View>
+            <ComicShortGenerator
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              hook={activeHook}
+              title={activeProductName || scan.title || 'Product'}
+              hashtags={allDisplayHashtags}
+              accentColor={td?.accentColor || theme.colors.accent[400]}
+              fileName={`snap-connect-comic-${scan.id}.png`}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              shortUrl={shortUrl || ''}
+              stickerPosition={stickerPosition}
+              stickerStyle={stickerStyle}
+              stickerSize={stickerSize}
+              productName={activeProductName || scan.product_name || ''}
+              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
+              priceEstimate={activePriceEstimate || ''}
+              oneLiner={activeOneLiner || ''}
+              productAdvantages={td?.productAdvantages || []}
+              localStoreInfo={localStoreInfo}
+              brandPersona={settings?.brand_persona}
+              preloadedVariant={selectedVariant}
+            />
+          </View>
+
           <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
 
           {detectedProducts.length > 1 && (
@@ -2295,6 +2281,24 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
+  },
+  comicTileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  comicTileTitle: {
+    fontSize: theme.typography.heading,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  comicTileDesc: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
   safetyTileBtn: {
     flexDirection: 'row',
