@@ -15,38 +15,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import {
-  Flame,
-  Zap,
-  ArrowRight,
-  Settings,
-  Check,
-  Lightbulb,
-  Clock,
-  Type,
-  Music,
-  Film,
-  Sparkles,
-  X,
-  Store,
-  Tag,
-  TrendingUp,
-  PenLine,
-  ChevronDown,
-  ChevronUp,
-  Mic,
-  Square,
-  Trash2,
-  Play,
-  Save,
-  Video,
-  Camera,
-  Clapperboard,
-  Download,
-  Shirt,
-  Wand2,
-  Image as ImageIcon,
-} from 'lucide-react-native';
+import { Flame, Zap, ArrowRight, Settings, Check, Lightbulb, Clock, Type, Music, Film, Sparkles, X, Store, Tag, TrendingUp, PenLine, ChevronDown, ChevronUp, Mic, Square, Trash2, Play, Save, Video, Camera, Clapperboard, Download, Shirt, Wand as Wand2, Image as ImageIcon } from 'lucide-react-native';
 import { Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { theme } from '@/lib/theme';
@@ -130,6 +99,7 @@ export default function MarketingScreen() {
   const [aiFittingEnabled, setAiFittingEnabled] = useState(false);
   const [aiFittingImage, setAiFittingImage] = useState<string | null>(null);
   const [aiCompositeImage, setAiCompositeImage] = useState<string | null>(null);
+  const [productionMode, setProductionMode] = useState<'template' | 'video'>('template');
   const lastActionRef = useRef(0);
   const voice = useVoiceRecording();
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
@@ -404,59 +374,75 @@ export default function MarketingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Two-pillar entry cards */}
-        <View style={styles.pillarGrid}>
-          {/* Pillar 1: Video Recording */}
-          <TouchableOpacity
-            style={styles.pillarCard}
-            onPress={handleVideoModePress}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.pillarIconWrap, { backgroundColor: theme.colors.error[500] + '20' }]}>
-              <Video size={28} color={theme.colors.error[400]} strokeWidth={2.5} />
-            </View>
-            <Text style={styles.pillarTitle}>동영상</Text>
-            <Text style={styles.pillarDesc}>현장감 넘치는 오프닝 영상을 직접 촬영해 숏폼의 첫 3초로 바로 태우세요</Text>
-            <View style={styles.pillarBadgeRow}>
-              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.error[500] + '18' }]}>
-                <Text style={[styles.pillarBadgeText, { color: theme.colors.error[400] }]}>최대 15초</Text>
-              </View>
-              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.accent[400] + '18' }]}>
-                <Text style={[styles.pillarBadgeText, { color: theme.colors.accent[400] }]}>오프닝 후킹</Text>
-              </View>
-            </View>
-            <View style={styles.pillarArrowRow}>
-              <Text style={styles.pillarArrowText}>카메라로 이동</Text>
-              <ArrowRight size={16} color={theme.colors.error[400]} strokeWidth={2.5} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Pillar 2: Template Rendering */}
-          <TouchableOpacity
-            style={styles.pillarCard}
-            onPress={() => setMarketingStep(marketingStep === 'store' ? null : 'store')}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.pillarIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
-              <Sparkles size={28} color={theme.colors.primary[300]} strokeWidth={2.5} />
-            </View>
-            <Text style={styles.pillarTitle}>템플릿</Text>
-            <Text style={styles.pillarDesc}>AI 심리 저격 + 뇌과학 트리거로 기획 고민 없이 숏폼을 대량 양산하세요</Text>
-            <View style={styles.pillarBadgeRow}>
-              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
-                <Text style={[styles.pillarBadgeText, { color: theme.colors.primary[300] }]}>AIDCA 자동</Text>
-              </View>
-              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.warning[400] + '18' }]}>
-                <Text style={[styles.pillarBadgeText, { color: theme.colors.warning[400] }]}>15초 완성</Text>
-              </View>
-            </View>
-            <View style={styles.pillarArrowRow}>
-              <Text style={styles.pillarArrowText}>템플릿 시작</Text>
-              <ArrowRight size={16} color={theme.colors.primary[300]} strokeWidth={2.5} />
-            </View>
-          </TouchableOpacity>
+        {/* Mode Switcher */}
+        <View style={styles.modeSwitcherWrap}>
+          <Text style={styles.modeSwitcherLabel}>제작 모드 선택</Text>
+          <View style={styles.modeSwitcher}>
+            <TouchableOpacity
+              style={[styles.modeTab, productionMode === 'template' && styles.modeTabActive]}
+              onPress={() => setProductionMode('template')}
+              activeOpacity={0.7}
+            >
+              <Sparkles size={18} color={productionMode === 'template' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.5} />
+              <Text style={[styles.modeTabText, productionMode === 'template' && styles.modeTabTextActive]}>템플릿 모드</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeTab, productionMode === 'video' && styles.modeTabActiveVideo]}
+              onPress={() => setProductionMode('video')}
+              activeOpacity={0.7}
+            >
+              <Video size={18} color={productionMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.5} />
+              <Text style={[styles.modeTabText, productionMode === 'video' && styles.modeTabTextActive]}>동영상 촬영 모드</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.modeHint}>
+            {productionMode === 'template'
+              ? 'AI 심리 템플릿과 가상영상/가상핏 옵션에만 집중합니다. 촬영 기능은 숨겨집니다.'
+              : '현장감 있는 영상 촬영에만 집중합니다. 템플릿·성우·심리 전략은 숨겨집니다.'}
+          </Text>
         </View>
 
+        {/* === VIDEO MODE: Camera recording only === */}
+        {productionMode === 'video' && (
+          <View style={styles.videoModeContainer}>
+            <View style={styles.videoModeCard}>
+              <View style={[styles.videoModeIconWrap, { backgroundColor: theme.colors.error[500] + '20' }]}>
+                <Video size={40} color={theme.colors.error[400]} strokeWidth={2.5} />
+              </View>
+              <Text style={styles.videoModeTitle}>동영상 직접 촬영</Text>
+              <Text style={styles.videoModeDesc}>
+                스마트폰 카메라로 현장감 있는 오프닝 영상을 촬영하세요. 촬영 후 숏폼에 바로 적용할 수 있습니다.
+              </Text>
+              <View style={styles.videoModeSpecRow}>
+                <View style={styles.videoModeSpec}>
+                  <Clock size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.videoModeSpecText}>최대 60초</Text>
+                </View>
+                <View style={styles.videoModeSpec}>
+                  <Film size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.videoModeSpecText}>오프닝 후킹</Text>
+                </View>
+                <View style={styles.videoModeSpec}>
+                  <Camera size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={styles.videoModeSpecText}>직접 촬영</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.videoModeActionBtn}
+                onPress={handleVideoModePress}
+                activeOpacity={0.85}
+              >
+                <Video size={22} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.videoModeActionText}>카메라로 이동하여 촬영 시작</Text>
+                <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* === TEMPLATE MODE: AI template pipeline only === */}
+        {productionMode === 'template' && (
+          <>
         {/* Template 3-step pipeline */}
         <Text style={styles.sectionLabel}>템플릿 렌더링 파이프라인</Text>
 
@@ -771,9 +757,12 @@ export default function MarketingScreen() {
             </Text>
           </View>
         )}
+          </>
+        )}
       </ScrollView>
 
-      {/* Sticky Generate Button */}
+      {/* Sticky Generate Button — template mode only */}
+      {productionMode === 'template' && (
       <View style={[styles.stickyGenerate, { bottom: tabBarHeight + theme.spacing.xl }]}>
         <TouchableOpacity
           style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
@@ -786,6 +775,7 @@ export default function MarketingScreen() {
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
+      )}
 
       {/* Advanced Settings Modal */}
       <Modal visible={advancedVisible} transparent animationType="slide" onRequestClose={() => setAdvancedVisible(false)}>
@@ -978,63 +968,123 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillarGrid: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
+  modeSwitcherWrap: {
     marginBottom: theme.spacing.lg,
   },
-  pillarCard: {
+  modeSwitcherLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 8,
+  },
+  modeSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 4,
+    gap: 4,
+  },
+  modeTab: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: 'transparent',
+  },
+  modeTabActive: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  modeTabActiveVideo: {
+    backgroundColor: theme.colors.error[500],
+  },
+  modeTabText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  modeTabTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  modeHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 8,
+    lineHeight: 16,
+  },
+  videoModeContainer: {
+    marginBottom: theme.spacing.lg,
+  },
+  videoModeCard: {
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.xl,
-    padding: theme.spacing.md,
+    padding: theme.spacing.xl,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
-    gap: 8,
+    alignItems: 'center',
+    gap: 14,
     ...theme.shadows.card,
   },
-  pillarIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.lg,
+  videoModeIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.xl,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillarTitle: {
-    fontSize: 18,
+  videoModeTitle: {
+    fontSize: 20,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
   },
-  pillarDesc: {
-    fontSize: 11,
+  videoModeDesc: {
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-    lineHeight: 16,
+    textAlign: 'center',
+    lineHeight: 19,
   },
-  pillarBadgeRow: {
+  videoModeSpecRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 12,
     flexWrap: 'wrap',
+    justifyContent: 'center',
   },
-  pillarBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: theme.radius.sm,
-  },
-  pillarBadgeText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.semiBold,
-  },
-  pillarArrowRow: {
+  videoModeSpec: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
   },
-  pillarArrowText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
+  videoModeSpecText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  videoModeActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.error[500],
+    borderRadius: theme.radius.lg,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    ...theme.shadows.card,
+  },
+  videoModeActionText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+    flexShrink: 1,
   },
   sectionLabel: {
     fontSize: 14,
