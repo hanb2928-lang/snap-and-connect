@@ -27,10 +27,10 @@ interface WebCameraViewProps {
 type Facing = 'user' | 'environment';
 
 const MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
-  { key: 'oneclick', label: '원클릭', icon: Zap, desc: '초간편 자동' },
-  { key: 'single', label: '1장', icon: Camera, desc: '단품 클로즈업' },
-  { key: 'multi', label: '다각도', icon: Layers, desc: '정밀 멀티컷' },
-  { key: 'video', label: '동영상', icon: Video, desc: '영상 녹화' },
+  { key: 'oneclick', label: '원클릭', icon: Zap, desc: '실시간 즉시 캡처' },
+  { key: 'single', label: '스틸컷', icon: Camera, desc: '단독 클로즈업 컷' },
+  { key: 'multi', label: '다각도', icon: Layers, desc: '멀티 앵글 시퀀스' },
+  { key: 'video', label: '동영상', icon: Video, desc: '리얼 타임 레코딩' },
 ];
 
 const MAX_RECORDING_SEC = 60;
@@ -584,10 +584,10 @@ export function WebCameraView({
               {autoSaving ? 'AI 자동 분석 중...' :
                capturing ? '촬영 중...' :
                isRecording ? `녹화 중... ${formatTime(recordingSec)} / ${formatTime(MAX_RECORDING_SEC)}` :
-               captureMode === 'video' ? '버튼을 눌러 영상을 녹화하세요 (최대 60초)' :
-               captureMode === 'oneclick' ? '셔터 한 번이면 숏폼이 보관함에 자동 저장!' :
-               captureMode === 'single' ? '단품 사진을 클로즈업해서 촬영하세요' :
-               '여러 각도를 차례로 촬영하세요'}
+               captureMode === 'video' ? '버튼을 눌러 현장감 넘치는 영상을 녹화하세요 (최대 60초)' :
+               captureMode === 'oneclick' ? '탭 한 번으로 순간을 잡아 숏폼 소스로 즉시 태우세요!' :
+               captureMode === 'single' ? '흔들림 없이 상품을 한 장 완벽하게 담아내세요' :
+               '전면, 측면, 디테일을 연달아 촬영해 역동적인 전환을 만드세요'}
             </Text>
           </View>
         </>

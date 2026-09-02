@@ -992,7 +992,7 @@ export default function CameraScreen() {
               activeOpacity={0.7}
             >
               <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>1장</Text>
+              <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>스틸컷</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
