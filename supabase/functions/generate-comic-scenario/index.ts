@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -281,17 +282,16 @@ async function generateWithOpenAI(
 
   const styleGuidance = artStyle ? `\n선택된 웹툰 화풍: ${STYLE_LABELS[artStyle]}\n이 화풍에 맞춰 대사의 톤과 분위기를 조절해:\n${artStyle === 'insta-toon' ? '- 깔끔하고 일상적인 대화체, 공감 가는 표현' : ''}${artStyle === 'b-grade' ? '- 과장되고 호쾌한 표현, 밈스러운 유머, 반말 혼용' : ''}${artStyle === 'food-toon' ? '- 음식의 질감과 맛을 살린 표현, 침 고인다는 듯한 묘사' : ''}${artStyle === 'american-comic' ? '- 강렬하고 힘있는 표현, 영웅물 같은 dramatic한 연출' : ''}${artStyle === 'ghibli' ? '- 따뜻하고 감성적인 표현, 몽환적이고 시적인 묘사' : ''}\n` : '';
 
-  const systemPrompt =
-    "너는 한국인 만화 작가야. 제품을 홍보하는 숏폼 만화의 시나리오를 작성해.\n" +
-    "만화는 '문제 → 해결 → 결과' 구조를 따라야 해.\n" +
-    "각 패널은 만화 말풍선에 들어갈 대사(speech), 효과음(sfx), 감정(emotion)을 가져야 해.\n" +
-    "대사는 일상적이고 자연스러운 한국어 대화체로 작성해. 과장된 마케팅 톤은 금지.\n" +
-    "효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!, 샤방~, 따봉!)를 사용하고 감정에 맞춰 자동 매칭될 거야.\n" +
-    "감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
+  const comicChannelSpecific =
+    "## 만화 전용 지시사항\n" +
+    "- 첫 패널은 절대 제품 소개로 시작하지 마라. 일상의 짜증, 황당한 상황, 공감되는 고민으로 시작하라.\n" +
+    "- 제품은 두 번째나 세 번째 패널에서 '우연한 구원자'처럼 자연스럽게 등장해야 한다.\n" +
+    "- 대사는 일상적이고 자연스러운 한국어 대화체. 과장된 마케팅 톤 절대 금지.\n" +
+    "- 효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!, 샤방~, 따봉!)를 사용.\n" +
+    "- 감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
+    "- 패널 레이아웃: 정렬된 깔끔한 그리드 피하기. 과장된 표정, 거친 대사 포맷, 고감정 대비 스파이크 활용.\n" +
+    "- 펀치라인은 전환 프레임에서 즉시 터져야 한다. 읽는 시간을 마이크로 도파민 히트로.\n" +
     `${styleGuidance}` +
-    (data.brandPersona && data.brandPersona.trim()
-      ? `\n다음 브랜드 톤앤매너를 만화 대사의 말투와 분위기에 반영해:\n${data.brandPersona.trim()}\n`
-      : "") +
     `${episodeGuidance}` +
     (mbtiMode ? "\n추가로 MBTI 유형별 구매 가이드를 만들어. 4개 유형(INTJ, ENFP, ISTP, ENFJ) 각각에 대해 이 제품을 왜 좋아할지 위트 있는 한 줄 멘트를 작성해.\n형식: \"type\": \"INTJ\", \"label\": \"계획형\", \"comment\": \"시간 절약템 - 이건 효율성이니까\"\n" : "") +
     (multiverseMode ? "\n이 만화는 '멀티버스 A/B 결말' 형식이야. 만화 마지막에 시청자가 선택할 수 있는 두 가지 갈림길을 제시해.\nchoicePrompt는 시청자에게 던지는 질문(예: '이 원피스, 데이트룩? vs 오피스룩?')이고,\nendings는 2개의 다른 결말 패널이야. 각 결말은 서로 다른 상황/감정을 보여줘.\n" : "") +
@@ -302,6 +302,12 @@ async function generateWithOpenAI(
         ? "결과는 JSON만 반환: { \"panels\": [...], \"narrationText\": \"...\", \"mbtiCommentary\": [{ \"type\": \"...\", \"label\": \"...\", \"comment\": \"...\" }] }\n"
         : "결과는 JSON만 반환: { \"panels\": [{ \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\", \"episodeLabel\": \"...\" }], \"narrationText\": \"...\" }\n") +
     "narrationText는 만화 전체를 한 줄로 설명하는 내레이션 문장이야. AI 음성 더빙에 사용될 거야.";
+
+  const systemPrompt = buildPsychoSystemPrompt(
+    "너는 한국인 만화 작가야. 제품을 홍보하는 숏폼 만화의 시나리오를 작성해. 만화는 '문제 → 해결 → 결과' 구조를 따라야 해.",
+    comicChannelSpecific,
+    data.brandPersona,
+  );
 
   const userPrompt =
     `제품명: ${data.productName}\n` +

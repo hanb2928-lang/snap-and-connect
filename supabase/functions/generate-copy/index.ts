@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -350,12 +351,14 @@ async function generateWithOpenAI(
   count: number,
   model: string = 'gpt-4o-mini',
 ): Promise<CopyItem[]> {
-  let systemPrompt =
+  const copyChannelSpecific =
+    "## 카피 전용 지시사항\n" +
     "너는 한국인 SNS 유저야. 마케터가 아니라 실제로 제품을 써본 사람처럼 글을 써.\n" +
-    "절대로 '놓치면 후회합니다', '지금 바로 확인하세요', '강력 추천합니다' 같은 상투적인 마케팅 문구는 쓰지 마.\n" +
     "진짜 친구한테 문자 보내듯이, 쓸데없는 수식어 빼고 핵심만 자연스럽게 말해.\n" +
     "인터넷에서 실제 사람들이 쓰는 말투(ㅋㅋ, ㅠㅠ, ~임, ~드라고요, ~거든요 등)를 자연스럽게 섞어 써.\n" +
     "과장 금지. '인생 바뀜', '대박', '최고' 같은 과도한 표현 대신 구체적인 경험을 담아.\n" +
+    "카피에서는 역심리, 역설, 충격적 고백으로 후킹하라. 예: '이거 사지 마세요... 아니 꼭 사세요'\n" +
+    "CTA는 기업 명령이 아니라 내부자 꿀팁처럼. 예: '링크 남겨둠 — 알아서들', '고민하는 사이 품절됨 ㅋㅋ'\n" +
     `\"${typeLabel(data.copyType)}\" 스타일로 ${platformLabel(data.platform)}에 맞게 ${count}개 변형을 만들어.\n` +
     `${platformTone(data.platform)}\n` +
     "각 변형은 'hook'(10~30자, 첫 줄부터 자연스럽게 호기심 유발), " +
@@ -363,13 +366,11 @@ async function generateWithOpenAI(
     "'hashtags'(5~12개, # 없이 문자열 배열)를 가져야 해.\n" +
     "해시태그도 너무 상업적인 건 빼고 실제 SNS에서 많이 쓰는 자연스러운 걸로.\n";
 
-  if (data.brandPersona && data.brandPersona.trim()) {
-    systemPrompt +=
-      "\n" +
-      "다음은 이 브랜드의 톤앤매너야. 반드시 이 톤앤매너에 맞춰서 카피를 써:\n" +
-      `${data.brandPersona.trim()}\n` +
-      "위 톤앤매너의 말투, 이모지 사용 여부, 호칭, 어조를 최우선으로 반영해. 기본 안내 사항보다 브랜드 톤앤매너가 우선이야.\n";
-  }
+  let systemPrompt = buildPsychoSystemPrompt(
+    "너는 한국인 SNS 콘텐츠 작가야.",
+    copyChannelSpecific,
+    data.brandPersona,
+  );
 
   if (data.localStoreInfo?.enabled && data.localStoreInfo.storeName) {
     const ls = data.localStoreInfo;

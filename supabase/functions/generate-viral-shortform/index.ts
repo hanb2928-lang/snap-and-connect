@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -152,32 +153,36 @@ async function generateWithOpenAI(
 
   const productHint = productName ? `\n사용자가 입력한 상품명: ${productName}` : "";
 
-  const systemPrompt =
-    "당신은 멀티모달 비전 분석 전문가이자, 인간의 소비 심리를 자극하여 구매 전환을 극대화하는 동시에 법적 규제를 완벽히 준수하는 '초고속 바이럴 숏폼 아키텍트'입니다.\n" +
-    "\n" +
-    "사용자가 업로드한 상품 사진을 실시간으로 스캔·분석하고, 인간의 심리적 트리거(손실 회피, 공감대 등)와 AIDCA 15초 타임라인 공식을 결합하여, 마지막 2초에 제휴 플랫폼 전용 공정위 법적 고지 문구가 자동으로 오버랩되는 '완전 자동화 숏폼 패키지'를 도출합니다.\n" +
-    "\n" +
-    "# Phase 1: Vision & Context Analysis\n" +
+  const shortformChannelSpecific =
+    "## 숏폼 영상 전용 지시사항\n" +
+    "- Hook(0-2초): 패턴 인식을 즉각 깨부수어라. 강렬한 부조화, 거친 모션, 역설적 내레이션/자막으로 시선을 잡아라.\n" +
+    "- 페이싱: 높은 서사 속도를 유지하라. 펀치한 시각-텍스트 시너지, 다이내믹 컷, 위트 있는 사운드 큐 마커로 이탈을 막아라.\n" +
+    "- 절대 제품 피치로 시작하지 마라. 일상의 짜증이나 황당한 반전으로 시작하라.\n" +
+    "- 제품은 중간에 '우연한 구원자'로 등장해야 한다.\n" +
+    "- CTA는 '지금 바로 구매하세요'가 아니라 내부자 꿀팁 톤으로. 예: '고민하는 사이 품절됨 ㅋㅋ'\n" +
+    "\n# Phase 1: Vision & Context Analysis\n" +
     "업로드된 상품 이미지를 분석하여 다음 데이터를 즉시 추출:\n" +
     "- Category & Core Feature: 상품의 정확한 카테고리 및 시각적으로 드러나는 핵심 USP\n" +
     "- Target Audience: 가장 즉각적인 구매 반응을 보일 타겟층 및 라이프스타일\n" +
     "- Mood & Color Palette: 상품의 패키징과 무드에 어울리는 최적의 톤앤매너 및 강조 컬러 헥스 코드\n" +
-    "\n" +
-    "# Phase 2: Psychological Trigger Mapping\n" +
+    "\n# Phase 2: Psychological Trigger Mapping\n" +
     "추출된 상품 데이터를 바탕으로 소비자의 구매를 강제하는 심리 트리거 적용:\n" +
     "- Loss Aversion (손실 회피): '오늘 자정 마감', '품절 임박' 등 긴급성 부여\n" +
     "- Pain Point Agony (일상 고통 공감): 타겟 소비자의 날것의 고민을 1컷 후킹 문구로 후벼파기\n" +
     "- Justification (가성비 합리화): '이 가격에 이 스펙이면 무조건 이득'이라는 구매 정당화\n" +
-    "\n" +
-    "# Phase 3: AIDCA 15-Second Timeline Auto-Assembly & Legal Disclosure\n" +
+    "\n# Phase 3: AIDCA 15-Second Timeline Auto-Assembly & Legal Disclosure\n" +
     "전체 15초 러닝타임을 4개 구간으로 정밀 분할:\n" +
     "- [0~3초 | Hook]: 시선을 단번에 사로잡는 강력한 일상 고통 공감 및 자극적 도입부 대사\n" +
     "- [4~8초 | Interest]: 문제를 심화시키고 해결책의 필요성을 각인시키는 구간\n" +
     "- [9~12초 | Desire]: 상품의 핵심 특장점과 시각적 스틸컷이 오버랩되며 감탄을 유도\n" +
     "- [13~15초 | Action & Mandatory Disclosure]: 마감 임박 타이머 및 직관적 구매 유도 독백 + 영상 하단에 공정위 문구 자동 고정\n" +
-    "\n" +
     platformHint +
-    productHint +
+    productHint;
+
+  const systemPrompt = buildPsychoSystemPrompt(
+    "당신은 멀티모달 비전 분석 전문가이자, 인간의 소비 심리를 자극하여 구매 전환을 극대화하는 동시에 법적 규제를 완벽히 준수하는 '초고속 바이럴 숏폼 아키텍트'입니다.",
+    shortformChannelSpecific,
+  );
     "\n\n다음 JSON 구조로만 응답할 것 (다른 텍스트 금지):\n" +
     "{\n" +
     '  "vision": {\n' +

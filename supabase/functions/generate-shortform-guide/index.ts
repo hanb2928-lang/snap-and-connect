@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,11 +123,19 @@ async function generateWithOpenAI(
   data: GuideRequest,
   apiKey: string,
 ): Promise<ShortFormGuide> {
-  const systemPrompt =
+  const guideChannelSpecific =
+    "## 숏폼 가이드 전용 지시사항\n" +
     "너는 숏폼 콘텐츠 제작 전문가야. 상품 정보를 받으면 그 상품에 맞는 숏폼 제작 가이드를 만들어.\n" +
+    "후킹 문구는 역심리, 역설, 충격적 고백을 활용하라. 절대 제품 피치로 시작하지 마라.\n" +
+    "팁은 실제 숏폼 크리에이터가 쓸 법한 거칠고 진짜 같은 조언으로. 기업형 조언 금지.\n" +
     "결과는 JSON만 반환: { \"concept\": \"이 상품에 어울리는 숏폼 콘셉트 한 줄\", \"tips\": [{ \"title\": \"팁 제목(10자 이내)\", \"description\": \"구체적인 제작 팁(30-60자)\" }], \"hooks\": [{ \"text\": \"후킹 문구(10-25자)\", \"angle\": \"이 문구가 왜 효과적인지 한 줄 설명\" }] }\n" +
     "tips는 3개, hooks는 3개를 만들어. 각각 서로 다른 각도(예: 호기심 유발, 가격 어필, 감정 자극, 사용 후기형 등)로.\n" +
     "한국어로 자연스럽게 작성하고, 실제 숏폼 크리에이터가 쓸 법한 표현을 사용해.";
+
+  const systemPrompt = buildPsychoSystemPrompt(
+    "너는 숏폼 콘텐츠 제작 전문가야.",
+    guideChannelSpecific,
+  );
 
   const userPrompt =
     `제품명: ${data.productName}\n` +
