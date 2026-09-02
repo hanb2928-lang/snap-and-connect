@@ -1499,11 +1499,19 @@ export function ComicShortGenerator({
     };
 
     const scriptEl = document.createElement('script');
-    scriptEl.textContent = scriptBody;
+    const scriptUrl = URL.createObjectURL(new Blob([scriptBody], { type: 'text/javascript' }));
+    scriptEl.src = scriptUrl;
+    scriptEl.onerror = () => {
+      handleWebViewMessage({
+        nativeEvent: { data: JSON.stringify({ type: 'error', genId: genIdRef.current, data: { msg: 'render script load failed' } }) },
+      } as WebViewMessageEvent);
+    };
+    scriptEl.onload = () => URL.revokeObjectURL(scriptUrl);
     document.body.appendChild(scriptEl);
 
     webGenCleanupRef.current = () => {
       (window as any).__comicPostMsg = prevCallback;
+      URL.revokeObjectURL(scriptUrl);
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
     };
