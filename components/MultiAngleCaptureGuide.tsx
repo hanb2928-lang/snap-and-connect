@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   },
   shotImage: {
     width: '100%',
-    height: 180,
+    height: 240,
     backgroundColor: theme.colors.dark.surfaceLight,
   },
   shotActions: {
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   shotPlaceholder: {
-    minHeight: 100,
+    minHeight: 140,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   galleryBtn: {
     flexDirection: 'row',
