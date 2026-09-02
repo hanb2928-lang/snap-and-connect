@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
+import { pickArchetype, toneProfileToPrompt } from "../_shared/mutation-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -153,6 +154,8 @@ async function generateWithOpenAI(
 
   const productHint = productName ? `\n사용자가 입력한 상품명: ${productName}` : "";
 
+  const archetype = await pickArchetype('generate-viral-shortform');
+
   const shortformChannelSpecific =
     "## 숏폼 영상 전용 지시사항\n" +
     "- Hook(0-2초): 패턴 인식을 즉각 깨부수어라. 강렬한 부조화, 거친 모션, 역설적 내레이션/자막으로 시선을 잡아라.\n" +
@@ -160,6 +163,8 @@ async function generateWithOpenAI(
     "- 절대 제품 피치로 시작하지 마라. 일상의 짜증이나 황당한 반전으로 시작하라.\n" +
     "- 제품은 중간에 '우연한 구원자'로 등장해야 한다.\n" +
     "- CTA는 '지금 바로 구매하세요'가 아니라 내부자 꿀팁 톤으로. 예: '고민하는 사이 품절됨 ㅋㅋ'\n" +
+    `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` +
+    toneProfileToPrompt(archetype.toneProfile) +
     "\n# Phase 1: Vision & Context Analysis\n" +
     "업로드된 상품 이미지를 분석하여 다음 데이터를 즉시 추출:\n" +
     "- Category & Core Feature: 상품의 정확한 카테고리 및 시각적으로 드러나는 핵심 USP\n" +
@@ -177,12 +182,7 @@ async function generateWithOpenAI(
     "- [9~12초 | Desire]: 상품의 핵심 특장점과 시각적 스틸컷이 오버랩되며 감탄을 유도\n" +
     "- [13~15초 | Action & Mandatory Disclosure]: 마감 임박 타이머 및 직관적 구매 유도 독백 + 영상 하단에 공정위 문구 자동 고정\n" +
     platformHint +
-    productHint;
-
-  const systemPrompt = buildPsychoSystemPrompt(
-    "당신은 멀티모달 비전 분석 전문가이자, 인간의 소비 심리를 자극하여 구매 전환을 극대화하는 동시에 법적 규제를 완벽히 준수하는 '초고속 바이럴 숏폼 아키텍트'입니다.",
-    shortformChannelSpecific,
-  );
+    productHint +
     "\n\n다음 JSON 구조로만 응답할 것 (다른 텍스트 금지):\n" +
     "{\n" +
     '  "vision": {\n' +
@@ -221,6 +221,11 @@ async function generateWithOpenAI(
     '    "ctaText": "구매 유도 CTA 문구 (한국어, 10-20자)"\n' +
     '  }\n' +
     "}";
+
+  const systemPrompt = buildPsychoSystemPrompt(
+    "당신은 멀티모달 비전 분석 전문가이자, 인간의 소비 심리를 자극하여 구매 전환을 극대화하는 동시에 법적 규제를 완벽히 준수하는 '초고속 바이럴 숏폼 아키텍트'입니다.",
+    shortformChannelSpecific,
+  );
 
   const userContent = [
     { type: "text", text: "이 상품 사진을 분석하여 완전 자동화 숏폼 패키지를 생성해주세요." },
