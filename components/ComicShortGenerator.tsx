@@ -374,6 +374,12 @@ type ComicBuildParams = {
   babyImgUrl?: string;
 };
 
+function toJavaScriptLiteral(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\\\u2028')
+    .replace(/\u2029/g, '\\\\u2029');
+}
+
 function buildComicScriptBody(params: ComicBuildParams): string {
   const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null, genId = 0, babyImgUrl } = params;
   const hashtagStr = hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
@@ -386,38 +392,38 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   const overlayColor = mc.overlayColor;
 
   return `(function(){
-  window.onerror=function(message){postMsg('error',{msg:'render script error: '+String(message)});};
+  window.onerror=function(message,source,lineno,colno,error){postMsg('error',{msg:'render script error: '+String(message)+(lineno?' (line '+lineno+')':'')});};
   var W=${W}, H=${H};
   var canvas=document.getElementById('cv');
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
-  var hook=${JSON.stringify(hook)};
-  var title=${JSON.stringify(title)};
-  var hashtagStr=${JSON.stringify(hashtagStr)};
-  var accentColor=${JSON.stringify(accentColor)};
-  var shortUrl=${JSON.stringify(shortUrl)};
-  var disclosureText=${JSON.stringify(disclosureText)};
-  var filterCode=${JSON.stringify(filterCode)};
-  var overlayColor=${JSON.stringify(overlayColor)};
+  var hook=${toJavaScriptLiteral(hook)};
+  var title=${toJavaScriptLiteral(title)};
+  var hashtagStr=${toJavaScriptLiteral(hashtagStr)};
+  var accentColor=${toJavaScriptLiteral(accentColor)};
+  var shortUrl=${toJavaScriptLiteral(shortUrl)};
+  var disclosureText=${toJavaScriptLiteral(disclosureText)};
+  var filterCode=${toJavaScriptLiteral(filterCode)};
+  var overlayColor=${toJavaScriptLiteral(overlayColor)};
   var duration=${params.duration};
   var FPS=${FPS};
-  var moodTemplate=${JSON.stringify(moodTemplate)};
-  var moodConfig=${JSON.stringify(mc)};
-  var effectiveAccent=${JSON.stringify(effectiveAccent)};
-  var panelLayout=${JSON.stringify(panelLayout)};
-  var stickerPosition=${JSON.stringify(stickerPosition)};
-  var stickerStyle=${JSON.stringify(stickerStyle)};
+  var moodTemplate=${toJavaScriptLiteral(moodTemplate)};
+  var moodConfig=${toJavaScriptLiteral(mc)};
+  var effectiveAccent=${toJavaScriptLiteral(effectiveAccent)};
+  var panelLayout=${toJavaScriptLiteral(panelLayout)};
+  var stickerPosition=${toJavaScriptLiteral(stickerPosition)};
+  var stickerStyle=${toJavaScriptLiteral(stickerStyle)};
   var stickerSize=${stickerSize};
   var episodeMode=${episodeMode};
-  var narrationAudioDataUrl=${JSON.stringify(narrationAudioDataUrl)};
-  var punchMarkers=${JSON.stringify(punchMarkers)};
-  var punchAudioDataUrl=${JSON.stringify(punchAudioDataUrl)};
-  var mbtiCommentary=${JSON.stringify(mbtiCommentary)};
+  var narrationAudioDataUrl=${toJavaScriptLiteral(narrationAudioDataUrl)};
+  var punchMarkers=${toJavaScriptLiteral(punchMarkers)};
+  var punchAudioDataUrl=${toJavaScriptLiteral(punchAudioDataUrl)};
+  var mbtiCommentary=${toJavaScriptLiteral(mbtiCommentary)};
   var emotionOverlay=${emotionOverlay};
-  var localStoreInfo=${JSON.stringify(localStoreInfo)};
-  var imageUrl=${JSON.stringify(imageUrl)};
+  var localStoreInfo=${toJavaScriptLiteral(localStoreInfo)};
+  var imageUrl=${toJavaScriptLiteral(imageUrl)};
   var genId=${genId};
-  var panelEmotions=${JSON.stringify(panels.map(p => p.emotion || ''))};
+  var panelEmotions=${toJavaScriptLiteral(panels.map(p => p.emotion || ''))};
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
   var emotionColors={'\uACE0\uBBFC':'#FFD600','\uB188\uB78C':'#FF6B6B','\uD589\uBCF5':'#10B981','\uD655\uC2E0':'#3B82F6','\uC124\uB808':'#EC4899','\uC2AC\uD544':'#6366F1','\uBD84\uB178':'#F59E0B','\uB3C4\uC804':'#EF4444','\uD589\uB3D9':'#8B5CF6','\uC9C0\uB8CC':'#64748B','\uC218\uB2E4':'#06B6D4','\uAC10\uB3D9':'#F43F5E'};
   var mbtiColors={'INTJ':'#8b5cf6','ENFP':'#f59e0b','ISTP':'#06b3d4','ENFJ':'#10b981'};
@@ -754,9 +760,9 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   }
 
   var panelCount=panelLayout==='single'?1:panelLayout==='split-2'?2:3;
-  var panelSpeeches=${JSON.stringify(panels.map(p => p.speech))};
-  var panelSfx=${JSON.stringify(panels.map(p => p.sfx || 'KWAANG!'))};
-  var panelLabels=${JSON.stringify(panels.map(p => p.episodeLabel || ''))};
+  var panelSpeeches=${toJavaScriptLiteral(panels.map(p => p.speech))};
+  var panelSfx=${toJavaScriptLiteral(panels.map(p => p.sfx || 'KWAANG!'))};
+  var panelLabels=${toJavaScriptLiteral(panels.map(p => p.episodeLabel || ''))};
 
 
   function drawImageInPanel(ctx,img,px,py,pw,ph,filter,panScale){
@@ -1483,14 +1489,26 @@ export function ComicShortGenerator({
       handleWebViewMessage({ nativeEvent: { data: rawMsg } } as WebViewMessageEvent);
     };
 
-    const scriptEl = document.createElement('script');
-    scriptEl.textContent = scriptBody;
-    document.body.appendChild(scriptEl);
+    let scriptError: Error | null = null;
+    try {
+      const fn = new Function(scriptBody);
+      fn();
+    } catch (e) {
+      scriptError = e as Error;
+    }
+
+    if (scriptError) {
+      handleWebViewMessage({
+        nativeEvent: { data: JSON.stringify({ type: 'error', genId: genIdRef.current, data: { msg: '스크립트 문법 오류: ' + (scriptError.message || 'unknown') } }) },
+      } as WebViewMessageEvent);
+      (window as any).__comicPostMsg = prevCallback;
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      return;
+    }
 
     webGenCleanupRef.current = () => {
       (window as any).__comicPostMsg = prevCallback;
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
     };
   }, [handleWebViewMessage]);
 

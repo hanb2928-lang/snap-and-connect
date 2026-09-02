@@ -263,6 +263,7 @@ export function drawRoamingBabyWithLink(
  * The baby image is loaded from the provided URL (babyImgUrl).
  */
 export function getWebViewOverlayScript(babyImgUrl: string = '/baby-crawl.webp'): string {
+  const safeUrl = babyImgUrl.replace(/[''\\\n\r\u2028\u2029]/g, '');
   return `
   var __babyImg = null;
   (function() {
@@ -270,7 +271,7 @@ export function getWebViewOverlayScript(babyImgUrl: string = '/baby-crawl.webp')
     img.crossOrigin = 'anonymous';
     img.onload = function() { __babyImg = img; };
     img.onerror = function() { __babyImg = null; };
-    img.src = '${babyImgUrl}';
+    img.src = '${safeUrl}';
   })();
 
   function __computeBabyPosition(elapsed, W, H) {
