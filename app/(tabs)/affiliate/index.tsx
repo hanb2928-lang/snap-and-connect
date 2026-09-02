@@ -1088,6 +1088,7 @@ export default function AffiliateScreen() {
     if (videoRenderingRef.current) return;
     videoRenderingRef.current = true;
     const isPreview = quality === 'preview';
+    let recorderTimeout: ReturnType<typeof setTimeout> | null = null;
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -1184,6 +1185,9 @@ export default function AffiliateScreen() {
       let audioDest: MediaStreamAudioDestinationNode | null = null;
       let bgmOsc: OscillatorNode | null = null;
       let melodyOsc: OscillatorNode | null = null;
+      let bgmOscGain: GainNode | null = null;
+      let melodyGain: GainNode | null = null;
+      let preloadedTtsBuffers: { buffer: AudioBuffer; offset: number }[] = [];
 
       if (!isPreview) {
       audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -1193,49 +1197,27 @@ export default function AffiliateScreen() {
       masterGain.connect(audioDest);
       masterGainRef.current = masterGain;
 
-      // Generate BGM: platform-specific beat pattern using oscillators
+      // BGM oscillators created but not started — started after recording begins for sync
       const bgmGain = audioCtx.createGain();
       bgmGain.gain.value = 0.15;
       bgmGain.connect(masterGain);
 
-      const beatInterval = 60 / bpm; // seconds per beat
       bgmOsc = audioCtx.createOscillator();
-      const bgmOscGain = audioCtx.createGain();
+      bgmOscGain = audioCtx.createGain();
       bgmOsc.type = 'sine';
       bgmOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 80 : selectedUploadPlatform === 'instagram' ? 60 : 70;
       bgmOsc.connect(bgmOscGain);
       bgmOscGain.gain.value = 0;
       bgmOsc.connect(bgmGain);
-      bgmOsc.start();
-
-      // Schedule beat pulses throughout the video
-      const totalBeats = Math.floor(DURATION / beatInterval);
-      for (let b = 0; b < totalBeats; b++) {
-        const beatTime = b * beatInterval;
-        bgmOscGain.gain.setValueAtTime(0.3, beatTime);
-        bgmOscGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.15);
-      }
       bgmOscGain.connect(bgmGain);
 
-      // Add a secondary melody oscillator for richness
       melodyOsc = audioCtx.createOscillator();
-      const melodyGain = audioCtx.createGain();
+      melodyGain = audioCtx.createGain();
       melodyOsc.type = 'triangle';
       melodyOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 220 : selectedUploadPlatform === 'instagram' ? 165 : 196;
       melodyGain.gain.value = 0;
       melodyOsc.connect(melodyGain);
       melodyGain.connect(bgmGain);
-      melodyOsc.start();
-
-      // Schedule melody notes on every other beat
-      const melodyNotes = [261.63, 293.66, 329.63, 392.00, 329.63, 293.66];
-      for (let b = 0; b < totalBeats; b += 2) {
-        const noteTime = b * beatInterval;
-        const freq = melodyNotes[(b / 2) % melodyNotes.length];
-        melodyOsc.frequency.setValueAtTime(freq, noteTime);
-        melodyGain.gain.setValueAtTime(0.08, noteTime);
-        melodyGain.gain.exponentialRampToValueAtTime(0.001, noteTime + beatInterval * 1.5);
-      }
       } // end audio setup (high-quality only)
 
       // Combine canvas video stream + audio stream (audio only for high-quality)
@@ -1269,12 +1251,79 @@ export default function AffiliateScreen() {
         }
       }
 
+      // Pre-generate TTS audio buffers BEFORE recording starts to avoid playback delay
+      const scenes = videoPreviewScenes!;
+      const totalScenes = scenes.length;
+      if (!isPreview && audioCtx) {
+        try {
+          const narrationText = scenes.map(s => s.textOverlay).join('. ');
+          if (narrationText.trim()) {
+            const voiceKey = selectedVoiceKey ?? settings?.default_tts_voice ?? 'bright_female_1';
+            const voiceParams = getOpenAiVoiceParams(voiceKey, settings?.tts_speed ?? null);
+            const prosodyProfile = mapVoiceKeyToProsody(voiceKey);
+            const emotionCurve = generateEmotionCurve(DURATION, prosodyProfile);
+            const segments = splitTextForEmotionCurve(
+              narrationText,
+              emotionCurve,
+              voiceParams.voice,
+              voiceParams.instructions,
+              prosodyProfile,
+            );
+            const prosodyMeta: ProsodyGenerationMeta = {
+              voiceKey,
+              prosodyProfileId: prosodyProfile.id,
+              phase: 'full',
+              speed: segments[0]?.speed ?? 1.0,
+              timestamp: Date.now(),
+              textLength: narrationText.length,
+            };
+            prosodyMetaRef.current = prosodyMeta;
+            const batchItems = segments.map((seg) => ({
+              languageCode: 'ko',
+              text: seg.text,
+              voice: seg.voice,
+              instructions: seg.instructions,
+              speed: seg.speed,
+            }));
+            const ttsResp = await fetch(BATCH_TTS_FUNCTION_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                apikey: supabaseAnonKey,
+              },
+              body: JSON.stringify({ items: batchItems, ttsApiKey: settings?.tts_api_key ?? undefined }),
+            });
+            if (ttsResp.ok) {
+              const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };
+              let playbackOffset = 0.2;
+              for (const result of ttsData.results) {
+                if (!result.audioBase64 || result.error) continue;
+                try {
+                  const audioBytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+                  const audioBuf = await audioCtx.decodeAudioData(audioBytes.buffer.slice(0));
+                  preloadedTtsBuffers.push({ buffer: audioBuf, offset: playbackOffset });
+                  playbackOffset += audioBuf.duration + 0.15;
+                } catch { /* skip failed segment decode */ }
+              }
+            }
+          }
+        } catch { /* TTS is optional — BGM still plays */ }
+      }
+
       const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
       recorderRef.current = recorder;
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
       recorder.start();
+
+      // Safety timeout: force-stop recorder after 60s to prevent infinite recording
+      recorderTimeout = setTimeout(() => {
+        if (recorderRef.current && recorderRef.current.state === 'recording') {
+          try { recorderRef.current.stop(); } catch { /* already stopped */ }
+        }
+      }, 60000);
 
       // Compute base dimensions for each scene image
       const getBaseDims = (imgEl: HTMLImageElement | null) => {
@@ -1285,97 +1334,67 @@ export default function AffiliateScreen() {
         return { baseH: H, baseW: H * imgAspect };
       };
 
-      const scenes = videoPreviewScenes;
-      const totalScenes = scenes.length;
       const sceneDuration = DURATION / totalScenes;
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
 
-      // Generate neural TTS voiceover via OpenAI gpt-4o-mini-tts (high-quality only)
-      // Splits narration by emotion curve (doubt→surprise→conviction) for natural prosody
+      // Schedule all audio relative to recording start time for proper sync
       if (!isPreview && audioCtx && masterGainRef.current) {
-      try {
-        const narrationText = scenes.map(s => s.textOverlay).join('. ');
-        if (narrationText.trim()) {
-          const voiceKey = selectedVoiceKey ?? settings?.default_tts_voice ?? 'bright_female_1';
-          const voiceParams = getOpenAiVoiceParams(voiceKey, settings?.tts_speed ?? null);
-          const prosodyProfile = mapVoiceKeyToProsody(voiceKey);
-          const emotionCurve = generateEmotionCurve(DURATION, prosodyProfile);
-          const segments = splitTextForEmotionCurve(
-            narrationText,
-            emotionCurve,
-            voiceParams.voice,
-            voiceParams.instructions,
-            prosodyProfile,
-          );
-          const prosodyMeta: ProsodyGenerationMeta = {
-            voiceKey,
-            prosodyProfileId: prosodyProfile.id,
-            phase: 'full',
-            speed: segments[0]?.speed ?? 1.0,
-            timestamp: Date.now(),
-            textLength: narrationText.length,
-          };
-          prosodyMetaRef.current = prosodyMeta;
-          const batchItems = segments.map((seg) => ({
-            languageCode: 'ko',
-            text: seg.text,
-            voice: seg.voice,
-            instructions: seg.instructions,
-            speed: seg.speed,
-          }));
-          const ttsResp = await fetch(BATCH_TTS_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${supabaseAnonKey}`,
-              apikey: supabaseAnonKey,
-            },
-            body: JSON.stringify({ items: batchItems, ttsApiKey: settings?.tts_api_key ?? undefined }),
-          });
-          if (ttsResp.ok) {
-            const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };
-            let playbackOffset = 0.2;
-            for (const result of ttsData.results) {
-              if (!result.audioBase64 || result.error) continue;
-              try {
-                const audioBytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
-                const audioBuf = await audioCtx.decodeAudioData(audioBytes.buffer.slice(0));
-                const src = audioCtx.createBufferSource();
-                src.buffer = audioBuf;
-                const ttsGain = audioCtx.createGain();
-                ttsGain.gain.value = 0.85;
-                src.connect(ttsGain);
-                ttsGain.connect(masterGainRef.current);
-                src.start(audioCtx.currentTime + playbackOffset);
-                playbackOffset += audioBuf.duration + 0.15;
-              } catch { /* skip failed segment decode */ }
-            }
+        const audioStartOffset = audioCtx.currentTime;
+
+        // Start BGM oscillators and schedule beats in sync with video
+        if (bgmOsc) bgmOsc.start(audioStartOffset);
+        if (melodyOsc) melodyOsc.start(audioStartOffset);
+        const beatInterval = 60 / bpm;
+        const totalBeats = Math.floor(DURATION / beatInterval);
+        if (bgmOscGain) {
+          for (let b = 0; b < totalBeats; b++) {
+            const beatTime = audioStartOffset + b * beatInterval;
+            bgmOscGain.gain.setValueAtTime(0.3, beatTime);
+            bgmOscGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.15);
           }
         }
-      } catch { /* TTS is optional — BGM still plays */ }
-      } // end neural TTS (high-quality only)
+        const melodyNotes = [261.63, 293.66, 329.63, 392.00, 329.63, 293.66];
+        if (melodyOsc && melodyGain) {
+          for (let b = 0; b < totalBeats; b += 2) {
+            const noteTime = audioStartOffset + b * beatInterval;
+            const freq = melodyNotes[(b / 2) % melodyNotes.length];
+            melodyOsc.frequency.setValueAtTime(freq, noteTime);
+            melodyGain.gain.setValueAtTime(0.08, noteTime);
+            melodyGain.gain.exponentialRampToValueAtTime(0.001, noteTime + beatInterval * 1.5);
+          }
+        }
 
-      // Add transition sound effects (whoosh/zip) at scene boundaries (high-quality only)
-      if (!isPreview && audioCtx && masterGainRef.current) {
-      const sfxGain = audioCtx.createGain();
-      sfxGain.gain.value = 0.2;
-      sfxGain.connect(masterGainRef.current);
-      for (let i = 1; i < totalScenes; i++) {
-        const sfxTime = (DURATION / totalScenes) * i;
-        const sfxOsc = audioCtx.createOscillator();
-        const sfxOscGain = audioCtx.createGain();
-        sfxOsc.type = 'sawtooth';
-        sfxOsc.frequency.setValueAtTime(800, sfxTime);
-        sfxOsc.frequency.exponentialRampToValueAtTime(200, sfxTime + 0.1);
-        sfxOscGain.gain.setValueAtTime(0.15, sfxTime);
-        sfxOscGain.gain.exponentialRampToValueAtTime(0.001, sfxTime + 0.12);
-        sfxOsc.connect(sfxOscGain);
-        sfxOscGain.connect(sfxGain);
-        sfxOsc.start(sfxTime);
-        sfxOsc.stop(sfxTime + 0.15);
+        // Schedule preloaded TTS buffers in sync with video timeline
+        for (const { buffer, offset } of preloadedTtsBuffers) {
+          const src = audioCtx.createBufferSource();
+          src.buffer = buffer;
+          const ttsGain = audioCtx.createGain();
+          ttsGain.gain.value = 0.85;
+          src.connect(ttsGain);
+          ttsGain.connect(masterGainRef.current);
+          src.start(audioStartOffset + offset);
+        }
+
+        // Schedule transition SFX at scene boundaries
+        const sfxGain = audioCtx.createGain();
+        sfxGain.gain.value = 0.2;
+        sfxGain.connect(masterGainRef.current);
+        for (let i = 1; i < totalScenes; i++) {
+          const sfxTime = audioStartOffset + (DURATION / totalScenes) * i;
+          const sfxOsc = audioCtx.createOscillator();
+          const sfxOscGain = audioCtx.createGain();
+          sfxOsc.type = 'sawtooth';
+          sfxOsc.frequency.setValueAtTime(800, sfxTime);
+          sfxOsc.frequency.exponentialRampToValueAtTime(200, sfxTime + 0.1);
+          sfxOscGain.gain.setValueAtTime(0.15, sfxTime);
+          sfxOscGain.gain.exponentialRampToValueAtTime(0.001, sfxTime + 0.12);
+          sfxOsc.connect(sfxOscGain);
+          sfxOscGain.connect(sfxGain);
+          sfxOsc.start(sfxTime);
+          sfxOsc.stop(sfxTime + 0.15);
+        }
       }
-      } // end SFX (high-quality only)
 
       const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
         ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
@@ -2076,6 +2095,7 @@ export default function AffiliateScreen() {
         durationSec: 0,
       }).catch(() => {});
     } finally {
+      if (recorderTimeout) clearTimeout(recorderTimeout);
       if (recorderRef.current && recorderRef.current.state === 'recording') {
         try { recorderRef.current.stop(); } catch { /* already stopped */ }
       }
