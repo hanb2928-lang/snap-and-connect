@@ -51,3 +51,4 @@ export const PERSONA_SIMULATOR_URL = `${supabaseUrl}/functions/v1/persona-simula
 export const TREND_MATCH_URL = `${supabaseUrl}/functions/v1/trend-match`;
 export const PEXELS_VIDEO_SEARCH_URL = `${supabaseUrl}/functions/v1/search-pexels-videos`;
 export const VIDEO_EDIT_PLAN_URL = `${supabaseUrl}/functions/v1/generate-video-edit-plan`;
+export const VIRAL_SHORTFORM_URL = `${supabaseUrl}/functions/v1/generate-viral-shortform`;

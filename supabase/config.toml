@@ -84,3 +84,6 @@ verify_jwt = false
 
 [functions.render-video]
 verify_jwt = false
+
+[functions.generate-viral-shortform]
+verify_jwt = false
