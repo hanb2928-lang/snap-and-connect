@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Camera, Wand as Wand2, ChevronRight } from 'lucide-react-native';
+import { Camera, Wand as Wand2, Film, Send, ChevronRight } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface WorkflowStep {
@@ -9,64 +8,62 @@ interface WorkflowStep {
   desc: string;
   icon: React.ReactNode;
   color: string;
-  route: string;
 }
 
 const STEPS: WorkflowStep[] = [
   {
     num: '1',
-    title: '사진 촬영 또는 불러오기',
-    desc: '제품의 단품 또는 다각도(앞·옆·뒤) 사진을 촬영하거나 앨범에서 불러옵니다.',
+    title: '사진 촬영 · 업로드',
+    desc: '제품 사진을 촬영하거나 앨범에서 불러오고 게시할 플랫폼을 선택하세요.',
     icon: <Camera size={22} color={theme.colors.primary[400]} strokeWidth={2} />,
     color: theme.colors.primary[500],
-    route: '/',
   },
   {
     num: '2',
-    title: 'AI 이미지 보정 및 합성',
+    title: 'AI 이미지 보정 · 합성',
     desc: 'AI 누끼(배경 제거), 조명 스튜디오 합성, AI 가상 피팅으로 전문 소재를 완성합니다.',
     icon: <Wand2 size={22} color={theme.colors.accent[400]} strokeWidth={2} />,
     color: theme.colors.accent[500],
-    route: '/',
+  },
+  {
+    num: '3',
+    title: 'AI 만화 숏폼 생성',
+    desc: '상품 사진 한 장으로 만화 컷 숏폼을 자동 생성하고 미리보기로 확인하세요.',
+    icon: <Film size={22} color={theme.colors.success[400]} strokeWidth={2} />,
+    color: theme.colors.success[500],
+  },
+  {
+    num: '4',
+    title: '발행 · 공유',
+    desc: '단축 URL을 복사하고 선택한 플랫폼에 바로 업로드하세요.',
+    icon: <Send size={22} color={theme.colors.warning[400]} strokeWidth={2} />,
+    color: theme.colors.warning[500],
   },
 ];
 
 interface WorkflowGuideProps {
-  onStepPress?: (step: number) => void;
   currentStep?: number;
 }
 
-export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) {
-  const router = useRouter();
-
-  const handleStepPress = (index: number, route: string) => {
-    if (onStepPress) {
-      onStepPress(index + 1);
-    } else {
-      router.push(route as never);
-    }
-  };
-
+export function WorkflowGuide({ currentStep }: WorkflowGuideProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>작업 순서 가이드</Text>
+      <Text style={styles.heading}>작업 순서</Text>
       <Text style={styles.subheading}>
-        각 카드를 탭하여 사진 촬영, AI 합성 및 보정을 진행하세요
+        4단계로 완성하는 숏폼 콘텐츠
       </Text>
 
       {STEPS.map((step, index) => {
         const isActive = currentStep === index + 1;
         const isDone = currentStep != null && currentStep > index + 1;
         return (
-          <TouchableOpacity
+          <View
             key={step.num}
             style={[
               styles.stepCard,
               isActive && styles.stepCardActive,
               isDone && styles.stepCardDone,
             ]}
-            onPress={() => handleStepPress(index, step.route)}
-            activeOpacity={0.7}
           >
             <View style={styles.stepLeft}>
               <View
@@ -99,13 +96,7 @@ export function WorkflowGuide({ onStepPress, currentStep }: WorkflowGuideProps) 
               </View>
               <Text style={styles.stepDesc}>{step.desc}</Text>
             </View>
-
-            <ChevronRight
-              size={18}
-              color={theme.colors.dark.textDim}
-              strokeWidth={2}
-            />
-          </TouchableOpacity>
+          </View>
         );
       })}
     </View>
@@ -132,7 +123,7 @@ const styles = StyleSheet.create({
   },
   stepCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: theme.spacing.md,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
@@ -168,12 +159,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 36,
     width: 2,
-    height: 28,
+    height: '100%',
+    minHeight: 28,
     backgroundColor: theme.colors.dark.border,
   },
   stepContent: {
     flex: 1,
     gap: 6,
+    paddingBottom: 4,
   },
   stepHeader: {
     flexDirection: 'row',

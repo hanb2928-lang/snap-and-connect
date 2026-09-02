@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
   ActivityIndicator,
   Platform,
   Modal,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe, Eye, EyeOff } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
@@ -1288,6 +1290,31 @@ export function ComicShortGenerator({
     toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
+  const handlePickProductImage = useCallback(async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast('상품 사진을 선택하려면 사진 접근 권한이 필요해요');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.92,
+      });
+      if (result.canceled || !result.assets[0]?.uri) return;
+      const selectedUri = result.assets[0].uri;
+      const converted = await urlToDataUrl(selectedUri);
+      setSafeImageUrl(converted);
+      setState('idle');
+      setResultUri(null);
+      setResultBlob(null);
+      showToast('상품 사진이 준비됐어요. AI 만화 숏폼을 생성해보세요');
+    } catch {
+      showToast('상품 사진을 불러오지 못했어요. 다시 시도해주세요');
+    }
+  }, [showToast]);
+
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -1573,12 +1600,13 @@ export function ComicShortGenerator({
       setTtsLoading(false);
     }
 
-    let finalImageUrl = imageUrl;
-    try {
-      const converted = await urlToDataUrl(imageUrl);
-      finalImageUrl = converted;
-    } catch {
-      // keep original URL; WebView fetch will retry
+    let finalImageUrl = safeImageUrl;
+    if (!finalImageUrl.startsWith('data:')) {
+      try {
+        finalImageUrl = await urlToDataUrl(finalImageUrl);
+      } catch {
+        // keep original URL; WebView fetch will retry
+      }
     }
     setSafeImageUrl(finalImageUrl);
     setMoodTemplate(finalMood);
@@ -1639,7 +1667,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 60000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, imageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant]);
 
 
 
@@ -1991,6 +2019,23 @@ export function ComicShortGenerator({
       {state === 'idle' && (
         <View>
           <TemplateBadge label={tpl.badgeLabel} />
+          <View style={styles.productImageUploadCard}>
+            <View style={styles.productImagePreviewWrap}>
+              <Image source={{ uri: safeImageUrl }} style={styles.productImagePreview} resizeMode="cover" />
+              <View style={styles.productImageBadge}>
+                <Check size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
+                <Text style={styles.productImageBadgeText}>생성 원본</Text>
+              </View>
+            </View>
+            <View style={styles.productImageUploadContent}>
+              <Text style={styles.productImageUploadTitle}>상품 사진 준비</Text>
+              <Text style={styles.productImageUploadDesc}>이 사진을 만화 숏폼의 원본 이미지로 사용합니다.</Text>
+              <TouchableOpacity style={styles.productImageUploadButton} onPress={handlePickProductImage} activeOpacity={0.8}>
+                <CloudUpload size={15} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={styles.productImageUploadButtonText}>다른 상품 사진 업로드</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
           <View style={styles.autoInfoBox}>
             <Sparkles size={14} color={theme.colors.accent[400]} strokeWidth={2} />
             <Text style={styles.autoInfoText}>
@@ -2701,6 +2746,77 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 16,
+  },
+  productImageUploadCard: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  productImagePreviewWrap: {
+    width: 78,
+    height: 78,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: theme.colors.dark.surface,
+  },
+  productImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  productImageBadge: {
+    position: 'absolute',
+    left: 4,
+    bottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    borderRadius: 5,
+    backgroundColor: 'rgba(10, 16, 24, 0.86)',
+  },
+  productImageBadgeText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  productImageUploadContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  productImageUploadTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  productImageUploadDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  productImageUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 3,
+    paddingVertical: 6,
+    paddingHorizontal: 9,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.accent[500] + '18',
+  },
+  productImageUploadButtonText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
   },
   autoInfoBox: {
     flexDirection: 'row',

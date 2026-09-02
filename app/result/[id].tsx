@@ -118,6 +118,8 @@ import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { AICutGenerator } from '@/components/AICutGenerator';
 import { VideoImportGenerator } from '@/components/VideoImportGenerator';
+import { WorkflowGuide } from '@/components/WorkflowGuide';
+import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1754,6 +1756,9 @@ export default function ResultScreen() {
         )}
 
         <View style={styles.body}>
+          <View style={styles.workflowGuideWrap}>
+            <WorkflowGuide currentStep={3} />
+          </View>
           <View style={styles.titleRow}>
             <Sparkles size={20} color={theme.colors.primary[400]} strokeWidth={2} />
             <Text style={styles.title} numberOfLines={2}>{scan.title || '제품 분석 결과'}</Text>
@@ -1862,7 +1867,7 @@ export default function ResultScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.sectionLabel}>마케팅 카피</Text>
+                <Text style={styles.sectionLabel}>1단계 · 플랫폼 게시판 선택</Text>
               </View>
               <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
               {platformSupportsBoth(activePlatform) && (
@@ -1975,10 +1980,10 @@ export default function ResultScreen() {
 
           <View style={styles.section}>
             <View style={styles.comicTileHeader}>
-              <Wand2 size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+              <FilmIcon size={18} color={theme.colors.success[400]} strokeWidth={2} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.comicTileTitle}>AI 만화 숏폼</Text>
-                <Text style={styles.comicTileDesc}>상품 사진 한 장으로 만화 컷 숏폼 자동 생성</Text>
+                <Text style={styles.comicTileTitle}>3단계 · AI 만화 숏폼 생성</Text>
+                <Text style={styles.comicTileDesc}>상품 사진으로 만화 컷 숏폼 자동 생성 · 미리보기 후 저장</Text>
               </View>
             </View>
             <ComicShortGenerator
@@ -2003,6 +2008,23 @@ export default function ResultScreen() {
               brandPersona={settings?.brand_persona}
               preloadedVariant={selectedVariant}
             />
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.comicTileHeader}>
+              <UploadIcon size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.comicTileTitle}>4단계 · 발행 · 공유</Text>
+                <Text style={styles.comicTileDesc}>단축 URL 복사 후 선택한 플랫폼에 업로드</Text>
+              </View>
+            </View>
+            {shortUrl ? (
+              <ShortLinkCopyBar url={shortUrl} scanId={scan.id} label="제휴 단축 URL" />
+            ) : (
+              <View style={styles.publishHintBox}>
+                <Text style={styles.publishHintText}>단축 URL이 아직 생성되지 않았습니다. 제휴 링크를 설정하면 자동 생성됩니다.</Text>
+              </View>
+            )}
           </View>
 
           <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
@@ -2279,6 +2301,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary[300],
   },
+  workflowGuideWrap: {
+    marginBottom: theme.spacing.lg,
+  },
   section: {
     marginTop: theme.spacing.xl,
   },
@@ -2299,6 +2324,19 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginTop: 2,
+  },
+  publishHintBox: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  publishHintText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 19,
   },
   safetyTileBtn: {
     flexDirection: 'row',
