@@ -1075,13 +1075,22 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       }
     },duration+15000);
 
+    function sendBase64InChunks(base64,size,mimeType,isImage){
+      var chunkSize=500000;
+      var total=Math.ceil(base64.length/chunkSize);
+      for(var ci=0;ci<total;ci++){
+        var chunk=base64.slice(ci*chunkSize,(ci+1)*chunkSize);
+        postMsg('chunk',{index:ci,total:total,chunk:chunk});
+      }
+      postMsg('done',{size:size,mimeType:mimeType,isImage:!!isImage});
+    }
     if(donePromise){
       donePromise.then(function(blob){
         clearTimeout(watchdog);
         var reader=new FileReader();
         reader.onloadend=function(){
           var base64=reader.result.split(',')[1];
-          postMsg('done',{base64:base64,size:blob.size,mimeType:mimeType});
+          sendBase64InChunks(base64,blob.size,mimeType,false);
         };
         reader.readAsDataURL(blob);
       });
@@ -1091,7 +1100,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         try{
           var dataUrl=canvas.toDataURL('image/png');
           var base64=dataUrl.split(',')[1];
-          postMsg('done',{base64:base64,size:0,mimeType:'image/png',isImage:true});
+          sendBase64InChunks(base64,0,'image/png',true);
         }catch(e){
           postMsg('error',{msg:'canvas toDataURL failed: '+(e&&e.message||'unknown')});
         }
@@ -1280,6 +1289,7 @@ export function ComicShortGenerator({
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
+  const chunkBufferRef = useRef<string[]>([]);
   const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -1287,12 +1297,24 @@ export function ComicShortGenerator({
       if (msg.type === 'progress') {
         if (stateRef.current !== 'generating') return;
         setProgress(msg.data.progress);
+      } else if (msg.type === 'chunk') {
+        if (stateRef.current !== 'generating') return;
+        const { index, chunk } = msg.data;
+        if (index === 0) chunkBufferRef.current = [];
+        chunkBufferRef.current[index] = chunk;
       } else if (msg.type === 'done') {
         if (stateRef.current !== 'generating') return;
-        const { base64, size, mimeType } = msg.data;
+        const { size, mimeType } = msg.data;
         const isImage = msg.data.isImage === true;
         const mime = mimeType || 'video/webm';
         const ext = isImage ? 'png' : (mime.includes('webm') ? 'webm' : 'mp4');
+        const base64 = chunkBufferRef.current.join('');
+        chunkBufferRef.current = [];
+        if (!base64) {
+          setState('error');
+          showToast('영상 데이터를 받지 못했어요. 다시 시도해주세요');
+          return;
+        }
         setResultMime(mime);
         setResultSize(size || 0);
         try {
