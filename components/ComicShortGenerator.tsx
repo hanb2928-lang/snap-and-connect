@@ -368,10 +368,11 @@ type ComicBuildParams = {
   emotionOverlay?: boolean;
   localStoreInfo?: LocalStoreInfo | null;
   genId?: number;
+  babyImgUrl?: string;
 };
 
 function buildComicScriptBody(params: ComicBuildParams): string {
-  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null, genId = 0 } = params;
+  const { imageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, disclosureText, stickerPosition, stickerStyle, stickerSize, panels, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiCommentary, emotionOverlay = false, localStoreInfo = null, genId = 0, babyImgUrl } = params;
   const hashtagStr = hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
 
   const mood = MOOD_TEMPLATES[moodTemplate] || MOOD_TEMPLATES['energetic-popart'];
@@ -709,7 +710,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     ctx.restore();
   }
 
-  ${getWebViewOverlayScript()}
+  ${getWebViewOverlayScript(babyImgUrl)}
 
   function postMsg(type,data){
     var msg=JSON.stringify({type:type,genId:genId,data:data||{}});
@@ -1197,6 +1198,21 @@ export function ComicShortGenerator({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
   const [webviewKey, setWebviewKey] = useState(0);
+  const [babyImgDataUrl, setBabyImgDataUrl] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const converted = await urlToDataUrl('/baby-crawl.webp');
+        if (!cancelled) setBabyImgDataUrl(converted);
+      } catch {
+        // fallback to pink circle in WebView script
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1573,6 +1589,7 @@ export function ComicShortGenerator({
         emotionOverlay,
         localStoreInfo,
         genId: currentGenId,
+        babyImgUrl: babyImgDataUrl,
       });
       runWebComicGeneration(scriptBody);
     } else {
@@ -1885,7 +1902,8 @@ export function ComicShortGenerator({
     emotionOverlay,
     localStoreInfo,
     genId: genIdRef.current,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, genIdRef.current]);
+    babyImgUrl: babyImgDataUrl,
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, genIdRef.current, babyImgDataUrl]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 
