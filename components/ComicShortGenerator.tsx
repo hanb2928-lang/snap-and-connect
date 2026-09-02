@@ -723,6 +723,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   }
 
   var img=new Image();
+  img.crossOrigin='anonymous';
   var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},45000);
   img.onload=function(){
     clearTimeout(imgLoadTimeout);
@@ -830,8 +831,19 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       recorder=new MediaRecorder(combinedStream,{mimeType:mimeType,videoBitsPerSecond:6000000});
       var chunks=[];
       recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
-      donePromise=new Promise(function(resolve){
-        recorder.onstop=function(){resolve(new Blob(chunks,{type:mimeType}));};
+      donePromise=new Promise(function(resolve,reject){
+        var stopTimeout=setTimeout(function(){
+          try{if(recorder&&recorder.state!=='inactive')recorder.stop();}catch(e){}
+          reject(new Error('recorder stop timeout'));
+        },duration+30000);
+        recorder.onstop=function(){
+          clearTimeout(stopTimeout);
+          resolve(new Blob(chunks,{type:mimeType}));
+        };
+        recorder.onerror=function(e){
+          clearTimeout(stopTimeout);
+          reject(new Error('recorder error: '+((e&&e.error&&e.error.message)||'unknown')));
+        };
       });
       recorder.start();
       }
@@ -1095,7 +1107,13 @@ function buildComicScriptBody(params: ComicBuildParams): string {
           var base64=reader.result.split(',')[1];
           sendBase64InChunks(base64,blob.size,mimeType,false);
         };
+        reader.onerror=function(){
+          postMsg('error',{msg:'blob read failed'});
+        };
         reader.readAsDataURL(blob);
+      }).catch(function(err){
+        clearTimeout(watchdog);
+        postMsg('error',{msg:'recording failed: '+(err&&err.message||'unknown')});
       });
     } else {
       setTimeout(function(){
@@ -1344,6 +1362,7 @@ export function ComicShortGenerator({
         chunkBufferRef.current = [];
         chunkTotalRef.current = 0;
         if (!base64 || (expectedTotal > 0 && receivedChunks < expectedTotal)) {
+          generatingLockRef.current = false;
           setState('error');
           showToast('영상 데이터를 받지 못했어요. 다시 시도해주세요');
           return;
@@ -1367,17 +1386,20 @@ export function ComicShortGenerator({
             setResultUri(fileUri);
           }
           if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+          generatingLockRef.current = false;
           setState('done');
           setProgress(100);
           const hasAudio = !!narrationAudioDataUrl;
           showToast(isImage ? '만화 숏폼 이미지가 완성됐어요!' : hasAudio ? 'AI 내레이션 만화 숏폼 완성!' : '만화 숏폼 동영상이 완성됐어요!');
         } catch {
+          generatingLockRef.current = false;
           setState('error');
           showToast('파일 저장에 실패했어요');
-        }
+       }
       } else if (msg.type === 'error') {
         if (stateRef.current !== 'generating') return;
         if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+        generatingLockRef.current = false;
         setState('error');
         const errMsg = msg.data?.msg || '';
         if (errMsg.includes('timeout')) {
@@ -1432,8 +1454,11 @@ export function ComicShortGenerator({
     };
   }, [handleWebViewMessage]);
 
+  const generatingLockRef = useRef(false);
   const handleGenerate = useCallback(async () => {
-    if (state === 'generating') return;
+    if (generatingLockRef.current) return;
+    generatingLockRef.current = true;
+    if (state === 'generating') { generatingLockRef.current = false; return; }
     genIdRef.current += 1;
     const currentGenId = genIdRef.current;
     setState('generating');
@@ -1655,6 +1680,7 @@ export function ComicShortGenerator({
     }
 
     generateTimeoutRef.current = setTimeout(() => {
+      generatingLockRef.current = false;
       setState((prev) => {
         if (prev === 'generating') {
           if (webGenCleanupRef.current) {
@@ -1904,11 +1930,13 @@ export function ComicShortGenerator({
     setProgress(0);
     setResultUri(null);
     setResultBlob(null);
+    generatingLockRef.current = false;
     setTimeout(() => handleGenerate(), 100);
   }, [editablePanels, handleGenerate]);
 
   const handleReset = useCallback(() => {
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    generatingLockRef.current = false;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
