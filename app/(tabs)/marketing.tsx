@@ -27,6 +27,7 @@ import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 import { PillNavCard } from '@/components/PillNavCard';
 import { VirtualFitting } from '@/components/VirtualFitting';
 import { AIImageComposite } from '@/components/AIImageComposite';
+import { RoadmapPreview } from '@/components/RoadmapPreview';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
@@ -373,6 +374,9 @@ export default function MarketingScreen() {
             <Settings size={22} color={theme.colors.dark.textDim} strokeWidth={2} />
           </TouchableOpacity>
         </View>
+
+        {/* V2 Roadmap Preview */}
+        <RoadmapPreview />
 
         {/* Mode Switcher */}
         <View style={styles.modeSwitcherWrap}>
