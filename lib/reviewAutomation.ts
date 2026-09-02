@@ -22,6 +22,11 @@ export interface InventoryItem {
   category: string | null;
   is_active: boolean;
   last_updated: string;
+  price?: number | null;
+  original_price?: number | null;
+  is_today_menu?: boolean;
+  is_closing_sale?: boolean;
+  auto_shortform?: boolean;
 }
 
 export interface PushAlert {

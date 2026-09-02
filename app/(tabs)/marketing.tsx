@@ -28,6 +28,7 @@ import { PillNavCard } from '@/components/PillNavCard';
 import { VirtualFitting } from '@/components/VirtualFitting';
 import { AIImageComposite } from '@/components/AIImageComposite';
 import { RoadmapPreview } from '@/components/RoadmapPreview';
+import { PosIntegrationCard } from '@/components/PosIntegrationCard';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
@@ -377,6 +378,9 @@ export default function MarketingScreen() {
 
         {/* V2 Roadmap Preview */}
         <RoadmapPreview />
+
+        {/* POS / Inventory Integration */}
+        <PosIntegrationCard />
 
         {/* Mode Switcher */}
         <View style={styles.modeSwitcherWrap}>
