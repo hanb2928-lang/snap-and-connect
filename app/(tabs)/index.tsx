@@ -581,13 +581,19 @@ export default function CameraScreen() {
     setMoodFilter('none');
     setError(null);
     setMultiAngleShots([]);
-    if (mode === 'video') {
-      setCameraRole('video');
-    } else if (cameraRole === 'video') {
-      setCameraRole('template');
-    }
     if (mode === 'multi') {
       setMultiAngleVisible(true);
+    }
+  };
+
+  const handleVideoRecordToggle = () => {
+    if (isRecording) {
+      stopVideoRecording();
+    } else {
+      if (!cameraReady || processing || autoSaving) return;
+      setCaptureMode('video');
+      setCameraRole('video');
+      startVideoRecording();
     }
   };
 
@@ -994,7 +1000,6 @@ export default function CameraScreen() {
         {/* Capture mode segment — filtered by camera role */}
         <View style={styles.modeSegmentWrap}>
           <View style={styles.modeSegment}>
-            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('oneclick')}
@@ -1004,8 +1009,6 @@ export default function CameraScreen() {
               <Zap size={13} color={captureMode === 'oneclick' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'oneclick' && styles.modeSegmentTextActive]}>원클릭</Text>
             </TouchableOpacity>
-            )}
-            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('single')}
@@ -1015,8 +1018,6 @@ export default function CameraScreen() {
               <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>스틸컷</Text>
             </TouchableOpacity>
-            )}
-            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('multi')}
@@ -1031,29 +1032,8 @@ export default function CameraScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.modeSegmentBtn, captureMode === 'video' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
-              onPress={() => handleCaptureModeChange('video')}
-              disabled={processing || autoSaving}
-              activeOpacity={0.7}
-            >
-              <Video size={13} color={captureMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.modeSegmentText, captureMode === 'video' && styles.modeSegmentTextActive]}>동영상</Text>
-            </TouchableOpacity>
           </View>
         </View>
-
-        {/* Recording timer indicator */}
-        {isRecording && (
-          <View style={styles.recordingIndicatorMobile}>
-            <View style={styles.recordingDotMobile} />
-            <Text style={styles.recordingTimerMobile}>
-              {Math.floor(recordingSec / 60).toString().padStart(2, '0')}:{(recordingSec % 60).toString().padStart(2, '0')}
-            </Text>
-            <Text style={styles.recordingMaxMobile}>/ 01:00</Text>
-          </View>
-        )}
 
         {/* Shutter row: Gallery (left) | Shutter (center) | Grid (right) */}
         <View style={styles.shutterRow}>
@@ -1072,24 +1052,16 @@ export default function CameraScreen() {
               hasImage && styles.shutterBtnGenerate,
               (!hasImage && !cameraReady) && styles.shutterBtnDisabled,
               captureMode === 'oneclick' && !hasImage && styles.shutterBtnOneclickMobile,
-              captureMode === 'video' && !hasImage && styles.shutterBtnVideoMobile,
-              isRecording && styles.shutterBtnRecordingMobile,
               (autoSaving || processing) && styles.shutterBtnCapturing,
             ]}
             onPress={hasImage ? handleGenerate : handleCapture}
-            disabled={processing || autoSaving || (!hasImage && !cameraReady && !isRecording)}
+            disabled={processing || autoSaving || (!hasImage && !cameraReady)}
             activeOpacity={0.85}
           >
             {hasImage ? (
               <Flame size={28} color="#fff" strokeWidth={2.5} />
             ) : captureMode === 'oneclick' ? (
               <Zap size={30} color="#fff" strokeWidth={2.5} />
-            ) : captureMode === 'video' ? (
-              isRecording ? (
-                <View style={styles.shutterStopIcon} />
-              ) : (
-                <View style={styles.shutterRecordIcon} />
-              )
             ) : (
               <Camera size={30} color="#fff" strokeWidth={2.5} />
             )}
@@ -1111,8 +1083,6 @@ export default function CameraScreen() {
         {/* Generate hint text */}
         {hasImage ? (
           <Text style={styles.shutterHintText}>홍보 만들기 시작</Text>
-        ) : captureMode === 'video' && !isRecording ? (
-          <Text style={styles.shutterHintText}>버튼을 눌러 현장감 넘치는 영상을 녹화하세요 (최대 60초)</Text>
         ) : captureMode === 'oneclick' ? (
           <Text style={styles.shutterHintText}>탭 한 번으로 순간을 잡아 숏폼 소스로 즉시 태우세요</Text>
         ) : captureMode === 'single' ? (
@@ -1120,6 +1090,48 @@ export default function CameraScreen() {
         ) : captureMode === 'multi' ? (
           <Text style={styles.shutterHintText}>전면, 측면, 디테일을 연달아 촬영해 역동적인 전환을 만드세요</Text>
         ) : null}
+
+        {/* Divider between photo controls and video record zone */}
+        <View style={styles.videoDivider} />
+
+        {/* Recording timer indicator */}
+        {isRecording && (
+          <View style={styles.recordingIndicatorMobile}>
+            <View style={styles.recordingDotMobile} />
+            <Text style={styles.recordingTimerMobile}>
+              {Math.floor(recordingSec / 60).toString().padStart(2, '0')}:{(recordingSec % 60).toString().padStart(2, '0')}
+            </Text>
+            <Text style={styles.recordingMaxMobile}>/ 01:00</Text>
+          </View>
+        )}
+
+        {/* Independent video record ring — Golden Zone */}
+        <View style={styles.videoRecordRow}>
+          <View style={styles.videoRecordSpacer} />
+          <TouchableOpacity
+            style={[
+              styles.videoRecordBtn,
+              (!cameraReady || processing || autoSaving) && !isRecording && styles.shutterBtnDisabled,
+            ]}
+            onPress={handleVideoRecordToggle}
+            disabled={!isRecording && (!cameraReady || processing || autoSaving)}
+            activeOpacity={0.85}
+          >
+            {isRecording ? (
+              <View style={styles.videoRecordStopIcon} />
+            ) : (
+              <Video size={26} color="#fff" strokeWidth={2.5} />
+            )}
+          </TouchableOpacity>
+          <View style={styles.videoRecordSpacer} />
+        </View>
+
+        {/* Video hint text */}
+        {!hasImage && (
+          <Text style={styles.shutterHintText}>
+            {isRecording ? '녹화 중 — 다시 누르면 멈춥니다' : '영상으로 현장감 있게 담아보세요 (최대 60초)'}
+          </Text>
+        )}
       </View>
 
       {/* Preview Modal */}
@@ -2029,6 +2041,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 15, 30, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  videoDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: theme.spacing.xs,
+  },
+  videoRecordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xs,
+  },
+  videoRecordSpacer: {
+    width: 52,
+  },
+  videoRecordBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.error[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  videoRecordStopIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: '#fff',
   },
   shutterHintText: {
     fontSize: 12,
