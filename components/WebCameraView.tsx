@@ -754,14 +754,9 @@ const styles = StyleSheet.create({
     height: 40,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: 'rgba(5, 8, 18, 0.85)',
     paddingTop: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
-    zIndex: 20,
   },
   errorBanner: {
     backgroundColor: theme.colors.error[500] + '18',
