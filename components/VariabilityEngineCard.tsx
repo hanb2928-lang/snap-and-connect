@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Shuffle, Eye, Type, Mic, Clock, Shield, Copy, Check, RefreshCw, Hash, TriangleAlert as AlertTriangle, TrendingUp } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import {
@@ -17,6 +18,8 @@ import {
   mutateHashtags,
   generateTtsVariation,
   type TtsVariationParams,
+  assessUploadSafety,
+  type UploadRecord,
 } from '@/lib/humanLikeEngine';
 
 const ESSENTIAL_TAGS = ['내돈내산', '리뷰'];
@@ -58,6 +61,15 @@ export function VariabilityEngineCard() {
   const [hashtagResult, setHashtagResult] = useState<string[]>([]);
   const [ttsParams, setTtsParams] = useState<TtsVariationParams | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [uploadRecords, setUploadRecords] = useState<UploadRecord[]>([]);
+
+  const pacingAssessments = useMemo(() => {
+    return Object.keys(PLATFORM_LABELS).map((platform) => ({
+      platform,
+      label: PLATFORM_LABELS[platform],
+      ...assessUploadSafety(platform, uploadRecords),
+    }));
+  }, [uploadRecords]);
 
   const handleGenerateVisual = useCallback(() => {
     setVisualParams(generateVisualParams());
@@ -82,9 +94,14 @@ export function VariabilityEngineCard() {
     setTtsParams(generateTtsVariation(1.0));
   }, []);
 
-  const handleCopy = useCallback((text: string, idx: number) => {
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
+  const handleCopy = useCallback(async (text: string, idx: number) => {
+    try {
+      await Clipboard.setStringAsync(text);
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx(null), 2000);
+    } catch {
+      // clipboard may be unavailable on some platforms
+    }
   }, []);
 
   const safetyScore = useMemo(() => {
@@ -273,19 +290,18 @@ export function VariabilityEngineCard() {
               플랫폼별 업로드 간격을 추적하여 연속 발행으로 인한 섀도우밴 위험을 경고합니다
             </Text>
             <View style={styles.pacingCards}>
-              {Object.entries(PLATFORM_LABELS).map(([key, label]) => {
-                const cooldownMin = 90;
-                const recommendWait = Math.max(0, cooldownMin - Math.floor(Math.random() * cooldownMin));
-                const isSafe = recommendWait === 0;
+              {pacingAssessments.map((item) => {
+                const isSafe = item.level === 'safe';
+                const waitText = item.recommendedWaitMinutes > 0 ? `${item.recommendedWaitMinutes}분 대기` : '안전';
                 return (
-                  <View key={key} style={styles.pacingCard}>
+                  <View key={item.platform} style={styles.pacingCard}>
                     <View style={styles.pacingCardLeft}>
                       <Clock size={16} color={isSafe ? theme.colors.success[400] : theme.colors.warning[400]} strokeWidth={2} />
-                      <Text style={styles.pacingLabel}>{label}</Text>
+                      <Text style={styles.pacingLabel}>{item.label}</Text>
                     </View>
                     <View style={[styles.pacingStatus, { backgroundColor: isSafe ? theme.colors.success[500] + '15' : theme.colors.warning[500] + '15' }]}>
                       <Text style={[styles.pacingStatusText, { color: isSafe ? theme.colors.success[400] : theme.colors.warning[400] }]}>
-                        {isSafe ? '안전' : `${recommendWait}분 대기`}
+                        {waitText}
                       </Text>
                     </View>
                   </View>

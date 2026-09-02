@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { ChartBar as BarChart3, Eye, MousePointerClick, TrendingUp, TrendingDown, DollarSign, Clock, Youtube, Instagram, Music2, Globe, Zap, Target, ArrowRight, Calendar, Percent } from 'lucide-react-native';
+import { ChartBar as BarChart3, Eye, MousePointerClick, TrendingUp, DollarSign, Clock, Youtube, Instagram, Music2, Globe, Zap, Target, ArrowRight, Calendar, Percent } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useRouter } from 'expo-router';
 import { fetchDashboardSummary, formatKRW, type DashboardSummary } from '@/lib/dashboard';
@@ -55,7 +55,7 @@ export function PerformanceReportCard() {
     }
   }, []);
 
-  useMemo(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleRefresh = () => {
     setRefreshing(true);
