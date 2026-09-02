@@ -115,8 +115,9 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
   }, []);
 
   const handleComposite = useCallback(
-    async (presetId: LightingPreset | BackgroundStyle | '__mood__') => {
+    async (presetId: LightingPreset | BackgroundStyle | '__mood__', promptText?: string) => {
       if (!sourceImage) return;
+      const effectivePrompt = promptText ?? customPrompt;
       setStep('processing');
       setError(null);
       setResultImage(null);
@@ -131,6 +132,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
               buildDataUrl(sourceImage, 'image/jpeg'),
               presetId as LightingPreset,
               preset?.gradient ?? ['#ffffff', '#f0f0f0'],
+              effectivePrompt,
             );
           } else {
             let gradient: [string, string] = ['#ffffff', '#f0f0f0'];
@@ -144,6 +146,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
             result = await compositeWithBackgroundWeb(
               buildDataUrl(sourceImage, 'image/jpeg'),
               gradient,
+              effectivePrompt,
             );
           }
         } else {
@@ -188,7 +191,7 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
         setStep('error');
       }
     },
-    [sourceImage, mode, onResult, mobileGradient, selectedMoodTag],
+    [sourceImage, mode, onResult, mobileGradient, selectedMoodTag, customPrompt],
   );
 
   const handleReset = useCallback(() => {
@@ -313,10 +316,30 @@ export function AIImageComposite({ onResult }: AIImageCompositeProps) {
                 multiline
                 maxLength={300}
               />
-              {customPrompt.length > 0 && (
-                <TouchableOpacity onPress={() => setCustomPrompt('')} activeOpacity={0.7} style={styles.promptClearBtn}>
-                  <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                </TouchableOpacity>
+              {customPrompt.trim().length > 0 && (
+                <View style={styles.promptActionRow}>
+                  <TouchableOpacity
+                    onPress={() => setCustomPrompt('')}
+                    activeOpacity={0.7}
+                    style={styles.promptClearBtn}
+                  >
+                    <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.promptApplyBtn}
+                    onPress={() => {
+                      const targetId: LightingPreset | BackgroundStyle | '__mood__' =
+                        selectedMoodTag ? '__mood__' :
+                        mode === 'lighting' ? (selectedPreset ?? 'studio') :
+                        (selectedBackground ?? 'studio');
+                      handleComposite(targetId, customPrompt.trim());
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Sparkles size={14} color="#fff" strokeWidth={2} />
+                    <Text style={styles.promptApplyBtnText}>프롬프트 적용</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           )}
@@ -467,6 +490,7 @@ async function compositeWithLightingWeb(
   productDataUrl: string,
   preset: LightingPreset,
   gradient: [string, string],
+  customPrompt?: string,
 ): Promise<string> {
   const img = await loadImage(productDataUrl);
   const canvas = document.createElement('canvas');
@@ -526,6 +550,8 @@ async function compositeWithLightingWeb(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
+  if (customPrompt) applyPromptAtmosphere(ctx, size, customPrompt);
+
   return canvas.toDataURL('image/png', 0.95);
 }
 
@@ -533,6 +559,7 @@ async function compositeWithLightingWeb(
 async function compositeWithBackgroundWeb(
   productDataUrl: string,
   gradient: [string, string],
+  customPrompt?: string,
 ): Promise<string> {
   const img = await loadImage(productDataUrl);
   const canvas = document.createElement('canvas');
@@ -565,7 +592,45 @@ async function compositeWithBackgroundWeb(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
+  if (customPrompt) applyPromptAtmosphere(ctx, size, customPrompt);
+
   return canvas.toDataURL('image/png', 0.95);
+}
+
+function applyPromptAtmosphere(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  prompt: string,
+): void {
+  const p = prompt.toLowerCase();
+  const keywords: Record<string, { color: string; alpha: number }> = {
+    '바다': { color: '90, 180, 255', alpha: 0.08 },
+    '해변': { color: '90, 180, 255', alpha: 0.08 },
+    '노을': { color: '255, 180, 80', alpha: 0.10 },
+    '선셋': { color: '255, 180, 80', alpha: 0.10 },
+    'sunset': { color: '255, 180, 80', alpha: 0.10 },
+    '거리': { color: '40, 40, 60', alpha: 0.12 },
+    '스트릿': { color: '40, 40, 60', alpha: 0.12 },
+    'street': { color: '40, 40, 60', alpha: 0.12 },
+    '카페': { color: '180, 140, 100', alpha: 0.08 },
+    '공원': { color: '100, 200, 120', alpha: 0.08 },
+    '자연': { color: '100, 200, 120', alpha: 0.08 },
+    '자연광': { color: '255, 255, 220', alpha: 0.06 },
+    '스튜디오': { color: '240, 240, 240', alpha: 0.05 },
+    'studio': { color: '240, 240, 240', alpha: 0.05 },
+    '따뜻': { color: '255, 200, 120', alpha: 0.08 },
+    'warm': { color: '255, 200, 120', alpha: 0.08 },
+    '차가운': { color: '150, 200, 255', alpha: 0.08 },
+    'cool': { color: '150, 200, 255', alpha: 0.08 },
+    '모던': { color: '200, 200, 220', alpha: 0.06 },
+    '미니멀': { color: '245, 245, 245', alpha: 0.05 },
+  };
+  for (const [kw, val] of Object.entries(keywords)) {
+    if (p.includes(kw)) {
+      ctx.fillStyle = `rgba(${val.color}, ${val.alpha})`;
+      ctx.fillRect(0, 0, size, size);
+    }
+  }
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -742,17 +807,39 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.md,
     padding: 12,
-    paddingRight: 36,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
     minHeight: 60,
     maxHeight: 100,
   },
   promptClearBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promptActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 6,
+  },
+  promptApplyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.accent[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  promptApplyBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   presetCard: {
     flexDirection: 'row',
