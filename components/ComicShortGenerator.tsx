@@ -1291,6 +1291,7 @@ export function ComicShortGenerator({
   useEffect(() => { stateRef.current = state; }, [state]);
 
   const chunkBufferRef = useRef<string[]>([]);
+  const chunkTotalRef = useRef<number>(0);
   const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -1300,8 +1301,8 @@ export function ComicShortGenerator({
         setProgress(msg.data.progress);
       } else if (msg.type === 'chunk') {
         if (stateRef.current !== 'generating') return;
-        const { index, chunk } = msg.data;
-        if (index === 0) chunkBufferRef.current = [];
+        const { index, total, chunk } = msg.data;
+        if (index === 0) { chunkBufferRef.current = []; chunkTotalRef.current = total; }
         chunkBufferRef.current[index] = chunk;
       } else if (msg.type === 'done') {
         if (stateRef.current !== 'generating') return;
@@ -1309,9 +1310,12 @@ export function ComicShortGenerator({
         const isImage = msg.data.isImage === true;
         const mime = mimeType || 'video/webm';
         const ext = isImage ? 'png' : (mime.includes('webm') ? 'webm' : 'mp4');
+        const expectedTotal = chunkTotalRef.current;
+        const receivedChunks = chunkBufferRef.current.filter((c) => c !== undefined).length;
         const base64 = chunkBufferRef.current.join('');
         chunkBufferRef.current = [];
-        if (!base64) {
+        chunkTotalRef.current = 0;
+        if (!base64 || (expectedTotal > 0 && receivedChunks < expectedTotal)) {
           setState('error');
           showToast('영상 데이터를 받지 못했어요. 다시 시도해주세요');
           return;
@@ -1408,6 +1412,8 @@ export function ComicShortGenerator({
     setProgress(0);
     setResultUri(null);
     setResultBlob(null);
+    chunkBufferRef.current = [];
+    chunkTotalRef.current = 0;
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
 
     const autoConfig = autoDecideConfig(productCategory, productAdvantages, selectedArtStyle || undefined);
