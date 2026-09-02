@@ -299,6 +299,13 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleThemeChange = useCallback((preset: ThemePreset, mode: 'dark' | 'light') => {
+    setThemePreset(preset);
+    setThemeMode(mode);
+    applyThemePreset(preset);
+    applyThemeMode(mode);
+  }, [applyThemePreset, applyThemeMode]);
+
   const handleSaveAffiliateId = async (id: string) => {
     try {
       await updateAffiliatePlatformId(id, editingAffiliateValue);
@@ -1612,7 +1619,7 @@ export default function SettingsScreen() {
           <View style={styles.progressStyleRow}>
             <TouchableOpacity
               style={[styles.progressStyleCard, themePreset === 'cinematic-dark' && styles.progressStyleCardActive]}
-              onPress={() => { setThemePreset('cinematic-dark'); setThemeMode('dark'); applyThemePreset('cinematic-dark'); applyThemeMode('dark'); }}
+              onPress={() => handleThemeChange('cinematic-dark', 'dark')}
               activeOpacity={0.7}
             >
               <View style={[styles.progressStyleIcon, themePreset === 'cinematic-dark' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'cinematic-dark' ? '#167ef5' : theme.colors.dark.surfaceLight }]}>
@@ -1623,7 +1630,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.progressStyleCard, themePreset === 'studio-light' && styles.progressStyleCardActive]}
-              onPress={() => { setThemePreset('studio-light'); setThemeMode('light'); applyThemePreset('studio-light'); applyThemeMode('light'); }}
+              onPress={() => handleThemeChange('studio-light', 'light')}
               activeOpacity={0.7}
             >
               <View style={[styles.progressStyleIcon, themePreset === 'studio-light' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'studio-light' ? '#3b82f6' : theme.colors.dark.surfaceLight }]}>
@@ -1634,7 +1641,7 @@ export default function SettingsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.progressStyleCard, themePreset === 'trendy-viral' && styles.progressStyleCardActive]}
-              onPress={() => { setThemePreset('trendy-viral'); setThemeMode('dark'); applyThemePreset('trendy-viral'); applyThemeMode('dark'); }}
+              onPress={() => handleThemeChange('trendy-viral', 'dark')}
               activeOpacity={0.7}
             >
               <View style={[styles.progressStyleIcon, themePreset === 'trendy-viral' && styles.progressStyleIconActive, { backgroundColor: themePreset === 'trendy-viral' ? '#e02eff' : theme.colors.dark.surfaceLight }]}>
