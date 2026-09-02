@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Layers, Sun, Droplet, PenLine, Check, ChevronDown, TrendingUp, Tag, Store } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Flame, ArrowRight, Settings, Sparkles, RotateCcw, Grid3x3, Zap, ZapOff, X, Layers, Sun, Droplet, PenLine, Check, ChevronDown, TrendingUp, Tag, Store, Video } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -94,6 +94,9 @@ export default function CameraScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [gridVisible, setGridVisible] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSec, setRecordingSec] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progressText, setProgressText] = useState('');
@@ -182,6 +185,69 @@ export default function CameraScreen() {
     fadeAnim.value = withTiming(1, { duration: 300 });
   }, [fadeAnim]);
 
+  const stopRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const startVideoRecording = useCallback(async () => {
+    if (!cameraRef.current || !cameraReady || isRecording) return;
+    try {
+      setRecordingSec(0);
+      setIsRecording(true);
+      const video = await cameraRef.current.recordAsync({ maxDuration: 60, mute: false } as Record<string, unknown>);
+      setIsRecording(false);
+      stopRecordingTimer();
+      if (video?.uri && isMountedRef.current) {
+        try {
+          const FileSystem = await import('expo-file-system/legacy');
+          const base64 = await FileSystem.readAsStringAsync(video.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          if (isMountedRef.current && base64) {
+            setSelectedImage(base64);
+            setSelectedImageMime('video/mp4');
+            setSelectedHook(null);
+            setCustomPrompt('');
+            setManualPromptOpen(false);
+            setMultiAngleShots([]);
+            setFunnelStage('analyzing');
+          }
+        } catch {
+          setError('녹화된 영상을 불러오는 데 실패했습니다.');
+        }
+      }
+    } catch {
+      setError('영상 녹화에 실패했습니다. 다시 시도해주세요.');
+      setIsRecording(false);
+      stopRecordingTimer();
+    }
+  }, [cameraReady, isRecording, stopRecordingTimer]);
+
+  const stopVideoRecording = useCallback(() => {
+    if (cameraRef.current && isRecording) {
+      cameraRef.current.stopRecording();
+    }
+    stopRecordingTimer();
+  }, [isRecording, stopRecordingTimer]);
+
+  useEffect(() => {
+    if (isRecording) {
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSec((s) => {
+          if (s + 1 >= 60) {
+            stopVideoRecording();
+            return 60;
+          }
+          return s + 1;
+        });
+      }, 1000);
+      return () => stopRecordingTimer();
+    }
+  }, [isRecording, stopRecordingTimer, stopVideoRecording]);
+
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
   }));
@@ -192,6 +258,16 @@ export default function CameraScreen() {
     // multi mode: open multi-angle guide instead of single capture
     if (captureMode === 'multi') {
       setMultiAngleVisible(true);
+      return;
+    }
+
+    // video mode: start/stop recording
+    if (captureMode === 'video') {
+      if (isRecording) {
+        stopVideoRecording();
+      } else {
+        startVideoRecording();
+      }
       return;
     }
 
@@ -729,6 +805,16 @@ export default function CameraScreen() {
     setFunnelStage('analyzing');
   };
 
+  const handleWebVideoCapture = async (videoBase64: string, mimeType: string) => {
+    setSelectedImage(videoBase64);
+    setSelectedImageMime(mimeType);
+    setSelectedHook(null);
+    setCustomPrompt('');
+    setManualPromptOpen(false);
+    setMultiAngleShots([]);
+    setFunnelStage('analyzing');
+  };
+
   const hasImage = selectedImage || previewCapture?.base64;
 
   if (isWebPlatform()) {
@@ -743,6 +829,7 @@ export default function CameraScreen() {
         onMoodFilterChange={setMoodFilter}
         onPickImage={handlePickImage}
         onWebCapture={handleWebCapture}
+        onWebVideoCapture={handleWebVideoCapture}
         onGenerate={handleGenerate}
         onMultiAnglePress={() => setMultiAngleVisible(true)}
         onSettingsPress={() => router.push('/settings' as never)}
@@ -921,6 +1008,15 @@ export default function CameraScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeSegmentBtn, captureMode === 'video' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
+              onPress={() => handleCaptureModeChange('video')}
+              disabled={processing || autoSaving}
+              activeOpacity={0.7}
+            >
+              <Video size={13} color={captureMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.modeSegmentText, captureMode === 'video' && styles.modeSegmentTextActive]}>동영상</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -948,6 +1044,17 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Recording timer indicator */}
+        {isRecording && (
+          <View style={styles.recordingIndicatorMobile}>
+            <View style={styles.recordingDotMobile} />
+            <Text style={styles.recordingTimerMobile}>
+              {Math.floor(recordingSec / 60).toString().padStart(2, '0')}:{(recordingSec % 60).toString().padStart(2, '0')}
+            </Text>
+            <Text style={styles.recordingMaxMobile}>/ 01:00</Text>
+          </View>
+        )}
+
         {/* Shutter button (centered, one step below) */}
         <View style={styles.shutterRow}>
           <TouchableOpacity
@@ -956,16 +1063,24 @@ export default function CameraScreen() {
               hasImage && styles.shutterBtnGenerate,
               (!hasImage && !cameraReady) && styles.shutterBtnDisabled,
               captureMode === 'oneclick' && !hasImage && styles.shutterBtnOneclickMobile,
+              captureMode === 'video' && !hasImage && styles.shutterBtnVideoMobile,
+              isRecording && styles.shutterBtnRecordingMobile,
               (autoSaving || processing) && styles.shutterBtnCapturing,
             ]}
             onPress={hasImage ? handleGenerate : handleCapture}
-            disabled={processing || autoSaving || (!hasImage && !cameraReady)}
+            disabled={processing || autoSaving || (!hasImage && !cameraReady && !isRecording)}
             activeOpacity={0.85}
           >
             {hasImage ? (
               <Flame size={28} color="#fff" strokeWidth={2.5} />
             ) : captureMode === 'oneclick' ? (
               <Zap size={30} color="#fff" strokeWidth={2.5} />
+            ) : captureMode === 'video' ? (
+              isRecording ? (
+                <View style={styles.shutterStopIcon} />
+              ) : (
+                <View style={styles.shutterRecordIcon} />
+              )
             ) : (
               <Camera size={30} color="#fff" strokeWidth={2.5} />
             )}
@@ -1218,6 +1333,7 @@ interface WebCameraScreenProps {
   onMoodFilterChange: (m: 'none' | 'warm' | 'fresh') => void;
   onPickImage: () => void;
   onWebCapture: (base64: string, mimeType: string) => void;
+  onWebVideoCapture?: (videoBase64: string, mimeType: string) => void;
   onGenerate: () => void;
   onMultiAnglePress: () => void;
   onSettingsPress: () => void;
@@ -1262,6 +1378,7 @@ function WebCameraScreen({
   onMoodFilterChange,
   onPickImage,
   onWebCapture,
+  onWebVideoCapture,
   onGenerate,
   onMultiAnglePress,
   onSettingsPress,
@@ -1481,6 +1598,7 @@ function WebCameraScreen({
       <View style={styles.cameraPreviewWrap}>
         <WebCameraView
           onCapture={onWebCapture}
+          onVideoCapture={onWebVideoCapture}
           onPickImage={onPickImage}
           isActive={isActive}
           safeTop={safeTop}
@@ -1757,6 +1875,52 @@ const styles = StyleSheet.create({
   },
   shutterBtnOneclickMobile: {
     backgroundColor: theme.colors.warning[500],
+  },
+  shutterBtnVideoMobile: {
+    backgroundColor: theme.colors.error[500],
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  shutterBtnRecordingMobile: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: theme.colors.error[500],
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  shutterRecordIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+  },
+  shutterStopIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  recordingIndicatorMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: theme.spacing.xs,
+  },
+  recordingDotMobile: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.error[500],
+  },
+  recordingTimerMobile: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  recordingMaxMobile: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: 'rgba(255,255,255,0.5)',
   },
   // Auto-save toast (mobile)
   autoSaveToastWrap: {

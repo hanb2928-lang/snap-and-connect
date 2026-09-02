@@ -2,14 +2,15 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
+import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check, Video, Square, Circle } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
-export type CaptureModeType = 'oneclick' | 'single' | 'multi';
+export type CaptureModeType = 'oneclick' | 'single' | 'multi' | 'video';
 
 interface WebCameraViewProps {
   onCapture: (base64: string, mimeType: string) => void;
+  onVideoCapture?: (videoBase64: string, mimeType: string) => void;
   onPickImage: () => void;
   isActive: boolean;
   safeTop: number;
@@ -29,10 +30,14 @@ const MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: 
   { key: 'oneclick', label: '원클릭', icon: Zap, desc: '초간편 자동' },
   { key: 'single', label: '1장', icon: Camera, desc: '단품 클로즈업' },
   { key: 'multi', label: '다각도', icon: Layers, desc: '정밀 멀티컷' },
+  { key: 'video', label: '동영상', icon: Video, desc: '영상 녹화' },
 ];
+
+const MAX_RECORDING_SEC = 60;
 
 export function WebCameraView({
   onCapture,
+  onVideoCapture,
   onPickImage,
   isActive,
   safeTop,
@@ -48,6 +53,9 @@ export function WebCameraView({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
   const [facing, setFacing] = useState<Facing>('environment');
   const [gridVisible, setGridVisible] = useState(false);
@@ -56,7 +64,18 @@ export function WebCameraView({
   const [capturing, setCapturing] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string>('image/jpeg');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSec, setRecordingSec] = useState(0);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoPreviewMime, setVideoPreviewMime] = useState<string>('video/webm');
   const pulseScale = useSharedValue(1);
+
+  const stopRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
 
   const stopStream = useCallback(() => {
     if (streamRef.current) {
@@ -72,14 +91,15 @@ export function WebCameraView({
     setError(null);
     setCameraReady(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         video: {
           facingMode: face,
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
-        audio: false,
-      });
+        audio: captureMode === 'video',
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (!mountedRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
@@ -101,11 +121,10 @@ export function WebCameraView({
         setError('카메라를 시작할 수 없습니다: ' + msg);
       }
     }
-  }, [stopStream]);
+  }, [stopStream, captureMode]);
 
   useEffect(() => {
-    if (isActive && !previewBase64) {
-      // Defer getUserMedia slightly so the UI paints first, avoiding jank on initial mount
+    if (isActive && !previewBase64 && !videoPreviewUrl) {
       const id = setTimeout(() => startStream(facing), 100);
       return () => {
         clearTimeout(id);
@@ -115,21 +134,28 @@ export function WebCameraView({
     return () => {
       stopStream();
     };
-  }, [isActive, facing, previewBase64, startStream, stopStream]);
+  }, [isActive, facing, previewBase64, videoPreviewUrl, startStream, stopStream]);
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
       stopStream();
+      stopRecordingTimer();
     };
-  }, [stopStream]);
+  }, [stopStream, stopRecordingTimer]);
 
-  // Clear internal capture state when capture mode changes to prevent state leak
   useEffect(() => {
     setPreviewBase64(null);
     setPreviewMime('image/jpeg');
+    setVideoPreviewUrl(null);
     setError(null);
     setGridVisible(false);
+    setIsRecording(false);
+    setRecordingSec(0);
+    if (isRecording && mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    stopRecordingTimer();
   }, [captureMode]);
 
   const captureFrame = useCallback(async (): Promise<string | null> => {
@@ -167,25 +193,87 @@ export function WebCameraView({
     }
   }, [cameraReady, facing]);
 
+  const startRecording = useCallback(() => {
+    if (!streamRef.current || !cameraReady) return;
+    recordedChunksRef.current = [];
+    setRecordingSec(0);
+
+    const mimeTypes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+    let mimeType = 'video/webm';
+    for (const mt of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mt)) {
+        mimeType = mt;
+        break;
+      }
+    }
+
+    try {
+      const recorder = new MediaRecorder(streamRef.current, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setVideoPreviewUrl(url);
+        setVideoPreviewMime(mimeType);
+        setIsRecording(false);
+        stopRecordingTimer();
+      };
+
+      recorder.start(1000);
+      setIsRecording(true);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSec((s) => {
+          if (s + 1 >= MAX_RECORDING_SEC) {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              mediaRecorderRef.current.stop();
+            }
+            return MAX_RECORDING_SEC;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setError('영상 녹화를 시작할 수 없습니다. 브라우저가 지원하지 않을 수 있습니다.');
+    }
+  }, [cameraReady, stopRecordingTimer]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    stopRecordingTimer();
+  }, [stopRecordingTimer]);
+
   const handleCapture = useCallback(async () => {
     if (!cameraReady || capturing || autoSaving) return;
     if (captureMode === 'multi') {
-      // multi mode: delegate to multi-angle flow
       onMultiAnglePress();
+      return;
+    }
+    if (captureMode === 'video') {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
       return;
     }
     const result = await captureFrame();
     if (!result) return;
     const [mime, b64] = result.split('|');
     if (captureMode === 'oneclick') {
-      // oneclick: pass directly to auto-save, no preview
       onCapture(b64, mime);
     } else {
-      // single mode: show preview first
       setPreviewBase64(b64);
       setPreviewMime(mime);
     }
-  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress]);
+  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress, isRecording, startRecording, stopRecording]);
 
   const handleConfirm = useCallback(() => {
     if (previewBase64) {
@@ -194,15 +282,47 @@ export function WebCameraView({
     }
   }, [previewBase64, previewMime, onCapture]);
 
+  const handleVideoConfirm = useCallback(() => {
+    if (videoPreviewUrl && onVideoCapture) {
+      fetch(videoPreviewUrl)
+        .then((res) => res.blob())
+        .then((blob) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',')[1];
+            if (base64) {
+              onVideoCapture(base64, videoPreviewMime);
+            }
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch(() => setError('영상을 불러오는 데 실패했습니다.'));
+      setVideoPreviewUrl(null);
+    }
+  }, [videoPreviewUrl, videoPreviewMime, onVideoCapture]);
+
   const handleRetake = useCallback(() => {
     setPreviewBase64(null);
   }, []);
+
+  const handleVideoRetake = useCallback(() => {
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    setRecordingSec(0);
+  }, [videoPreviewUrl]);
 
   const handleFlip = useCallback(() => {
     setFacing((f) => (f === 'environment' ? 'user' : 'environment'));
   }, []);
 
   const hasPreview = !!previewBase64;
+  const hasVideoPreview = !!videoPreviewUrl;
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     if (autoSaving) {
@@ -234,7 +354,7 @@ export function WebCameraView({
       )}
 
       {/* Auto-saving overlay */}
-      {autoSaving && !hasPreview && (
+      {autoSaving && !hasPreview && !hasVideoPreview && (
         <View style={styles.autoSavingWrap}>
           <View style={styles.autoSavingCard}>
             <Animated.View style={{ transform: [{ scale: pulseScale }] }}>
@@ -255,8 +375,34 @@ export function WebCameraView({
         </View>
       )}
 
-      {/* Preview overlay (after capture, before confirm) */}
-      {hasPreview ? (
+      {/* Video preview overlay */}
+      {hasVideoPreview ? (
+        <View style={styles.previewWrap}>
+          <video
+            src={videoPreviewUrl ?? undefined}
+            controls
+            autoPlay
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+          <View style={[styles.previewTopBar, { top: safeTop + 8 }]}>
+            <TouchableOpacity style={styles.topBtn} onPress={handleVideoRetake} activeOpacity={0.7}>
+              <X size={22} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <Text style={styles.previewTitle}>녹화 결과</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={[styles.previewBottom, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+            <TouchableOpacity style={styles.retakeBtn} onPress={handleVideoRetake} activeOpacity={0.8}>
+              <RotateCcw size={22} color="#fff" strokeWidth={2} />
+              <Text style={styles.retakeText}>다시 녹화</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtn} onPress={handleVideoConfirm} activeOpacity={0.85}>
+              <Check size={24} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.confirmText}>이 영상으로</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : hasPreview ? (
         <View style={styles.previewWrap}>
           <Image
             source={{ uri: `data:${previewMime};base64,${previewBase64}` }}
@@ -308,6 +454,17 @@ export function WebCameraView({
               </View>
             )}
 
+            {/* Recording indicator */}
+            {isRecording && (
+              <View style={styles.recordingIndicator} pointerEvents="none">
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingTimer}>{formatTime(recordingSec)}</Text>
+                <Text style={styles.recordingMax}>/ {formatTime(MAX_RECORDING_SEC)}</Text>
+              </View>
+            )}
+
+            {/* Recording progress ring around shutter would go here — using bottom bar instead */}
+
             {/* Loading / error state overlay */}
             {!cameraReady && !error && (
               <View style={styles.loadingWrap}>
@@ -337,7 +494,7 @@ export function WebCameraView({
               <View style={styles.topBtnPlaceholder} />
             </View>
             <View style={styles.topBarRight}>
-              <TouchableOpacity style={styles.topBtn} onPress={handleFlip} activeOpacity={0.7} disabled={!cameraReady}>
+              <TouchableOpacity style={styles.topBtn} onPress={handleFlip} activeOpacity={0.7} disabled={!cameraReady || isRecording}>
                 <RotateCcw size={20} color="#fff" strokeWidth={2} />
               </TouchableOpacity>
             </View>
@@ -351,7 +508,7 @@ export function WebCameraView({
               </View>
             )}
 
-            {/* 3-mode capsule toggle (above shutter) */}
+            {/* Mode capsule toggle (above shutter) */}
             <View style={styles.modeToggleWrap}>
               {MODE_META.map((mode, idx) => {
                 const Icon = mode.icon;
@@ -365,9 +522,10 @@ export function WebCameraView({
                       idx === MODE_META.length - 1 && styles.modeToggleBtnLast,
                       isActiveMode && styles.modeToggleBtnActive,
                       autoSaving && styles.modeToggleBtnDisabled,
+                      isRecording && styles.modeToggleBtnDisabled,
                     ]}
                     onPress={() => onCaptureModeChange(mode.key)}
-                    disabled={autoSaving}
+                    disabled={autoSaving || isRecording}
                     activeOpacity={0.7}
                   >
                     <Icon size={15} color={isActiveMode ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
@@ -381,23 +539,31 @@ export function WebCameraView({
 
             <View style={styles.bottomControlsRow}>
               {/* Gallery / file pick */}
-              <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
-                <ImageIcon size={22} color="#fff" strokeWidth={2} />
+              <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8} disabled={isRecording}>
+                <ImageIcon size={22} color={isRecording ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
               </TouchableOpacity>
 
-              {/* Shutter */}
+              {/* Shutter / Record button */}
               <TouchableOpacity
                 style={[
                   styles.shutterBtn,
                   !cameraReady && styles.shutterBtnDisabled,
                   (capturing || autoSaving) && styles.shutterBtnCapturing,
                   captureMode === 'oneclick' && styles.shutterBtnOneclick,
+                  captureMode === 'video' && styles.shutterBtnVideo,
+                  isRecording && styles.shutterBtnRecording,
                 ]}
                 onPress={handleCapture}
                 disabled={!cameraReady || capturing || autoSaving}
                 activeOpacity={0.85}
               >
-                {captureMode === 'oneclick' ? (
+                {captureMode === 'video' ? (
+                  isRecording ? (
+                    <Square size={26} color="#fff" strokeWidth={2.5} fill="#fff" />
+                  ) : (
+                    <Circle size={30} color="#fff" strokeWidth={2.5} fill="rgba(255,255,255,0.2)" />
+                  )
+                ) : captureMode === 'oneclick' ? (
                   <Zap size={30} color="#fff" strokeWidth={2.5} />
                 ) : (
                   <Camera size={30} color="#fff" strokeWidth={2.5} />
@@ -405,11 +571,11 @@ export function WebCameraView({
               </TouchableOpacity>
 
               {/* Grid toggle */}
-              <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7} disabled={isRecording}>
                 {gridVisible ? (
                   <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
                 ) : (
-                  <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+                  <Grid3x3 size={24} color={isRecording ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
                 )}
               </TouchableOpacity>
             </View>
@@ -417,6 +583,8 @@ export function WebCameraView({
             <Text style={styles.shutterHint}>
               {autoSaving ? 'AI 자동 분석 중...' :
                capturing ? '촬영 중...' :
+               isRecording ? `녹화 중... ${formatTime(recordingSec)} / ${formatTime(MAX_RECORDING_SEC)}` :
+               captureMode === 'video' ? '버튼을 눌러 영상을 녹화하세요 (최대 60초)' :
                captureMode === 'oneclick' ? '셔터 한 번이면 숏폼이 보관함에 자동 저장!' :
                captureMode === 'single' ? '단품 사진을 클로즈업해서 촬영하세요' :
                '여러 각도를 차례로 촬영하세요'}
@@ -474,6 +642,33 @@ const styles = StyleSheet.create({
     right: 0,
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  recordingIndicator: {
+    position: 'absolute',
+    top: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    zIndex: 15,
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.error[500],
+  },
+  recordingTimer: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  recordingMax: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: 'rgba(255,255,255,0.5)',
   },
   loadingWrap: {
     ...StyleSheet.absoluteFillObject,
@@ -569,7 +764,6 @@ const styles = StyleSheet.create({
     color: theme.colors.error[400],
     textAlign: 'center',
   },
-  // 3-mode capsule toggle
   modeToggleWrap: {
     flexDirection: 'row',
     backgroundColor: 'rgba(10, 15, 30, 0.6)',
@@ -642,6 +836,18 @@ const styles = StyleSheet.create({
   shutterBtnOneclick: {
     backgroundColor: theme.colors.warning[500],
   },
+  shutterBtnVideo: {
+    backgroundColor: theme.colors.error[500],
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  shutterBtnRecording: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
   gridToggleBtn: {
     width: 52,
     height: 52,
@@ -657,7 +863,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  // Auto-saving overlay
   autoSavingWrap: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -700,7 +905,6 @@ const styles = StyleSheet.create({
   autoSavingStepDotActive: {
     backgroundColor: theme.colors.primary[400],
   },
-  // Toast
   toastWrap: {
     position: 'absolute',
     left: 0,
@@ -727,7 +931,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.success[400],
   },
-  // Preview styles
   previewWrap: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.dark.bg,
