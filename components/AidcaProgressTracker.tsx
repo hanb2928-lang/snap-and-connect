@@ -20,18 +20,18 @@ interface AidcaPhaseInfo {
 }
 
 const PHASE_RATIOS: Record<EmotionPhase, number> = {
-  attention: 0.15,
-  interest: 0.25,
-  desire: 0.3,
-  conviction: 0.2,
-  action: 0.1,
+  attention: 0.20,
+  interest: 0.467,
+  desire: 0.167,
+  conviction: 0.10,
+  action: 0.066,
 };
 
 const PHASE_META: Record<EmotionPhase, { color: string; desc: string }> = {
-  attention: { color: theme.colors.warning[400], desc: '도파민 후킹' },
+  attention: { color: theme.colors.warning[400], desc: '후킹 0-3s' },
   interest: { color: theme.colors.accent[400], desc: '신뢰 구축' },
-  desire: { color: theme.colors.primary[400], desc: '스펙 소구' },
-  conviction: { color: theme.colors.success[400], desc: '사회적 증거' },
+  desire: { color: theme.colors.primary[400], desc: '제품 소구' },
+  conviction: { color: theme.colors.success[400], desc: '구매 확신' },
   action: { color: theme.colors.error[400], desc: '클로징 · 공정위' },
 };
 

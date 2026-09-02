@@ -278,6 +278,8 @@ export default function AffiliateScreen() {
   const renderProgress = useSharedValue(0);
   const masterGainRef = useRef<GainNode | null>(null);
   const prosodyMetaRef = useRef<ProsodyGenerationMeta | null>(null);
+  const videoRenderingRef = useRef(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${videoPreviewProgress.value * 100}%`,
@@ -1083,6 +1085,8 @@ export default function AffiliateScreen() {
       setRenderError('먼저 스토리보드를 생성해주세요.');
       return;
     }
+    if (videoRenderingRef.current) return;
+    videoRenderingRef.current = true;
     const isPreview = quality === 'preview';
     setVideoRendering(true);
     setVideoRenderComplete(false);
@@ -1254,7 +1258,19 @@ export default function AffiliateScreen() {
       }
       if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
 
+      // Detect tainted canvas before recording — if crossOrigin images lacked CORS headers,
+      // getImageData throws SecurityError here instead of silently producing a black video
+      if (stockVid || sceneImgs.some((img) => img !== null) || fallbackImg) {
+        try {
+          ctx.fillRect(0, 0, 1, 1);
+          ctx.getImageData(0, 0, 1, 1);
+        } catch {
+          throw new Error('이미지 CORS 권한 문제로 영상을 생성할 수 없습니다. 다른 이미지를 사용해주세요.');
+        }
+      }
+
       const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
+      recorderRef.current = recorder;
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -1331,7 +1347,7 @@ export default function AffiliateScreen() {
                 ttsGain.gain.value = 0.85;
                 src.connect(ttsGain);
                 ttsGain.connect(masterGainRef.current);
-                src.start(playbackOffset);
+                src.start(audioCtx.currentTime + playbackOffset);
                 playbackOffset += audioBuf.duration + 0.15;
               } catch { /* skip failed segment decode */ }
             }
@@ -1558,7 +1574,7 @@ export default function AffiliateScreen() {
         ctx.globalAlpha = 1;
       };
 
-      // AIDCA phase boundaries (seconds): hook 0-3, trust 4-12, closing 13-15
+      // AIDCA phase boundaries (seconds): hook 0-3, trust 3-(D-2), closing (D-2)-D
       const HOOK_END = Math.min(3, DURATION * 0.2);
       const CLOSING_START = DURATION - 2;
       const TRUST_END = CLOSING_START;
@@ -2060,6 +2076,11 @@ export default function AffiliateScreen() {
         durationSec: 0,
       }).catch(() => {});
     } finally {
+      if (recorderRef.current && recorderRef.current.state === 'recording') {
+        try { recorderRef.current.stop(); } catch { /* already stopped */ }
+      }
+      recorderRef.current = null;
+      videoRenderingRef.current = false;
       setVideoRendering(false);
       renderProgress.value = 1;
     }
@@ -2085,6 +2106,10 @@ export default function AffiliateScreen() {
 
   const handleAutoEdit = useCallback(async () => {
     if (autoEditing) return;
+    if (!selectedUploadPlatform) {
+      setRenderError('먼저 발행 플랫폼을 선택해주세요.');
+      return;
+    }
     setAutoEditing(true);
     setAutoEditStep('분석 중...');
     setRenderError(null);
