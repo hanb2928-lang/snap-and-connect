@@ -216,14 +216,12 @@ function getBoardMediaType(platform: string | null, board: string | null): 'imag
   return 'video';
 }
 
-type StepKey = 'source' | 'autoEdit' | 'preview' | 'publish';
+type StepKey = 'source' | 'publish';
 
-const STEP_ORDER: StepKey[] = ['source', 'autoEdit', 'preview', 'publish'];
+const STEP_ORDER: StepKey[] = ['source', 'publish'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
   source: { num: 1, color: theme.colors.accent[400] },
-  autoEdit: { num: 2, color: theme.colors.warning[400] },
-  preview: { num: 3, color: theme.colors.success[400] },
-  publish: { num: 4, color: theme.colors.primary[400] },
+  publish: { num: 2, color: theme.colors.primary[400] },
 };
 
 export default function AffiliateScreen() {
@@ -743,7 +741,7 @@ export default function AffiliateScreen() {
       } catch {
         // analysis enhancement is best-effort; scan already saved
       }
-      markCompleted('autoEdit');
+      markCompleted('source');
       setLastScanId(scanId);
 
       setAiRecommendLoading(true);
@@ -794,9 +792,7 @@ export default function AffiliateScreen() {
       if (result) {
         setContentSaveSuccess(true);
         setTimeout(() => setContentSaveSuccess(false), 3000);
-        markCompleted('autoEdit');
-      } else {
-        setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+        markCompleted('source');
       }
     } catch {
       setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
@@ -987,7 +983,7 @@ export default function AffiliateScreen() {
     setUploadPlatform(showUploadConfirm);
     setShowUploadConfirm(null);
     setPendingUploadPlatform(null);
-    markCompleted('preview');
+    markCompleted('publish');
   };
 
   const handleCancelUploadConfirm = () => {
@@ -998,7 +994,7 @@ export default function AffiliateScreen() {
   const handleMarkUploaded = (key: string) => {
     setUploadedPlatforms((prev) => new Set(prev).add(key));
     setUploadPlatform(key);
-    markCompleted('preview');
+    markCompleted('publish');
   };
 
   const handleImportMedia = useCallback(async () => {
@@ -2160,7 +2156,7 @@ export default function AffiliateScreen() {
       // Step 3: Render high-quality video
       setAutoEditStep('영상 렌더링 중...');
       await generatePreviewVideo('high');
-      markCompleted('autoEdit');
+      markCompleted('source');
     } catch {
       setRenderError('자동 편집 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
@@ -2202,7 +2198,7 @@ export default function AffiliateScreen() {
         <PillNavCard
           icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
           title="소스 불러오기"
-          subtitle="제휴 링크 입력 · 상품 사진 · 스톡 영상 선택"
+          subtitle="제휴 링크 입력 · 상품 사진 · AI 만화숏폼 패키지 생성"
           accentColor={theme.colors.accent[400]}
           iconBg={theme.colors.accent[500] + '22'}
           stepNumber={1}
@@ -2356,23 +2352,6 @@ export default function AffiliateScreen() {
             />
           )}
 
-          {/* Pexels stock video picker */}
-          <View style={styles.subAccordionHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.subAccordionTitle}>스톡 영상/이미지 선택</Text>
-              <Text style={styles.subAccordionDesc} numberOfLines={1}>
-                {stockVideoClip ? '선택됨' : 'Pexels에서 무료 영상 검색'}
-              </Text>
-            </View>
-          </View>
-          <StockVideoPicker
-            productName={productMeta?.productName}
-            mediaType="video"
-            orientation="portrait"
-            selectedClip={stockVideoClip}
-            onSelectClip={setStockVideoClip}
-          />
-
           {/* Platform list for affiliate link setup */}
           <PlatformListSection
             platforms={PLATFORMS}
@@ -2404,350 +2383,15 @@ export default function AffiliateScreen() {
           >
             <ArrowRight size={20} color="#fff" strokeWidth={2} />
             <View style={styles.aiOneTapTextWrap}>
-              <Text style={styles.aiOneTapBtnTitle}>다음: AI 자동 편집</Text>
+              <Text style={styles.aiOneTapBtnTitle}>다음: 멀티 플랫폼 발행</Text>
             </View>
             <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
           </TouchableOpacity>
         </PillNavCard>
 
-        {/* ─────────── STEP 2: AI 자동 편집 실행 ─────────── */}
+        {/* ─────────── STEP 2: 멀티 플랫폼 발행 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[2] = ref; }}
-          collapsable={false}
-        />
-        <PillNavCard
-          icon={<Sparkles size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
-          title="AI 자동 편집 실행"
-          subtitle="15/30초 타임라인 · 자막 · 비트싱크 · 공정위 문구 · 해시태그 자동 적용"
-          accentColor={theme.colors.warning[400]}
-          iconBg={theme.colors.warning[500] + '22'}
-          stepNumber={2}
-          expanded={expandedStep === 'autoEdit'}
-          completed={completedSteps.has('autoEdit')}
-          onToggle={() => setExpandedStep(expandedStep === 'autoEdit' ? null : 'autoEdit')}
-        >
-          <Text style={styles.autoEditDesc}>
-            제품 정보와 소스 영상을 기반으로 AI가 모든 편집을 자동으로 처리합니다. 타임라인 길이와 심리 전략만 선택하세요.
-          </Text>
-
-          {/* Pacing selection */}
-          <Text style={styles.chipGroupLabel}>타임라인 길이</Text>
-          <View style={styles.chipRow}>
-            {([
-              { key: '15s', label: '15초', desc: '임팩트 중심' },
-              { key: '30s', label: '30초', desc: '스토리텔링' },
-            ] as const).map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={[styles.pacingChip, selectedPacing === p.key && styles.pacingChipActive]}
-                onPress={() => setSelectedPacing(p.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.pacingChipLabel, selectedPacing === p.key && styles.pacingChipLabelActive]}>
-                  {p.label}
-                </Text>
-                <Text style={[styles.pacingChipDesc, selectedPacing === p.key && styles.pacingChipDescActive]}>
-                  {p.desc}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Psychology strategy selection */}
-          <Text style={styles.chipGroupLabel}>심리 전략</Text>
-          <View style={styles.strategyChipRow}>
-            {([
-              { key: 'fomo', label: 'FOMO', icon: '🔥', desc: '희소성·긴박감' },
-              { key: 'curiosity', label: '호기심', icon: '🤔', desc: '정보 갭 후킹' },
-              { key: 'social_proof', label: '사회적 증거', icon: '👥', desc: '리뷰·공감' },
-              { key: 'desire', label: '욕구 자극', icon: '✨', desc: '가치·혜택' },
-              { key: 'nano_analysis', label: '나노분석', icon: '🔬', desc: '상위1% 문구 분석' },
-              { key: 'psychology_sniping', label: '심리저격', icon: '🎯', desc: '구매 유도 정밀 타격' },
-            ] as const).map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.strategyChip, selectedStrategy === s.key && styles.strategyChipActive]}
-                onPress={() => setSelectedStrategy(s.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.strategyChipIcon}>{s.icon}</Text>
-                <Text style={[styles.strategyChipLabel, selectedStrategy === s.key && styles.strategyChipLabelActive]}>
-                  {s.label}
-                </Text>
-                <Text style={[styles.strategyChipDesc, selectedStrategy === s.key && styles.strategyChipDescActive]}>
-                  {s.desc}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Auto-applied features list */}
-          <View style={styles.autoFeatureList}>
-            <View style={styles.autoFeatureItem}>
-              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.autoFeatureText}>15초/30초 동적 타임라인 페이싱</Text>
-            </View>
-            <View style={styles.autoFeatureItem}>
-              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.autoFeatureText}>키네틱 타이포그래피 자막 오버레이</Text>
-            </View>
-            <View style={styles.autoFeatureItem}>
-              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.autoFeatureText}>오디오 비트싱크 (Beat-sync)</Text>
-            </View>
-            <View style={styles.autoFeatureItem}>
-              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.autoFeatureText}>공정위 필수 제휴 문구 자동 주입</Text>
-            </View>
-            <View style={styles.autoFeatureItem}>
-              <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
-              <Text style={styles.autoFeatureText}>최적화 해시태그 자동 생성</Text>
-            </View>
-          </View>
-
-          {/* Auto-edit button */}
-          <TouchableOpacity
-            style={[styles.aiOneTapBtn, autoEditing && { opacity: 0.7 }]}
-            onPress={handleAutoEdit}
-            disabled={autoEditing}
-            activeOpacity={0.85}
-          >
-            {autoEditing ? (
-              <Loader size={20} color="#fff" strokeWidth={2} />
-            ) : (
-              <Sparkles size={20} color="#fff" strokeWidth={2} />
-            )}
-            <View style={styles.aiOneTapTextWrap}>
-              <Text style={styles.aiOneTapBtnTitle}>
-                {autoEditing ? autoEditStep : 'AI 자동 편집 실행'}
-              </Text>
-              <Text style={styles.aiOneTapBtnSub}>
-                {autoEditing ? '잠시만 기다려주세요...' : '클릭 한 번으로 모든 편집이 자동 완료됩니다'}
-              </Text>
-            </View>
-            {!autoEditing && (
-              <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-            )}
-          </TouchableOpacity>
-
-          {/* AIDCA timeline-synchronized render progress */}
-          {videoRendering && (
-            <AidcaProgressTracker progressSV={renderProgress} totalDurationSec={selectedPacing === '30s' ? 30 : 15} />
-          )}
-
-          {/* Storyboard preview while rendering */}
-          {videoPreviewScenes && videoPreviewScenes.length > 0 && !videoRenderComplete && (
-            <View style={styles.videoStoryboardWrap}>
-              <Text style={styles.videoStoryboardTitle}>스토리보드</Text>
-              {videoPreviewScenes.map((scene, i) => (
-                <View key={i} style={styles.videoSceneCard}>
-                  <View style={[styles.videoSceneTimeBadge, { backgroundColor: scene.colorTheme.primary }]}>
-                    <Text style={styles.videoSceneTimeText}>{scene.time}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.videoSceneHookText}>{scene.textOverlay}</Text>
-                    <Text style={styles.videoSceneDescText} numberOfLines={2}>{scene.subtext}</Text>
-                  </View>
-                  <View style={styles.videoSceneNumber}>
-                    <Text style={styles.videoSceneNumberText}>{i + 1}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Nano-analysis report */}
-          {nanoReport && videoPreviewScenes && videoPreviewScenes.length > 0 && (
-            <View style={styles.nanoReportCard}>
-              <View style={styles.nanoReportHeader}>
-                <Text style={styles.nanoReportTitle}>나노 분석 리포트</Text>
-                <View style={styles.nanoReportBoostBadge}>
-                  <Text style={styles.nanoReportBoostText}>전환율 +{nanoReport.estimatedConversionBoost}%</Text>
-                </View>
-              </View>
-              <Text style={styles.nanoReportStrategy}>{nanoReport.fusionStrategy}</Text>
-              <Text style={styles.nanoReportIterLabel}>자가 학습 누적: {nanoReport.learningIterations}회 반복</Text>
-              <View style={styles.nanoReportSection}>
-                <Text style={styles.nanoReportSectionTitle}>적용된 상위 1% 패턴</Text>
-                {nanoReport.topPatternNames.map((name, i) => (
-                  <View key={i} style={styles.nanoReportPatternRow}>
-                    <Text style={styles.nanoReportPatternDot}> </Text>
-                    <Text style={styles.nanoReportPatternText}>{name}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.nanoReportSection}>
-                <Text style={styles.nanoReportSectionTitle}>심리 저격 트리거</Text>
-                {nanoReport.appliedSniperNames.map((name, i) => (
-                  <View key={i} style={styles.nanoReportSniperRow}>
-                    <Text style={styles.nanoReportSniperDot}> </Text>
-                    <Text style={styles.nanoReportSniperText}>{name}</Text>
-                  </View>
-                ))}
-              </View>
-              {learningStats && learningStats.totalGenerations > 1 && (
-                <Text style={styles.nanoReportLearnSummary}>
-                  누적 학습: {learningStats.totalGenerations}회 · 시스템이 점점 더 정교해지고 있습니다
-                </Text>
-              )}
-            </View>
-          )}
-
-          {/* Disclosure badge */}
-          {autoDisclosure && disclosureText && (
-            <View style={styles.storyboardDisclosureBadge}>
-              <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
-                공정위 제휴 문구 자동 삽입: {disclosureText}
-              </Text>
-            </View>
-          )}
-
-          {renderError && (
-            <View style={styles.renderCompleteBox}>
-              <Text style={[styles.renderCompleteText, { color: theme.colors.error[400] }]}>
-                {renderError}
-              </Text>
-            </View>
-          )}
-        </PillNavCard>
-
-        {/* ─────────── STEP 3: 미리보기 및 갤러리 저장 ─────────── */}
-        <View
-          ref={(ref) => { stepRefs.current[3] = ref; }}
-          collapsable={false}
-        />
-        <PillNavCard
-          icon={<Download size={22} color={theme.colors.success[400]} strokeWidth={2.5} />}
-          title="미리보기 및 갤러리 저장"
-          subtitle="완성된 영상 확인 · 기기에 저장"
-          accentColor={theme.colors.success[400]}
-          iconBg={theme.colors.success[500] + '22'}
-          stepNumber={3}
-          expanded={expandedStep === 'preview'}
-          completed={completedSteps.has('preview')}
-          onToggle={() => setExpandedStep(expandedStep === 'preview' ? null : 'preview')}
-        >
-          {!renderedVideoUrl && !videoRendering && (
-            <View style={styles.videoPreviewEmptyInline}>
-              <Clapperboard size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
-              <Text style={styles.videoPreviewEmptyInlineText}>
-                2단계에서 AI 자동 편집을 실행하면 여기에 결과물이 표시됩니다
-              </Text>
-            </View>
-          )}
-
-          {videoRendering && !renderedVideoUrl && (
-            <View style={styles.videoPreviewGenWrap}>
-              <Loader size={28} color="#fff" strokeWidth={2} />
-              <Text style={styles.videoPreviewGenText}>영상 렌더링 중...</Text>
-            </View>
-          )}
-
-          {renderedVideoUrl && videoRenderComplete && (
-            <View style={styles.renderedVideoWrap}>
-              {previewMediaMode === 'video' ? (
-                <>
-                  {/* @ts-ignore web-only video element */}
-                  <video
-                    src={renderedVideoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    style={{
-                      width: '100%',
-                      maxHeight: 400,
-                      borderRadius: 12,
-                      backgroundColor: '#000',
-                    }}
-                  />
-                </>
-              ) : (
-                <Image
-                  source={{ uri: renderedVideoUrl }}
-                  style={{
-                    width: '100%',
-                    maxHeight: 400,
-                    borderRadius: 12,
-                    backgroundColor: '#000',
-                  }}
-                  resizeMode="contain"
-                />
-              )}
-              <View style={styles.renderedVideoActions}>
-                <TouchableOpacity
-                  style={styles.renderedDownloadBtn}
-                  onPress={handleSaveRenderedVideo}
-                  disabled={savingVideo}
-                  activeOpacity={0.7}
-                >
-                  {savingVideo ? (
-                    <Loader size={15} color="#fff" strokeWidth={2} />
-                  ) : videoSaved ? (
-                    <Check size={15} color="#fff" strokeWidth={2.5} />
-                  ) : (
-                    <Download size={15} color="#fff" strokeWidth={2} />
-                  )}
-                  <Text style={styles.renderedDownloadBtnText}>
-                    {savingVideo ? '저장 중...' : videoSaved ? '갤러리에 저장됨' : '갤러리에 저장'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.renderedRegenBtn}
-                  onPress={() => {
-                    setRenderedVideoUrl(null);
-                    setVideoRenderComplete(false);
-                    setCompletedSteps((prev) => {
-                      const next = new Set(prev);
-                      next.delete('preview');
-                      next.delete('autoEdit');
-                      return next;
-                    });
-                    renderProgress.value = 0;
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <RefreshCw size={15} color={theme.colors.dark.text} strokeWidth={2} />
-                  <Text style={styles.renderedRegenBtnText}>다시 생성</Text>
-                </TouchableOpacity>
-              </View>
-
-              {videoSaved && (
-                <View style={styles.renderCompleteBox}>
-                  <Text style={styles.renderCompleteText}>
-                    영상이 저장되었습니다. 제휴 단축 링크와 공정위 문구가 클립보드에 자동 복사되었습니다. 플랫폼에 붙여넣기 하시면 됩니다.
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Short link copy bar */}
-          {affiliateUrl.trim() && renderedVideoUrl && (
-            <View style={{ marginTop: theme.spacing.md }}>
-              <ShortLinkCopyBar url={affiliateUrl.trim()} label="제휴 단축 링크" />
-            </View>
-          )}
-
-          {/* Next: publish */}
-          {renderedVideoUrl && videoRenderComplete && (
-            <TouchableOpacity
-              style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md, backgroundColor: theme.colors.primary[500] }]}
-              onPress={() => markCompleted('preview')}
-              activeOpacity={0.85}
-            >
-              <ArrowRight size={20} color="#fff" strokeWidth={2} />
-              <View style={styles.aiOneTapTextWrap}>
-                <Text style={styles.aiOneTapBtnTitle}>다음: 멀티 플랫폼 발행</Text>
-              </View>
-              <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
-            </TouchableOpacity>
-          )}
-        </PillNavCard>
-
-        {/* ─────────── STEP 4: 멀티 플랫폼 발행 및 링크 위장 ─────────── */}
-        <View
-          ref={(ref) => { stepRefs.current[4] = ref; }}
           collapsable={false}
         />
         <PillNavCard
@@ -2756,21 +2400,21 @@ export default function AffiliateScreen() {
           subtitle="스마트 링크 단축 · 인스타 릴스 · 유튜브 쇼츠 · 네이버 클립 연동"
           accentColor={theme.colors.primary[400]}
           iconBg={theme.colors.primary[500] + '22'}
-          stepNumber={4}
+          stepNumber={2}
           expanded={expandedStep === 'publish'}
           completed={completedSteps.has('publish')}
           onToggle={() => setExpandedStep(expandedStep === 'publish' ? null : 'publish')}
         >
-          {!renderedVideoUrl && (
+          {!imagePreviewUri && (
             <View style={styles.videoPreviewEmptyInline}>
               <Share2 size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
               <Text style={styles.videoPreviewEmptyInlineText}>
-                3단계에서 영상을 먼저 완성해주세요
+                1단계에서 상품 사진을 불러오고 AI 만화숏폼 패키지를 생성해주세요
               </Text>
             </View>
           )}
 
-          {renderedVideoUrl && (
+          {imagePreviewUri && (
             <>
               {/* Smart link cloaking section */}
               <View style={styles.publishLinkSection}>
