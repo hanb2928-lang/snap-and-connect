@@ -18,7 +18,6 @@ import {
 import {
   Flame,
   Zap,
-  Link2,
   ArrowRight,
   Settings,
   Check,
@@ -40,6 +39,10 @@ import {
   Trash2,
   Play,
   Save,
+  Video,
+  Camera,
+  Clapperboard,
+  Download,
 } from 'lucide-react-native';
 import { Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -48,23 +51,17 @@ import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
 import { getItem, setItem } from '@/lib/storage';
 import { getUserSettings } from '@/lib/settings';
-import { HotDealPickerModal } from '@/components/HotDealPickerModal';
-import { ClipboardAffiliateBanner } from '@/components/ClipboardAffiliateBanner';
-import { validateAffiliateUrl } from '@/lib/affiliate';
-import { extractProductMeta } from '@/lib/analysis';
 import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 import { PillNavCard } from '@/components/PillNavCard';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
 
-// Strip HTML/script tags, control chars, and dangerous angle brackets to prevent
-// rendering breakage and JSON parse errors on the AI server.
 function sanitizeTextInput(raw: string, maxLength: number): string {
   const stripped = raw
-    .replace(/<\/?[a-zA-Z][^>]*>/g, '') // HTML/script tags
-    .replace(/[<>]/g, '') // remaining angle brackets
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // control chars
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   return stripped.slice(0, maxLength);
 }
 
@@ -98,6 +95,12 @@ function getWaveformOpacity(index: number, duration: number): number {
   return index < activeBars ? 1 : 0.25;
 }
 
+const BUSINESS_TYPES = [
+  { key: 'fnb', label: 'F&B / 음식점', icon: Store, color: theme.colors.warning[400] },
+  { key: 'beauty', label: '뷰티 / 미용', icon: Sparkles, color: theme.colors.accent[400] },
+  { key: 'retail', label: '로컬 숍 / 소매', icon: Tag, color: theme.colors.primary[400] },
+] as const;
+
 export default function MarketingScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
@@ -107,7 +110,7 @@ export default function MarketingScreen() {
   const [signatureMenu, setSignatureMenu] = useState('');
   const [promoText, setPromoText] = useState('');
   const [storeSaved, setStoreSaved] = useState(false);
-  const [videoLength, setVideoLength] = useState('7s');
+  const [videoLength, setVideoLength] = useState('15s');
   const [captionTone, setCaptionTone] = useState('hook');
   const [bgmMood, setBgmMood] = useState('pop');
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
@@ -117,6 +120,7 @@ export default function MarketingScreen() {
   const [manualPromptOpen, setManualPromptOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [marketingStep, setMarketingStep] = useState<string | null>('store');
+  const [selectedBusinessType, setSelectedBusinessType] = useState<string>('fnb');
   const lastActionRef = useRef(0);
   const voice = useVoiceRecording();
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
@@ -131,21 +135,6 @@ export default function MarketingScreen() {
       }
     };
   }, []);
-
-  // Affiliate sub-setting state (hidden in advanced modal)
-  const [affiliateOpen, setAffiliateOpen] = useState(false);
-  const [hotDealModalVisible, setHotDealModalVisible] = useState(false);
-  const [affiliateUrl, setAffiliateUrl] = useState('');
-  const [extracting, setExtracting] = useState(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
-  const [productMeta, setProductMeta] = useState<{
-    productName: string;
-    description: string;
-    price: string;
-    image: string;
-    platform: string;
-    brand: string;
-  } | null>(null);
 
   const STORE_HOOK_CHIPS = [
     { key: 'new_menu', label: '오늘 우리 동네 신메뉴 특가!', icon: Store, color: theme.colors.warning[400] },
@@ -171,7 +160,6 @@ export default function MarketingScreen() {
         if (settings?.fixed_hook_phrase) {
           await setItem('marketing_fixed_hook', settings.fixed_hook_phrase);
         }
-        // Restore previously entered store info
         const savedStoreName = await getItem('marketing_store_name');
         const savedMenu = await getItem('marketing_signature_menu');
         const savedPromo = await getItem('marketing_promo_text');
@@ -261,46 +249,6 @@ export default function MarketingScreen() {
     }, 1200);
   }, [customPrompt, selectedHook, canGenerate]);
 
-  const handleSaveAffiliate = async () => {
-    if (!affiliateUrl.trim()) return;
-    const validation = validateAffiliateUrl(affiliateUrl);
-    if (!validation.valid) {
-      setExtractError(validation.error);
-      return;
-    }
-    setAffiliateUrl(validation.normalizedUrl);
-    setExtracting(true);
-    setExtractError(null);
-    try {
-      const meta = await extractProductMeta(affiliateUrl.trim());
-      setProductMeta({
-        productName: meta.productName || '',
-        description: meta.description || '',
-        price: meta.price || '',
-        image: meta.image || '',
-        platform: meta.platform || '',
-        brand: meta.brand || '',
-      });
-    } catch {
-      setProductMeta(null);
-      setExtractError('상품 정보를 자동으로 가져오지 못했습니다. 직접 입력하거나 다른 링크를 시도해주세요.');
-    } finally {
-      setExtracting(false);
-    }
-  };
-
-  const handleHotDealSelect = (product: { name: string; price: string; link: string; imageUrl?: string }) => {
-    setAffiliateUrl(product.link);
-    setProductMeta({
-      productName: product.name,
-      description: '',
-      price: product.price,
-      image: product.imageUrl || '',
-      platform: '',
-      brand: '',
-    });
-  };
-
   const handleVoiceRecord = async () => {
     if (voice.state === 'recording') {
       const dataUrl = await voice.stop();
@@ -339,6 +287,13 @@ export default function MarketingScreen() {
     setVoicePlaying(false);
   };
 
+  const handleVideoModePress = async () => {
+    await setItem('marketing_capture_mode', 'video');
+    await setItem('marketing_video_length', '15s');
+    await setItem('marketing_handoff', 'false');
+    router.replace('/(tabs)/');
+  };
+
   const handleStartGeneration = async () => {
     const now = Date.now();
     if (now - lastActionRef.current < 800) return;
@@ -354,6 +309,7 @@ export default function MarketingScreen() {
       await setItem('marketing_bgm_mood', bgmMood);
       await setItem('marketing_watermark', watermarkEnabled ? 'true' : 'false');
       await setItem('marketing_handoff', 'false');
+      await setItem('marketing_capture_mode', 'oneclick');
       try {
         const settings = await getUserSettings();
         if (settings?.brand_persona) {
@@ -372,20 +328,12 @@ export default function MarketingScreen() {
           await setItem('marketing_selected_hook', selectedHook);
         }
       }
-      // Pass affiliate link if provided in advanced settings
-      if (affiliateUrl.trim()) {
-        await setItem('marketing_affiliate_url', affiliateUrl.trim());
-        await setItem('marketing_affiliate_priority', 'true');
-      } else {
-        await setItem('marketing_affiliate_priority', 'false');
-      }
-      // Pass voice recording if provided
+      await setItem('marketing_affiliate_priority', 'false');
       if (voiceDataUrl) {
         await setItem('marketing_voice_recording', voiceDataUrl);
       } else {
         await setItem('marketing_voice_recording', '');
       }
-      // Pass auto-captured photo from voice command if available
       const voiceImage = await getItem('marketing_voice_image');
       const voiceImageMime = await getItem('marketing_voice_image_mime');
       if (voiceImage) {
@@ -394,7 +342,6 @@ export default function MarketingScreen() {
       }
       router.replace('/(tabs)/');
     } catch {
-      // navigation failure — reset so user can retry
     } finally {
       setGenerating(false);
     }
@@ -420,15 +367,15 @@ export default function MarketingScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={() => setRefreshing(false)} tintColor={theme.colors.primary[400]} />
         }
       >
-        {/* Header with Settings Gear */}
+        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.headerIcon}>
-              <Zap size={24} color={theme.colors.primary[300]} strokeWidth={2.5} />
+              <Clapperboard size={24} color={theme.colors.primary[300]} strokeWidth={2.5} />
             </View>
             <View>
               <Text style={styles.headerTitle}>숏폼 제작</Text>
-              <Text style={styles.headerSub}>매장 사진 한 장으로 홍보 영상 만들기</Text>
+              <Text style={styles.headerSub}>매장 홍보 15초 숏폼 올인원 프로덕션</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -440,19 +387,94 @@ export default function MarketingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Step 1: Store Info Input */}
+        {/* Two-pillar entry cards */}
+        <View style={styles.pillarGrid}>
+          {/* Pillar 1: Video Recording */}
+          <TouchableOpacity
+            style={styles.pillarCard}
+            onPress={handleVideoModePress}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.pillarIconWrap, { backgroundColor: theme.colors.error[500] + '20' }]}>
+              <Video size={28} color={theme.colors.error[400]} strokeWidth={2.5} />
+            </View>
+            <Text style={styles.pillarTitle}>동영상</Text>
+            <Text style={styles.pillarDesc}>현장감 넘치는 오프닝 영상을 직접 촬영해 숏폼의 첫 3초로 바로 태우세요</Text>
+            <View style={styles.pillarBadgeRow}>
+              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.error[500] + '18' }]}>
+                <Text style={[styles.pillarBadgeText, { color: theme.colors.error[400] }]}>최대 15초</Text>
+              </View>
+              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.accent[400] + '18' }]}>
+                <Text style={[styles.pillarBadgeText, { color: theme.colors.accent[400] }]}>오프닝 후킹</Text>
+              </View>
+            </View>
+            <View style={styles.pillarArrowRow}>
+              <Text style={styles.pillarArrowText}>카메라로 이동</Text>
+              <ArrowRight size={16} color={theme.colors.error[400]} strokeWidth={2.5} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Pillar 2: Template Rendering */}
+          <TouchableOpacity
+            style={styles.pillarCard}
+            onPress={() => setMarketingStep(marketingStep === 'store' ? null : 'store')}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.pillarIconWrap, { backgroundColor: theme.colors.primary[500] + '20' }]}>
+              <Sparkles size={28} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            </View>
+            <Text style={styles.pillarTitle}>템플릿</Text>
+            <Text style={styles.pillarDesc}>AI 심리 저격 + 뇌과학 트리거로 기획 고민 없이 숏폼을 대량 양산하세요</Text>
+            <View style={styles.pillarBadgeRow}>
+              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.primary[500] + '18' }]}>
+                <Text style={[styles.pillarBadgeText, { color: theme.colors.primary[300] }]}>AIDCA 자동</Text>
+              </View>
+              <View style={[styles.pillarBadge, { backgroundColor: theme.colors.warning[400] + '18' }]}>
+                <Text style={[styles.pillarBadgeText, { color: theme.colors.warning[400] }]}>15초 완성</Text>
+              </View>
+            </View>
+            <View style={styles.pillarArrowRow}>
+              <Text style={styles.pillarArrowText}>템플릿 시작</Text>
+              <ArrowRight size={16} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Template 3-step pipeline */}
+        <Text style={styles.sectionLabel}>템플릿 렌더링 파이프라인</Text>
+
+        {/* STEP 1: Source Selection */}
         <PillNavCard
-          icon={<Store size={22} color={theme.colors.primary[300]} strokeWidth={2.5} />}
-          title="매장 홍보 정보"
-          subtitle="가게 이름 · 대표 메뉴 · 특가 멘트 입력"
-          accentColor={theme.colors.primary[400]}
-          iconBg={theme.colors.primary[500] + '22'}
+          icon={<Camera size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="소스 선택"
+          subtitle="카메라 촬영 또는 매장/상품 이미지"
+          accentColor={theme.colors.accent[400]}
+          iconBg={theme.colors.accent[500] + '22'}
           stepNumber={1}
           completed={storeSaved}
           expanded={marketingStep === 'store'}
           onToggle={() => setMarketingStep(marketingStep === 'store' ? null : 'store')}
         >
           <Text style={styles.storeDesc}>가게 이름과 대표 메뉴만 적어도 AI가 알아서 숏폼을 만들어드려요</Text>
+
+          {/* Business type selector */}
+          <View style={styles.bizTypeRow}>
+            {BUSINESS_TYPES.map((bt) => {
+              const Icon = bt.icon;
+              const selected = selectedBusinessType === bt.key;
+              return (
+                <TouchableOpacity
+                  key={bt.key}
+                  style={[styles.bizTypeChip, selected && { borderColor: bt.color, backgroundColor: bt.color + '15' }]}
+                  onPress={() => setSelectedBusinessType(bt.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={13} color={selected ? bt.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.bizTypeText, selected && { color: bt.color }]}>{bt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>매장 이름</Text>
@@ -482,7 +504,7 @@ export default function MarketingScreen() {
               style={[styles.textInput, { minHeight: 70 }]}
               value={promoText}
               onChangeText={(t) => setPromoText(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
-              placeholder="예: 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료"
+              placeholder="예: 오늘 저녁 한정 2천원 할인, 선찹순 10명 서비스 음료"
               placeholderTextColor={theme.colors.dark.textFaint}
               multiline
               textAlignVertical="top"
@@ -505,13 +527,13 @@ export default function MarketingScreen() {
           </TouchableOpacity>
         </PillNavCard>
 
-        {/* Step 2: AI Hook Selection */}
+        {/* STEP 2: AI Template Matching */}
         <PillNavCard
-          icon={<Sparkles size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="홍보 문구 및 템플릿 선택"
-          subtitle="AI 매장 훅 문구 · 직접 프롬프트 입력"
-          accentColor={theme.colors.accent[400]}
-          iconBg={theme.colors.accent[500] + '22'}
+          icon={<Sparkles size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="AI 심리 템플릿 매칭"
+          subtitle="업종별 후킹 문구 · 성우 보이스 자동 결합"
+          accentColor={theme.colors.warning[400]}
+          iconBg={theme.colors.warning[500] + '22'}
           stepNumber={2}
           completed={!!selectedHook || !!customPrompt.trim()}
           expanded={marketingStep === 'hook'}
@@ -536,7 +558,6 @@ export default function MarketingScreen() {
             })}
           </View>
 
-          {/* Manual Prompt Toggle */}
           <TouchableOpacity
             style={styles.manualToggle}
             onPress={() => {
@@ -563,7 +584,7 @@ export default function MarketingScreen() {
                 style={styles.manualInput}
                 value={customPrompt}
                 onChangeText={(t) => setCustomPrompt(sanitizeTextInput(t, MAX_PROMPT_LENGTH))}
-                placeholder="예: 매콤한 아보카도 명란 비빔밥, 오늘 저녁 한정 2천원 할인, 선착순 10명 서비스 음료 제공"
+                placeholder="예: 매콤한 아보카도 명란 비빔밥, 오늘 저녁 한정 2천원 할인, 선찹순 10명 서비스 음료 제공"
                 placeholderTextColor={theme.colors.dark.textFaint}
                 multiline
                 textAlignVertical="top"
@@ -580,14 +601,14 @@ export default function MarketingScreen() {
               )}
               <Text style={[styles.manualHint, customPrompt.trim().length > 0 && { color: theme.colors.success[400] }]}>
                 {customPrompt.trim().length > 0
-                  ? '✓ 입력하신 문구가 AI 생성에 반영됩니다'
+                  ? '입력하신 문구가 AI 생성에 반영됩니다'
                   : 'AI가 놓친 가격·할인·강조 내용을 직접 넣으세요'}
               </Text>
             </View>
           )}
         </PillNavCard>
 
-        {/* Step 3: Voice Recording */}
+        {/* STEP 3: Voice Recording (optional) */}
         <PillNavCard
           icon={<Mic size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
           title="내 목소리 얹기 (선택)"
@@ -691,17 +712,10 @@ export default function MarketingScreen() {
           activeOpacity={0.85}
         >
           <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.generateBtnText}>홍보 만들기 시작</Text>
+          <Text style={styles.generateBtnText}>15초 숏폼 만들기</Text>
           <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
-
-      {/* Hot Deal Picker Modal (from advanced affiliate section) */}
-      <HotDealPickerModal
-        visible={hotDealModalVisible}
-        onClose={() => setHotDealModalVisible(false)}
-        onSelect={handleHotDealSelect}
-      />
 
       {/* Advanced Settings Modal */}
       <Modal visible={advancedVisible} transparent animationType="slide" onRequestClose={() => setAdvancedVisible(false)}>
@@ -715,7 +729,6 @@ export default function MarketingScreen() {
             </View>
 
             <ScrollView style={styles.modalScroll} contentContainerStyle={{ gap: theme.spacing.md, paddingBottom: 20 }}>
-              {/* Video Length */}
               <View style={styles.presetGroup}>
                 <View style={styles.presetLabelRow}>
                   <Clock size={14} color={theme.colors.warning[400]} strokeWidth={2} />
@@ -741,7 +754,6 @@ export default function MarketingScreen() {
                 </View>
               </View>
 
-              {/* Caption Tone */}
               <View style={styles.presetGroup}>
                 <View style={styles.presetLabelRow}>
                   <Type size={14} color={theme.colors.accent[400]} strokeWidth={2} />
@@ -767,7 +779,6 @@ export default function MarketingScreen() {
                 </View>
               </View>
 
-              {/* BGM Mood */}
               <View style={styles.presetGroup}>
                 <View style={styles.presetLabelRow}>
                   <Music size={14} color={theme.colors.primary[400]} strokeWidth={2} />
@@ -793,7 +804,6 @@ export default function MarketingScreen() {
                 </View>
               </View>
 
-              {/* Watermark Toggle */}
               <TouchableOpacity
                 style={styles.watermarkToggle}
                 onPress={() => setWatermarkEnabled(!watermarkEnabled)}
@@ -808,104 +818,6 @@ export default function MarketingScreen() {
                 </View>
               </TouchableOpacity>
 
-              {/* Affiliate Sub-setting — Collapsible */}
-              <View style={styles.affiliateSection}>
-                <TouchableOpacity
-                  style={styles.affiliateToggle}
-                  onPress={() => {
-                    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-                      UIManager.setLayoutAnimationEnabledExperimental(true);
-                    }
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setAffiliateOpen((v) => !v);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Link2 size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={styles.affiliateToggleText}>고급 제휴/부업 링크 연동 (선택)</Text>
-                  {affiliateOpen ? (
-                    <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  ) : (
-                    <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
-
-                {affiliateOpen && (
-                  <View style={styles.affiliateBody}>
-                    <Text style={styles.affiliateDesc}>
-                      쿠팡·네이버 등 제휴 링크를 연동하면 숏폼에 부업 수익 링크를 추가할 수 있습니다. 매장 홍보만 하실 경우 그냥 두세요.
-                    </Text>
-
-                    <ClipboardAffiliateBanner
-                      onInsert={(url) => setAffiliateUrl(url)}
-                      currentUrl={affiliateUrl}
-                    />
-
-                    <TextInput
-                      style={styles.affiliateInput}
-                      value={affiliateUrl}
-                      onChangeText={setAffiliateUrl}
-                      placeholder="제휴 링크 URL (선택사항)"
-                      placeholderTextColor={theme.colors.dark.textFaint}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      multiline
-                    />
-
-                    <TouchableOpacity
-                      style={[styles.affiliateSubmitBtn, (!affiliateUrl.trim() || extracting) && styles.affiliateSubmitBtnDisabled]}
-                      onPress={handleSaveAffiliate}
-                      disabled={!affiliateUrl.trim() || extracting}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.affiliateSubmitBtnText}>
-                        {extracting ? '추출 중...' : '링크에서 상품 정보 추출'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.hotDealLink}
-                      onPress={() => setHotDealModalVisible(true)}
-                      activeOpacity={0.7}
-                    >
-                      <Flame size={13} color={theme.colors.warning[400]} strokeWidth={2} />
-                      <Text style={styles.hotDealLinkText}>실시간 핫딜에서 가져오기</Text>
-                      <ArrowRight size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                    </TouchableOpacity>
-
-                    {extractError && (
-                      <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{extractError}</Text>
-                      </View>
-                    )}
-
-                    {productMeta && (productMeta.productName || productMeta.price) && (
-                      <View style={styles.productMetaCard}>
-                        {productMeta.image ? (
-                          <Image source={{ uri: productMeta.image }} style={styles.productMetaImage} resizeMode="cover" />
-                        ) : null}
-                        <View style={styles.productMetaInfo}>
-                          {productMeta.productName ? (
-                            <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
-                          ) : null}
-                          {productMeta.price ? (
-                            <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
-                          ) : null}
-                          {productMeta.brand ? (
-                            <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
-                          ) : null}
-                        </View>
-                        <View style={styles.productMetaCheck}>
-                          <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
-
-              {/* Full Settings Link */}
               <TouchableOpacity
                 style={styles.fullSettingsBtn}
                 onPress={() => {
@@ -923,7 +835,6 @@ export default function MarketingScreen() {
         </View>
       </Modal>
 
-      {/* Generating overlay — shown during save + handoff to camera */}
       {generating && (
         <View style={styles.generatingOverlay}>
           <View style={styles.generatingCard}>
@@ -940,7 +851,7 @@ export default function MarketingScreen() {
                 <Text style={styles.generatingStepTextActive}>AI 분석 준비 중</Text>
               </View>
               <View style={styles.generatingStepRowDim}>
-                <Text style={styles.generatingStepTextPending}>숏폼 렌더링 대기</Text>
+                <Text style={styles.generatingStepTextPending}>15초 하이브리드 인코딩 대기</Text>
               </View>
             </View>
           </View>
@@ -997,30 +908,97 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  storeSection: {
+  pillarGrid: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  pillarCard: {
+    flex: 1,
     backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
-  },
-  storeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    ...theme.shadows.card,
   },
-  storeTitle: {
-    fontSize: 15,
+  pillarIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: theme.radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillarTitle: {
+    fontSize: 18,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
+  },
+  pillarDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  pillarBadgeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  pillarBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+  },
+  pillarBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  pillarArrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  pillarArrowText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: theme.spacing.sm,
   },
   storeDesc: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     marginBottom: theme.spacing.sm,
+  },
+  bizTypeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: theme.spacing.sm,
+  },
+  bizTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.bg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  bizTypeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
   storeSaveBtn: {
     flexDirection: 'row',
@@ -1060,22 +1038,6 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
-  },
-  hookSection: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    gap: 8,
-  },
-  hookHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hookTitle: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
   },
   hookDesc: {
     fontSize: 11,
@@ -1158,25 +1120,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-  },
-  voiceSection: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1.5,
-    borderColor: theme.colors.accent[400] + '30',
-    gap: 8,
-  },
-  voiceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  voiceTitle: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
   },
   voiceDesc: {
     fontSize: 11,
@@ -1313,7 +1256,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -1423,135 +1365,6 @@ const styles = StyleSheet.create({
   },
   toggleKnobActive: {
     transform: [{ translateX: 18 }],
-  },
-  // Affiliate sub-setting styles
-  affiliateSection: {
-    gap: 0,
-  },
-  affiliateToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.bg,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  affiliateToggleText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  affiliateBody: {
-    marginTop: 8,
-    gap: 8,
-  },
-  affiliateDesc: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    lineHeight: 16,
-  },
-  affiliateInput: {
-    backgroundColor: theme.colors.dark.bg,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    minHeight: 60,
-  },
-  affiliateSubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.accent[500],
-    borderRadius: theme.radius.md,
-    paddingVertical: 12,
-  },
-  affiliateSubmitBtnDisabled: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  affiliateSubmitBtnText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
-  },
-  hotDealLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.warning[500] + '12',
-    alignSelf: 'flex-start',
-  },
-  hotDealLinkText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.warning[400],
-  },
-  errorBox: {
-    backgroundColor: theme.colors.error[500] + '18',
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  errorText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.error[400],
-    textAlign: 'center',
-  },
-  productMetaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    padding: 12,
-    borderWidth: 1.5,
-    borderColor: theme.colors.success[400] + '30',
-  },
-  productMetaImage: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.radius.sm,
-  },
-  productMetaInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  productMetaName: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  productMetaPrice: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primary[300],
-  },
-  productMetaBrand: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-  },
-  productMetaCheck: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.success[500] + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   fullSettingsBtn: {
     flexDirection: 'row',
