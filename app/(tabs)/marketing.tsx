@@ -273,13 +273,6 @@ export default function MarketingScreen() {
     setVoicePlaying(false);
   };
 
-  const handleVideoModePress = async () => {
-    await setItem('marketing_capture_mode', 'video');
-    await setItem('marketing_video_length', '15s');
-    await setItem('marketing_handoff', 'false');
-    router.replace('/(tabs)/');
-  };
-
   const handleStartGeneration = async () => {
     const now = Date.now();
     if (now - lastActionRef.current < 800) return;
@@ -434,15 +427,6 @@ export default function MarketingScreen() {
                   <Text style={styles.videoModeSpecText}>직접 촬영</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                style={styles.videoModeActionBtn}
-                onPress={handleVideoModePress}
-                activeOpacity={0.85}
-              >
-                <Video size={22} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.videoModeActionText}>카메라로 이동하여 촬영 시작</Text>
-                <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -768,22 +752,6 @@ export default function MarketingScreen() {
         )}
       </ScrollView>
 
-      {/* Sticky Generate Button — template mode only */}
-      {productionMode === 'template' && (
-      <View style={[styles.stickyGenerate, { bottom: tabBarHeight + theme.spacing.xl }]}>
-        <TouchableOpacity
-          style={[styles.generateBtn, !canGenerate && styles.generateBtnDisabled]}
-          onPress={handleStartGeneration}
-          disabled={!canGenerate || generating}
-          activeOpacity={0.85}
-        >
-          <Flame size={24} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.generateBtnText}>15초 숏폼 만들기</Text>
-          <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
-        </TouchableOpacity>
-      </View>
-      )}
-
       {/* Advanced Settings Modal */}
       <Modal visible={advancedVisible} transparent animationType="slide" onRequestClose={() => setAdvancedVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1075,24 +1043,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
-  videoModeActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.error[500],
-    borderRadius: theme.radius.lg,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    width: '100%',
-    ...theme.shadows.card,
-  },
-  videoModeActionText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-    flexShrink: 1,
-  },
   sectionLabel: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.bold,
@@ -1359,29 +1309,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.success[400],
     flex: 1,
-  },
-  stickyGenerate: {
-    position: 'absolute',
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-  },
-  generateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: theme.colors.primary[600],
-    borderRadius: theme.radius.xl,
-    paddingVertical: 18,
-    ...theme.shadows.glowPrimary,
-  },
-  generateBtnDisabled: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  generateBtnText: {
-    fontSize: 17,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
   modalOverlay: {
     flex: 1,
