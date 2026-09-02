@@ -157,6 +157,11 @@ export function useSoundPunch() {
       analyser.smoothingTimeConstant = 0.3;
       sourceNode.connect(analyser);
 
+      if (typeof MediaRecorder === 'undefined') {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('이 브라우저에서는 오디오 녹음을 지원하지 않아요');
+      }
+
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')

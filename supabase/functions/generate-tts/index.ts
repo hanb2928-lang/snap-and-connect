@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
     // TTS for the same text+voice+speed produces identical audio — no need
     // to call OpenAI again. 30-day TTL. Speed jitter is excluded from the
     // cache key so the same baseSpeed reuses cached audio.
-    const ttsCacheKey = `generate-tts:${contentHashTts(`${text}|${voice}|${baseSpeed}`)}`;
+    const ttsCacheKey = `generate-tts:${contentHashTts(`${text}|${voice}|${baseSpeed}|${body.pitch ?? 0}|${instructions ?? ''}`)}`;
     const cachedTts = await checkTtsCache(ttsCacheKey);
     if (cachedTts) {
       return new Response(

@@ -661,7 +661,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     ctx.strokeStyle=color;ctx.lineWidth=5;ctx.stroke();
     ctx.fillStyle=textColor||'#1a1a2e';
     ctx.textBaseline='top';
-    drawTextLines(ctx,text,x+padding,y+padding,w-padding*2,bubbleH-padding*2,lineH);
+    drawTextLines(ctx,text,x+padding,y+padding,w-padding*2,lineH);
   }
 
   function drawSfxSticker(ctx,text,x,y,fontSize,color,rotation){
@@ -812,16 +812,21 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       }
       if(!mimeType){hasRecorder=false;}
       if(hasRecorder){
-      var tracks=canvasStream.getVideoTracks();
       var audioStream=null;
 
-      if(primaryAudioUrl&&narrationAudio){
+      if(primaryAudioUrl&&(narrationAudio||punchAudioEl)){
         try{
           var audioCtx=new (window.AudioContext||window.webkitAudioContext)();
           if(audioCtx.state==='suspended'){audioCtx.resume().catch(function(){});}
           var audioDest=audioCtx.createMediaStreamDestination();
-          var sourceNode=audioCtx.createMediaElementSource(narrationAudio);
-          sourceNode.connect(audioDest);
+          if(narrationAudio){
+            var sourceNode=audioCtx.createMediaElementSource(narrationAudio);
+            sourceNode.connect(audioDest);
+          }
+          if(punchAudioEl){
+            var punchSourceNode=audioCtx.createMediaElementSource(punchAudioEl);
+            punchSourceNode.connect(audioDest);
+          }
           audioStream=audioDest.stream;
           audioConnected=true;
         }catch(e){audioConnected=false;}
@@ -877,6 +882,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         var mk=punchMarkers[mi];
         var mkElapsed=elapsed-mk.time;
         if(mkElapsed>=0&&mkElapsed<600){
+          if(mkElapsed<50&&punchAudioEl){try{punchAudioEl.currentTime=0;punchAudioEl.play().catch(function(){});}catch(e){}}
           var mkT=mkElapsed/600;
           var mkIntensity=mk.intensity||1;
           if(mk.effect==='shake'){
@@ -1007,8 +1013,8 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         ctx.textBaseline='middle';
         ctx.shadowColor='rgba(0,0,0,0.6)';
         ctx.shadowBlur=12;ctx.shadowOffsetY=3;
-        var titleY=H*0.65;
-        if(panelCount>1)titleY=H*0.64;
+        var titleY=H*0.72;
+        if(panelCount>1)titleY=H*0.68;
         drawTextLines(ctx,title,W/2,titleY,W-80,Math.round(H*0.05));
         ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
         ctx.textAlign='left';ctx.globalAlpha=1;
@@ -1025,7 +1031,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         ctx.textBaseline='middle';
         ctx.shadowColor='rgba(0,0,0,0.5)';
         ctx.shadowBlur=8;ctx.shadowOffsetY=2;
-        drawTextLines(ctx,hashtagStr,W/2,H*0.72,W-80,Math.round(H*0.035));
+        drawTextLines(ctx,hashtagStr,W/2,H*0.78,W-80,Math.round(H*0.035));
         ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
         ctx.textAlign='left';ctx.globalAlpha=1;
         ctx.restore();

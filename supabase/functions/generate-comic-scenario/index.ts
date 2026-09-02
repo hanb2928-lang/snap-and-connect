@@ -206,7 +206,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    scenario.autoConfig = autoConfig;
+    const resolvedAutoConfig: AutoConfig = {
+      ...autoConfig,
+      panelCount,
+      duration: panelCount >= 3 ? 20000 : panelCount === 2 ? 15000 : 10000,
+    };
+    scenario.autoConfig = resolvedAutoConfig;
 
     return new Response(
       JSON.stringify(scenario),
