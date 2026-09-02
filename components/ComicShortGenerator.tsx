@@ -757,7 +757,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var panelSpeeches=${JSON.stringify(panels.map(p => p.speech))};
   var panelSfx=${JSON.stringify(panels.map(p => p.sfx || 'KWAANG!'))};
   var panelLabels=${JSON.stringify(panels.map(p => p.episodeLabel || ''))};
-  var sfxColors=[accentColor,'#FFD600','#FF6B6B'];
+
 
   function drawImageInPanel(ctx,img,px,py,pw,ph,filter,panScale){
     ctx.save();
@@ -789,10 +789,16 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   function startGeneration(){
     var primaryAudioUrl=narrationAudioDataUrl||punchAudioDataUrl;
     var audioConnected=false;
-    if(primaryAudioUrl){
+    if(narrationAudioDataUrl){
       try{
-        narrationAudio=new Audio(primaryAudioUrl);
+        narrationAudio=new Audio(narrationAudioDataUrl);
         narrationAudio.play().catch(function(){});
+      }catch(e){}
+    }
+    if(punchAudioDataUrl){
+      try{
+        punchAudioEl=new Audio(punchAudioDataUrl);
+        punchAudioEl.preload='auto';
       }catch(e){}
     }
 
@@ -986,14 +992,44 @@ function buildComicScriptBody(params: ComicBuildParams): string {
         }
       }
 
-      var stickerT=0;
-
-      var titleT=0;
-
-      if(t>0.6&&hashtagStr){
+      if(t>0.15&&shortUrl){
+        var stickerT=Math.min(1,(t-0.15)/0.25);
+        drawStickerLink(ctx,stickerPosition,stickerStyle,stickerSize,shortUrl,Math.min(stickerT*2,1));
       }
 
-      var ctaT=0;
+      if(t>0.3&&title){
+        var titleT=Math.min(1,(t-0.3)/0.25);
+        ctx.save();
+        ctx.globalAlpha=Math.min(titleT*3,1);
+        ctx.fillStyle='#fff';
+        ctx.font='700 '+Math.round(H*0.04)+'px sans-serif';
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.shadowColor='rgba(0,0,0,0.6)';
+        ctx.shadowBlur=12;ctx.shadowOffsetY=3;
+        var titleY=H*0.65;
+        if(panelCount>1)titleY=H*0.64;
+        drawTextLines(ctx,title,W/2,titleY,W-80,Math.round(H*0.05));
+        ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+        ctx.textAlign='left';ctx.globalAlpha=1;
+        ctx.restore();
+      }
+
+      if(t>0.5&&hashtagStr){
+        var hashT=Math.min(1,(t-0.5)/0.25);
+        ctx.save();
+        ctx.globalAlpha=Math.min(hashT*3,1);
+        ctx.fillStyle=effectiveAccent;
+        ctx.font='600 '+Math.round(H*0.028)+'px sans-serif';
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        ctx.shadowColor='rgba(0,0,0,0.5)';
+        ctx.shadowBlur=8;ctx.shadowOffsetY=2;
+        drawTextLines(ctx,hashtagStr,W/2,H*0.72,W-80,Math.round(H*0.035));
+        ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+        ctx.textAlign='left';ctx.globalAlpha=1;
+        ctx.restore();
+      }
 
       if(mbtiCommentary.length>0){
         var mbtiStart=0.55;
