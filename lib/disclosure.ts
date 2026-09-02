@@ -10,9 +10,14 @@ export const COUPANG_DISCLOSURE =
 export const COUPANG_DISCLOSURE_SHORT = '쿠팡 파트너스 활동의 일환으로 수수료를 제공받습니다.';
 
 export const NAVER_DISCLOSURE =
-  '이 포스팅은 네이버 커넥트 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.';
+  '이 포스팅은 네이버 커넥트(네이버쇼핑 파트너스) 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.';
 
-export const NAVER_DISCLOSURE_SHORT = '네이버 커넥트 활동의 일환으로 수수료를 제공받을 수 있습니다.';
+export const NAVER_DISCLOSURE_SHORT = '네이버 커넥트(파트너스) 활동의 일환으로 수수료를 제공받을 수 있습니다.';
+
+export const BRANDCONNECT_DISCLOSURE =
+  '이 포스팅은 네이버 브랜드커넥트 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있습니다.';
+
+export const BRANDCONNECT_DISCLOSURE_SHORT = '네이버 브랜드커넥트 활동의 일환으로 수수료를 제공받을 수 있습니다.';
 
 export const TOSS_DISCLOSURE =
   '이 포스팅은 토스 쉐어링크를 포함하고 있으며, 링크를 통해 송금 시 일정액의 보상을 제공받을 수 있습니다.';
@@ -43,8 +48,8 @@ const PLATFORM_DISCLOSURES: Record<string, PlatformDisclosure> = {
   },
   BrandConnect: {
     platform: 'BrandConnect',
-    short: NAVER_DISCLOSURE_SHORT,
-    full: NAVER_DISCLOSURE,
+    short: BRANDCONNECT_DISCLOSURE_SHORT,
+    full: BRANDCONNECT_DISCLOSURE,
   },
   Toss: {
     platform: 'Toss',
@@ -119,9 +124,10 @@ const PLATFORM_ALIASES: Record<string, string> = {
   '네이버쇼핑': 'NaverShopping',
   '네이버스마트스토어': 'NaverShopping',
   brandconnect: 'BrandConnect',
+  '네이버커넥트': 'NaverShopping',
+  '네이버파트너스': 'NaverShopping',
   '네이버브랜드커넥트': 'BrandConnect',
   '브랜드커넥트': 'BrandConnect',
-  '네이버커넥트': 'BrandConnect',
   toss: 'Toss',
   '토스': 'Toss',
   '토스쉐어링크': 'Toss',

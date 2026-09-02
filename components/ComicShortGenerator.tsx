@@ -26,6 +26,7 @@ import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type Voice
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
+import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
@@ -2464,6 +2465,12 @@ export function ComicShortGenerator({
               </View>
             </View>
           </View>
+
+          {shortUrl ? (
+            <View style={{ marginTop: 10 }}>
+              <ShortLinkCopyBar url={shortUrl} label="제휴 단축 URL" />
+            </View>
+          ) : null}
 
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
