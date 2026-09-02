@@ -845,11 +845,16 @@ function buildComicScriptBody(params: ComicBuildParams): string {
           reject(new Error('recorder error: '+((e&&e.error&&e.error.message)||'unknown')));
         };
       });
-      recorder.start();
+      recorder.start(2000);
       }
     }
     var startTime=performance.now();
     var lastPct=-1;
+    var watchdog=setTimeout(function(){
+      if(lastPct<0||lastPct===0){
+        postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+15000)/1000)+'s'});
+      }
+    },duration+15000);
 
     function drawFrame(){
       try{
@@ -1083,12 +1088,6 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       }
     }
     setTimeout(drawFrame,0);
-
-    var watchdog=setTimeout(function(){
-      if(lastPct<0||lastPct===0){
-        postMsg('error',{msg:'generation watchdog: no progress within '+(Math.round(duration/1000)+15)+'s'});
-      }
-    },duration+15000);
 
     function sendBase64InChunks(base64,size,mimeType,isImage){
       var chunkSize=500000;
@@ -1989,7 +1988,7 @@ export function ComicShortGenerator({
     localStoreInfo,
     genId: genIdRef.current,
     babyImgUrl: babyImgDataUrl,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, genIdRef.current, babyImgDataUrl]);
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, webviewKey, babyImgDataUrl]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 
