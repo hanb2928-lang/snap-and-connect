@@ -29,6 +29,7 @@ import { VirtualFitting } from '@/components/VirtualFitting';
 import { AIImageComposite } from '@/components/AIImageComposite';
 import { RoadmapPreview } from '@/components/RoadmapPreview';
 import { PosIntegrationCard } from '@/components/PosIntegrationCard';
+import { syncPosToMarketing, fetchPosMenuItems, type PosMenuItem } from '@/lib/posIntegration';
 
 const MAX_PROMPT_LENGTH = 200;
 const MAX_STORE_INPUT_LENGTH = 80;
@@ -102,6 +103,8 @@ export default function MarketingScreen() {
   const [aiFittingImage, setAiFittingImage] = useState<string | null>(null);
   const [aiCompositeImage, setAiCompositeImage] = useState<string | null>(null);
   const [productionMode, setProductionMode] = useState<'template' | 'video'>('template');
+  const [posAutoSynced, setPosAutoSynced] = useState(false);
+  const posSyncedRef = useRef(false);
   const lastActionRef = useRef(0);
   const voice = useVoiceRecording();
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | null>(null);
@@ -166,6 +169,32 @@ export default function MarketingScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
+        // Auto-sync POS inventory on tab focus (once per session)
+        if (!posSyncedRef.current) {
+          posSyncedRef.current = true;
+          try {
+            const result = await syncPosToMarketing();
+            if (cancelled) return;
+            if (result.closingSaleItems.length > 0) {
+              const item = result.closingSaleItems[0];
+              if (!storeName.trim()) {
+                setPromoText(result.autoPrompt || promoText);
+              }
+              if (result.autoHook === '마감 떨이') {
+                setSelectedHook('limited');
+              }
+              setPosAutoSynced(true);
+              setTimeout(() => setPosAutoSynced(false), 4000);
+            } else if (result.todayMenuItems.length > 0) {
+              const item = result.todayMenuItems[0];
+              if (!signatureMenu.trim()) {
+                setSignatureMenu(item.name);
+              }
+              setPosAutoSynced(true);
+              setTimeout(() => setPosAutoSynced(false), 4000);
+            }
+          } catch {}
+        }
         if (voiceCommandHandledRef.current) return;
         try {
           const active = await getItem('marketing_voice_command_active');
@@ -378,6 +407,16 @@ export default function MarketingScreen() {
 
         {/* V2 Roadmap Preview */}
         <RoadmapPreview />
+
+        {/* POS Auto-Sync Indicator */}
+        {posAutoSynced && (
+          <View style={styles.posAutoSyncBanner}>
+            <Check size={14} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <Text style={styles.posAutoSyncText}>
+              POS 재고 변동 감지 — 마케팅 템플릿에 자동 반영되었습니다
+            </Text>
+          </View>
+        )}
 
         {/* POS / Inventory Integration */}
         <PosIntegrationCard />
@@ -953,6 +992,25 @@ const styles = StyleSheet.create({
   },
   modeSwitcherWrap: {
     marginBottom: theme.spacing.lg,
+  },
+  posAutoSyncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500] + '12',
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '30',
+    marginBottom: 10,
+  },
+  posAutoSyncText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    lineHeight: 17,
   },
   modeSwitcherLabel: {
     fontSize: 13,
