@@ -450,6 +450,7 @@ function WebClipGenerator({
   const recorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
+  const generatingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRafRef = useRef<number | null>(null);
@@ -806,6 +807,8 @@ function WebClipGenerator({
   }, []);
 
   const generateClip = useCallback(async () => {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setState('generating');
     setProgress(0);
     setRenderTimedOut(false);
@@ -846,6 +849,8 @@ function WebClipGenerator({
       let recorder: any = null;
       let mimeType = 'video/webm';
       let done: Promise<any> = Promise.resolve(new (window as any).Blob([], { type: 'image/png' }));
+      let chunks: any[] = [];
+      let doneResolveRef: ((blob: any) => void) | null = null;
       if (hasRecorder) {
         const canvasStream = (canvas as any).captureStream(FPS);
 
@@ -876,16 +881,17 @@ function WebClipGenerator({
         });
         recorderRef.current = recorder;
         canvasStreamRef.current = combinedStream;
-        const chunks: any[] = [];
         recorder.ondataavailable = (e: any) => {
           if (e.data.size > 0) chunks.push(e.data);
         };
 
-        done = new Promise<any>((resolve) => {
+        done = new Promise<any>((resolve, reject) => {
+          doneResolveRef = resolve;
           recorder.onstop = () => resolve(new (window as any).Blob(chunks, { type: mimeType }));
+          recorder.onerror = () => reject(new Error('영상 인코딩 오류가 발생했습니다.'));
         });
 
-        recorder.start();
+        recorder.start(100);
       }
       const startTime = performance.now();
 
@@ -1110,8 +1116,8 @@ function WebClipGenerator({
           recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') {
               try { recorder.stop(); } catch {
-                // If stop throws, force-resolve the done promise so render doesn't hang
-                recorder.onstop = null;
+                // If stop throws, manually resolve with whatever chunks we have
+                if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
               }
             }
           }, 150);
@@ -1127,6 +1133,12 @@ function WebClipGenerator({
         cancelledRef.current = true;
         if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+        // Stop recorder to unblock the await done below
+        if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+          try { recorderRef.current.stop(); } catch {
+            if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
+          }
+        }
         setRenderTimedOut(true);
         setState('error');
         showToast('렌더링 시간이 초과되었어요. 영상 길이를 줄이거나 다시 시도해주세요.');
@@ -1157,6 +1169,7 @@ function WebClipGenerator({
       if (cancelledRef.current) return;
       setState('done');
       setProgress(100);
+      generatingRef.current = false;
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     } catch (err) {
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
@@ -1177,6 +1190,8 @@ function WebClipGenerator({
       } else {
         showToast('동영상 생성에 실패했어요');
       }
+    } finally {
+      generatingRef.current = false;
     }
   }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure, mascotEnabled]);
 
@@ -1198,6 +1213,7 @@ function WebClipGenerator({
     setVideoUrl(null);
     setState('idle');
     setProgress(0);
+    generatingRef.current = false;
   }, [videoUrl, stopPreview]);
 
   const handleCancelRender = useCallback(() => {
@@ -1214,6 +1230,7 @@ function WebClipGenerator({
       canvasStreamRef.current = null;
     }
     recorderRef.current = null;
+    generatingRef.current = false;
     setState('idle');
     setProgress(0);
   }, []);
