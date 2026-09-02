@@ -145,9 +145,16 @@ export default function MarketingScreen() {
         if (savedStoreName) setStoreName(savedStoreName);
         if (savedMenu) setSignatureMenu(savedMenu);
         if (savedPromo) setPromoText(savedPromo);
+        const savedMode = await getItem('marketing_production_mode');
+        if (savedMode === 'video' || savedMode === 'template') setProductionMode(savedMode);
       } catch {}
     })();
   }, []);
+
+  const handleModeSwitch = async (mode: 'template' | 'video') => {
+    setProductionMode(mode);
+    try { await setItem('marketing_production_mode', mode); } catch {}
+  };
 
   const voiceCommandHandledRef = useRef(false);
   const voiceAutoGenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -380,7 +387,7 @@ export default function MarketingScreen() {
           <View style={styles.modeSwitcher}>
             <TouchableOpacity
               style={[styles.modeTab, productionMode === 'template' && styles.modeTabActive]}
-              onPress={() => setProductionMode('template')}
+              onPress={() => handleModeSwitch('template')}
               activeOpacity={0.7}
             >
               <Sparkles size={18} color={productionMode === 'template' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.5} />
@@ -388,7 +395,7 @@ export default function MarketingScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeTab, productionMode === 'video' && styles.modeTabActiveVideo]}
-              onPress={() => setProductionMode('video')}
+              onPress={() => handleModeSwitch('video')}
               activeOpacity={0.7}
             >
               <Video size={18} color={productionMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.5} />

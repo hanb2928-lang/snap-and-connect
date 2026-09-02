@@ -22,16 +22,22 @@ interface WebCameraViewProps {
   autoSaveToast: string | null;
   autoSaveStep: number;
   onMultiAnglePress: () => void;
+  cameraRole?: 'template' | 'video';
 }
 
 type Facing = 'user' | 'environment';
 
-const MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
+const ALL_MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
   { key: 'oneclick', label: '원클릭', icon: Zap, desc: '실시간 즉시 캡처' },
   { key: 'single', label: '스틸컷', icon: Camera, desc: '단독 클로즈업 컷' },
   { key: 'multi', label: '다각도', icon: Layers, desc: '멀티 앵글 시퀀스' },
   { key: 'video', label: '동영상', icon: Video, desc: '리얼 타임 레코딩' },
 ];
+
+const MODE_META = (role: 'template' | 'video'): typeof ALL_MODE_META =>
+  role === 'video'
+    ? ALL_MODE_META.filter((m) => m.key === 'video')
+    : ALL_MODE_META.filter((m) => m.key !== 'video');
 
 const MAX_RECORDING_SEC = 60;
 
@@ -49,6 +55,7 @@ export function WebCameraView({
   autoSaveToast,
   autoSaveStep,
   onMultiAnglePress,
+  cameraRole = 'template',
 }: WebCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -510,7 +517,7 @@ export function WebCameraView({
 
             {/* Mode capsule toggle (above shutter) */}
             <View style={styles.modeToggleWrap}>
-              {MODE_META.map((mode, idx) => {
+              {MODE_META(cameraRole).map((mode, idx) => {
                 const Icon = mode.icon;
                 const isActiveMode = captureMode === mode.key;
                 return (
@@ -519,7 +526,7 @@ export function WebCameraView({
                     style={[
                       styles.modeToggleBtn,
                       idx === 0 && styles.modeToggleBtnFirst,
-                      idx === MODE_META.length - 1 && styles.modeToggleBtnLast,
+                      idx === MODE_META(cameraRole).length - 1 && styles.modeToggleBtnLast,
                       isActiveMode && styles.modeToggleBtnActive,
                       autoSaving && styles.modeToggleBtnDisabled,
                       isRecording && styles.modeToggleBtnDisabled,

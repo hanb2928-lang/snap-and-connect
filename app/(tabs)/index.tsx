@@ -107,6 +107,7 @@ export default function CameraScreen() {
   const [multiAngleVisible, setMultiAngleVisible] = useState(false);
   const [multiAngleShots, setMultiAngleShots] = useState<AngleShot[]>([]);
   const [captureMode, setCaptureMode] = useState<CaptureModeType>('oneclick');
+  const [cameraRole, setCameraRole] = useState<'template' | 'video'>('template');
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
   const [autoSaveStep, setAutoSaveStep] = useState(1);
@@ -148,6 +149,15 @@ export default function CameraScreen() {
     useCallback(() => {
       isMountedRef.current = true;
       setIsActive(true);
+      (async () => {
+        try {
+          const mode = await getItem('marketing_production_mode');
+          if (mode === 'video' || mode === 'template') {
+            setCameraRole(mode);
+            if (mode === 'video') setCaptureMode('video');
+          }
+        } catch {}
+      })();
       return () => {
         isMountedRef.current = false;
         setIsActive(false);
@@ -824,6 +834,7 @@ export default function CameraScreen() {
         selectedImageMime={selectedImageMime}
         multiAngleCount={multiAngleShots.length}
         captureMode={captureMode}
+        cameraRole={cameraRole}
         moodFilter={moodFilter}
         onCaptureModeChange={handleCaptureModeChange}
         onMoodFilterChange={setMoodFilter}
@@ -973,9 +984,10 @@ export default function CameraScreen() {
           </View>
         )}
 
-        {/* Capture mode segment — 3 modes */}
+        {/* Capture mode segment — filtered by camera role */}
         <View style={styles.modeSegmentWrap}>
           <View style={styles.modeSegment}>
+            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'oneclick' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('oneclick')}
@@ -985,6 +997,8 @@ export default function CameraScreen() {
               <Zap size={13} color={captureMode === 'oneclick' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'oneclick' && styles.modeSegmentTextActive]}>원클릭</Text>
             </TouchableOpacity>
+            )}
+            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'single' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('single')}
@@ -994,6 +1008,8 @@ export default function CameraScreen() {
               <Camera size={13} color={captureMode === 'single' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'single' && styles.modeSegmentTextActive]}>스틸컷</Text>
             </TouchableOpacity>
+            )}
+            {cameraRole !== 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'multi' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('multi')}
@@ -1008,6 +1024,8 @@ export default function CameraScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            )}
+            {cameraRole === 'video' && (
             <TouchableOpacity
               style={[styles.modeSegmentBtn, captureMode === 'video' && styles.modeSegmentBtnActive, (processing || autoSaving) && styles.modeSegmentBtnDisabled]}
               onPress={() => handleCaptureModeChange('video')}
@@ -1017,6 +1035,7 @@ export default function CameraScreen() {
               <Video size={13} color={captureMode === 'video' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={[styles.modeSegmentText, captureMode === 'video' && styles.modeSegmentTextActive]}>동영상</Text>
             </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -1328,6 +1347,7 @@ interface WebCameraScreenProps {
   selectedImageMime: string;
   multiAngleCount: number;
   captureMode: CaptureModeType;
+  cameraRole: 'template' | 'video';
   moodFilter: 'none' | 'warm' | 'fresh';
   onCaptureModeChange: (mode: CaptureModeType) => void;
   onMoodFilterChange: (m: 'none' | 'warm' | 'fresh') => void;
@@ -1373,6 +1393,7 @@ function WebCameraScreen({
   selectedImageMime,
   multiAngleCount,
   captureMode,
+  cameraRole,
   moodFilter,
   onCaptureModeChange,
   onMoodFilterChange,
@@ -1605,6 +1626,7 @@ function WebCameraScreen({
           tabBarHeight={tabBarHeight}
           bottomInset={bottomInset}
           captureMode={captureMode}
+          cameraRole={cameraRole}
           onCaptureModeChange={onCaptureModeChange}
           autoSaving={autoSaving}
           autoSaveToast={autoSaveToast}
