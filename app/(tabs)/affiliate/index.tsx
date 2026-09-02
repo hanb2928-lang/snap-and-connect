@@ -216,12 +216,13 @@ function getBoardMediaType(platform: string | null, board: string | null): 'imag
   return 'video';
 }
 
-type StepKey = 'source' | 'publish';
+type StepKey = 'platform' | 'upload' | 'publish';
 
-const STEP_ORDER: StepKey[] = ['source', 'publish'];
+const STEP_ORDER: StepKey[] = ['platform', 'upload', 'publish'];
 const STEP_META: Record<StepKey, { num: number; color: string }> = {
-  source: { num: 1, color: theme.colors.accent[400] },
-  publish: { num: 2, color: theme.colors.primary[400] },
+  platform: { num: 1, color: theme.colors.accent[400] },
+  upload: { num: 2, color: theme.colors.warning[400] },
+  publish: { num: 3, color: theme.colors.primary[400] },
 };
 
 export default function AffiliateScreen() {
@@ -238,7 +239,7 @@ export default function AffiliateScreen() {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
 
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
-  const [expandedStep, setExpandedStep] = useState<StepKey | null>('source');
+  const [expandedStep, setExpandedStep] = useState<StepKey | null>('platform');
 
   // Image for analysis (from product meta or user upload)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -366,7 +367,7 @@ export default function AffiliateScreen() {
 
   useEffect(() => {
     if (selectedUploadPlatform && !PLATFORM_BOARDS[selectedUploadPlatform]) {
-      markCompleted('source');
+      markCompleted('platform');
     }
   }, [selectedUploadPlatform]);
 
@@ -513,14 +514,14 @@ export default function AffiliateScreen() {
           : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${newMeta.platform || '쇼핑몰'} ${newMeta.brand ? `· ${newMeta.brand} ` : ''}정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`;
         setExtractError(searchHint);
         setProductMeta({ ...newMeta, productName: newMeta.platform ? `${newMeta.platform} 상품` : '상품' });
-        markCompleted('source');
+        markCompleted('platform');
         return;
       }
       setProductMeta(newMeta);
       if (newMeta.platform && newMeta.platform !== 'Unknown') {
         setSelectedPlatform(newMeta.platform);
       }
-      markCompleted('source');
+      markCompleted('platform');
       // Use server-captured base64 image directly — bypasses CORS entirely
       if (newMeta.imageBase64) {
         setSelectedImage(newMeta.imageBase64);
@@ -562,7 +563,7 @@ export default function AffiliateScreen() {
           ? `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 검색 페이지에서 상품을 확인하거나, 사진을 업로드하여 진행할 수 있습니다. 영상 생성은 바로 가능합니다.|||${searchUrl}`
           : `상품 정보를 자동으로 가져오지 못했습니다. AI가 URL 패턴을 분석하여 ${platformKey || '쇼핑몰'} 정보를 추론했습니다. 사진을 업로드하면 더 정확한 분석이 가능합니다. 영상 생성은 바로 가능합니다.`,
       );
-      markCompleted('source');
+      markCompleted('platform');
     } finally {
       setExtracting(false);
     }
@@ -741,7 +742,7 @@ export default function AffiliateScreen() {
       } catch {
         // analysis enhancement is best-effort; scan already saved
       }
-      markCompleted('source');
+      markCompleted('platform');
       setLastScanId(scanId);
 
       setAiRecommendLoading(true);
@@ -792,7 +793,7 @@ export default function AffiliateScreen() {
       if (result) {
         setContentSaveSuccess(true);
         setTimeout(() => setContentSaveSuccess(false), 3000);
-        markCompleted('source');
+        markCompleted('platform');
       }
     } catch {
       setContentSaveError('저장에 실패했습니다. 다시 시도해주세요.');
@@ -2156,7 +2157,7 @@ export default function AffiliateScreen() {
       // Step 3: Render high-quality video
       setAutoEditStep('영상 렌더링 중...');
       await generatePreviewVideo('high');
-      markCompleted('source');
+      markCompleted('upload');
     } catch {
       setRenderError('자동 편집 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
@@ -2184,29 +2185,93 @@ export default function AffiliateScreen() {
         {!loading && (
           <>
         <View style={styles.verticalHeader}>
-          <Text style={styles.verticalTitle}>제휴쇼핑 숏폼 제작</Text>
+          <Text style={styles.verticalTitle}>AI 만화숏폼 제작</Text>
           <Text style={styles.verticalSubtitle}>
-            소스 불러오기 → AI 자동 편집 → 미리보기 → 멀티 플랫폼 발행
+            플랫폼 선택 → 상품 사진 업로드 → AI 4컷 만화 자동 생성 → 발행
           </Text>
         </View>
 
-        {/* ─────────── STEP 1: 소스/영상 불러오기 ─────────── */}
+        {/* ─────────── STEP 1: 발행 플랫폼 선택 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[1] = ref; }}
           collapsable={false}
         />
         <PillNavCard
-          icon={<Link2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-          title="소스 불러오기"
-          subtitle="제휴 링크 입력 · 상품 사진 · AI 만화숏폼 패키지 생성"
+          icon={<Share2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+          title="발행 플랫폼 선택"
+          subtitle="유튜브 쇼츠 · 인스타 릴스 · 틱톡 · 네이버 클립"
           accentColor={theme.colors.accent[400]}
           iconBg={theme.colors.accent[500] + '22'}
           stepNumber={1}
-          expanded={expandedStep === 'source'}
-          completed={completedSteps.has('source')}
-          onToggle={() => setExpandedStep(expandedStep === 'source' ? null : 'source')}
+          expanded={expandedStep === 'platform'}
+          completed={completedSteps.has('platform')}
+          onToggle={() => setExpandedStep(expandedStep === 'platform' ? null : 'platform')}
         >
-          {/* Affiliate URL input */}
+          <Text style={styles.autoEditDesc}>
+            만화숏폼을 발행할 타겟 플랫폼과 게시판을 먼저 선택하세요. 선택한 플랫폼의 영상 규격에 맞추어 AI가 자동으로 레이아웃을 조정합니다.
+          </Text>
+
+          {/* Platform selection grid */}
+          <Text style={styles.chipGroupLabel}>플랫폼</Text>
+          <View style={styles.uploadGrid}>
+            {UPLOAD_PLATFORMS.map((p) => {
+              const Icon = p.icon;
+              const isSelected = selectedUploadPlatform === p.key;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.uploadPlatformCard, isSelected && styles.uploadPlatformCardDone]}
+                  onPress={() => {
+                    setSelectedUploadPlatform(p.key);
+                    setSelectedBoard(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.uploadPlatformIcon, { backgroundColor: p.color + '20' }]}>
+                    <Icon size={22} color={p.color} strokeWidth={2} />
+                  </View>
+                  <Text style={styles.uploadPlatformLabel}>{p.label}</Text>
+                  {isSelected && (
+                    <View style={styles.uploadDoneBadge}>
+                      <Check size={12} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.uploadDoneBadgeText}>선택됨</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Board selection */}
+          {selectedUploadPlatform && PLATFORM_BOARDS[selectedUploadPlatform] && (
+            <>
+              <Text style={styles.chipGroupLabel}>게시판</Text>
+              <View style={styles.strategyChipRow}>
+                {PLATFORM_BOARDS[selectedUploadPlatform].map((b) => {
+                  const isSelected = selectedBoard === b.key;
+                  const specs = BOARD_VIDEO_SPECS[selectedUploadPlatform]?.[b.key];
+                  return (
+                    <TouchableOpacity
+                      key={b.key}
+                      style={[styles.strategyChip, isSelected && styles.strategyChipActive]}
+                      onPress={() => setSelectedBoard(b.key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.strategyChipLabel, isSelected && styles.strategyChipLabelActive]}>
+                        {b.label}
+                      </Text>
+                      <Text style={[styles.strategyChipDesc, isSelected && styles.strategyChipDescActive]}>
+                        {specs ? `${specs.ratio} · ${specs.maxDuration}` : b.desc}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* Affiliate link input (optional, for disclosure) */}
+          <Text style={styles.chipGroupLabel}>제휴 링크 (선택)</Text>
           <View style={styles.affiliateUrlInputWrap}>
             <View style={styles.affiliateUrlInputRow}>
               <View style={styles.affiliateUrlInputField}>
@@ -2215,7 +2280,7 @@ export default function AffiliateScreen() {
                   style={styles.affiliateUrlInput}
                   value={affiliateUrl}
                   onChangeText={setAffiliateUrl}
-                  placeholder="제휴 상품 링크 URL 입력하기"
+                  placeholder="제휴 상품 링크 URL"
                   placeholderTextColor={theme.colors.dark.textFaint}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -2240,43 +2305,34 @@ export default function AffiliateScreen() {
             </View>
           </View>
 
-          {/* Gallery pick + link page */}
-          {affiliateUrl.trim() && (
-            <View style={styles.captureImageRow}>
-              <TouchableOpacity
-                style={styles.openLinkBtn}
-                onPress={handleOpenLinkPage}
-                activeOpacity={0.85}
-              >
-                <ExternalLink size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                <Text style={styles.openLinkBtnText}>링크 페이지 열기</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.captureImageBtn, mediaLoading && styles.captureImageBtnDisabled]}
-                onPress={handlePickFromGallery}
-                disabled={mediaLoading}
-                activeOpacity={0.85}
-              >
-                {mediaLoading ? (
-                  <Loader size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                ) : (
-                  <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                )}
-                <Text style={styles.captureImageBtnText}>
-                  {mediaLoading ? '불러오는 중...' : '갤러리에서 불러오기'}
-                </Text>
-              </TouchableOpacity>
-              {selectedImage && imageSource === 'user' && (
-                <View style={styles.captureImageDoneBadge}>
-                  <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  <Text style={styles.captureImageDoneText}>이미지 선택됨</Text>
-                </View>
-              )}
-            </View>
-          )}
-          {captureError && (
-            <View style={styles.captureErrorBox}>
-              <Text style={styles.captureErrorText}>{captureError}</Text>
+          {extractError && (
+            <View style={styles.extractErrorBox}>
+              <Text style={styles.extractErrorText}>
+                {extractError.split('|||')[0]}
+              </Text>
+              <View style={styles.extractErrorActionRow}>
+                <TouchableOpacity
+                  style={styles.extractRetryBtn}
+                  onPress={handleSaveAffiliate}
+                  disabled={extracting}
+                  activeOpacity={0.7}
+                >
+                  {extracting ? (
+                    <Loader size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  ) : (
+                    <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
+                  )}
+                  <Text style={styles.extractRetryBtnText}>재시도</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.extractManualBtn, { borderColor: theme.colors.success[400], marginLeft: 8 }]}
+                  onPress={() => setExtractError(null)}
+                  activeOpacity={0.7}
+                >
+                  <ArrowRight size={12} color={theme.colors.success[400]} strokeWidth={2} />
+                  <Text style={[styles.extractManualBtnText, { color: theme.colors.success[400] }]}>그대로 진행</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -2310,206 +2366,274 @@ export default function AffiliateScreen() {
             </View>
           )}
 
-          {/* Extract error */}
-          {extractError && (
-            <View style={styles.extractErrorBox}>
-              <Text style={styles.extractErrorText}>
-                {extractError.split('|||')[0]}
-              </Text>
-              <View style={styles.extractErrorActionRow}>
-                <TouchableOpacity
-                  style={styles.extractRetryBtn}
-                  onPress={handleSaveAffiliate}
-                  disabled={extracting}
-                  activeOpacity={0.7}
-                >
-                  {extracting ? (
-                    <Loader size={12} color={theme.colors.error[400]} strokeWidth={2} />
-                  ) : (
-                    <RefreshCw size={12} color={theme.colors.error[400]} strokeWidth={2} />
-                  )}
-                  <Text style={styles.extractRetryBtnText}>재시도</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.extractManualBtn, { borderColor: theme.colors.success[400], marginLeft: 8 }]}
-                  onPress={() => setExtractError(null)}
-                  activeOpacity={0.7}
-                >
-                  <ArrowRight size={12} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={[styles.extractManualBtnText, { color: theme.colors.success[400] }]}>그대로 진행</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Viral Shortform Architect — AIDCA 15s auto-package */}
-          {imagePreviewUri && (
-            <ViralShortformArchitect
-              imageDataUrl={imagePreviewUri}
-              mimeType={selectedImageMime}
-              affiliatePlatform={selectedPlatform || undefined}
-              productName={productMeta?.productName || undefined}
-            />
-          )}
-
-          {/* Platform list for affiliate link setup */}
-          <PlatformListSection
-            platforms={PLATFORMS}
-            isConfigured={isConfigured}
-            copiedPlatform={copiedPlatform}
-            onOpenUrl={handleOpenUrl}
-            onCopySignup={handleCopySignup}
-            customPlatforms={customPlatforms}
-            onAddCustomPlatform={(name, url) => {
-              const key = 'custom_' + Date.now();
-              setCustomPlatforms((prev) => [...prev, { key, label: name, url }]);
-            }}
-            onRemoveCustomPlatform={(key) => {
-              setCustomPlatforms((prev) => prev.filter((cp) => cp.key !== key));
-              if (selectedPlatform === key) setSelectedPlatform('');
-            }}
-            onSelectCustomPlatform={(key, url) => {
-              setSelectedPlatform(key);
-              setAffiliateUrl(url);
-            }}
-            selectedPlatform={selectedPlatform}
-          />
-
           {/* Next button */}
           <TouchableOpacity
-            style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md }]}
-            onPress={() => markCompleted('source')}
+            style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md }, !selectedUploadPlatform && { opacity: 0.5 }]}
+            onPress={() => markCompleted('platform')}
+            disabled={!selectedUploadPlatform}
             activeOpacity={0.85}
           >
             <ArrowRight size={20} color="#fff" strokeWidth={2} />
             <View style={styles.aiOneTapTextWrap}>
-              <Text style={styles.aiOneTapBtnTitle}>다음: 멀티 플랫폼 발행</Text>
+              <Text style={styles.aiOneTapBtnTitle}>다음: 상품 사진 업로드</Text>
             </View>
             <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
           </TouchableOpacity>
         </PillNavCard>
 
-        {/* ─────────── STEP 2: 멀티 플랫폼 발행 ─────────── */}
+        {/* ─────────── STEP 2: 상품 사진 업로드 & AI 만화숏폼 생성 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[2] = ref; }}
           collapsable={false}
         />
         <PillNavCard
-          icon={<Share2 size={22} color={theme.colors.primary[400]} strokeWidth={2.5} />}
-          title="멀티 플랫폼 발행"
-          subtitle="스마트 링크 단축 · 인스타 릴스 · 유튜브 쇼츠 · 네이버 클립 연동"
+          icon={<Camera size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+          title="상품 사진 업로드"
+          subtitle="사진 한 장으로 AI 4컷 만화숏폼 + 공정위 고지 자동 생성"
+          accentColor={theme.colors.warning[400]}
+          iconBg={theme.colors.warning[500] + '22'}
+          stepNumber={2}
+          expanded={expandedStep === 'upload'}
+          completed={completedSteps.has('upload')}
+          onToggle={() => setExpandedStep(expandedStep === 'upload' ? null : 'upload')}
+        >
+          {!selectedUploadPlatform && (
+            <View style={styles.videoPreviewEmptyInline}>
+              <Camera size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+              <Text style={styles.videoPreviewEmptyInlineText}>
+                1단계에서 발행 플랫폼을 먼저 선택해주세요
+              </Text>
+            </View>
+          )}
+
+          {selectedUploadPlatform && (
+            <>
+              {/* Photo upload buttons */}
+              <View style={styles.captureImageRow}>
+                <TouchableOpacity
+                  style={[styles.captureImageBtn, mediaLoading && styles.captureImageBtnDisabled]}
+                  onPress={handlePickFromGallery}
+                  disabled={mediaLoading}
+                  activeOpacity={0.85}
+                >
+                  {mediaLoading ? (
+                    <Loader size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  ) : (
+                    <ImageIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  )}
+                  <Text style={styles.captureImageBtnText}>
+                    {mediaLoading ? '불러오는 중...' : '갤러리에서 불러오기'}
+                  </Text>
+                </TouchableOpacity>
+                {affiliateUrl.trim() && (
+                  <TouchableOpacity
+                    style={styles.openLinkBtn}
+                    onPress={handleOpenLinkPage}
+                    activeOpacity={0.85}
+                  >
+                    <ExternalLink size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                    <Text style={styles.openLinkBtnText}>링크 페이지 열기</Text>
+                  </TouchableOpacity>
+                )}
+                {selectedImage && imageSource === 'user' && (
+                  <View style={styles.captureImageDoneBadge}>
+                    <Check size={11} color={theme.colors.success[400]} strokeWidth={2.5} />
+                    <Text style={styles.captureImageDoneText}>이미지 선택됨</Text>
+                  </View>
+                )}
+              </View>
+
+              {captureError && (
+                <View style={styles.captureErrorBox}>
+                  <Text style={styles.captureErrorText}>{captureError}</Text>
+                </View>
+              )}
+
+              {/* Product metadata preview */}
+              {productMeta && (productMeta.productName || productMeta.price) && (
+                <View style={styles.productMetaCard}>
+                  {imagePreviewUri ? (
+                    <Image
+                      source={{ uri: imagePreviewUri }}
+                      style={styles.productMetaImage}
+                      resizeMode="cover"
+                    />
+                  ) : productMeta.image ? (
+                    <Image
+                      source={{ uri: productMeta.image }}
+                      style={styles.productMetaImage}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                  <View style={styles.productMetaInfo}>
+                    {productMeta.productName ? (
+                      <Text style={styles.productMetaName} numberOfLines={2}>{productMeta.productName}</Text>
+                    ) : null}
+                    {productMeta.price ? (
+                      <Text style={styles.productMetaPrice}>{productMeta.price}</Text>
+                    ) : null}
+                    {productMeta.brand ? (
+                      <Text style={styles.productMetaBrand}>{productMeta.brand}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              )}
+
+              {/* Viral Shortform Architect — AIDCA 4컷 만화숏폼 자동 생성 */}
+              {imagePreviewUri && (
+                <ViralShortformArchitect
+                  imageDataUrl={imagePreviewUri}
+                  mimeType={selectedImageMime}
+                  affiliatePlatform={selectedPlatform || undefined}
+                  productName={productMeta?.productName || undefined}
+                />
+              )}
+
+              {/* Next button */}
+              <TouchableOpacity
+                style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md }, !imagePreviewUri && { opacity: 0.5 }]}
+                onPress={() => markCompleted('upload')}
+                disabled={!imagePreviewUri}
+                activeOpacity={0.85}
+              >
+                <ArrowRight size={20} color="#fff" strokeWidth={2} />
+                <View style={styles.aiOneTapTextWrap}>
+                  <Text style={styles.aiOneTapBtnTitle}>다음: 발행</Text>
+                </View>
+                <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+              </TouchableOpacity>
+            </>
+          )}
+        </PillNavCard>
+
+        {/* ─────────── STEP 3: 플랫폼 발행 (선택한 플랫폼만 노출) ─────────── */}
+        <View
+          ref={(ref) => { stepRefs.current[3] = ref; }}
+          collapsable={false}
+        />
+        <PillNavCard
+          icon={<Send size={22} color={theme.colors.primary[400]} strokeWidth={2.5} />}
+          title="발행"
+          subtitle="선택한 플랫폼에 만화숏폼 업로드"
           accentColor={theme.colors.primary[400]}
           iconBg={theme.colors.primary[500] + '22'}
-          stepNumber={2}
+          stepNumber={3}
           expanded={expandedStep === 'publish'}
           completed={completedSteps.has('publish')}
           onToggle={() => setExpandedStep(expandedStep === 'publish' ? null : 'publish')}
         >
           {!imagePreviewUri && (
             <View style={styles.videoPreviewEmptyInline}>
-              <Share2 size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+              <Send size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
               <Text style={styles.videoPreviewEmptyInlineText}>
-                1단계에서 상품 사진을 불러오고 AI 만화숏폼 패키지를 생성해주세요
+                2단계에서 상품 사진을 업로드하고 AI 만화숏폼을 생성해주세요
               </Text>
             </View>
           )}
 
-          {imagePreviewUri && (
-            <>
-              {/* Smart link cloaking section */}
-              <View style={styles.publishLinkSection}>
-                <View style={styles.publishLinkHeader}>
-                  <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={styles.publishLinkTitle}>스마트 제휴 링크 단축 (Cloaking)</Text>
-                </View>
-                <Text style={styles.publishLinkDesc}>
-                  원본 제휴 링크를 숨기고 짧은 링크로 변환하여 클릭률을 높이고 계정을 보호합니다.
-                </Text>
-                <ShortLinkCopyBar url={affiliateUrl.trim()} label="단축 링크 생성" />
-              </View>
+          {imagePreviewUri && selectedUploadPlatform && (() => {
+            const p = UPLOAD_PLATFORMS.find((up) => up.key === selectedUploadPlatform);
+            if (!p) return null;
+            const Icon = p.icon;
+            const isUploaded = uploadedPlatforms.has(p.key);
+            const dl = getDeepLink(p.key as UploadPlatformKey);
+            return (
+              <>
+                {/* Smart link cloaking section */}
+                {affiliateUrl.trim() && (
+                  <View style={styles.publishLinkSection}>
+                    <View style={styles.publishLinkHeader}>
+                      <ShieldCheck size={16} color={theme.colors.success[400]} strokeWidth={2} />
+                      <Text style={styles.publishLinkTitle}>스마트 제휴 링크 단축</Text>
+                    </View>
+                    <Text style={styles.publishLinkDesc}>
+                      원본 제휴 링크를 숨기고 짧은 링크로 변환하여 클릭률을 높이고 계정을 보호합니다.
+                    </Text>
+                    <ShortLinkCopyBar url={affiliateUrl.trim()} label="단축 링크 생성" />
+                  </View>
+                )}
 
-              {/* Platform publish grid */}
-              <Text style={styles.chipGroupLabel}>발행할 플랫폼 선택</Text>
-              <View style={styles.uploadGrid}>
-                {UPLOAD_PLATFORMS.map((p) => {
-                  const Icon = p.icon;
-                  const isUploaded = uploadedPlatforms.has(p.key);
-                  const dl = getDeepLink(p.key as UploadPlatformKey);
-                  return (
-                    <View key={p.key} style={[styles.uploadPlatformCard, isUploaded && styles.uploadPlatformCardDone]}>
-                      <View style={[styles.uploadPlatformIcon, { backgroundColor: p.color + '20' }]}>
-                        <Icon size={22} color={p.color} strokeWidth={2} />
-                      </View>
-                      <Text style={styles.uploadPlatformLabel}>{p.label}</Text>
-                      {isUploaded ? (
-                        <View style={styles.uploadDoneBadge}>
-                          <Check size={12} color="#fff" strokeWidth={2.5} />
-                          <Text style={styles.uploadDoneBadgeText}>발행 완료</Text>
-                        </View>
-                      ) : (
+                {/* Selected platform upload card */}
+                <Text style={styles.chipGroupLabel}>선택한 플랫폼</Text>
+                <View style={[styles.uploadPlatformCard, isUploaded && styles.uploadPlatformCardDone, { width: '100%' }]}>
+                  <View style={[styles.uploadPlatformIcon, { backgroundColor: p.color + '20' }]}>
+                    <Icon size={22} color={p.color} strokeWidth={2} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.uploadPlatformLabel}>{p.label}</Text>
+                    {selectedBoard && (
+                      <Text style={styles.platformDesc}>
+                        {PLATFORM_BOARDS[p.key]?.find((b) => b.key === selectedBoard)?.label || ''}
+                      </Text>
+                    )}
+                  </View>
+                  {isUploaded ? (
+                    <View style={styles.uploadDoneBadge}>
+                      <Check size={12} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.uploadDoneBadgeText}>발행 완료</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.uploadOpenBtn}
+                      onPress={() => handleOneTapCopyAndOpen(p.key)}
+                      activeOpacity={0.7}
+                    >
+                      <ExternalLink size={13} color="#fff" strokeWidth={2} />
+                      <Text style={styles.uploadOpenBtnText}>열기</Text>
+                    </TouchableOpacity>
+                  )}
+                  {copyFeedback === p.key && (
+                    <Text style={styles.copyFeedbackText}>복사됨!</Text>
+                  )}
+                  {deepLinkFeedback === p.key && (
+                    <Text style={styles.deepLinkFeedbackText}>{dl.appUrl.startsWith('http') ? '웹 열림' : '앱 열림'}</Text>
+                  )}
+                </View>
+
+                {/* Auto disclosure badge */}
+                {autoDisclosure && disclosureText && (
+                  <View style={styles.storyboardDisclosureBadge}>
+                    <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
+                    <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
+                      공정위 제휴 문구 자동 포함: {disclosureText}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Upload confirm modal */}
+                {showUploadConfirm && (
+                  <View style={styles.uploadConfirmOverlay}>
+                    <View style={styles.uploadConfirmBox}>
+                      <Text style={styles.uploadConfirmTitle}>플랫폼에 업로드 완료</Text>
+                      <Text style={styles.uploadConfirmDesc}>
+                        {(() => {
+                          const up = UPLOAD_PLATFORMS.find((up2) => up2.key === showUploadConfirm);
+                          return up ? `${up.label}에 만화숏폼이 업로드되었나요?` : '업로드가 완료되었나요?';
+                        })()}
+                      </Text>
+                      <View style={styles.uploadConfirmActions}>
                         <TouchableOpacity
-                          style={styles.uploadOpenBtn}
-                          onPress={() => handleOneTapCopyAndOpen(p.key)}
+                          style={styles.uploadConfirmCancelBtn}
+                          onPress={handleCancelUploadConfirm}
                           activeOpacity={0.7}
                         >
-                          <ExternalLink size={13} color="#fff" strokeWidth={2} />
-                          <Text style={styles.uploadOpenBtnText}>열기</Text>
+                          <Text style={styles.uploadConfirmCancelText}>아직</Text>
                         </TouchableOpacity>
-                      )}
-                      {copyFeedback === p.key && (
-                        <Text style={styles.copyFeedbackText}>복사됨!</Text>
-                      )}
-                      {deepLinkFeedback === p.key && (
-                        <Text style={styles.deepLinkFeedbackText}>{dl.appUrl.startsWith('http') ? '웹 열림' : '앱 열림'}</Text>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-
-              {/* Auto disclosure badge */}
-              {autoDisclosure && disclosureText && (
-                <View style={styles.storyboardDisclosureBadge}>
-                  <ShieldCheck size={13} color={theme.colors.success[400]} strokeWidth={2} />
-                  <Text style={styles.storyboardDisclosureText} numberOfLines={2}>
-                    공정위 제휴 문구 자동 포함: {disclosureText}
-                  </Text>
-                </View>
-              )}
-
-              {/* Upload confirm modal */}
-              {showUploadConfirm && (
-                <View style={styles.uploadConfirmOverlay}>
-                  <View style={styles.uploadConfirmBox}>
-                    <Text style={styles.uploadConfirmTitle}>플랫폼에 업로드 완료</Text>
-                    <Text style={styles.uploadConfirmDesc}>
-                      {(() => {
-                        const p = UPLOAD_PLATFORMS.find((up) => up.key === showUploadConfirm);
-                        return p ? `${p.label}에 영상이 업로드되었나요?` : '업로드가 완료되었나요?';
-                      })()}
-                    </Text>
-                    <View style={styles.uploadConfirmActions}>
-                      <TouchableOpacity
-                        style={styles.uploadConfirmCancelBtn}
-                        onPress={handleCancelUploadConfirm}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.uploadConfirmCancelText}>아직</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.uploadConfirmDoneBtn}
-                        onPress={handleConfirmUploadComplete}
-                        activeOpacity={0.7}
-                      >
-                        <Check size={15} color="#fff" strokeWidth={2.5} />
-                        <Text style={styles.uploadConfirmDoneText}>완료</Text>
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.uploadConfirmDoneBtn}
+                          onPress={handleConfirmUploadComplete}
+                          activeOpacity={0.7}
+                        >
+                          <Check size={15} color="#fff" strokeWidth={2.5} />
+                          <Text style={styles.uploadConfirmDoneText}>완료</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
-                </View>
-              )}
-            </>
-          )}
+                )}
+              </>
+            );
+          })()}
         </PillNavCard>
 
         {/* Recent revenue */}
