@@ -37,8 +37,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const authToken = req.headers.get("Authorization")?.replace("Bearer ", "") || null;
-    const openaiKey = await resolveOpenAIKey(authToken);
+    const openaiKey = await resolveOpenAIKey();
 
     if (!openaiKey) {
       return new Response(
@@ -55,7 +54,7 @@ Deno.serve(async (req: Request) => {
     const enhancedPrompt = enhancePrompt(body.prompt);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     let response: Response;
     try {
       response = await fetch("https://api.openai.com/v1/images/generations", {
@@ -126,50 +125,32 @@ function enhancePrompt(prompt: string): string {
   return `${prompt}. High quality, professional product photography style, clean composition, vibrant colors, detailed. CRITICAL: Do NOT distort, warp, stretch, or morph the product's original shape, proportions, colors, patterns, or text. Preserve the product exactly as it appears — maintain exact shape, color accuracy, pattern integrity, and all labels/logos/text without alteration or hallucination.`;
 }
 
-async function resolveOpenAIKey(authToken: string | null): Promise<string | null> {
+async function resolveOpenAIKey(): Promise<string | null> {
   const serverKey = Deno.env.get("OPENAI_API_KEY");
   if (serverKey) return serverKey;
 
-  if (supabaseUrl && serviceRoleKey && authToken) {
+  if (supabaseUrl && serviceRoleKey) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       const resp = await fetch(
-        `${supabaseUrl}/auth/v1/user`,
+        `${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&order=updated_at.desc&limit=1`,
         {
           headers: {
             apikey: serviceRoleKey,
-            Authorization: `Bearer ${authToken}`,
+            Authorization: `Bearer ${serviceRoleKey}`,
           },
           signal: controller.signal,
         },
       );
       clearTimeout(timeoutId);
       if (resp.ok) {
-        const user = await resp.json() as { id?: string };
-        const userId = user.id;
-        if (!userId) return null;
-        const dbController = new AbortController();
-        const dbTimeoutId = setTimeout(() => dbController.abort(), 5000);
-        const dbResp = await fetch(
-          `${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&id=eq.${userId}&limit=1`,
-          {
-            headers: {
-              apikey: serviceRoleKey,
-              Authorization: `Bearer ${serviceRoleKey}`,
-            },
-            signal: dbController.signal,
-          },
-        );
-        clearTimeout(dbTimeoutId);
-        if (dbResp.ok) {
-          const rows = await dbResp.json() as Array<{ openai_api_key: string | null }>;
-          const dbKey = rows[0]?.openai_api_key;
-          if (dbKey) return dbKey;
-        }
+        const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
+        const dbKey = rows[0]?.openai_api_key;
+        if (dbKey) return dbKey;
       }
-    } catch (err) {
-      console.warn("[generate-image] failed to resolve OpenAI key from DB:", err);
+    } catch {
+      // no fallback beyond env
     }
   }
   return null;
