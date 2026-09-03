@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Film, Download, Loader as Loader2, Play, RefreshCw, CircleAlert as AlertCircle, Music, Volume2, VolumeX, CloudUpload, Lightbulb, Mic, Sparkles, ChevronDown, Clock, X } from 'lucide-react-native';
+import { isWebCodecsSupported, isWebCodecsEncoderConfigSupported, encodeCanvasToWebM } from '@/lib/webCodecsEncoder';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetBlobWithProgress, saveAssetRecord } from '@/lib/savedAssets';
@@ -849,6 +850,7 @@ function WebClipGenerator({
       }
 
       const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
+      const useWebCodecs = isWebCodecsSupported() && isWebCodecsEncoderConfigSupported(L.width, L.height);
       let recorder: any = null;
       let mimeType = 'video/webm';
       let done: Promise<any> = Promise.resolve(new (window as any).Blob([], { type: 'image/png' }));
@@ -861,8 +863,8 @@ function WebClipGenerator({
         if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
       };
 
-      // Silent audio context to prevent background-tab throttling
-      if (hasRecorder) {
+      // Silent audio context to prevent background-tab throttling (only for MediaRecorder fallback)
+      if (hasRecorder && !useWebCodecs) {
         try {
           const ctx = new (window as any).AudioContext();
           antiThrottleCtx = ctx;
@@ -875,7 +877,241 @@ function WebClipGenerator({
         } catch { antiThrottleCtx = null; }
       }
 
-      if (hasRecorder) {
+      // Pre-render halftone dot grid to offscreen canvas (avoids ~3600 arc/fill calls per frame)
+      let halftoneCanvas: HTMLCanvasElement | null = null;
+      if (hybridMode === 'photo-to-comic') {
+        halftoneCanvas = document.createElement('canvas');
+        halftoneCanvas.width = L.width;
+        halftoneCanvas.height = L.height;
+        const hctx = halftoneCanvas.getContext('2d');
+        if (hctx) {
+          hctx.fillStyle = accentColor;
+          const dotSpacing = 24;
+          const dotR = 3;
+          for (let dy = 0; dy < L.height; dy += dotSpacing) {
+            for (let dx = 0; dx < L.width; dx += dotSpacing) {
+              hctx.beginPath();
+              hctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+              hctx.fill();
+            }
+          }
+        }
+      }
+
+      // Pre-build gradient (reused every frame)
+      const cachedGrad = ctx.createLinearGradient(0, 0, 0, L.height);
+      cachedGrad.addColorStop(0, 'rgba(10,15,30,0.25)');
+      cachedGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
+      cachedGrad.addColorStop(1, 'rgba(10,15,30,0.95)');
+
+      // Unified frame drawing function — used by both WebCodecs and MediaRecorder paths.
+      // Accepts a progress value (0..1) and an optional elapsed time for baby animation.
+      const renderFrameAt = (frameCtx: CanvasRenderingContext2D, t: number, elapsedMs: number) => {
+        frameCtx.fillStyle = '#0a0f1e';
+        frameCtx.fillRect(0, 0, L.width, L.height);
+
+        const motion = getMotionParams(motionPreset, t);
+        const scale = motion.scale;
+        const imgRatio = img.width / img.height;
+        const canvasRatio = L.width / L.height;
+        let drawW: number, drawH: number;
+        if (imgRatio > canvasRatio) {
+          drawH = L.height * scale;
+          drawW = drawH * imgRatio;
+        } else {
+          drawW = L.width * scale;
+          drawH = drawW / imgRatio;
+        }
+        const panY = (L.height - drawH) / 2 + motion.panY;
+        const panX = (L.width - drawW) / 2 + motion.panX;
+
+        frameCtx.globalAlpha = motion.alpha;
+        frameCtx.drawImage(img, panX, panY, drawW, drawH);
+        frameCtx.globalAlpha = 1;
+
+        // Hybrid mode: photo-to-comic transition at 1.5s (or 25% of duration)
+        const hybridTransitionPoint = 0.25;
+        const isHybrid = hybridMode === 'photo-to-comic';
+        const inComicPhase = isHybrid && t >= hybridTransitionPoint;
+        if (inComicPhase) {
+          const comicT = Math.min((t - hybridTransitionPoint) / 0.15, 1);
+          const easedComic = easeInOutCubic(comicT);
+          frameCtx.globalAlpha = easedComic * 0.45;
+          frameCtx.fillStyle = accentColor;
+          frameCtx.fillRect(0, 0, L.width, L.height);
+          frameCtx.globalAlpha = 1;
+
+          frameCtx.save();
+          frameCtx.filter = `saturate(2.0) contrast(1.4) brightness(1.05)`;
+          frameCtx.globalAlpha = easedComic * 0.6;
+          frameCtx.drawImage(img, panX, panY, drawW, drawH);
+          frameCtx.restore();
+          frameCtx.filter = 'none';
+          frameCtx.globalAlpha = 1;
+
+          if (comicT > 0.3) {
+            const flashAlpha = Math.min((comicT - 0.3) * 3, 1) * (1 - Math.min((comicT - 0.3) * 2, 1));
+            frameCtx.globalAlpha = flashAlpha;
+            frameCtx.fillStyle = '#ffffff';
+            frameCtx.fillRect(0, 0, L.width, L.height);
+            frameCtx.globalAlpha = 1;
+          }
+
+          if (comicT > 0.5 && halftoneCanvas) {
+            const dotAlpha = Math.min((comicT - 0.5) * 4, 1) * 0.08;
+            frameCtx.globalAlpha = dotAlpha;
+            frameCtx.drawImage(halftoneCanvas, 0, 0);
+            frameCtx.globalAlpha = 1;
+          }
+        }
+
+        frameCtx.fillStyle = cachedGrad;
+        frameCtx.fillRect(0, 0, L.width, L.height);
+
+        const tagText = STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT';
+        const hashtagStr = hashtags.slice(0, 8).map((h) => `#${h}`).join(' ');
+
+        // Badge (top-left, fades in early)
+        const badgeT = Math.max(0, (t - 0.03) / 0.12);
+        if (badgeT > 0) {
+          const badgeAlpha = Math.min(badgeT * 5, 1);
+          frameCtx.globalAlpha = badgeAlpha;
+          frameCtx.fillStyle = accentColor;
+          roundRect(frameCtx, L.badge.x, L.badge.y, L.badge.w, L.badge.h, L.badge.r);
+          frameCtx.fill();
+          frameCtx.fillStyle = '#fff';
+          frameCtx.font = L.badgeText.font;
+          frameCtx.textBaseline = 'middle';
+          frameCtx.textAlign = 'left';
+          frameCtx.fillText(tagText, L.badgeText.x, L.badgeText.y);
+          frameCtx.textAlign = 'left';
+          frameCtx.globalAlpha = 1;
+        }
+
+        // Hook text
+        const hookT = Math.max(0, (t - 0.15) / 0.3);
+        if (hookT > 0) {
+          const hookAlpha = Math.min(hookT * 4, 1);
+          const hookOffset = (1 - easeOutBack(Math.min(hookT, 1))) * 50;
+          const hookY = L.height * L.hookBox.yBase + hookOffset;
+          frameCtx.globalAlpha = hookAlpha;
+
+          frameCtx.fillStyle = '#fff';
+          frameCtx.font = L.hookText.font;
+          frameCtx.textBaseline = 'top';
+          frameCtx.shadowColor = 'rgba(0,0,0,0.85)';
+          frameCtx.shadowBlur = 12;
+          frameCtx.shadowOffsetY = 3;
+          drawTextLines(frameCtx, hook, L.hookText.x, hookY + L.hookText.yOffset, L.hookText.maxWidth, L.hookText.lineHeight);
+          frameCtx.shadowColor = 'transparent';
+          frameCtx.shadowBlur = 0;
+          frameCtx.shadowOffsetY = 0;
+          frameCtx.globalAlpha = 1;
+        }
+
+        // Title text
+        const titleT = Math.max(0, (t - 0.3) / 0.2);
+        if (titleT > 0 && title) {
+          const titleAlpha = Math.min(titleT * 5, 1);
+          frameCtx.globalAlpha = titleAlpha;
+          frameCtx.fillStyle = 'rgba(255,255,255,0.9)';
+          frameCtx.font = L.title.font;
+          frameCtx.textBaseline = 'top';
+          frameCtx.shadowColor = 'rgba(0,0,0,0.7)';
+          frameCtx.shadowBlur = 8;
+          frameCtx.shadowOffsetY = 2;
+          drawTextLines(frameCtx, title, L.title.x, L.height * L.title.yBase, L.title.maxWidth, L.title.lineHeight);
+          frameCtx.shadowColor = 'transparent';
+          frameCtx.shadowBlur = 0;
+          frameCtx.shadowOffsetY = 0;
+          frameCtx.globalAlpha = 1;
+        }
+
+        // Hashtags
+        const tagTextT = Math.max(0, (t - 0.4) / 0.2);
+        if (tagTextT > 0 && hashtags.length > 0) {
+          frameCtx.globalAlpha = Math.min(tagTextT * 5, 1);
+          frameCtx.fillStyle = accentColor;
+          frameCtx.font = L.hashtags.font;
+          frameCtx.textBaseline = 'top';
+          drawTextLines(frameCtx, hashtagStr, L.hashtags.x, L.height * L.hashtags.yBase, L.hashtags.maxWidth, L.hashtags.lineHeight);
+          frameCtx.globalAlpha = 1;
+        }
+
+        // CTA button
+        const ctaT = Math.max(0, (t - 0.45) / 0.15);
+        if (ctaT > 0 && shortUrl) {
+          frameCtx.globalAlpha = Math.min(ctaT * 5, 1);
+          frameCtx.fillStyle = accentColor;
+          roundRect(frameCtx, L.cta.x, L.cta.y, L.cta.w, L.cta.h, L.cta.r);
+          frameCtx.fill();
+          frameCtx.fillStyle = '#fff';
+          frameCtx.font = L.ctaText.font;
+          frameCtx.textBaseline = 'middle';
+          frameCtx.textAlign = 'center';
+          frameCtx.fillText('자세히 보기', L.ctaText.x, L.ctaText.y);
+          frameCtx.fillStyle = 'rgba(255,255,255,0.6)';
+          frameCtx.font = '400 14px sans-serif';
+          frameCtx.fillText(shortUrl, L.ctaShortUrl.x, L.ctaShortUrl.y);
+          frameCtx.textAlign = 'left';
+          frameCtx.globalAlpha = 1;
+        }
+
+        // Logo watermark (visible until disclosure covers screen)
+        if (logoImg && t < 0.667) {
+          drawLogoWatermark(frameCtx, logoImg, L.width, L.height, 0.65);
+        }
+
+        // Baby + link sticker composited into the video frame
+        if (shortUrl && t < 0.667) {
+          drawRoamingBabyWithLink(frameCtx, elapsedMs, L.width, L.height, shortUrl, accentColor, effectiveMascotEnabled);
+        }
+
+        // Disclosure text (last ~2 seconds)
+        if (t >= 0.667) {
+          const dt = Math.min((t - 0.667) / 0.1, 1);
+          frameCtx.globalAlpha = dt;
+          frameCtx.fillStyle = '#0a0f1e';
+          frameCtx.fillRect(0, 0, L.width, L.height);
+          frameCtx.fillStyle = 'rgba(255,255,255,0.85)';
+          frameCtx.font = '400 18px sans-serif';
+          frameCtx.textAlign = 'center';
+          frameCtx.textBaseline = 'middle';
+          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
+          drawTextLines(frameCtx, disclosure, L.width / 2, L.height / 2 - 20, L.width - 80, 26);
+          frameCtx.textAlign = 'left';
+          frameCtx.globalAlpha = 1;
+        }
+      };
+
+      if (useWebCodecs) {
+        // ===== WebCodecs path: deterministic encoding, no browser throttling =====
+        const renderAbort = new AbortController();
+        abortControllerRef.current = renderAbort;
+        const durationMs = clipDuration * 1000;
+
+        const result = await encodeCanvasToWebM(
+          canvas,
+          L.width,
+          L.height,
+          FPS,
+          durationMs,
+          (frameCtx, progress, frameIndex) => {
+            const elapsedMs = progress * durationMs;
+            renderFrameAt(frameCtx, progress, elapsedMs);
+          },
+          {
+            onProgress: (pct) => setProgress(pct),
+            signal: renderAbort.signal,
+          },
+        );
+
+        if (cancelledRef.current) return;
+        const url = URL.createObjectURL(result.blob);
+        setVideoUrl(url);
+        setVideoMime(result.mimeType);
+      } else if (hasRecorder) {
+        // ===== MediaRecorder fallback path (older browsers) =====
         // captureStream(0) = manual frame mode: only captures when requestFrame() is called
         const canvasStream = (canvas as any).captureStream(0);
 
@@ -933,40 +1169,15 @@ function WebClipGenerator({
 
         recorder.start(100);
       }
-      const startTime = performance.now();
 
-      // Pre-render halftone dot grid to offscreen canvas (avoids ~3600 arc/fill calls per frame)
-      let halftoneCanvas: HTMLCanvasElement | null = null;
-      if (hybridMode === 'photo-to-comic') {
-        halftoneCanvas = document.createElement('canvas');
-        halftoneCanvas.width = L.width;
-        halftoneCanvas.height = L.height;
-        const hctx = halftoneCanvas.getContext('2d');
-        if (hctx) {
-          hctx.fillStyle = accentColor;
-          const dotSpacing = 24;
-          const dotR = 3;
-          for (let dy = 0; dy < L.height; dy += dotSpacing) {
-            for (let dx = 0; dx < L.width; dx += dotSpacing) {
-              hctx.beginPath();
-              hctx.arc(dx, dy, dotR, 0, Math.PI * 2);
-              hctx.fill();
-            }
-          }
-        }
-      }
-
-      // Pre-build gradient (reused every frame)
-      const cachedGrad = ctx.createLinearGradient(0, 0, 0, L.height);
-      cachedGrad.addColorStop(0, 'rgba(10,15,30,0.25)');
-      cachedGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
-      cachedGrad.addColorStop(1, 'rgba(10,15,30,0.95)');
-
+      // ===== MediaRecorder fallback: real-time capture loop =====
+      if (!useWebCodecs) {
       let lastPct = -1;
+      const fallbackStartTime = performance.now();
 
       const drawFrame = () => {
        try {
-        const elapsed = performance.now() - startTime;
+        const elapsed = performance.now() - fallbackStartTime;
         const t = Math.min(elapsed / clipDuration, 1);
         const pct = Math.round(t * 100);
         if (pct !== lastPct) {
@@ -974,184 +1185,9 @@ function WebClipGenerator({
           setProgress(pct);
         }
 
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, L.width, L.height);
+        renderFrameAt(ctx, t, elapsed);
 
-        const motion = getMotionParams(motionPreset, t);
-        const scale = motion.scale;
-        const imgRatio = img.width / img.height;
-        const canvasRatio = L.width / L.height;
-        let drawW: number, drawH: number;
-        if (imgRatio > canvasRatio) {
-          drawH = L.height * scale;
-          drawW = drawH * imgRatio;
-        } else {
-          drawW = L.width * scale;
-          drawH = drawW / imgRatio;
-        }
-        const panY = (L.height - drawH) / 2 + motion.panY;
-        const panX = (L.width - drawW) / 2 + motion.panX;
-
-        ctx.globalAlpha = motion.alpha;
-        ctx.drawImage(img, panX, panY, drawW, drawH);
-        ctx.globalAlpha = 1;
-
-        // Hybrid mode: photo-to-comic transition at 1.5s (or 25% of duration)
-        const hybridTransitionPoint = 0.25;
-        const isHybrid = hybridMode === 'photo-to-comic';
-        const inComicPhase = isHybrid && t >= hybridTransitionPoint;
-        if (inComicPhase) {
-          const comicT = Math.min((t - hybridTransitionPoint) / 0.15, 1);
-          const easedComic = easeInOutCubic(comicT);
-          ctx.globalAlpha = easedComic * 0.45;
-          ctx.fillStyle = accentColor;
-          ctx.fillRect(0, 0, L.width, L.height);
-          ctx.globalAlpha = 1;
-
-          ctx.save();
-          ctx.filter = `saturate(2.0) contrast(1.4) brightness(1.05)`;
-          ctx.globalAlpha = easedComic * 0.6;
-          ctx.drawImage(img, panX, panY, drawW, drawH);
-          ctx.restore();
-          ctx.filter = 'none';
-          ctx.globalAlpha = 1;
-
-          if (comicT > 0.3) {
-            const flashAlpha = Math.min((comicT - 0.3) * 3, 1) * (1 - Math.min((comicT - 0.3) * 2, 1));
-            ctx.globalAlpha = flashAlpha;
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, L.width, L.height);
-            ctx.globalAlpha = 1;
-          }
-
-          // Comic-style halftone dots overlay (cached offscreen)
-          if (comicT > 0.5 && halftoneCanvas) {
-            const dotAlpha = Math.min((comicT - 0.5) * 4, 1) * 0.08;
-            ctx.globalAlpha = dotAlpha;
-            ctx.drawImage(halftoneCanvas, 0, 0);
-            ctx.globalAlpha = 1;
-          }
-        }
-
-        ctx.fillStyle = cachedGrad;
-        ctx.fillRect(0, 0, L.width, L.height);
-
-        const tagText = STYLE_PRESETS.find((s) => s.value === cardStyle)?.tag || 'PRODUCT';
-        const hashtagStr = hashtags.slice(0, 8).map((h) => `#${h}`).join(' ');
-
-        // Badge (top-left, fades in early)
-        const badgeT = Math.max(0, (t - 0.03) / 0.12);
-        if (badgeT > 0) {
-          const badgeAlpha = Math.min(badgeT * 5, 1);
-          ctx.globalAlpha = badgeAlpha;
-          ctx.fillStyle = accentColor;
-          roundRect(ctx, L.badge.x, L.badge.y, L.badge.w, L.badge.h, L.badge.r);
-          ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.font = L.badgeText.font;
-          ctx.textBaseline = 'middle';
-          ctx.textAlign = 'left';
-          ctx.fillText(tagText, L.badgeText.x, L.badgeText.y);
-          ctx.textAlign = 'left';
-          ctx.globalAlpha = 1;
-        }
-
-        // Hook text
-        const hookT = Math.max(0, (t - 0.15) / 0.3);
-        if (hookT > 0) {
-          const hookAlpha = Math.min(hookT * 4, 1);
-          const hookOffset = (1 - easeOutBack(Math.min(hookT, 1))) * 50;
-          const hookY = L.height * L.hookBox.yBase + hookOffset;
-          ctx.globalAlpha = hookAlpha;
-
-          ctx.fillStyle = '#fff';
-          ctx.font = L.hookText.font;
-          ctx.textBaseline = 'top';
-          ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 3;
-          drawTextLines(ctx, hook, L.hookText.x, hookY + L.hookText.yOffset, L.hookText.maxWidth, L.hookText.lineHeight);
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.globalAlpha = 1;
-        }
-
-        // Title text
-        const titleT = Math.max(0, (t - 0.3) / 0.2);
-        if (titleT > 0 && title) {
-          const titleAlpha = Math.min(titleT * 5, 1);
-          ctx.globalAlpha = titleAlpha;
-          ctx.fillStyle = 'rgba(255,255,255,0.9)';
-          ctx.font = L.title.font;
-          ctx.textBaseline = 'top';
-          ctx.shadowColor = 'rgba(0,0,0,0.7)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetY = 2;
-          drawTextLines(ctx, title, L.title.x, L.height * L.title.yBase, L.title.maxWidth, L.title.lineHeight);
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.globalAlpha = 1;
-        }
-
-        // Hashtags
-        const tagTextT = Math.max(0, (t - 0.4) / 0.2);
-        if (tagTextT > 0 && hashtags.length > 0) {
-          ctx.globalAlpha = Math.min(tagTextT * 5, 1);
-          ctx.fillStyle = accentColor;
-          ctx.font = L.hashtags.font;
-          ctx.textBaseline = 'top';
-          drawTextLines(ctx, hashtagStr, L.hashtags.x, L.height * L.hashtags.yBase, L.hashtags.maxWidth, L.hashtags.lineHeight);
-          ctx.globalAlpha = 1;
-        }
-
-        // CTA button
-        const ctaT = Math.max(0, (t - 0.45) / 0.15);
-        if (ctaT > 0 && shortUrl) {
-          ctx.globalAlpha = Math.min(ctaT * 5, 1);
-          ctx.fillStyle = accentColor;
-          roundRect(ctx, L.cta.x, L.cta.y, L.cta.w, L.cta.h, L.cta.r);
-          ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.font = L.ctaText.font;
-          ctx.textBaseline = 'middle';
-          ctx.textAlign = 'center';
-          ctx.fillText('자세히 보기', L.ctaText.x, L.ctaText.y);
-          ctx.fillStyle = 'rgba(255,255,255,0.6)';
-          ctx.font = '400 14px sans-serif';
-          ctx.fillText(shortUrl, L.ctaShortUrl.x, L.ctaShortUrl.y);
-          ctx.textAlign = 'left';
-          ctx.globalAlpha = 1;
-        }
-
-        // Logo watermark (visible until disclosure covers screen)
-        if (logoImg && t < 0.667) {
-          drawLogoWatermark(ctx, logoImg, L.width, L.height, 0.65);
-        }
-
-        // Baby + link sticker composited into the video frame
-        if (shortUrl && t < 0.667) {
-          drawRoamingBabyWithLink(ctx, elapsed, L.width, L.height, shortUrl, accentColor, effectiveMascotEnabled);
-        }
-
-        // Disclosure text (last ~2 seconds)
-        if (t >= 0.667) {
-          const dt = Math.min((t - 0.667) / 0.1, 1);
-          ctx.globalAlpha = dt;
-          ctx.fillStyle = '#0a0f1e';
-          ctx.fillRect(0, 0, L.width, L.height);
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          ctx.font = '400 18px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
-          drawTextLines(ctx, disclosure, L.width / 2, L.height / 2 - 20, L.width - 80, 26);
-          ctx.textAlign = 'left';
-          ctx.globalAlpha = 1;
-        }
-
-        // Manual frame capture: only push frames we actually drew (not empty/duplicate frames)
+        // Manual frame capture: only push frames we actually drew
         if (canvasStreamRef.current) {
           const videoTrack = canvasStreamRef.current.getVideoTracks?.()[0];
           if (videoTrack && typeof videoTrack.requestFrame === 'function') {
@@ -1160,8 +1196,6 @@ function WebClipGenerator({
         }
 
         if (t < 1) {
-          // Use setTimeout instead of requestAnimationFrame to avoid background-tab throttling.
-          // RAF is throttled to ~1Hz in background tabs; setTimeout(16) maintains ~60fps.
           rafRef.current = window.setTimeout(drawFrame, 16) as unknown as number;
         } else {
           recorderTimerRef.current = setTimeout(() => {
@@ -1191,7 +1225,6 @@ function WebClipGenerator({
 
       rafRef.current = window.setTimeout(drawFrame, 16) as unknown as number;
 
-      // Wall-clock fallback: if timer stops (tab backgrounded), force-stop at clipDuration + 5s
       const wallClockFallbackMs = (clipDuration + 5) * 1000;
       wallClockTimer = setTimeout(() => {
         if (cancelledRef.current) return;
@@ -1203,7 +1236,6 @@ function WebClipGenerator({
         }
       }, wallClockFallbackMs);
 
-      // Overall render timeout: clipDuration + 30s buffer
       const renderTimeoutMs = (clipDuration + 30) * 1000;
       renderTimeoutRef.current = setTimeout(() => {
         if (cancelledRef.current) return;
@@ -1211,7 +1243,6 @@ function WebClipGenerator({
         if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
         if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
-        // Stop recorder to unblock the await done below
         if (recorderRef.current && recorderRef.current.state !== 'inactive') {
           try { recorderRef.current.stop(); } catch { resolveDone(); }
         } else {
@@ -1245,6 +1276,7 @@ function WebClipGenerator({
         setVideoUrl(url);
         setVideoMime('image/png');
       }
+      } // end MediaRecorder fallback
       if (cancelledRef.current) return;
       if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
       setState('done');
