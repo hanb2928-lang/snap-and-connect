@@ -154,7 +154,12 @@ async function generateWithOpenAI(
 
   const productHint = productName ? `\n사용자가 입력한 상품명: ${productName}` : "";
 
-  const archetype = await pickArchetype('generate-viral-shortform');
+  let archetype;
+  try { archetype = await pickArchetype('generate-viral-shortform'); }
+  catch { archetype = null; }
+  const archetypeInjection = archetype
+    ? `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` + toneProfileToPrompt(archetype.toneProfile)
+    : '';
 
   const shortformChannelSpecific =
     "## 숏폼 영상 전용 지시사항\n" +
@@ -163,8 +168,7 @@ async function generateWithOpenAI(
     "- 절대 제품 피치로 시작하지 마라. 일상의 짜증이나 황당한 반전으로 시작하라.\n" +
     "- 제품은 중간에 '우연한 구원자'로 등장해야 한다.\n" +
     "- CTA는 '지금 바로 구매하세요'가 아니라 내부자 꿀팁 톤으로. 예: '고민하는 사이 품절됨 ㅋㅋ'\n" +
-    `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` +
-    toneProfileToPrompt(archetype.toneProfile) +
+    archetypeInjection +
     "\n# Phase 1: Vision & Context Analysis\n" +
     "업로드된 상품 이미지를 분석하여 다음 데이터를 즉시 추출:\n" +
     "- Category & Core Feature: 상품의 정확한 카테고리 및 시각적으로 드러나는 핵심 USP\n" +

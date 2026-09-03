@@ -93,7 +93,10 @@ export function ViralShortformArchitect({ imageDataUrl, mimeType, affiliatePlatf
         throw new Error(`Server error: ${response.status} - ${errText}`);
       }
 
-      const data = await response.json() as ViralShortformPackage;
+      const rawText = await response.text();
+      let data: ViralShortformPackage;
+      try { data = JSON.parse(rawText) as ViralShortformPackage; }
+      catch { throw new Error('서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해주세요.'); }
       setResult(data);
     } catch (err) {
       setError(friendlyError(err, '숏폼 패키지 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'));

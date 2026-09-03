@@ -101,7 +101,10 @@ export function CopyWriter({
         timeoutMs: 115000,
       });
       if (!response.ok) throw new Error('generation failed');
-      const data = await response.json();
+      const rawText = await response.text();
+      let data;
+      try { data = JSON.parse(rawText); }
+      catch { throw new Error('서버 응답을 해석하지 못했습니다'); }
       if (data.error) throw new Error(data.error);
       if (data.groups && Array.isArray(data.groups)) {
         setGroups(data.groups);

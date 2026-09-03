@@ -1613,8 +1613,11 @@ export function ComicShortGenerator({
           timeoutMs: 20000,
         });
         if (response.ok) {
-          const data = await response.json();
-          if (data.panels && Array.isArray(data.panels) && data.panels.length > 0) {
+          const rawText = await response.text();
+          let data;
+          try { data = JSON.parse(rawText); }
+          catch { data = null; }
+          if (data && data.panels && Array.isArray(data.panels) && data.panels.length > 0) {
             panels = data.panels;
             finalScenarioFallback = !!data.isFallback;
           }

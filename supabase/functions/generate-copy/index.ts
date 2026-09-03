@@ -352,7 +352,12 @@ async function generateWithOpenAI(
   count: number,
   model: string = 'gpt-4o-mini',
 ): Promise<CopyItem[]> {
-  const archetype = await pickArchetype('generate-copy');
+  let archetype;
+  try { archetype = await pickArchetype('generate-copy'); }
+  catch { archetype = null; }
+  const archetypeInjection = archetype
+    ? `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` + toneProfileToPrompt(archetype.toneProfile)
+    : '';
 
   const copyChannelSpecific =
     "## 카피 전용 지시사항\n" +
@@ -362,8 +367,7 @@ async function generateWithOpenAI(
     "과장 금지. '인생 바뀜', '대박', '최고' 같은 과도한 표현 대신 구체적인 경험을 담아.\n" +
     "카피에서는 역심리, 역설, 충격적 고백으로 후킹하라. 예: '이거 사지 마세요... 아니 꼭 사세요'\n" +
     "CTA는 기업 명령이 아니라 내부자 꿀팁처럼. 예: '링크 남겨둠 — 알아서들', '고민하는 사이 품절됨 ㅋㅋ'\n" +
-    `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` +
-    toneProfileToPrompt(archetype.toneProfile) +
+    archetypeInjection +
     `\"${typeLabel(data.copyType)}\" 스타일로 ${platformLabel(data.platform)}에 맞게 ${count}개 변형을 만들어.\n` +
     `${platformTone(data.platform)}\n` +
     "각 변형은 'hook'(10~30자, 첫 줄부터 자연스럽게 호기심 유발), " +

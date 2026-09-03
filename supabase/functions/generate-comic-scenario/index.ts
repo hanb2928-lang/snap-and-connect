@@ -283,7 +283,12 @@ async function generateWithOpenAI(
 
   const styleGuidance = artStyle ? `\n선택된 웹툰 화풍: ${STYLE_LABELS[artStyle]}\n이 화풍에 맞춰 대사의 톤과 분위기를 조절해:\n${artStyle === 'insta-toon' ? '- 깔끔하고 일상적인 대화체, 공감 가는 표현' : ''}${artStyle === 'b-grade' ? '- 과장되고 호쾌한 표현, 밈스러운 유머, 반말 혼용' : ''}${artStyle === 'food-toon' ? '- 음식의 질감과 맛을 살린 표현, 침 고인다는 듯한 묘사' : ''}${artStyle === 'american-comic' ? '- 강렬하고 힘있는 표현, 영웅물 같은 dramatic한 연출' : ''}${artStyle === 'ghibli' ? '- 따뜻하고 감성적인 표현, 몽환적이고 시적인 묘사' : ''}\n` : '';
 
-  const archetype = await pickArchetype('generate-comic-scenario');
+  let archetype;
+  try { archetype = await pickArchetype('generate-comic-scenario'); }
+  catch { archetype = null; }
+  const archetypeInjection = archetype
+    ? `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` + toneProfileToPrompt(archetype.toneProfile)
+    : '';
 
   const comicChannelSpecific =
     "## 만화 전용 지시사항\n" +
@@ -294,8 +299,7 @@ async function generateWithOpenAI(
     "- 감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
     "- 패널 레이아웃: 정렬된 깔끔한 그리드 피하기. 과장된 표정, 거친 대사 포맷, 고감정 대비 스파이크 활용.\n" +
     "- 펀치라인은 전환 프레임에서 즉시 터져야 한다. 읽는 시간을 마이크로 도파민 히트로.\n" +
-    `\n## 이번 생성의 아키타입: ${archetype.archetypeKey}\n${archetype.instructionSnippet}\n` +
-    toneProfileToPrompt(archetype.toneProfile) +
+    archetypeInjection +
     `${styleGuidance}` +
     `${episodeGuidance}` +
     (mbtiMode ? "\n추가로 MBTI 유형별 구매 가이드를 만들어. 4개 유형(INTJ, ENFP, ISTP, ENFJ) 각각에 대해 이 제품을 왜 좋아할지 위트 있는 한 줄 멘트를 작성해.\n형식: \"type\": \"INTJ\", \"label\": \"계획형\", \"comment\": \"시간 절약템 - 이건 효율성이니까\"\n" : "") +
