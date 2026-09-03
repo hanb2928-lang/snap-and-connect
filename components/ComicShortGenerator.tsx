@@ -543,6 +543,7 @@ export function ComicShortGenerator({
     setSlideshowMode(false);
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
 
+    try {
     let heroImageUrl = safeImageUrl;
     if (!heroImageUrl.startsWith('data:')) {
       try {
@@ -813,15 +814,21 @@ export function ComicShortGenerator({
     setResultBlob(null);
     setResultSize(0);
 
-    if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-    generatingLockRef.current = false;
-
     setState('done');
     setProgress(100);
     if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
       showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 대사 배경으로 표시됩니다.');
     } else {
       showToast('만화 슬라이드쇼가 완성됐어요!');
+    }
+    } catch (e) {
+      console.error('[ComicShortGenerator] generate failed', e);
+      setState('error');
+      setProgress(0);
+      setErrorDetail('만화 생성 중 예상치 못한 오류가 발생했어요. 다시 시도해주세요.');
+    } finally {
+      if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+      generatingLockRef.current = false;
     }
   }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant, customPrompt]);
 
