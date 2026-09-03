@@ -1576,7 +1576,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   downloadButtonText: {
-    fontSize: theme.typography.caption,
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
@@ -1595,8 +1595,8 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   cloudSaveButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary[300],
   },
   remakeButton: {
@@ -1610,8 +1610,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surfaceLight,
   },
   remakeButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.textDim,
   },
   errorBox: {

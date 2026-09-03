@@ -1690,7 +1690,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[600],
   },
   downloadButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
@@ -1705,7 +1705,7 @@ const styles = StyleSheet.create({
   },
   remakeButtonText: {
     fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.textDim,
   },
   errorBox: {

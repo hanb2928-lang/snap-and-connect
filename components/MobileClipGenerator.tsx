@@ -1175,7 +1175,7 @@ export function MobileClipGenerator({
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
               <Download size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.downloadButtonText}>저장</Text>
+              <Text style={styles.downloadButtonText}>다운로드</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cloudSaveButton}
@@ -1194,7 +1194,7 @@ export function MobileClipGenerator({
             </TouchableOpacity>
             <TouchableOpacity style={styles.remakeButton} onPress={handleReset} activeOpacity={0.7}>
               <RefreshCw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.remakeButtonText}>다시</Text>
+              <Text style={styles.remakeButtonText}>다시 만들기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1556,7 +1556,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.warning[500],
   },
   downloadButtonText: {
-    fontSize: theme.typography.caption,
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
@@ -1571,8 +1571,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surfaceLight,
   },
   remakeButtonText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.textDim,
   },
   cloudSaveButton: {
@@ -1588,8 +1588,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary[400] + '30',
   },
   cloudSaveButtonText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary[300],
   },
   uploadPreviewButton: {
