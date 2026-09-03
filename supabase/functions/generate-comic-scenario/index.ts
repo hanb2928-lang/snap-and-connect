@@ -384,7 +384,9 @@ async function generateWithOpenAI(
     sfx: String(p.sfx || "").slice(0, 20),
     emotion: String(p.emotion || "").slice(0, 20),
     episodeLabel: p.episodeLabel ? String(p.episodeLabel).slice(0, 15) : undefined,
-    imagePrompt: p.imagePrompt ? String(p.imagePrompt).slice(0, 500) : undefined,
+    imagePrompt: (p.imagePrompt || p.imageUrl || p.url || p.panel_image || p.image || "")
+      ? String(p.imagePrompt || p.imageUrl || p.url || p.panel_image || p.image).slice(0, 500)
+      : undefined,
   }));
 
   if (panels.length < panelCount) {

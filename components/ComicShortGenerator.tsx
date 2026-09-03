@@ -892,8 +892,10 @@ export function ComicShortGenerator({
                 });
                 if (imgResponse.ok) {
                   const imgData = await imgResponse.json();
-                  if (imgData.image) {
-                    return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
+                  const b64 = imgData.image || imgData.b64_json || imgData.imageUrl || imgData.url;
+                  if (b64) {
+                    if (b64.startsWith('data:') || b64.startsWith('http')) return b64;
+                    return `data:${imgData.mimeType || 'image/png'};base64,${b64}`;
                   }
                 }
               } catch (e) {
@@ -913,6 +915,8 @@ export function ComicShortGenerator({
       setProgress(40);
       if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
         showToast('일부 컷 이미지를 생성하지 못했어요. 해당 컷은 대사 배경으로 표시됩니다.');
+      } else if (panelImageErrorCount >= panels.length && panels.length > 0) {
+        showToast('AI 컷 이미지 생성에 실패했어요. 상품 사진으로 만화를 완성합니다.');
       }
     }
 
@@ -1032,8 +1036,10 @@ export function ComicShortGenerator({
 
     setState('done');
     setProgress(100);
-    if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
-      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 대사 배경으로 표시됩니다.');
+    if (panelImageErrorCount >= panels.length && panels.length > 0 && imagePrompts.length > 0) {
+      showToast('만화 슬라이드쇼가 완성됐어요! AI 이미지 생성 실패로 상품 사진을 사용했어요.');
+    } else if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
+      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 상품 사진으로 표시됩니다.');
     } else {
       showToast('만화 슬라이드쇼가 완성됐어요!');
     }
