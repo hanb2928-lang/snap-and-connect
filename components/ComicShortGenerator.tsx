@@ -1032,13 +1032,42 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       }catch(e){}
     }
 
+    var useWebCodecs=typeof window!=='undefined'&&typeof window.VideoEncoder!=='undefined'&&typeof window.VideoFrame!=='undefined';
+    var hasRecorder=typeof MediaRecorder!=='undefined'&&typeof canvas.captureStream==='function';
+    var canvasStream=null,recorder=null,mimeType='',donePromise=null;
+    var webCodecsBlob=null;
+    var chunks=[];
+    var startTime=0;
+    var lastPct=-1;
+    var watchdog=setTimeout(function(){
+      if(lastPct<0){
+        postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+30000)/1000)+'s'});
+      }
+    },duration+30000);
+    var wallClockFallback=setTimeout(function(){
+      if(lastPct>=0&&lastPct<100){
+        if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(e){}}
+        resolveDone();
+      }
+    },duration+5000);
+    var doneResolved=false;
+    var stopResolveRef=null;
+    function resolveDone(){
+      if(doneResolved)return;
+      doneResolved=true;
+      if(stopResolveRef)stopResolveRef(webCodecsBlob||new Blob(chunks||[],{type:mimeType}));
+    }
+
     if(snapshotMode){
+      startTime=performance.now();
       var snapIdx=0;
       var snapTotal=panelCount;
       function captureNextSnapshot(){
         if(snapIdx>=snapTotal){
           if(narrationAudio){try{narrationAudio.pause();}catch(e){}}
           if(punchAudioEl){try{punchAudioEl.pause();}catch(e){}}
+          clearTimeout(watchdog);
+          clearTimeout(wallClockFallback);
           postMsg('done',{size:0,mimeType:'image/png',isImage:true,snapshotMode:true,panelCount:snapTotal});
           return;
         }
@@ -1061,10 +1090,6 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       return;
     }
 
-    var useWebCodecs=typeof window!=='undefined'&&typeof window.VideoEncoder!=='undefined'&&typeof window.VideoFrame!=='undefined';
-    var hasRecorder=typeof MediaRecorder!=='undefined'&&typeof canvas.captureStream==='function';
-    var canvasStream=null,recorder=null,mimeType='',donePromise=null;
-    var webCodecsBlob=null;
     if(useWebCodecs){
       // WebCodecs deterministic encoding: no MediaRecorder, no real-time loop
       var totalFrames=Math.ceil((duration/1000)*FPS);
@@ -1098,13 +1123,6 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
           }catch(e2){useWebCodecs=false;}
         }
       }else{useWebCodecs=false;}
-    }
-    var doneResolved=false;
-    var stopResolveRef=null;
-    function resolveDone(){
-      if(doneResolved)return;
-      doneResolved=true;
-      if(stopResolveRef)stopResolveRef(webCodecsBlob||new Blob(chunks||[],{type:mimeType}));
     }
     if(hasRecorder&&!useWebCodecs){
       canvasStream=canvas.captureStream(FPS);
@@ -1142,7 +1160,6 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       }
 
       recorder=new MediaRecorder(combinedStream,{mimeType:mimeType,videoBitsPerSecond:6000000});
-      var chunks=[];
       recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
       donePromise=new Promise(function(resolve,reject){
         stopResolveRef=resolve;
@@ -1162,19 +1179,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       recorder.start(2000);
       }
     }
-    var startTime=performance.now();
-    var lastPct=-1;
-    var watchdog=setTimeout(function(){
-      if(lastPct<0){
-        postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+30000)/1000)+'s'});
-      }
-    },duration+30000);
-    var wallClockFallback=setTimeout(function(){
-      if(lastPct>=0&&lastPct<100){
-        if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(e){}}
-        resolveDone();
-      }
-    },duration+5000);
+    startTime=performance.now();
 
     function drawFrame(elapsedOverride){
       try{
@@ -1450,7 +1455,8 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         ctx.restore();
       }
 
-      if(t<1){if(!useWebCodecs){setTimeout(function(){drawFrame();},16);}}
+      if(snapshotMode){/* no recursion in snapshot mode */}
+      else if(t<1){if(!useWebCodecs){setTimeout(function(){drawFrame();},16);}}
       else{
         clearTimeout(watchdog);
         clearTimeout(wallClockFallback);
@@ -1462,10 +1468,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         },300);
       }
       }catch(e){
-        clearTimeout(watchdog);
-        clearTimeout(wallClockFallback);
-        if(recorder&&recorder.state!=='inactive')recorder.stop();
-        resolveDone();
+        if(!snapshotMode){clearTimeout(watchdog);clearTimeout(wallClockFallback);if(recorder&&recorder.state!=='inactive')recorder.stop();resolveDone();}
         postMsg('error',{msg:'frame render failed: '+(e&&e.message||'unknown')});
       }
     }
