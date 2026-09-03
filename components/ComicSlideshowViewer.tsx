@@ -170,7 +170,17 @@ export function ComicSlideshowViewer({
             accessibilityLabel={`만화 ${currentIndex + 1}번째 컷`}
           />
         ) : (
-          <View style={styles.panelImagePlaceholder} />
+          <View style={styles.panelImagePlaceholder}>
+            <View style={styles.placeholderInner}>
+              {panel.emotion ? (
+                <Text style={styles.placeholderEmotion}>{panel.emotion}</Text>
+              ) : null}
+              {panel.speech ? (
+                <Text style={styles.placeholderSpeech}>{panel.speech}</Text>
+              ) : null}
+              <Text style={styles.placeholderHint}>컷 이미지 없음</Text>
+            </View>
+          </View>
         )}
         <View style={styles.gradientOverlay} pointerEvents="none" />
 
@@ -307,6 +317,33 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  placeholderInner: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  placeholderEmotion: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  placeholderSpeech: {
+    fontSize: 17,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#e2e8f0',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  placeholderHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: '#64748b',
+    marginTop: 4,
   },
   gradientOverlay: {
     ...StyleSheet.absoluteFillObject,

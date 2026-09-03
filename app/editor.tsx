@@ -40,7 +40,6 @@ import { BackgroundPicker, type BackgroundStyle } from '@/components/BackgroundP
 import { BgRemoveEditor } from '@/components/BgRemoveEditor';
 import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
 import { cleanBase64 } from '@/lib/base64';
-import { getHtml2Canvas } from '@/lib/html2canvas';
 import { captureRef } from 'react-native-view-shot';
 import type { Scan } from '@/types/database';
 
@@ -490,17 +489,15 @@ export default function EditorScreen() {
 
       if (hasOverlays && imageWrapRef.current) {
         if (Platform.OS === 'web') {
-          const el = imageWrapRef.current as unknown as HTMLElement;
-          const html2canvas = await getHtml2Canvas();
-          if (!html2canvas) throw new Error('이미지 캡처를 불러올 수 없습니다');
-          const canvas = await html2canvas(el, {
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: null,
+          // Canvas capture removed — use captureRef instead
+          const capturedUri = await captureRef(imageWrapRef, {
+            format: 'png',
+            quality: 1,
+            fileName: `${scan.id}-edited.png`,
           });
-          const dataUrl = canvas.toDataURL('image/png', 1);
-          mimeType = 'image/png';
-          base64 = cleanBase64(dataUrl);
+          const result = await readUriAsBase64(capturedUri);
+          base64 = result.base64;
+          mimeType = result.mimeType;
         } else {
           const capturedUri = await captureRef(imageWrapRef, {
             format: 'png',

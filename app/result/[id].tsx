@@ -62,8 +62,6 @@ import { ShoppingMatchCard } from '@/components/ShoppingMatchCard';
 import { ProductSelector } from '@/components/ProductSelector';
 import { PlatformTabs, BoardTabs, getPlatformMediaType, platformSupportsBoth } from '@/components/PlatformTabs';
 import type { MediaType as BoardMediaType } from '@/components/PlatformTabs';
-import { ClipGenerator } from '@/components/ClipGenerator';
-import { CarouselGenerator } from '@/components/CarouselGenerator';
 import { MultiPlatformExport } from '@/components/MultiPlatformExport';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
 import type { LocalStoreInfo } from '@/types/database';
@@ -74,7 +72,6 @@ import { VariantGenerator, type Variant } from '@/components/VariantGenerator';
 import { SmartScheduler } from '@/components/SmartScheduler';
 import { OcrTextExtractor } from '@/components/OcrTextExtractor';
 import { BellRing, ScanText as ScanTextIcon } from 'lucide-react-native';
-import { TimelineShortGenerator } from '@/components/TimelineShortGenerator';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
 import { HybridBannerCard } from '@/components/HybridBannerCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
@@ -108,7 +105,6 @@ import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
 import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
-import { MotionZoomVideo } from '@/components/MotionZoomVideo';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
 import { LinkInBioCard } from '@/components/LinkInBioCard';
@@ -117,7 +113,6 @@ import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { AICutGenerator } from '@/components/AICutGenerator';
-import { VideoImportGenerator } from '@/components/VideoImportGenerator';
 import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 
@@ -1000,57 +995,6 @@ export default function ResultScreen() {
           ),
         },
         {
-          key: 'clipGen',
-          label: '클립 / 숏폼 (9:16)',
-          description: '릴스·숏츠·틱톡용 세로형 숏폼 영상 생성',
-          category: 'template',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <FilmIcon size={16} color={theme.colors.accent[300]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <ClipGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.primary[400]}
-              category={td?.category || ''}
-              fileName={`snap-connect-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              templateData={td ?? null}
-              customReview={scan.custom_review?.text ? scan.custom_review : null}
-              shortUrl={shortUrl || ''}
-              recommendedStyle={recommendedStyle}
-              styleAppliedKey={styleAppliedKey}
-            />
-          ),
-        },
-        {
-          key: 'timelineShort',
-          label: '30초/60초 숏폼',
-          description: '타임라인 기반 단계별 숏폼 영상 제작',
-          category: 'template',
-          modes: ['single', 'multi'] as ScanMode[],
-          icon: <Clock size={16} color={theme.colors.warning[400]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <TimelineShortGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.warning[400]}
-              fileName={`snap-connect-timeline-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-              productAdvantages={td?.productAdvantages || []}
-              oneLiner={activeOneLiner || scan?.one_liner || ''}
-            />
-          ),
-        },
-        {
           key: 'lightingStudio',
           label: '조명 & 배경 스튜디오',
           description: '제품 원본은 그대로, 배경과 조명만 AI로 다채롭게 변경',
@@ -1067,22 +1011,6 @@ export default function ResultScreen() {
           ),
         },
         {
-          key: 'motionZoom',
-          label: '2.5D 모션 줌 & 팬',
-          description: '원본 1장으로 줌/팬/틸트 시네마틱 숏폼 영상 생성',
-          category: 'template',
-          modes: ['single', 'multi', 'template'] as ScanMode[],
-          icon: <FilmZoomIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <MotionZoomVideo
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              productName={activeProductName || scan.product_name || ''}
-              fileName={`motion-zoom-${scan.id}`}
-            />
-          ),
-        },
-        {
           key: 'aiCut',
           label: 'AI 컷 분할',
           description: 'AI가 소스를 분석하여 템포에 맞춘 하이라이트/전환/디테일 컷 자동 분할',
@@ -1093,22 +1021,6 @@ export default function ResultScreen() {
           render: () => (
             <AICutGenerator
               sourceImage={captureImageUrl || scan.edited_image_url || scan.image_url}
-            />
-          ),
-        },
-        {
-          key: 'videoImport',
-          label: '내 영상 임포트 & 자동 편집',
-          description: '사용자 영상/이미지를 불러와 자막 오버레이, AI 카피, 하이라이트 자동 추출',
-          category: 'template',
-          modes: ['single', 'multi', 'template'] as ScanMode[],
-          icon: <UploadIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <VideoImportGenerator
-              affiliatePlatforms={affiliatePlatforms}
-              shortUrl={shortUrl || ''}
-              onClose={() => {}}
             />
           ),
         },
@@ -2028,23 +1940,6 @@ export default function ResultScreen() {
           </View>
 
           <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
-
-          {detectedProducts.length > 1 && (
-            <LazySection delayMs={250}>
-              <View style={styles.section}>
-                <CarouselGenerator
-                  imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-                  detectedProducts={detectedProducts}
-                  platform={activePlatform}
-                  customReview={scan.custom_review?.text ? scan.custom_review : null}
-                  affiliatePlatforms={affiliatePlatforms}
-                  fileName={`snap-connect-${scan.id}.png`}
-                  shortUrl={shortUrl || ''}
-                  stickerPosition={stickerPosition}
-                />
-              </View>
-            </LazySection>
-          )}
 
           {disclosureText ? (
             <View style={styles.disclosureSection}>

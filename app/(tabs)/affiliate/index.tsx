@@ -49,7 +49,6 @@ import { generatePsychAnalysis, generateNanoFusedAnalysis, getLearningStats, typ
 import { GlobalLocalizer } from '@/components/GlobalLocalizer';
 import { StockVideoPicker } from '@/components/StockVideoPicker';
 import { VideoEditPlanCard } from '@/components/VideoEditPlanCard';
-import { VideoRenderCard } from '@/components/VideoRenderCard';
 import type { StockVideoClip } from '@/lib/pexelsVideo';
 import type { EditPlan } from '@/lib/videoEditPlan';
 import { MessageSquare } from 'lucide-react-native';
@@ -279,7 +278,6 @@ export default function AffiliateScreen() {
   const masterGainRef = useRef<GainNode | null>(null);
   const prosodyMetaRef = useRef<ProsodyGenerationMeta | null>(null);
   const videoRenderingRef = useRef(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${videoPreviewProgress.value * 100}%`,
@@ -1089,6 +1087,7 @@ export default function AffiliateScreen() {
     videoRenderingRef.current = true;
     const isPreview = quality === 'preview';
     let recorderTimeout: ReturnType<typeof setTimeout> | null = null;
+    let recorderForFinally: MediaRecorder | null = null;
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -1312,7 +1311,7 @@ export default function AffiliateScreen() {
       }
 
       const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
-      recorderRef.current = recorder;
+      recorderForFinally = recorder;
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
@@ -1320,8 +1319,8 @@ export default function AffiliateScreen() {
 
       // Safety timeout: force-stop recorder after 60s to prevent infinite recording
       recorderTimeout = setTimeout(() => {
-        if (recorderRef.current && recorderRef.current.state === 'recording') {
-          try { recorderRef.current.stop(); } catch { /* already stopped */ }
+        if (recorder.state === 'recording') {
+          try { recorder.stop(); } catch { /* already stopped */ }
         }
       }, 60000);
 
@@ -2096,10 +2095,9 @@ export default function AffiliateScreen() {
       }).catch(() => {});
     } finally {
       if (recorderTimeout) clearTimeout(recorderTimeout);
-      if (recorderRef.current && recorderRef.current.state === 'recording') {
-        try { recorderRef.current.stop(); } catch { /* already stopped */ }
+      if (recorderForFinally && recorderForFinally.state === 'recording') {
+        try { recorderForFinally.stop(); } catch { /* already stopped */ }
       }
-      recorderRef.current = null;
       videoRenderingRef.current = false;
       setVideoRendering(false);
       renderProgress.value = 1;

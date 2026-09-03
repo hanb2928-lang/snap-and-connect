@@ -685,7 +685,7 @@ export function ComicShortGenerator({
                     quality: 'standard',
                     style: 'vivid',
                   }),
-                  timeoutMs: 25000,
+                  timeoutMs: 15000,
                 });
                 if (imgResponse.ok) {
                   const imgData = await imgResponse.json();
