@@ -223,8 +223,6 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
     };
   });
 
-  // Start playback + recording
-  video.currentTime = 0;
   await video.play().catch((playErr) => {
     throw new Error(`영상 재생을 시작할 수 없습니다: ${playErr instanceof Error ? playErr.message : '알 수 없는 오류'}`);
   });

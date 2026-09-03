@@ -856,8 +856,12 @@ function WebClipGenerator({
 
         let bgmResult: { stream: any; stop: () => void } | null = null;
         if (musicMood !== 'none') {
-          bgmResult = createBgmStream(musicMood, clipDuration, false);
-          if (bgmResult) bgmStopRef.current = bgmResult.stop;
+          try {
+            bgmResult = createBgmStream(musicMood, clipDuration, false);
+            if (bgmResult) bgmStopRef.current = bgmResult.stop;
+          } catch {
+            bgmResult = null;
+          }
         }
 
         let combinedStream: any = canvasStream;
@@ -875,10 +879,21 @@ function WebClipGenerator({
           : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
             ? 'video/webm;codecs=vp8'
             : 'video/webm';
-        recorder = new (window as any).MediaRecorder(combinedStream, {
-          mimeType,
-          videoBitsPerSecond: 6000000,
-        });
+        try {
+          recorder = new (window as any).MediaRecorder(combinedStream, {
+            mimeType,
+            videoBitsPerSecond: 6000000,
+          });
+        } catch {
+          try {
+            recorder = new (window as any).MediaRecorder(combinedStream, {
+              videoBitsPerSecond: 6000000,
+            });
+            mimeType = 'video/webm';
+          } catch (recErr) {
+            throw new Error('영상 녹화를 시작할 수 없습니다: ' + (recErr instanceof Error ? recErr.message : 'unknown'));
+          }
+        }
         recorderRef.current = recorder;
         canvasStreamRef.current = combinedStream;
         recorder.ondataavailable = (e: any) => {
@@ -925,6 +940,7 @@ function WebClipGenerator({
       let lastPct = -1;
 
       const drawFrame = () => {
+       try {
         const elapsed = performance.now() - startTime;
         const t = Math.min(elapsed / clipDuration, 1);
         const pct = Math.round(t * 100);
@@ -1116,12 +1132,26 @@ function WebClipGenerator({
           recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') {
               try { recorder.stop(); } catch {
-                // If stop throws, manually resolve with whatever chunks we have
                 if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
               }
             }
           }, 150);
         }
+       } catch (frameErr) {
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+        if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+        if (recorder && recorder.state !== 'inactive') {
+          try { recorder.stop(); } catch {
+            if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
+          }
+        }
+        if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
+        if (!cancelledRef.current) {
+          cancelledRef.current = true;
+          setState('error');
+          showToast('영상 렌더링 중 오류가 발생했어요. 다시 시도해주세요');
+        }
+       }
       };
 
       rafRef.current = requestAnimationFrame(drawFrame);
@@ -1187,8 +1217,10 @@ function WebClipGenerator({
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('이미지 로드') || msg.includes('CORS') || msg.includes('시간 초과') || msg.includes('SecurityError')) {
         showToast('이미지를 불러올 수 없어요. 네트워크 또는 CORS 문제일 수 있어요. 잠시 후 다시 시도해주세요');
+      } else if (msg.includes('녹화') || msg.includes('인코딩') || msg.includes('recorder') || msg.includes('recording')) {
+        showToast('영상 녹화를 시작할 수 없어요. 브라우저를 새로고침 후 다시 시도해주세요');
       } else {
-        showToast('동영상 생성에 실패했어요');
+        showToast('동영상 생성에 실패했어요: ' + msg.slice(0, 80));
       }
     } finally {
       generatingRef.current = false;
