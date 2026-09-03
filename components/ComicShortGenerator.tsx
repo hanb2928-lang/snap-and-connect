@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Loader as Loader2, BookOpen, Sparkles, Mic, Volume2, Share2, Music2, Youtube, Instagram, Lightbulb, Smartphone, AlignVerticalJustifyCenter, Clock, ChevronDown, Shirt, X, Check, Play, Pause, Pencil, Globe, Eye, EyeOff } from 'lucide-react-native';
 import { VideoPreview } from '@/components/VideoPreview';
+import { ComicSlideshowViewer, type SlideshowPanel } from '@/components/ComicSlideshowViewer';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
@@ -373,6 +374,7 @@ type ComicBuildParams = {
   localStoreInfo?: LocalStoreInfo | null;
   genId?: number;
   babyImgUrl?: string;
+  snapshotMode?: boolean;
 };
 
 function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown> {
@@ -416,6 +418,7 @@ function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown
     panelEmotions: params.panels.map(p => p.emotion || ''),
     panels: params.panels,
     babyImgUrl: babyImgUrl ?? null,
+    snapshotMode: params.snapshotMode ?? false,
   };
 }
 
@@ -454,6 +457,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
   var imageUrl=P.imageUrl;
   var panelImages=P.panelImages||[];
   var genId=P.genId;
+  var snapshotMode=P.snapshotMode;
   var panels=P.panels;
   var panelEmotions=P.panelEmotions;
   var emotionEmojis={'\uACE0\uBBFC':'\uD83D\uDE15','\uB188\uB78C':'\uD83D\uDE31','\uD589\uBCF5':'\uD83D\uDE0D','\uD655\uC2E0':'\uD83D\uDE0E','\uC124\uB808':'\uD83D\uDE0D','\uC2AC\uD544':'\uD83D\uDE22','\uBD84\uB178':'\uD83D\uDE24','\uB3C4\uC804':'\uD83D\uDE01','\uD589\uB3D9':'\uD83D\uDE80','\uC9C0\uB8CC':'\uD83D\uDE34','\uC218\uB2E4':'\uD83D\uDE4B','\uAC10\uB3D9':'\uD83D\uDE2D'};
@@ -1026,6 +1030,35 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         punchAudioEl=new Audio(punchAudioDataUrl);
         punchAudioEl.preload='auto';
       }catch(e){}
+    }
+
+    if(snapshotMode){
+      var snapIdx=0;
+      var snapTotal=panelCount;
+      function captureNextSnapshot(){
+        if(snapIdx>=snapTotal){
+          if(narrationAudio){try{narrationAudio.pause();}catch(e){}}
+          if(punchAudioEl){try{punchAudioEl.pause();}catch(e){}}
+          postMsg('done',{size:0,mimeType:'image/png',isImage:true,snapshotMode:true,panelCount:snapTotal});
+          return;
+        }
+        var panelMidT=(snapIdx+0.5)/snapTotal;
+        var panelElapsed=panelMidT*duration;
+        try{
+          drawFrame(panelElapsed);
+          var dataUrl=canvas.toDataURL('image/png');
+          var base64=dataUrl.split(',')[1];
+          postMsg('snapshot',{index:snapIdx,total:snapTotal,base64:base64});
+        }catch(e){
+          postMsg('error',{msg:'snapshot capture failed at panel '+snapIdx+': '+(e&&e.message||'unknown')});
+          return;
+        }
+        snapIdx++;
+        setTimeout(captureNextSnapshot,10);
+      }
+      if(narrationAudio){try{narrationAudio.play().catch(function(){});}catch(e){}}
+      setTimeout(captureNextSnapshot,50);
+      return;
     }
 
     var useWebCodecs=typeof window!=='undefined'&&typeof window.VideoEncoder!=='undefined'&&typeof window.VideoFrame!=='undefined';
@@ -1601,6 +1634,8 @@ export function ComicShortGenerator({
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioFallback, setScenarioFallback] = useState(false);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [slideshowPanels, setSlideshowPanels] = useState<SlideshowPanel[]>([]);
+  const [slideshowMode, setSlideshowMode] = useState(false);
   const [episodeMode, setEpisodeMode] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
@@ -1762,12 +1797,43 @@ export function ComicShortGenerator({
         const { index, total, chunk } = msg.data;
         if (index === 0) { chunkBufferRef.current = []; chunkTotalRef.current = total; }
         chunkBufferRef.current[index] = chunk;
+      } else if (msg.type === 'snapshot') {
+        if (stateRef.current !== 'generating') return;
+        const { index, total, base64 } = msg.data;
+        setSlideshowPanels((prev) => {
+          const next = [...prev];
+          while (next.length < total) next.push({ imageUri: '', speech: '', sfx: '', emotion: '' });
+          const imgUri = Platform.OS === 'web'
+            ? URL.createObjectURL(new Blob([Uint8Array.from(atob(base64), c => c.charCodeAt(0))], { type: 'image/png' }))
+            : `data:image/png;base64,${base64}`;
+          const sp = scenarioPanelsRef.current[index];
+          next[index] = {
+            imageUri: imgUri,
+            speech: sp?.speech || '',
+            sfx: sp?.sfx || '',
+            emotion: sp?.emotion || '',
+            episodeLabel: sp?.episodeLabel,
+          };
+          return next;
+        });
+        setProgress(Math.round(((index + 1) / total) * 100));
       } else if (msg.type === 'done') {
         if (stateRef.current !== 'generating') return;
         const { size, mimeType } = msg.data;
         const isImage = msg.data.isImage === true;
+        const isSnapshot = msg.data.snapshotMode === true;
         const mime = mimeType || 'video/webm';
         const ext = isImage ? 'png' : (mime.includes('webm') ? 'webm' : 'mp4');
+        if (isSnapshot) {
+          if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+          generatingLockRef.current = false;
+          setSlideshowMode(true);
+          setResultMime('image/png');
+          setState('done');
+          setProgress(100);
+          showToast('만화 슬라이드쇼가 완성됐어요!');
+          return;
+        }
         const expectedTotal = chunkTotalRef.current;
         const receivedChunks = chunkBufferRef.current.filter((c) => c !== undefined).length;
         const base64 = chunkBufferRef.current.join('');
@@ -1888,6 +1954,7 @@ export function ComicShortGenerator({
   }, [handleWebViewMessage]);
 
   const generatingLockRef = useRef(false);
+  const scenarioPanelsRef = useRef<ComicPanel[]>([]);
   const handleGenerate = useCallback(async () => {
     if (generatingLockRef.current) return;
     generatingLockRef.current = true;
@@ -1899,6 +1966,8 @@ export function ComicShortGenerator({
     setResultUri(null);
     setResultBlob(null);
     setErrorDetail(null);
+    setSlideshowPanels([]);
+    setSlideshowMode(false);
     chunkBufferRef.current = [];
     chunkTotalRef.current = 0;
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
@@ -2132,6 +2201,7 @@ export function ComicShortGenerator({
     setScenarioFallback(finalScenarioFallback);
     setNarrationAudioDataUrl(finalNarrationAudioDataUrl);
     setScenarioPanels(panels);
+    scenarioPanelsRef.current = panels;
     setPanelImages(panelImages);
 
     if (Platform.OS === 'web') {
@@ -2161,6 +2231,7 @@ export function ComicShortGenerator({
           localStoreInfo,
           genId: currentGenId,
           babyImgUrl: babyImgDataUrl,
+          snapshotMode: true,
         };
         const scriptBody = buildComicScriptBody(comicParams);
         const payload = buildComicDataPayload(comicParams);
@@ -2454,6 +2525,9 @@ export function ComicShortGenerator({
     setErrorDetail(null);
     setNarrationAudioDataUrl(null);
     setScenarioPanels([]);
+    scenarioPanelsRef.current = [];
+    setSlideshowPanels([]);
+    setSlideshowMode(false);
     setFittingResultUrl(null);
     setFittingModalOpen(false);
   }, [resultUri]);
@@ -2956,11 +3030,13 @@ export function ComicShortGenerator({
         <View style={styles.resultWrap}>
           <View style={styles.doneHeaderRow}>
             <Text style={styles.doneNotice}>
-              {resultMime.includes('png')
-                ? '만화 숏폼 이미지가 완성됐어요.'
-                : narrationAudioDataUrl
-                  ? 'AI 내레이션 만화 숏폼이 완성됐어요.'
-                  : '만화 숏폼 동영상이 완성됐어요.'}
+              {slideshowMode
+                ? '만화 슬라이드쇼가 완성됐어요. 재생 버튼을 눌러 보세요.'
+                : resultMime.includes('png')
+                  ? '만화 숏폼 이미지가 완성됐어요.'
+                  : narrationAudioDataUrl
+                    ? 'AI 내레이션 만화 숏폼이 완성됐어요.'
+                    : '만화 숏폼 동영상이 완성됐어요.'}
             </Text>
             <TouchableOpacity
               style={styles.previewToggleBtn}
@@ -2978,12 +3054,21 @@ export function ComicShortGenerator({
 
           {showPreview && (
             <View style={styles.previewWrap}>
-            <VideoPreview
-              uri={resultUri}
-              mimeType={resultMime}
-              isVertical
-              maxHeight={380}
-            />
+            {slideshowMode ? (
+              <ComicSlideshowViewer
+                panels={slideshowPanels}
+                audioDataUrl={narrationAudioDataUrl}
+                durationPerPanel={comicDuration}
+                maxHeight={380}
+              />
+            ) : (
+              <VideoPreview
+                uri={resultUri}
+                mimeType={resultMime}
+                isVertical
+                maxHeight={380}
+              />
+            )}
             <TouchableOpacity
               style={styles.fittingFloatBtn}
               onPress={() => setFittingModalOpen(true)}
