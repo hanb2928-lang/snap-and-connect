@@ -476,7 +476,7 @@ function WebClipGenerator({
 
   useEffect(() => {
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
       if (previewTimerRef.current !== null) clearTimeout(previewTimerRef.current);
       if (recorderTimerRef.current !== null) clearTimeout(recorderTimerRef.current);
@@ -820,6 +820,7 @@ function WebClipGenerator({
     }
 
     let wallClockTimer: ReturnType<typeof setTimeout> | null = null;
+    let antiThrottleCtx: AudioContext | null = null;
 
     try {
       if (!imageUrl) {
@@ -859,8 +860,24 @@ function WebClipGenerator({
         doneResolved = true;
         if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
       };
+
+      // Silent audio context to prevent background-tab throttling
       if (hasRecorder) {
-        const canvasStream = (canvas as any).captureStream(FPS);
+        try {
+          const ctx = new (window as any).AudioContext();
+          antiThrottleCtx = ctx;
+          const silentBuffer = ctx.createBuffer(1, 44100, 44100);
+          const silentSrc = ctx.createBufferSource();
+          silentSrc.buffer = silentBuffer;
+          silentSrc.loop = true;
+          silentSrc.connect(ctx.destination);
+          silentSrc.start();
+        } catch { antiThrottleCtx = null; }
+      }
+
+      if (hasRecorder) {
+        // captureStream(0) = manual frame mode: only captures when requestFrame() is called
+        const canvasStream = (canvas as any).captureStream(0);
 
         let bgmResult: { stream: any; stop: () => void } | null = null;
         if (musicMood !== 'none') {
@@ -1134,8 +1151,18 @@ function WebClipGenerator({
           ctx.globalAlpha = 1;
         }
 
+        // Manual frame capture: only push frames we actually drew (not empty/duplicate frames)
+        if (canvasStreamRef.current) {
+          const videoTrack = canvasStreamRef.current.getVideoTracks?.()[0];
+          if (videoTrack && typeof videoTrack.requestFrame === 'function') {
+            try { videoTrack.requestFrame(); } catch {}
+          }
+        }
+
         if (t < 1) {
-          rafRef.current = requestAnimationFrame(drawFrame);
+          // Use setTimeout instead of requestAnimationFrame to avoid background-tab throttling.
+          // RAF is throttled to ~1Hz in background tabs; setTimeout(16) maintains ~60fps.
+          rafRef.current = window.setTimeout(drawFrame, 16) as unknown as number;
         } else {
           recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') {
@@ -1146,7 +1173,7 @@ function WebClipGenerator({
           }, 150);
         }
        } catch (frameErr) {
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+        if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
         if (recorder && recorder.state !== 'inactive') {
           try { recorder.stop(); } catch {
@@ -1162,13 +1189,13 @@ function WebClipGenerator({
        }
       };
 
-      rafRef.current = requestAnimationFrame(drawFrame);
+      rafRef.current = window.setTimeout(drawFrame, 16) as unknown as number;
 
-      // Wall-clock fallback: if RAF stops (tab backgrounded), force-stop at clipDuration + 5s
+      // Wall-clock fallback: if timer stops (tab backgrounded), force-stop at clipDuration + 5s
       const wallClockFallbackMs = (clipDuration + 5) * 1000;
       wallClockTimer = setTimeout(() => {
         if (cancelledRef.current) return;
-        if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+        if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
         if (recorder && recorder.state !== 'inactive') {
           try { recorder.stop(); } catch { resolveDone(); }
         } else {
@@ -1182,7 +1209,7 @@ function WebClipGenerator({
         if (cancelledRef.current) return;
         cancelledRef.current = true;
         if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+        if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
         // Stop recorder to unblock the await done below
         if (recorderRef.current && recorderRef.current.state !== 'inactive') {
@@ -1199,6 +1226,7 @@ function WebClipGenerator({
         const blob = await done;
         if (cancelledRef.current) return;
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
+        if (antiThrottleCtx) { try { antiThrottleCtx.close(); } catch {} antiThrottleCtx = null; }
         if (canvasStreamRef.current) {
           try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
           canvasStreamRef.current = null;
@@ -1234,6 +1262,7 @@ function WebClipGenerator({
       if (recorderRef.current && recorderRef.current.state !== 'inactive') {
         try { recorderRef.current.stop(); } catch {}
       }
+      if (antiThrottleCtx) { try { antiThrottleCtx.close(); } catch {} }
       recorderRef.current = null;
       if (cancelledRef.current) return;
       setState('error');
@@ -1273,7 +1302,7 @@ function WebClipGenerator({
 
   const handleCancelRender = useCallback(() => {
     cancelledRef.current = true;
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (rafRef.current !== null) { clearTimeout(rafRef.current); rafRef.current = null; }
     if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     if (abortControllerRef.current) { abortControllerRef.current.abort(); abortControllerRef.current = null; }
     if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
