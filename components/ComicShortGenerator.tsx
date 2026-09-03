@@ -793,7 +793,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
   var panelLabels=panels.map(function(p){return p.episodeLabel||'';});
 
 
-  function drawImageInPanel(ctx,img,px,py,pw,ph,filter,panScale){
+  function drawImageInPanel(ctx,img,px,py,pw,ph,filter,panScale,flipX,cropOffX,cropOffY){
     ctx.save();
     ctx.beginPath();ctx.rect(px,py,pw,ph);ctx.clip();
     ctx.filter=filter;
@@ -802,9 +802,34 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
     var drawW,drawH;
     if(imgRatio>panelRatio){drawH=ph*panScale;drawW=drawH*imgRatio;}
     else{drawW=pw*panScale;drawH=drawW/imgRatio;}
-    ctx.drawImage(img,px+(pw-drawW)/2,py+(ph-drawH)/2,drawW,drawH);
+    var dx=px+(pw-drawW)/2+(cropOffX||0);
+    var dy=py+(ph-drawH)/2+(cropOffY||0);
+    if(flipX){
+      ctx.translate(px+pw,0);
+      ctx.scale(-1,1);
+      ctx.translate(-(px+pw),0);
+      dx=px+(pw+drawW)/2-(cropOffX||0);
+    }
+    ctx.drawImage(img,dx,dy,drawW,drawH);
     ctx.restore();
     ctx.filter='none';
+  }
+  var panelFilters=[
+    filterCode,
+    filterCode+' brightness(1.1) contrast(1.15)',
+    filterCode+' saturate(1.3) hue-rotate(-8deg)'
+  ];
+  var panelFlips=[false,true,false];
+  var panelCrops=[
+    {ox:0,oy:0},
+    {ox:0,oy:0},
+    {ox:0,oy:0}
+  ];
+  if(panelCount>=2){
+    panelCrops[1]={ox:0,oy:-H*0.04};
+  }
+  if(panelCount>=3){
+    panelCrops[2]={ox:W*0.03,oy:0};
   }
 
   function getPanelRects(){
@@ -958,7 +983,10 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         var pt=Math.min(Math.max((t-panelStart)/(panelEnd-panelStart),0),1);
 
         var panScale=1+easeOutCubic(pt)*0.12;
-        drawImageInPanel(ctx,img,r.x,r.y,r.w,r.h,filterCode,panScale);
+        var pFilter=panelFilters[pi%panelFilters.length];
+        var pFlip=panelFlips[pi%panelFlips.length];
+        var pCrop=panelCrops[pi%panelCrops.length];
+        drawImageInPanel(ctx,img,r.x,r.y,r.w,r.h,pFilter,panScale,pFlip,pCrop.ox,pCrop.oy);
 
         if(moodConfig.halftone){
           drawHalftonePattern(ctx,r.x,r.y,r.w,r.h,3,12,moodConfig.halftoneColor,moodConfig.halftoneAlpha);
