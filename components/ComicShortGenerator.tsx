@@ -762,7 +762,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
 
   var img=new Image();
   img.crossOrigin='anonymous';
-  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},60000);
+  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},120000);
   
   var panelImgs=[];
   var panelImgsLoaded=0;
@@ -939,7 +939,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         var stopTimeout=setTimeout(function(){
           try{if(recorder&&recorder.state!=='inactive')recorder.stop();}catch(e){}
           reject(new Error('recorder stop timeout'));
-        },duration+30000);
+        },duration+60000);
         recorder.onstop=function(){
           clearTimeout(stopTimeout);
           resolve(new Blob(chunks,{type:mimeType}));
@@ -956,9 +956,9 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
     var lastPct=-1;
     var watchdog=setTimeout(function(){
       if(lastPct<0||lastPct===0){
-        postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+15000)/1000)+'s'});
+        postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+30000)/1000)+'s'});
       }
-    },duration+15000);
+    },duration+30000);
 
     function drawFrame(){
       try{
@@ -1911,7 +1911,7 @@ export function ComicShortGenerator({
         }
         return prev;
       });
-    }, finalDuration + 60000);
+    }, finalDuration + 120000);
   }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant]);
 
 
