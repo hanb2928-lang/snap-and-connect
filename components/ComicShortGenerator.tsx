@@ -657,6 +657,7 @@ export function ComicShortGenerator({
     }
 
     setProgress(20);
+    const fallbackImage = safeImageUrl || '';
     let panelImages: (string | null)[] = new Array(panels.length).fill(null);
     const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
     let panelImageErrorCount = 0;
@@ -708,9 +709,7 @@ export function ComicShortGenerator({
       setScenarioLoading(false);
       setProgress(40);
       if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
-        showToast(`${panelImageErrorCount}개 컷 이미지 생성에 실패했어요. 해당 컷은 대사 배경으로 표시됩니다.`);
-      } else if (panelImageErrorCount === panels.length && imagePrompts.length > 0) {
-        showToast('컷 이미지 생성에 실패했어요. 대사가 표시된 배경으로 만들어집니다.');
+        showToast('일부 컷을 상품 사진으로 대체했어요. 대사와 연출로 감쌌습니다.');
       }
     }
 
@@ -800,7 +799,7 @@ export function ComicShortGenerator({
     setPanelImages(panelImages);
 
     const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
-      imageUri: panelImages[i] || '',
+      imageUri: panelImages[i] || fallbackImage || '',
       speech: panel.speech || '',
       sfx: panel.sfx || '',
       emotion: panel.emotion || '',
@@ -818,14 +817,11 @@ export function ComicShortGenerator({
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
     generatingLockRef.current = false;
 
-    const allImagesFailed = imagePrompts.length > 0 && panelImages.every((img) => img === null);
-    if (allImagesFailed) {
-      setState('error');
-      setProgress(0);
-      setErrorDetail('AI 컷 이미지 생성에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.');
+    setState('done');
+    setProgress(100);
+    if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
+      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 상품 사진으로 대체됐습니다.');
     } else {
-      setState('done');
-      setProgress(100);
       showToast('만화 슬라이드쇼가 완성됐어요!');
     }
   }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant, customPrompt]);
