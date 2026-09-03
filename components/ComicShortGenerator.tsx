@@ -542,6 +542,16 @@ export function ComicShortGenerator({
     setSlideshowPanels([]);
     setSlideshowMode(false);
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    generateTimeoutRef.current = setTimeout(() => {
+      if (genIdRef.current !== currentGenId) return;
+      console.warn('[ComicShortGenerator] wall-clock timeout (120s) — forcing error state');
+      setState('error');
+      setProgress(0);
+      setErrorDetail('생성 시간이 너무 오래 걸렸어요. 네트워크 상태를 확인하고 다시 시도해주세요.');
+      setScenarioLoading(false);
+      setTtsLoading(false);
+      generatingLockRef.current = false;
+    }, 120000);
 
     try {
     let heroImageUrl = safeImageUrl;
