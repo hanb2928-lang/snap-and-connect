@@ -1003,6 +1003,11 @@ export function ComicShortGenerator({
     const finalPanelImages = await Promise.all(
       panelImages.map(async (img, i) => {
         if (img) return img;
+        if (heroImageUrl) {
+          const comicPanel = await createComicPanelFromPhoto(heroImageUrl, i, moodConfig);
+          if (comicPanel) return comicPanel;
+          return heroImageUrl;
+        }
         return generateGradientFallback(panels[i]?.speech || '', panels[i]?.emotion || '', i) || '';
       }),
     );
