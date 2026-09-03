@@ -1600,6 +1600,7 @@ export function ComicShortGenerator({
   const [panelImages, setPanelImages] = useState<(string | null)[]>([]);
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioFallback, setScenarioFallback] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [episodeMode, setEpisodeMode] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
@@ -1774,8 +1775,8 @@ export function ComicShortGenerator({
         chunkTotalRef.current = 0;
         if (!base64 || (expectedTotal > 0 && receivedChunks < expectedTotal)) {
           generatingLockRef.current = false;
+          setErrorDetail('영상 데이터를 받지 못했어요');
           setState('error');
-          showToast('영상 데이터를 받지 못했어요. 다시 시도해주세요');
           return;
         }
         setResultMime(mime);
@@ -1804,8 +1805,8 @@ export function ComicShortGenerator({
           showToast(isImage ? '만화 숏폼 이미지가 완성됐어요!' : hasAudio ? 'AI 내레이션 만화 숏폼 완성!' : '만화 숏폼 동영상이 완성됐어요!');
         } catch {
           generatingLockRef.current = false;
+          setErrorDetail('파일 저장에 실패했어요');
           setState('error');
-          showToast('파일 저장에 실패했어요');
        }
       } else if (msg.type === 'error') {
         if (stateRef.current !== 'generating') return;
@@ -1813,21 +1814,23 @@ export function ComicShortGenerator({
         generatingLockRef.current = false;
         setState('error');
         const errMsg = msg.data?.msg || '';
+        let detail = '만화 숏폼 생성에 실패했어요';
         if (errMsg.includes('timeout')) {
-          showToast('이미지 로드 시간이 초과됐어요. 다시 시도해주세요');
+          detail = '이미지 로드 시간이 초과됐어요';
         } else if (errMsg.includes('image load')) {
-          showToast('이미지를 불러올 수 없어요. 다시 시도해주세요');
+          detail = '이미지를 불러올 수 없어요';
         } else if (errMsg.includes('image blob read') || errMsg.includes('CORS')) {
-          showToast('이미지 보안 정책(CORS) 문제로 불러오지 못했어요');
+          detail = '이미지 보안 정책(CORS) 문제로 불러오지 못했어요';
         } else if (errMsg.includes('frame render')) {
-          showToast('영상 렌더링 중 오류가 발생했어요. 다시 시도해주세요');
+          detail = '영상 렌더링 중 오류가 발생했어요';
         } else if (errMsg.includes('recorder') || errMsg.includes('recording')) {
-          showToast('영상 녹화 중 오류가 발생했어요. 다시 시도해주세요');
+          detail = '영상 녹화 중 오류가 발생했어요';
         } else if (errMsg.includes('blob read') || errMsg.includes('canvas toDataURL')) {
-          showToast('영상 변환 중 오류가 발생했어요. 다시 시도해주세요');
-        } else {
-          showToast(errMsg ? '만화 숏폼 오류: ' + errMsg.slice(0, 60) : '만화 숏폼 생성에 실패했어요. 다시 시도해주세요');
+          detail = '영상 변환 중 오류가 발생했어요';
+        } else if (errMsg) {
+          detail = '만화 숏폼 오류: ' + errMsg.slice(0, 80);
         }
+        setErrorDetail(detail);
       }
     } catch {
       // ignore parse errors
@@ -1895,6 +1898,7 @@ export function ComicShortGenerator({
     setProgress(0);
     setResultUri(null);
     setResultBlob(null);
+    setErrorDetail(null);
     chunkBufferRef.current = [];
     chunkTotalRef.current = 0;
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
@@ -2164,8 +2168,8 @@ export function ComicShortGenerator({
       } catch (e) {
         generatingLockRef.current = false;
         if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+        setErrorDetail('만화 스크립트 생성 오류: ' + ((e as Error)?.message || 'unknown').slice(0, 80));
         setState('error');
-        showToast('만화 스크립트 생성 오류: ' + ((e as Error)?.message || 'unknown').slice(0, 80));
       }
     } else {
       setWebviewKey((k) => k + 1);
@@ -2179,7 +2183,7 @@ export function ComicShortGenerator({
             webGenCleanupRef.current();
             webGenCleanupRef.current = null;
           }
-          showToast('생성 시간이 초과됐어요. 다시 시도해주세요');
+          setErrorDetail('생성 시간이 초과됐어요');
           return 'error';
         }
         return prev;
@@ -2447,6 +2451,7 @@ export function ComicShortGenerator({
     setResultBlob(null);
     setState('idle');
     setProgress(0);
+    setErrorDetail(null);
     setNarrationAudioDataUrl(null);
     setScenarioPanels([]);
     setFittingResultUrl(null);
@@ -3112,7 +3117,7 @@ export function ComicShortGenerator({
       {state === 'error' && (
         <View style={styles.errorBox}>
           <AlertCircle size={16} color={theme.colors.error[400]} strokeWidth={2} />
-          <Text style={styles.errorText}>생성 실패. 다시 시도해주세요.</Text>
+          <Text style={styles.errorText}>{errorDetail || '생성 실패. 다시 시도해주세요.'}</Text>
         </View>
       )}
 
@@ -3171,8 +3176,8 @@ export function ComicShortGenerator({
             onMessage={handleWebViewMessage}
             onError={() => {
               if (stateRef.current === 'generating') {
+                setErrorDetail('웹뷰 로드에 실패했어요');
                 setState('error');
-                showToast('웹뷰 로드에 실패했어요. 다시 시도해주세요');
               }
             }}
             javaScriptEnabled
