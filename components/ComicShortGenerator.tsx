@@ -20,7 +20,6 @@ import { Zap, Download, RefreshCw, CircleAlert as AlertCircle, CloudUpload, Load
 import { VideoPreview } from '@/components/VideoPreview';
 import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
-import { getWebViewOverlayScript } from '@/lib/canvasOverlay';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
 import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
@@ -418,9 +417,7 @@ function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown
 }
 
 function buildComicScriptBody(params: ComicBuildParams): string {
-  const { babyImgUrl } = params;
-
-  return `(function(){
+  return `(function(){ 
   try{
   var W=${W}, H=${H};
   var canvas=document.getElementById('cv');
@@ -750,7 +747,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     ctx.restore();
   }
 
-  ${getWebViewOverlayScript(babyImgUrl)}
+  var __drawRoamingBabyWithLink=function(){};
 
   function postMsg(type,data){
     var msg=JSON.stringify({type:type,genId:genId,data:data||{}});
