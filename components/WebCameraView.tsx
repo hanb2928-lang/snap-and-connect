@@ -5,6 +5,7 @@ import { theme } from '@/lib/theme';
 import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check, Video, Square, Circle } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
+import { isMobileWebView, canUseMediaRecorder } from '@/lib/devicePerformance';
 
 export type CaptureModeType = 'oneclick' | 'single' | 'multi' | 'video';
 
@@ -34,10 +35,12 @@ const ALL_MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; de
   { key: 'video', label: '동영상', icon: Video, desc: '리얼 타임 레코딩' },
 ];
 
-const MODE_META = (role: 'template' | 'video'): typeof ALL_MODE_META =>
-  role === 'video'
+const MODE_META = (role: 'template' | 'video'): typeof ALL_MODE_META => {
+  const base = role === 'video'
     ? ALL_MODE_META.filter((m) => m.key === 'video')
     : ALL_MODE_META.filter((m) => m.key !== 'video');
+  return isMobileWebView() ? base.filter((m) => m.key !== 'video') : base;
+};
 
 const MAX_RECORDING_SEC = 60;
 
@@ -203,8 +206,8 @@ export function WebCameraView({
   const startRecording = useCallback(() => {
     if (Platform.OS !== 'web') return;
     if (!streamRef.current || !cameraReady) return;
-    if (typeof MediaRecorder === 'undefined') {
-      setError('이 브라우저에서는 영상 녹화를 지원하지 않습니다.');
+    if (!canUseMediaRecorder()) {
+      setError('모바일에서는 영상 녹화를 지원하지 않습니다. 사진 촬영을 이용해주세요.');
       return;
     }
     recordedChunksRef.current = [];
@@ -268,7 +271,7 @@ export function WebCameraView({
       onMultiAnglePress();
       return;
     }
-    if (captureMode === 'video') {
+    if (captureMode === 'video' && !isMobileWebView()) {
       if (isRecording) {
         stopRecording();
       } else {

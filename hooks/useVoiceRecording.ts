@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
+import { isMobileWebView } from '@/lib/devicePerformance';
 
 type RecordingState = 'idle' | 'recording' | 'stopped' | 'error';
 
@@ -53,8 +54,8 @@ export function useVoiceRecording(): MediaRecorderLike {
     setDuration(0);
     durationRef.current = 0;
 
-    if (Platform.OS !== 'web') {
-      setError('이 기기에서는 음성 녹음을 지원하지 않습니다.');
+    if (Platform.OS !== 'web' || isMobileWebView()) {
+      setError('모바일에서는 음성 녹음을 지원하지 않습니다.');
       setState('error');
       return;
     }

@@ -38,3 +38,26 @@ export function shouldUseHeavyShadows(): boolean {
 export function shouldUseGlowEffects(): boolean {
   return detectTier() !== 'low';
 }
+
+let cachedIsMobileWebView: boolean | null = null;
+
+export function isMobileWebView(): boolean {
+  if (cachedIsMobileWebView !== null) return cachedIsMobileWebView;
+  if (Platform.OS !== 'web') {
+    cachedIsMobileWebView = true;
+    return true;
+  }
+  const ua = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+  const isWebView = /wv|WebView|CB|Line\/|KaKao|Instagram|FBAV|FBAN|Snapchat/i.test(ua);
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  cachedIsMobileWebView = (isAndroid || isIOS) && (isWebView || hasTouch);
+  return cachedIsMobileWebView;
+}
+
+export function canUseMediaRecorder(): boolean {
+  if (isMobileWebView()) return false;
+  if (Platform.OS !== 'web') return false;
+  return typeof MediaRecorder !== 'undefined';
+}
