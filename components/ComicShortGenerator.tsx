@@ -445,19 +445,57 @@ function generateGradientFallback(speech: string, emotion: string, panelIndex: n
     grad.addColorStop(1, c2);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 1080, 1080);
-    if (emotion) {
-      ctx.font = '700 42px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.textAlign = 'center';
-      ctx.fillText(emotion, 540, 360);
+
+    // Halftone dots for comic texture
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = '#ffffff';
+    for (let y = 0; y < 1080; y += 20) {
+      for (let x = 0; x < 1080; x += 20) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
+    ctx.globalAlpha = 1;
+
+    // Emotion label badge
+    if (emotion) {
+      ctx.font = '700 36px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.textAlign = 'center';
+      ctx.fillText(emotion, 540, 280);
+    }
+
+    // Speech bubble
+    const bubbleW = 820;
+    const bubbleH = 280;
+    const bubbleX = (1080 - bubbleW) / 2;
+    const bubbleY = 400;
+    ctx.fillStyle = 'rgba(255,250,240,0.95)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, 32);
+    ctx.fill();
+    ctx.stroke();
+
+    // Bubble tail
+    ctx.beginPath();
+    ctx.moveTo(460, bubbleY + bubbleH);
+    ctx.lineTo(540, bubbleY + bubbleH + 50);
+    ctx.lineTo(620, bubbleY + bubbleH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,250,240,0.95)';
+    ctx.fill();
+
+    // Speech text inside bubble
     if (speech) {
-      ctx.font = '700 56px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = '700 48px sans-serif';
+      ctx.fillStyle = '#2d1b3d';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const words = speech.split('');
-      const maxCharsPerLine = 16;
+      const maxCharsPerLine = 15;
       const lines: string[] = [];
       let current = '';
       for (const ch of words) {
@@ -469,9 +507,16 @@ function generateGradientFallback(speech: string, emotion: string, panelIndex: n
         }
       }
       if (current) lines.push(current);
-      const startY = 540 - ((lines.length - 1) * 70) / 2;
-      lines.forEach((line, i) => ctx.fillText(line, 540, startY + i * 70));
+      const lineH = 60;
+      const startY = bubbleY + bubbleH / 2 - ((lines.length - 1) * lineH) / 2;
+      lines.forEach((line, i) => ctx.fillText(line, 540, startY + i * lineH));
     }
+
+    // Panel border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, 1072, 1072);
+
     return canvas.toDataURL('image/png');
   } catch {
     return '';
@@ -958,8 +1003,6 @@ export function ComicShortGenerator({
     const finalPanelImages = await Promise.all(
       panelImages.map(async (img, i) => {
         if (img) return img;
-        const photoPanel = await createComicPanelFromPhoto(heroImageUrl, i, moodConfig);
-        if (photoPanel) return photoPanel;
         return generateGradientFallback(panels[i]?.speech || '', panels[i]?.emotion || '', i) || '';
       }),
     );

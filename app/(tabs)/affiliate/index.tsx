@@ -1088,6 +1088,7 @@ export default function AffiliateScreen() {
     const isPreview = quality === 'preview';
     let recorderTimeout: ReturnType<typeof setTimeout> | null = null;
     let recorderForFinally: MediaRecorder | null = null;
+    let wallClockCheck: ReturnType<typeof setInterval> | null = null;
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -1336,6 +1337,15 @@ export default function AffiliateScreen() {
       const sceneDuration = DURATION / totalScenes;
       const startTime = performance.now();
       const durationMs = DURATION * 1000;
+
+      // Wall-clock fallback: if requestAnimationFrame freezes (tab background),
+      // this timer independently checks elapsed time and stops the recorder
+      wallClockCheck = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= durationMs + 500 && recorder.state === 'recording') {
+          try { recorder.stop(); } catch { /* already stopped */ }
+        }
+      }, 1000);
 
       // Schedule all audio relative to recording start time for proper sync
       if (!isPreview && audioCtx && masterGainRef.current) {
@@ -2095,6 +2105,7 @@ export default function AffiliateScreen() {
       }).catch(() => {});
     } finally {
       if (recorderTimeout) clearTimeout(recorderTimeout);
+      if (wallClockCheck) clearInterval(wallClockCheck);
       if (recorderForFinally && recorderForFinally.state === 'recording') {
         try { recorderForFinally.stop(); } catch { /* already stopped */ }
       }
