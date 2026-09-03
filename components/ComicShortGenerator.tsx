@@ -374,7 +374,7 @@ type ComicBuildParams = {
   babyImgUrl?: string;
 };
 
-function buildComicScriptBody(params: ComicBuildParams): string {
+function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown> {
   const { moodTemplate, accentColor, stickerSize, episodeMode, emotionOverlay = false, genId = 0, babyImgUrl } = params;
   const hashtagStr = params.hashtags.slice(0, 6).map((h) => `#${h}`).join(' ');
 
@@ -385,7 +385,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   const filterCode = mc.filter;
   const overlayColor = mc.overlayColor;
 
-  const dataPayload = {
+  return {
     hook: params.hook,
     title: params.title,
     hashtagStr,
@@ -415,11 +415,10 @@ function buildComicScriptBody(params: ComicBuildParams): string {
     panels: params.panels,
     babyImgUrl: babyImgUrl ?? null,
   };
+}
 
-  const jsonStr = JSON.stringify(dataPayload);
-  const b64 = typeof btoa !== 'undefined'
-    ? btoa(unescape(encodeURIComponent(jsonStr)))
-    : Buffer.from(jsonStr, 'utf-8').toString('base64');
+function buildComicScriptBody(params: ComicBuildParams): string {
+  const { babyImgUrl } = params;
 
   return `(function(){
   try{
@@ -427,7 +426,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
   var canvas=document.getElementById('cv');
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
-  var P=JSON.parse(decodeURIComponent(escape(atob("${b64}"))));
+  var P=(typeof window!=='undefined'&&window.__comicPayload)||JSON.parse(document.getElementById('__comic_payload').textContent);
   var hook=P.hook;
   var title=P.title;
   var hashtagStr=P.hashtagStr;
@@ -1214,10 +1213,12 @@ function buildComicScriptBody(params: ComicBuildParams): string {
 }
 
 export function buildComicHTML(params: ComicBuildParams): string {
+  const payloadJson = JSON.stringify(buildComicDataPayload(params)).replace(/</g, '\\u003c');
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 </head><body>
 <canvas id="cv"></canvas>
+<script type="application/json" id="__comic_payload">${payloadJson}</script>
 <script>
 ${buildComicScriptBody(params)}
 </script>
@@ -1514,12 +1515,13 @@ export function ComicShortGenerator({
     return () => window.removeEventListener('message', handler);
   }, [handleWebViewMessage]);
 
-  const runWebComicGeneration = useCallback((scriptBody: string) => {
+  const runWebComicGeneration = useCallback((scriptBody: string, payload: Record<string, unknown>) => {
     if (webGenCleanupRef.current) {
       webGenCleanupRef.current();
       webGenCleanupRef.current = null;
     }
     const prevCallback = (window as any).__comicPostMsg;
+    const prevPayload = (window as any).__comicPayload;
 
     const canvas = document.createElement('canvas');
     canvas.id = 'cv';
@@ -1531,6 +1533,7 @@ export function ComicShortGenerator({
     (window as any).__comicPostMsg = (rawMsg: string) => {
       handleWebViewMessage({ nativeEvent: { data: rawMsg } } as WebViewMessageEvent);
     };
+    (window as any).__comicPayload = payload;
 
     const scriptEl = document.createElement('script');
     const scriptUrl = URL.createObjectURL(new Blob([scriptBody], { type: 'text/javascript' }));
@@ -1545,6 +1548,7 @@ export function ComicShortGenerator({
 
     webGenCleanupRef.current = () => {
       (window as any).__comicPostMsg = prevCallback;
+      (window as any).__comicPayload = prevPayload;
       URL.revokeObjectURL(scriptUrl);
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
@@ -1750,7 +1754,7 @@ export function ComicShortGenerator({
 
     if (Platform.OS === 'web') {
       try {
-        const scriptBody = buildComicScriptBody({
+        const comicParams = {
           imageUrl: finalImageUrl,
           hook,
           title,
@@ -1774,8 +1778,10 @@ export function ComicShortGenerator({
           localStoreInfo,
           genId: currentGenId,
           babyImgUrl: babyImgDataUrl,
-        });
-        runWebComicGeneration(scriptBody);
+        };
+        const scriptBody = buildComicScriptBody(comicParams);
+        const payload = buildComicDataPayload(comicParams);
+        runWebComicGeneration(scriptBody, payload);
       } catch (e) {
         generatingLockRef.current = false;
         if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
