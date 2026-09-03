@@ -1832,6 +1832,20 @@ export function ComicShortGenerator({
           generatingLockRef.current = false;
           setSlideshowMode(true);
           setResultMime('image/png');
+          const firstPanel = slideshowPanelsRef.current.find(p => p.imageUri);
+          if (firstPanel) {
+            try {
+              const imgResp = await fetch(firstPanel.imageUri);
+              const blob = await imgResp.blob();
+              if (Platform.OS === 'web') {
+                const blobUrl = URL.createObjectURL(blob);
+                setResultUri(blobUrl);
+                setResultBlob(blob);
+              }
+            } catch {
+              setResultUri(firstPanel.imageUri);
+            }
+          }
           setState('done');
           setProgress(100);
           showToast('만화 슬라이드쇼가 완성됐어요!');
@@ -1958,6 +1972,7 @@ export function ComicShortGenerator({
 
   const generatingLockRef = useRef(false);
   const scenarioPanelsRef = useRef<ComicPanel[]>([]);
+  const slideshowPanelsRef = useRef<SlideshowPanel[]>([]);
   const handleGenerate = useCallback(async () => {
     if (generatingLockRef.current) return;
     generatingLockRef.current = true;
@@ -2205,6 +2220,10 @@ export function ComicShortGenerator({
     setNarrationAudioDataUrl(finalNarrationAudioDataUrl);
     setScenarioPanels(panels);
     scenarioPanelsRef.current = panels;
+
+  useEffect(() => {
+    slideshowPanelsRef.current = slideshowPanels;
+  }, [slideshowPanels]);
     setPanelImages(panelImages);
 
     if (Platform.OS === 'web') {
@@ -3029,7 +3048,7 @@ export function ComicShortGenerator({
         </View>
       )}
 
-      {state === 'done' && resultUri && (
+      {state === 'done' && (resultUri || slideshowMode) && (
         <View style={styles.resultWrap}>
           <View style={styles.doneHeaderRow}>
             <Text style={styles.doneNotice}>
@@ -3066,7 +3085,7 @@ export function ComicShortGenerator({
               />
             ) : (
               <VideoPreview
-                uri={resultUri}
+                uri={resultUri || ''}
                 mimeType={resultMime}
                 isVertical
                 maxHeight={380}
@@ -3175,14 +3194,14 @@ export function ComicShortGenerator({
           ) : null}
 
           <View style={styles.resultButtons}>
-            <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8} disabled={!resultUri && slideshowPanels.length === 0}>
               <Download size={18} color="#fff" strokeWidth={2} />
               <Text style={styles.downloadButtonText}>다운로드</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cloudSaveButton}
               onPress={handleSaveToCloud}
-              disabled={cloudSaving}
+              disabled={cloudSaving || (!resultUri && slideshowPanels.length === 0)}
               activeOpacity={0.7}
             >
               {cloudSaving ? (
