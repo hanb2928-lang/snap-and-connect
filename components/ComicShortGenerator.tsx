@@ -27,6 +27,7 @@ import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type Voice
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
 import { SoundPunchEditor } from '@/components/SoundPunchEditor';
+import { VirtualFitting } from '@/components/VirtualFitting';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
@@ -3003,7 +3004,17 @@ export function ComicShortGenerator({
                 contentContainerStyle={styles.fittingModalContent}
                 showsVerticalScrollIndicator={false}
               >
-                <Text style={styles.fittingModalEmpty}>이 기능은 더 이상 제공되지 않습니다.</Text>
+                <VirtualFitting
+                  onResult={(imageBase64: string, mimeType: string) => {
+                    const dataUrl = mimeType.includes('png')
+                      ? `data:image/png;base64,${imageBase64}`
+                      : `data:image/jpeg;base64,${imageBase64}`;
+                    setFittingResultUrl(dataUrl);
+                    setSafeImageUrl(dataUrl);
+                    setFittingModalOpen(false);
+                    showToast('피팅 이미지가 적용됐어요. 다시 만들기로 반영됩니다.');
+                  }}
+                />
               </ScrollView>
             </View>
           </View>

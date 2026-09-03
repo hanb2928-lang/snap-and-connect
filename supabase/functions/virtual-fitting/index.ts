@@ -194,8 +194,8 @@ async function resolveOpenAIKey(): Promise<string | null> {
         const dbKey = rows[0]?.openai_api_key;
         if (dbKey) return dbKey;
       }
-    } catch {
-      // no fallback beyond env
+    } catch (err) {
+      console.warn("[virtual-fitting] failed to resolve OpenAI key from DB:", err);
     }
   }
   return null;
