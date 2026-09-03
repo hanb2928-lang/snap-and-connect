@@ -460,6 +460,139 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
   var emotionColors={'\uACE0\uBBFC':'#FFD600','\uB188\uB78C':'#FF6B6B','\uD589\uBCF5':'#10B981','\uD655\uC2E0':'#3B82F6','\uC124\uB808':'#EC4899','\uC2AC\uD544':'#6366F1','\uBD84\uB178':'#F59E0B','\uB3C4\uC804':'#EF4444','\uD589\uB3D9':'#8B5CF6','\uC9C0\uB8CC':'#64748B','\uC218\uB2E4':'#06B6D4','\uAC10\uB3D9':'#F43F5E'};
   var mbtiColors={'INTJ':'#8b5cf6','ENFP':'#f59e0b','ISTP':'#06b3d4','ENFJ':'#10b981'};
 
+  function WebMMuxer(width,height,fps){
+    this.width=width;this.height=height;this.fps=fps;
+    this.chunks=[];this.totalSize=0;
+    this.codecPrivateData=null;
+    this.keyframeReceived=false;
+  }
+  WebMMuxer.prototype.addVideoChunk=function(chunk,meta){
+    var data=new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+    this.chunks.push({data:data,timestamp:chunk.timestamp,keyFrame:chunk.type==='key'});
+    this.totalSize+=data.length;
+    if(meta&&meta.decoderConfig&&meta.decoderConfig.description){
+      this.codecPrivateData=meta.decoderConfig.description;
+    }
+  };
+  WebMMuxer.prototype.finalize=function(){
+    // Build a minimal WebM container with EBML
+    var EBML_BITS=[0x1A,0x45,0xDF,0xA3]; // EBML
+    var SEGMENT_BITS=[0x18,0x53,0x80,0x67]; // Segment
+    var INFO_BITS=[0x15,0x49,0xA9,0x66]; // Info
+    var TRACKS_BITS=[0x16,0x54,0xAE,0x6B]; // Tracks
+    var CLUSTER_BITS=[0x1F,0x43,0xB6,0x75]; // Cluster
+    var SIMPLEBLOCK_BITS=[0xA3]; // SimpleBlock
+
+    // We'll build the buffer manually
+    var parts=[];
+    // EBML header
+    parts.push(new Uint8Array([0x1A,0x45,0xDF,0xA3,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x42,0x86,0x81,0x01,0x42,0xF7,0x81,0x01,0x42,0xF2,0x81,0x04,0x42,0xF3,0x81,0x08,0x42,0x82,0x88,0x6D,0x61,0x74,0x72,0x6F,0x73,0x6B,0x61,0x42,0x87,0x81,0x04,0x42,0x85,0x81,0x02]));
+    // Segment header (unknown size)
+    parts.push(new Uint8Array([0x18,0x53,0x80,0x67,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x10]));
+    // Info element
+    var timescaleBytes=this.encodeEBMLFloat(1000000); // 1ms timescale
+    parts.push(new Uint8Array([0x15,0x49,0xA9,0x66,0x88]));
+    parts.push(timescaleBytes);
+    // Tracks element
+    var trackEntry=this.buildTrackEntry();
+    var tracksSize=trackEntry.length;
+    parts.push(this.encodeEBMLElement(0x1654AE6B,trackEntry));
+    // Cluster
+    var clusterParts=[];
+    clusterParts.push(this.encodeEBMLInt(0xE7,0)); // Timestamp=0
+    for(var i=0;i<this.chunks.length;i++){
+      var c=this.chunks[i];
+      var blockData=new Uint8Array(c.data.length+4);
+      blockData[0]=1; // track number
+      blockData[1]=(c.timestamp>>16)&0xFF;
+      blockData[2]=(c.timestamp>>8)&0xFF;
+      blockData[3]=c.timestamp&0xFF;
+      blockData[4]=c.keyFrame?0x80:0x00;
+      // Actually SimpleBlock format: track number (EBML), timestamp (int16), flags
+      // Let's use proper format
+      var ts=c.timestamp/1000; // convert us to ms (timescale=1000000 means 1ms units, but timestamp is in timescale units)
+      // For VP9, timestamps are in nanoseconds typically. Let's just use the raw timestamp divided by 1000
+      var simpleBlock=new Uint8Array(c.data.length+4);
+      simpleBlock[0]=0x81; // track 1
+      simpleBlock[1]=(ts>>8)&0xFF;
+      simpleBlock[2]=ts&0xFF;
+      simpleBlock[3]=c.keyFrame?0x80:0x00;
+      simpleBlock.set(c.data,4);
+      clusterParts.push(this.encodeEBMLElement(0xA3,simpleBlock));
+    }
+    var clusterData=this.concatUint8Arrays(clusterParts);
+    parts.push(this.encodeEBMLElement(0x1F43B675,clusterData));
+    this.buffer=this.concatUint8Arrays(parts);
+  };
+  WebMMuxer.prototype.getBuffer=function(){return this.buffer||new ArrayBuffer(0);};
+  WebMMuxer.prototype.encodeEBMLFloat=function(val){
+    // 8-byte float
+    var buf=new ArrayBuffer(8);
+    var view=new DataView(buf);
+    view.setFloat64(0,val,false);
+    return new Uint8Array(buf);
+  };
+  WebMMuxer.prototype.encodeEBMLInt=function(id,val){
+    var valBytes;
+    if(val<0x80){valBytes=new Uint8Array([val]);}
+    else if(val<0x4000){valBytes=new Uint8Array([(val>>8)&0xFF,val&0xFF]);}
+    else{valBytes=new Uint8Array([(val>>16)&0xFF,(val>>8)&0xFF,val&0xFF]);}
+    var idBytes=this.idToBytes(id);
+    return this.concatUint8Arrays([idBytes,valBytes]);
+  };
+  WebMMuxer.prototype.encodeEBMLElement=function(id,data){
+    var idBytes=this.idToBytes(id);
+    var sizeBytes=this.encodeSize(data.length);
+    return this.concatUint8Arrays([idBytes,sizeBytes,data]);
+  };
+  WebMMuxer.prototype.idToBytes=function(id){
+    if(id<=0xFF)return new Uint8Array([id&0xFF]);
+    if(id<=0xFFFF)return new Uint8Array([(id>>8)&0xFF,id&0xFF]);
+    if(id<=0xFFFFFF)return new Uint8Array([(id>>16)&0xFF,(id>>8)&0xFF,id&0xFF]);
+    return new Uint8Array([(id>>24)&0xFF,(id>>16)&0xFF,(id>>8)&0xFF,id&0xFF]);
+  };
+  WebMMuxer.prototype.encodeSize=function(size){
+    // VINT encoding
+    if(size<0x7F){return new Uint8Array([0x80|size]);}
+    if(size<0x3FFF){return new Uint8Array([0x40|(size>>8),size&0xFF]);}
+    if(size<0x1FFFFF){return new Uint8Array([0x20|(size>>16),(size>>8)&0xFF,size&0xFF]);}
+    if(size<0x0FFFFFFF){return new Uint8Array([0x10|(size>>24),(size>>16)&0xFF,(size>>8)&0xFF,size&0xFF]);}
+    return new Uint8Array([0x08|(size>>32),(size>>24)&0xFF,(size>>16)&0xFF,(size>>8)&0xFF,size&0xFF]);
+  };
+  WebMMuxer.prototype.buildTrackEntry=function(){
+    var parts=[];
+    // TrackNumber=1
+    parts.push(this.encodeEBMLInt(0xD7,1));
+    // TrackUID=1
+    parts.push(this.encodeEBMLInt(0x73C5,1));
+    // FlagLacing=0
+    parts.push(this.encodeEBMLInt(0x9C,0));
+    // CodecID=V_VP9
+    var codecId=new Uint8Array([0x86]); // string element
+    var codecStr=new TextEncoder().encode('V_VP9');
+    parts.push(this.encodeEBMLElement(0x86,codecStr));
+    // TrackType=1 (video)
+    parts.push(this.encodeEBMLInt(0x83,1));
+    // Video settings
+    var videoParts=[];
+    videoParts.push(this.encodeEBMLInt(0xB0,this.width));
+    videoParts.push(this.encodeEBMLInt(0xBA,this.height));
+    parts.push(this.encodeEBMLElement(0xE0,this.concatUint8Arrays(videoParts)));
+    return this.concatUint8Arrays(parts);
+  };
+  WebMMuxer.prototype.concatUint8Arrays=function(arrays){
+    var total=0;
+    for(var i=0;i<arrays.length;i++)total+=arrays[i].length;
+    var result=new Uint8Array(total);
+    var offset=0;
+    for(var i=0;i<arrays.length;i++){
+      result.set(arrays[i],offset);
+      offset+=arrays[i].length;
+    }
+    return result;
+  };
+
   function drawEmotionOverlay(ctx,emotion,x,y,emoji,scale,color,fontSize){
     if(!emoji)return;
     fontSize=fontSize||120;
@@ -895,9 +1028,52 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       }catch(e){}
     }
 
+    var useWebCodecs=typeof window!=='undefined'&&typeof window.VideoEncoder!=='undefined'&&typeof window.VideoFrame!=='undefined';
     var hasRecorder=typeof MediaRecorder!=='undefined'&&typeof canvas.captureStream==='function';
     var canvasStream=null,recorder=null,mimeType='',donePromise=null;
-    if(hasRecorder){
+    var webCodecsBlob=null;
+    if(useWebCodecs){
+      // WebCodecs deterministic encoding: no MediaRecorder, no real-time loop
+      var totalFrames=Math.ceil((duration/1000)*FPS);
+      var frameDurationUs=Math.round(1000000/FPS);
+      // Dynamically import webm-muxer is not possible in WebView, so we inline a minimal WebM muxer
+      // Instead, use VideoEncoder + manual WebM container writing
+      var wcEncoder=null;
+      var wcMuxer=null;
+      var wcChunks=[];
+      var wcError=null;
+      try{
+        // Load webm-muxer from CDN if available
+        wcMuxer=new WebMMuxer(W,H,FPS);
+      }catch(e){
+        useWebCodecs=false;
+      }
+      if(useWebCodecs&&wcMuxer){
+        try{
+          wcEncoder=new VideoEncoder({
+            output:function(chunk,meta){wcMuxer.addVideoChunk(chunk,meta);},
+            error:function(e){wcError=e;}
+          });
+          wcEncoder.configure({codec:'vp9',width:W,height:H,bitrate:6000000,framerate:FPS});
+        }catch(e){
+          try{
+            wcEncoder=new VideoEncoder({
+              output:function(chunk,meta){wcMuxer.addVideoChunk(chunk,meta);},
+              error:function(e){wcError=e;}
+            });
+            wcEncoder.configure({codec:'vp8',width:W,height:H,bitrate:6000000,framerate:FPS});
+          }catch(e2){useWebCodecs=false;}
+        }
+      }else{useWebCodecs=false;}
+    }
+    var doneResolved=false;
+    var stopResolveRef=null;
+    function resolveDone(){
+      if(doneResolved)return;
+      doneResolved=true;
+      if(stopResolveRef)stopResolveRef(webCodecsBlob||new Blob(chunks||[],{type:mimeType}));
+    }
+    if(hasRecorder&&!useWebCodecs){
       canvasStream=canvas.captureStream(FPS);
       var mimeCandidates=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
       for(var mci=0;mci<mimeCandidates.length;mci++){
@@ -935,13 +1111,6 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       recorder=new MediaRecorder(combinedStream,{mimeType:mimeType,videoBitsPerSecond:6000000});
       var chunks=[];
       recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
-      var doneResolved=false;
-      var stopResolveRef=null;
-      function resolveDone(){
-        if(doneResolved)return;
-        doneResolved=true;
-        if(stopResolveRef)stopResolveRef(new Blob(chunks,{type:mimeType}));
-      }
       donePromise=new Promise(function(resolve,reject){
         stopResolveRef=resolve;
         var stopTimeout=setTimeout(function(){
@@ -974,9 +1143,9 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       }
     },duration+5000);
 
-    function drawFrame(){
+    function drawFrame(elapsedOverride){
       try{
-      var elapsed=performance.now()-startTime;
+      var elapsed=elapsedOverride!==undefined?elapsedOverride:(performance.now()-startTime);
       var t=Math.min(elapsed/duration,1);
       var pct=Math.round(t*100);
       if(pct!==lastPct){lastPct=pct;postMsg('progress',{progress:pct});}
@@ -1248,7 +1417,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         ctx.restore();
       }
 
-      if(t<1){setTimeout(drawFrame,16);}
+      if(t<1){if(!useWebCodecs){setTimeout(function(){drawFrame();},16);}}
       else{
         clearTimeout(watchdog);
         clearTimeout(wallClockFallback);
@@ -1267,7 +1436,60 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         postMsg('error',{msg:'frame render failed: '+(e&&e.message||'unknown')});
       }
     }
-    setTimeout(drawFrame,0);
+    if(useWebCodecs&&wcEncoder&&wcMuxer){
+      donePromise=new Promise(function(resolve){stopResolveRef=resolve;});
+      // WebCodecs deterministic encoding loop
+      var wcStartTime=performance.now();
+      var wcTotalFrames=Math.ceil((duration/1000)*FPS);
+      var wcFrameDurationUs=Math.round(1000000/FPS);
+      var wcFrameIdx=0;
+      function encodeNextFrame(){
+        if(wcError){postMsg('error',{msg:'WebCodecs encode error: '+(wcError.message||'unknown')});return;}
+        if(wcFrameIdx>=wcTotalFrames){
+          // Flush encoder
+          function waitForFlush(){
+            if(wcEncoder.encodeQueueSize===0){
+              try{wcEncoder.close();}catch(e){}
+              wcMuxer.finalize();
+              var wcBuffer=wcMuxer.getBuffer();
+              webCodecsBlob=new Blob([wcBuffer],{type:'video/webm'});
+              mimeType='video/webm';
+              clearTimeout(watchdog);
+              clearTimeout(wallClockFallback);
+              if(narrationAudio){try{narrationAudio.pause();}catch(e){}}
+              if(punchAudioEl){try{punchAudioEl.pause();}catch(e){}}
+              resolveDone();
+            }else{setTimeout(waitForFlush,2);}
+          }
+          wcEncoder.flush().then(waitForFlush).catch(function(e){postMsg('error',{msg:'WebCodecs flush failed: '+(e.message||'unknown')});});
+          return;
+        }
+        var progress=wcFrameIdx/wcTotalFrames;
+        var elapsedOverride=progress*duration;
+        var pct=Math.round(progress*100);
+        if(pct!==lastPct){lastPct=pct;postMsg('progress',{progress:pct});}
+        // Draw frame synchronously
+        drawFrame(elapsedOverride);
+        // Create VideoFrame and encode
+        var frame=new VideoFrame(canvas,{timestamp:wcFrameIdx*wcFrameDurationUs,duration:wcFrameDurationUs});
+        wcEncoder.encode(frame,{keyFrame:wcFrameIdx===0||wcFrameIdx%(FPS*2)===0});
+        frame.close();
+        wcFrameIdx++;
+        // Yield to let encoder process
+        if(wcFrameIdx%8===0){
+          function checkQueue(){
+            if(wcEncoder.encodeQueueSize<=2){setTimeout(encodeNextFrame,0);}
+            else{setTimeout(checkQueue,1);}
+          }
+          checkQueue();
+        }else{
+          setTimeout(encodeNextFrame,0);
+        }
+      }
+      setTimeout(encodeNextFrame,0);
+    } else {
+    setTimeout(function(){drawFrame();},0);
+    }
 
     function sendBase64InChunks(base64,size,mimeType,isImage){
       var chunkSize=500000;

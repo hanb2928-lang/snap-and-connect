@@ -9,6 +9,7 @@ import { getUserSettings } from '@/lib/settings';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
+import { isWebCodecsSupported, isWebCodecsEncoderConfigSupported, encodeCanvasToWebM } from '@/lib/webCodecsEncoder';
 
 interface VideoImportGeneratorProps {
   affiliatePlatforms?: string[];
@@ -446,6 +447,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       const totalDuration = contentDuration + DISCLOSURE_DURATION;
       const disclosureStart = contentDuration;
 
+      const useWebCodecs = isImage && isWebCodecsSupported() && isWebCodecsEncoderConfigSupported(W, H);
       const hasRecorder = !isImage && typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
       let recorder: any = null;
       let mimeType = 'video/webm';
@@ -482,6 +484,94 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       }
       if (video) await video.play();
 
+      if (useWebCodecs && isImage && img) {
+        // ===== WebCodecs path for image mode: deterministic encoding =====
+        const finalImg = img;
+        const totalDurationMs = totalDuration * 1000;
+        const result = await encodeCanvasToWebM(
+          canvas, W, H, FPS, totalDurationMs,
+          (frameCtx, progress) => {
+            const elapsed = progress * totalDuration;
+            frameCtx.fillStyle = '#0a0f1e';
+            frameCtx.fillRect(0, 0, W, H);
+
+            if (elapsed < disclosureStart) {
+              const iRatio = finalImg.naturalWidth / finalImg.naturalHeight;
+              const cRatio = W / H;
+              let drawW: number, drawH: number;
+              if (iRatio > cRatio) {
+                drawH = H;
+                drawW = drawH * iRatio;
+              } else {
+                drawW = W;
+                drawH = drawW / iRatio;
+              }
+              const px = (W - drawW) / 2;
+              const py = (H - drawH) / 2;
+              frameCtx.drawImage(finalImg, px, py, drawW, drawH);
+
+              const grad = frameCtx.createLinearGradient(0, 0, 0, H);
+              grad.addColorStop(0, 'rgba(10,15,30,0.15)');
+              grad.addColorStop(0.5, 'rgba(10,15,30,0.3)');
+              grad.addColorStop(1, 'rgba(10,15,30,0.75)');
+              frameCtx.fillStyle = grad;
+              frameCtx.fillRect(0, 0, W, H);
+
+              if (hookText.trim()) {
+                frameCtx.fillStyle = '#ffffff';
+                frameCtx.font = `700 ${hookFontSize}px sans-serif`;
+                frameCtx.textBaseline = 'top';
+                frameCtx.textAlign = 'left';
+                frameCtx.shadowColor = 'rgba(0,0,0,0.85)';
+                frameCtx.shadowBlur = 12;
+                frameCtx.shadowOffsetY = 3;
+                drawTextLines(frameCtx, hookText, 60, H * 0.62, W - 120, hookFontSize + 12, 'left');
+                frameCtx.shadowColor = 'transparent';
+                frameCtx.shadowBlur = 0;
+                frameCtx.shadowOffsetY = 0;
+              }
+
+              if (subtitleText.trim()) {
+                frameCtx.fillStyle = 'rgba(255,255,255,0.9)';
+                frameCtx.font = `500 ${subtitleFontSize}px sans-serif`;
+                frameCtx.textBaseline = 'top';
+                frameCtx.textAlign = 'center';
+                frameCtx.shadowColor = 'rgba(0,0,0,0.7)';
+                frameCtx.shadowBlur = 8;
+                frameCtx.shadowOffsetY = 2;
+                drawTextLines(frameCtx, subtitleText, W / 2, H * 0.82, W - 100, subtitleFontSize + 10, 'center');
+                frameCtx.shadowColor = 'transparent';
+                frameCtx.shadowBlur = 0;
+                frameCtx.shadowOffsetY = 0;
+              }
+            } else {
+              const dt = Math.min((elapsed - disclosureStart) / 0.5, 1);
+              frameCtx.globalAlpha = dt;
+              frameCtx.fillStyle = '#0a0f1e';
+              frameCtx.fillRect(0, 0, W, H);
+              frameCtx.fillStyle = 'rgba(255,255,255,0.85)';
+              frameCtx.font = '400 20px sans-serif';
+              frameCtx.textBaseline = 'middle';
+              frameCtx.textAlign = 'center';
+              const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
+              drawTextLines(frameCtx, disclosure, W / 2, H / 2 - 20, W - 80, 28, 'center');
+              frameCtx.globalAlpha = 1;
+            }
+
+            if (shortUrl) {
+              drawRoamingBabyWithLink(frameCtx, elapsed * 1000, W, H, shortUrl, theme.colors.primary[500], mascotEnabled);
+            }
+          },
+          { onProgress: (pct) => setProgress(pct) },
+        );
+
+        if (cancelledRef.current) return;
+        const url = URL.createObjectURL(result.blob);
+        setOutputUrl(url);
+        setOutputMime(result.mimeType);
+        if (mountedRef.current) { setState('done'); setProgress(100); }
+      } else {
+      // ===== MediaRecorder path (video mode) or fallback =====
       const startTime = performance.now();
       let segStartPerf = performance.now();
       let lastPct = -1;
@@ -665,6 +755,7 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
       } finally {
         clearTimeout(genTimer);
       }
+      } // end MediaRecorder/fallback path
     } catch (err) {
       if (canvasStreamRef.current) {
         try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}

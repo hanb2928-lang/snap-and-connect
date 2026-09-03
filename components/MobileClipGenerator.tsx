@@ -298,11 +298,103 @@ function buildWebViewHTML(params: {
     });
   }
 
+  function WebMMuxer(width,height,fps){
+    this.width=width;this.height=height;this.fps=fps;
+    this.chunks=[];this.totalSize=0;this.buffer=null;
+  }
+  WebMMuxer.prototype.addVideoChunk=function(chunk,meta){
+    var data=new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+    this.chunks.push({data:data,timestamp:chunk.timestamp,keyFrame:chunk.type==='key'});
+    this.totalSize+=data.length;
+  };
+  WebMMuxer.prototype.finalize=function(){
+    var parts=[];
+    parts.push(new Uint8Array([0x1A,0x45,0xDF,0xA3,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x42,0x86,0x81,0x01,0x42,0xF7,0x81,0x01,0x42,0xF2,0x81,0x04,0x42,0xF3,0x81,0x08,0x42,0x82,0x88,0x6D,0x61,0x74,0x72,0x6F,0x73,0x6B,0x61,0x42,0x87,0x81,0x04,0x42,0x85,0x81,0x02]));
+    parts.push(new Uint8Array([0x18,0x53,0x80,0x67,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x10]));
+    var tsBuf=new ArrayBuffer(8);var tsView=new DataView(tsBuf);tsView.setFloat64(0,1000000,false);
+    parts.push(new Uint8Array([0x15,0x49,0xA9,0x66,0x88]));
+    parts.push(new Uint8Array(tsBuf));
+    var trackParts=[];
+    trackParts.push(this._encInt(0xD7,1));
+    trackParts.push(this._encInt(0x73C5,1));
+    trackParts.push(this._encInt(0x9C,0));
+    var codecStr=new TextEncoder().encode('V_VP9');
+    trackParts.push(this._encEl(0x86,codecStr));
+    trackParts.push(this._encInt(0x83,1));
+    var vidParts=[];
+    vidParts.push(this._encInt(0xB0,this.width));
+    vidParts.push(this._encInt(0xBA,this.height));
+    trackParts.push(this._encEl(0xE0,this._concat(vidParts)));
+    parts.push(this._encEl(0x1654AE6B,this._concat(trackParts)));
+    var clParts=[];
+    clParts.push(this._encInt(0xE7,0));
+    for(var i=0;i<this.chunks.length;i++){
+      var c=this.chunks[i];
+      var ts=c.timestamp/1000;
+      var sb=new Uint8Array(c.data.length+4);
+      sb[0]=0x81;sb[1]=(ts>>8)&0xFF;sb[2]=ts&0xFF;sb[3]=c.keyFrame?0x80:0x00;
+      sb.set(c.data,4);
+      clParts.push(this._encEl(0xA3,sb));
+    }
+    parts.push(this._encEl(0x1F43B675,this._concat(clParts)));
+    this.buffer=this._concat(parts);
+  };
+  WebMMuxer.prototype.getBuffer=function(){return this.buffer||new ArrayBuffer(0);};
+  WebMMuxer.prototype._encInt=function(id,val){
+    var vb;
+    if(val<0x80)vb=new Uint8Array([val]);
+    else if(val<0x4000)vb=new Uint8Array([(val>>8)&0xFF,val&0xFF]);
+    else vb=new Uint8Array([(val>>16)&0xFF,(val>>8)&0xFF,val&0xFF]);
+    return this._concat([this._idBytes(id),vb]);
+  };
+  WebMMuxer.prototype._encEl=function(id,data){
+    return this._concat([this._idBytes(id),this._encSize(data.length),data]);
+  };
+  WebMMuxer.prototype._idBytes=function(id){
+    if(id<=0xFF)return new Uint8Array([id&0xFF]);
+    if(id<=0xFFFF)return new Uint8Array([(id>>8)&0xFF,id&0xFF]);
+    if(id<=0xFFFFFF)return new Uint8Array([(id>>16)&0xFF,(id>>8)&0xFF,id&0xFF]);
+    return new Uint8Array([(id>>24)&0xFF,(id>>16)&0xFF,(id>>8)&0xFF,id&0xFF]);
+  };
+  WebMMuxer.prototype._encSize=function(s){
+    if(s<0x7F)return new Uint8Array([0x80|s]);
+    if(s<0x3FFF)return new Uint8Array([0x40|(s>>8),s&0xFF]);
+    if(s<0x1FFFFF)return new Uint8Array([0x20|(s>>16),(s>>8)&0xFF,s&0xFF]);
+    if(s<0x0FFFFFFF)return new Uint8Array([0x10|(s>>24),(s>>16)&0xFF,(s>>8)&0xFF,s&0xFF]);
+    return new Uint8Array([0x08|(s>>32),(s>>24)&0xFF,(s>>16)&0xFF,(s>>8)&0xFF,s&0xFF]);
+  };
+  WebMMuxer.prototype._concat=function(arrays){
+    var total=0;for(var i=0;i<arrays.length;i++)total+=arrays[i].length;
+    var result=new Uint8Array(total);var off=0;
+    for(var i=0;i<arrays.length;i++){result.set(arrays[i],off);off+=arrays[i].length;}
+    return result;
+  };
+
   function startGeneration(){
+    var useWebCodecs=typeof window!=='undefined'&&typeof window.VideoEncoder!=='undefined'&&typeof window.VideoFrame!=='undefined';
     var hasRecorder=typeof MediaRecorder!=='undefined'&&typeof canvas.captureStream==='function';
     var canvasStream=null,recorder=null,bgmResult=null,combinedStream=null,mimeType='video/webm';
     var donePromise=null;
-    if(hasRecorder){
+    var webCodecsBlob=null;
+    var webCodecsDoneResolve=null;
+    var webCodecsDonePromise=null;
+    function resolveDone(){if(webCodecsDoneResolve)webCodecsDoneResolve();}
+    var wcEncoder=null,wcMuxer=null,wcError=null;
+    if(useWebCodecs){
+      try{wcMuxer=new WebMMuxer(W,H,FPS);}catch(e){useWebCodecs=false;}
+      if(useWebCodecs&&wcMuxer){
+        try{
+          wcEncoder=new VideoEncoder({output:function(chunk,meta){wcMuxer.addVideoChunk(chunk,meta);},error:function(e){wcError=e;}});
+          wcEncoder.configure({codec:'vp9',width:W,height:H,bitrate:6000000,framerate:FPS});
+        }catch(e){
+          try{wcEncoder=new VideoEncoder({output:function(chunk,meta){wcMuxer.addVideoChunk(chunk,meta);},error:function(e){wcError=e;}});
+          wcEncoder.configure({codec:'vp8',width:W,height:H,bitrate:6000000,framerate:FPS});
+          }catch(e2){useWebCodecs=false;}
+        }
+      }else{useWebCodecs=false;}
+    }
+    if(hasRecorder&&!useWebCodecs){
       canvasStream=canvas.captureStream(FPS);
       if(musicMood!=='none'){bgmResult=createBgm(musicMood,duration);}
       combinedStream=canvasStream;
@@ -337,8 +429,8 @@ function buildWebViewHTML(params: {
     cachedGrad.addColorStop(0,'rgba(10,15,30,0.25)');cachedGrad.addColorStop(0.45,'rgba(10,15,30,0.55)');cachedGrad.addColorStop(1,'rgba(10,15,30,0.95)');
     var lastPct=-1;
 
-    function drawFrame(){
-      var elapsed=performance.now()-startTime;
+    function drawFrame(elapsedOverride){
+      var elapsed=elapsedOverride!==undefined?elapsedOverride:(performance.now()-startTime);
       var t=Math.min(elapsed/duration,1);
       var pct=Math.round(t*100);
       if(pct!==lastPct){lastPct=pct;postMsg('progress',{progress:pct});}
@@ -442,13 +534,66 @@ function buildWebViewHTML(params: {
         ctx.textAlign='left';ctx.globalAlpha=1;
       }
 
-      if(t<1){setTimeout(drawFrame,16);}
+      if(t<1){if(!useWebCodecs){setTimeout(function(){drawFrame();},16);}}
       else{setTimeout(function(){if(recorder&&recorder.state!=='inactive')recorder.stop();if(bgmResult)bgmResult.stop();},150);}
     }
-    setTimeout(drawFrame,0);
+    if(useWebCodecs&&wcEncoder&&wcMuxer){
+      donePromise=new Promise(function(resolve){webCodecsDoneResolve=resolve;});
+      var wcTotalFrames=Math.ceil((duration/1000)*FPS);
+      var wcFrameDurationUs=Math.round(1000000/FPS);
+      var wcFrameIdx=0;
+      function encodeNextFrame(){
+        if(wcError){postMsg('error',{msg:'WebCodecs encode error: '+(wcError.message||'unknown')});return;}
+        if(wcFrameIdx>=wcTotalFrames){
+          function waitForFlush(){
+            if(wcEncoder.encodeQueueSize===0){
+              try{wcEncoder.close();}catch(e){}
+              wcMuxer.finalize();
+              var wcBuffer=wcMuxer.getBuffer();
+              webCodecsBlob=new Blob([wcBuffer],{type:'video/webm'});
+              mimeType='video/webm';
+              clearTimeout(watchdog);
+              if(bgmResult)bgmResult.stop();
+              resolveDone();
+            }else{setTimeout(waitForFlush,2);}
+          }
+          wcEncoder.flush().then(waitForFlush).catch(function(e){postMsg('error',{msg:'WebCodecs flush failed: '+(e.message||'unknown')});});
+          return;
+        }
+        var progress=wcFrameIdx/wcTotalFrames;
+        var elapsedOverride=progress*duration;
+        var pct=Math.round(progress*100);
+        if(pct!==lastPct){lastPct=pct;postMsg('progress',{progress:pct});}
+        drawFrame(elapsedOverride);
+        var frame=new VideoFrame(canvas,{timestamp:wcFrameIdx*wcFrameDurationUs,duration:wcFrameDurationUs});
+        wcEncoder.encode(frame,{keyFrame:wcFrameIdx===0||wcFrameIdx%(FPS*2)===0});
+        frame.close();
+        wcFrameIdx++;
+        if(wcFrameIdx%8===0){
+          function checkQueue(){
+            if(wcEncoder.encodeQueueSize<=2){setTimeout(encodeNextFrame,0);}
+            else{setTimeout(checkQueue,1);}
+          }
+          checkQueue();
+        }else{setTimeout(encodeNextFrame,0);}
+      }
+      setTimeout(encodeNextFrame,0);
+    } else {
+    setTimeout(function(){drawFrame();},0);
+    }
     var watchdog=setTimeout(function(){if(lastPct<0||lastPct===0){postMsg('error',{msg:'generation watchdog: no progress within '+(Math.round(duration/1000)+15)+'s'});}},duration+15000);
 
-    if(donePromise){
+    if(donePromise||webCodecsDonePromise){
+      if(webCodecsDonePromise){
+        webCodecsDonePromise.then(function(){
+          if(webCodecsBlob){
+            var wcReader=new FileReader();
+            wcReader.onloadend=function(){var wcBase64=wcReader.result.split(',')[1];postMsg('done',{base64:wcBase64,size:webCodecsBlob.size,mimeType:'video/webm'});};
+            wcReader.onerror=function(){postMsg('error',{msg:'blob read failed'});};
+            wcReader.readAsDataURL(webCodecsBlob);
+          }
+        });
+      } else {
       donePromise.then(function(blob){
         var reader=new FileReader();
         reader.onloadend=function(){
@@ -457,6 +602,7 @@ function buildWebViewHTML(params: {
         };
         reader.readAsDataURL(blob);
       });
+      }
     } else {
       setTimeout(function(){
         try{

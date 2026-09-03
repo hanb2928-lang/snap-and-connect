@@ -23,6 +23,7 @@ import { RoamingBabyOverlay } from '@/components/RoamingBabyOverlay';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
+import { isWebCodecsSupported, isWebCodecsEncoderConfigSupported, encodeCanvasToWebM } from '@/lib/webCodecsEncoder';
 import type { PlatformKey } from '@/types/database';
 
 interface TimelineShortGeneratorProps {
@@ -314,175 +315,270 @@ function WebTimelineGenerator({
         } catch { /* skip logo */ }
       }
 
-      const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
-      let recorder: any = null;
-      let mimeType = 'video/webm';
-      let done: Promise<any> = Promise.resolve(new (window as any).Blob([], { type: 'image/png' }));
-
-      if (hasRecorder) {
-        const canvasStream = (canvas as any).captureStream(FPS);
-        canvasStreamRef.current = canvasStream;
-        mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-          ? 'video/webm;codecs=vp9'
-          : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-            ? 'video/webm;codecs=vp8'
-            : 'video/webm';
-        recorder = new (window as any).MediaRecorder(canvasStream, {
-          mimeType,
-          videoBitsPerSecond: 6000000,
-        });
-        recorderRef.current = recorder;
-        const chunks: any[] = [];
-        recorder.ondataavailable = (e: any) => {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
-        done = new Promise<any>((resolve) => {
-          recorder.onstop = () => resolve(new (window as any).Blob(chunks, { type: mimeType }));
-        });
-        recorder.start();
-      }
-
-      // Pre-build gradient
-      const cachedGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
-      cachedGrad.addColorStop(0, 'rgba(10,15,30,0.2)');
-      cachedGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
-      cachedGrad.addColorStop(1, 'rgba(10,15,30,0.92)');
-
-      const startTime = performance.now();
-      let lastPct = -1;
-
       const advantages = (productAdvantages && productAdvantages.length > 0)
         ? productAdvantages.slice(0, 3)
         : ['핵심 장점 1', '핵심 장점 2', '핵심 장점 3'];
 
-      const drawImageCover = (scale: number, panY: number) => {
-        const imgRatio = img.width / img.height;
-        let drawW: number, drawH: number;
-        if (imgRatio > CANVAS_W / CANVAS_H) {
-          drawH = CANVAS_H * scale;
-          drawW = drawH * imgRatio;
-        } else {
-          drawW = CANVAS_W * scale;
-          drawH = drawW / imgRatio;
-        }
-        const px = (CANVAS_W - drawW) / 2;
-        const py = (CANVAS_H - drawH) / 2 + panY;
-        ctx.drawImage(img, px, py, drawW, drawH);
-      };
+      const useWebCodecs = isWebCodecsSupported() && isWebCodecsEncoderConfigSupported(CANVAS_W, CANVAS_H);
 
-      const drawFrame = () => {
-        const elapsed = (performance.now() - startTime) / 1000;
-        const t = Math.min(elapsed / (duration / 1000), 1);
-        const pct = Math.round(t * 100);
-        if (pct !== lastPct) {
-          lastPct = pct;
-          setProgress(pct);
-        }
+      if (useWebCodecs) {
+        // ===== WebCodecs path: deterministic encoding =====
+        const result = await encodeCanvasToWebM(
+          canvas, CANVAS_W, CANVAS_H, FPS, duration,
+          (frameCtx, progress) => {
+            const timeSec = progress * (duration / 1000);
+            const t = progress;
+            const totalSec = duration / 1000;
 
-        const timeSec = elapsed;
-        const totalSec = duration / 1000;
+            frameCtx.fillStyle = '#0a0f1e';
+            frameCtx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-        // Background
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+            const currentPhase = phases.find((p) => timeSec >= p.start && timeSec < p.end) || phases[phases.length - 1];
+            const phaseIdx = phases.indexOf(currentPhase);
+            const phaseProgress = Math.min((timeSec - currentPhase.start) / (currentPhase.end - currentPhase.start), 1);
 
-        // Determine current phase
-        const currentPhase = phases.find((p) => timeSec >= p.start && timeSec < p.end) || phases[phases.length - 1];
-        const phaseIdx = phases.indexOf(currentPhase);
-        const phaseProgress = Math.min((timeSec - currentPhase.start) / (currentPhase.end - currentPhase.start), 1);
+            const frameGrad = frameCtx.createLinearGradient(0, 0, 0, CANVAS_H);
+            frameGrad.addColorStop(0, 'rgba(10,15,30,0.2)');
+            frameGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
+            frameGrad.addColorStop(1, 'rgba(10,15,30,0.92)');
 
-        // Phase-specific rendering
-        if (mode === '30s') {
-          draw30sFrame(ctx, img, drawImageCover, cachedGrad, timeSec, phaseIdx, phaseProgress, {
-            hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+            const drawImageCoverFrame = (scale: number, panY: number) => {
+              const imgRatio = img.width / img.height;
+              let drawW: number, drawH: number;
+              if (imgRatio > CANVAS_W / CANVAS_H) {
+                drawH = CANVAS_H * scale;
+                drawW = drawH * imgRatio;
+              } else {
+                drawW = CANVAS_W * scale;
+                drawH = drawW / imgRatio;
+              }
+              const px = (CANVAS_W - drawW) / 2;
+              const py = (CANVAS_H - drawH) / 2 + panY;
+              frameCtx.drawImage(img, px, py, drawW, drawH);
+            };
+
+            if (mode === '30s') {
+              draw30sFrame(frameCtx, img, drawImageCoverFrame, frameGrad, timeSec, phaseIdx, phaseProgress, {
+                hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+              });
+            } else {
+              draw60sFrame(frameCtx, img, drawImageCoverFrame, frameGrad, timeSec, phaseIdx, phaseProgress, {
+                hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+              });
+            }
+
+            const barY = 8;
+            const barH = 4;
+            frameCtx.fillStyle = 'rgba(255,255,255,0.15)';
+            roundRect(frameCtx, 60, barY, CANVAS_W - 120, barH, 2);
+            frameCtx.fill();
+            frameCtx.fillStyle = accentColor;
+            roundRect(frameCtx, 60, barY, (CANVAS_W - 120) * t, barH, 2);
+            frameCtx.fill();
+
+            frameCtx.font = '500 16px sans-serif';
+            frameCtx.textAlign = 'center';
+            frameCtx.textBaseline = 'top';
+            phases.forEach((p, i) => {
+              const phaseCenter = 60 + (CANVAS_W - 120) * ((p.start + p.end) / 2) / totalSec;
+              const isActive = i === phaseIdx;
+              frameCtx.globalAlpha = isActive ? 1 : 0.4;
+              frameCtx.fillStyle = isActive ? accentColor : 'rgba(255,255,255,0.6)';
+              frameCtx.fillText(p.label, phaseCenter, barY + 8);
+            });
+            frameCtx.globalAlpha = 1;
+            frameCtx.textAlign = 'left';
+            frameCtx.textBaseline = 'alphabetic';
+
+            const disclosureStart = totalSec - 2;
+            if (timeSec >= disclosureStart) {
+              const dt = Math.min((timeSec - disclosureStart) / 0.5, 1);
+              frameCtx.globalAlpha = dt * 0.75;
+              frameCtx.fillStyle = '#0a0f1e';
+              frameCtx.fillRect(0, CANVAS_H - 80, CANVAS_W, 80);
+              frameCtx.fillStyle = 'rgba(255,255,255,0.85)';
+              frameCtx.font = '400 16px sans-serif';
+              frameCtx.textAlign = 'center';
+              frameCtx.textBaseline = 'middle';
+              const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
+              frameCtx.fillText(disclosure, CANVAS_W / 2, CANVAS_H - 40);
+              frameCtx.textAlign = 'left';
+              frameCtx.textBaseline = 'alphabetic';
+              frameCtx.globalAlpha = 1;
+            }
+
+            if (shortUrl) {
+              drawRoamingBabyWithLink(frameCtx, timeSec * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor, mascotEnabled);
+            }
+          },
+          { onProgress: (pct) => setProgress(pct) },
+        );
+
+        if (cancelledRef.current) return;
+        const url = URL.createObjectURL(result.blob);
+        setVideoUrl(url);
+        setVideoMime(result.mimeType);
+        if (mountedRef.current) { setState('done'); setProgress(100); }
+      } else {
+        // ===== MediaRecorder fallback =====
+        const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
+        let recorder: any = null;
+        let mimeType = 'video/webm';
+        let done: Promise<any> = Promise.resolve(new (window as any).Blob([], { type: 'image/png' }));
+
+        if (hasRecorder) {
+          const canvasStream = (canvas as any).captureStream(FPS);
+          canvasStreamRef.current = canvasStream;
+          mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9'
+            : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+              ? 'video/webm;codecs=vp8'
+              : 'video/webm';
+          recorder = new (window as any).MediaRecorder(canvasStream, {
+            mimeType,
+            videoBitsPerSecond: 6000000,
           });
-        } else {
-          draw60sFrame(ctx, img, drawImageCover, cachedGrad, timeSec, phaseIdx, phaseProgress, {
-            hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+          recorderRef.current = recorder;
+          const chunks: any[] = [];
+          recorder.ondataavailable = (e: any) => {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
+          done = new Promise<any>((resolve) => {
+            recorder.onstop = () => resolve(new (window as any).Blob(chunks, { type: mimeType }));
           });
+          recorder.start();
         }
 
-        // Timeline progress bar at top
-        const barY = 8;
-        const barH = 4;
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        roundRect(ctx, 60, barY, CANVAS_W - 120, barH, 2);
-        ctx.fill();
-        ctx.fillStyle = accentColor;
-        roundRect(ctx, 60, barY, (CANVAS_W - 120) * t, barH, 2);
-        ctx.fill();
+        const cachedGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+        cachedGrad.addColorStop(0, 'rgba(10,15,30,0.2)');
+        cachedGrad.addColorStop(0.45, 'rgba(10,15,30,0.55)');
+        cachedGrad.addColorStop(1, 'rgba(10,15,30,0.92)');
 
-        // Phase labels on timeline
-        ctx.font = '500 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        phases.forEach((p, i) => {
-          const phaseCenter = 60 + (CANVAS_W - 120) * ((p.start + p.end) / 2) / totalSec;
-          const isActive = i === phaseIdx;
-          ctx.globalAlpha = isActive ? 1 : 0.4;
-          ctx.fillStyle = isActive ? accentColor : 'rgba(255,255,255,0.6)';
-          ctx.fillText(p.label, phaseCenter, barY + 8);
-        });
-        ctx.globalAlpha = 1;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
+        const startTime = performance.now();
+        let lastPct = -1;
 
-        // Disclosure at the very end (last 2 seconds, partial overlay so CTA stays visible)
-        const disclosureStart = totalSec - 2;
-        if (timeSec >= disclosureStart) {
-          const dt = Math.min((timeSec - disclosureStart) / 0.5, 1);
-          ctx.globalAlpha = dt * 0.75;
+        const drawImageCover = (scale: number, panY: number) => {
+          const imgRatio = img.width / img.height;
+          let drawW: number, drawH: number;
+          if (imgRatio > CANVAS_W / CANVAS_H) {
+            drawH = CANVAS_H * scale;
+            drawW = drawH * imgRatio;
+          } else {
+            drawW = CANVAS_W * scale;
+            drawH = drawW / imgRatio;
+          }
+          const px = (CANVAS_W - drawW) / 2;
+          const py = (CANVAS_H - drawH) / 2 + panY;
+          ctx.drawImage(img, px, py, drawW, drawH);
+        };
+
+        const drawFrame = () => {
+          const elapsed = (performance.now() - startTime) / 1000;
+          const t = Math.min(elapsed / (duration / 1000), 1);
+          const pct = Math.round(t * 100);
+          if (pct !== lastPct) {
+            lastPct = pct;
+            setProgress(pct);
+          }
+
+          const timeSec = elapsed;
+          const totalSec = duration / 1000;
+
           ctx.fillStyle = '#0a0f1e';
-          ctx.fillRect(0, CANVAS_H - 80, CANVAS_W, 80);
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          ctx.font = '400 16px sans-serif';
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+          const currentPhase = phases.find((p) => timeSec >= p.start && timeSec < p.end) || phases[phases.length - 1];
+          const phaseIdx = phases.indexOf(currentPhase);
+          const phaseProgress = Math.min((timeSec - currentPhase.start) / (currentPhase.end - currentPhase.start), 1);
+
+          if (mode === '30s') {
+            draw30sFrame(ctx, img, drawImageCover, cachedGrad, timeSec, phaseIdx, phaseProgress, {
+              hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+            });
+          } else {
+            draw60sFrame(ctx, img, drawImageCover, cachedGrad, timeSec, phaseIdx, phaseProgress, {
+              hook, title, hashtags, accentColor, advantages, oneLiner, logoImg, shortUrl,
+            });
+          }
+
+          const barY = 8;
+          const barH = 4;
+          ctx.fillStyle = 'rgba(255,255,255,0.15)';
+          roundRect(ctx, 60, barY, CANVAS_W - 120, barH, 2);
+          ctx.fill();
+          ctx.fillStyle = accentColor;
+          roundRect(ctx, 60, barY, (CANVAS_W - 120) * t, barH, 2);
+          ctx.fill();
+
+          ctx.font = '500 16px sans-serif';
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
-          ctx.fillText(disclosure, CANVAS_W / 2, CANVAS_H - 40);
+          ctx.textBaseline = 'top';
+          phases.forEach((p, i) => {
+            const phaseCenter = 60 + (CANVAS_W - 120) * ((p.start + p.end) / 2) / totalSec;
+            const isActive = i === phaseIdx;
+            ctx.globalAlpha = isActive ? 1 : 0.4;
+            ctx.fillStyle = isActive ? accentColor : 'rgba(255,255,255,0.6)';
+            ctx.fillText(p.label, phaseCenter, barY + 8);
+          });
+          ctx.globalAlpha = 1;
           ctx.textAlign = 'left';
           ctx.textBaseline = 'alphabetic';
-          ctx.globalAlpha = 1;
-        }
 
-        // Draw roaming baby + link sticker overlay into the video frame
-        if (shortUrl) {
-          drawRoamingBabyWithLink(ctx, elapsed * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor, mascotEnabled);
-        }
+          const disclosureStart = totalSec - 2;
+          if (timeSec >= disclosureStart) {
+            const dt = Math.min((timeSec - disclosureStart) / 0.5, 1);
+            ctx.globalAlpha = dt * 0.75;
+            ctx.fillStyle = '#0a0f1e';
+            ctx.fillRect(0, CANVAS_H - 80, CANVAS_W, 80);
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = '400 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const disclosure = getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure);
+            ctx.fillText(disclosure, CANVAS_W / 2, CANVAS_H - 40);
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.globalAlpha = 1;
+          }
 
-        if (t < 1) {
-          rafRef.current = requestAnimationFrame(drawFrame);
+          if (shortUrl) {
+            drawRoamingBabyWithLink(ctx, elapsed * 1000, CANVAS_W, CANVAS_H, shortUrl, accentColor, mascotEnabled);
+          }
+
+          if (t < 1) {
+            rafRef.current = requestAnimationFrame(drawFrame);
+          } else {
+            recorderTimerRef.current = setTimeout(() => {
+              if (recorder && recorder.state !== 'inactive') recorder.stop();
+            }, 150);
+          }
+        };
+
+        rafRef.current = requestAnimationFrame(drawFrame);
+
+        if (hasRecorder) {
+          const blob = await done;
+          if (cancelledRef.current) return;
+          if (canvasStreamRef.current) {
+            try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+            canvasStreamRef.current = null;
+          }
+          recorderRef.current = null;
+          const url = URL.createObjectURL(blob);
+          setVideoUrl(url);
+          setVideoMime(mimeType);
         } else {
-          recorderTimerRef.current = setTimeout(() => {
-            if (recorder && recorder.state !== 'inactive') recorder.stop();
-          }, 150);
+          await new Promise<void>((resolve) => setTimeout(resolve, duration + 200));
+          if (cancelledRef.current) return;
+          const dataUrl = canvas.toDataURL('image/png');
+          const blob = await (await fetch(dataUrl)).blob();
+          if (cancelledRef.current) return;
+          const url = URL.createObjectURL(blob);
+          setVideoUrl(url);
+          setVideoMime('image/png');
         }
-      };
-
-      rafRef.current = requestAnimationFrame(drawFrame);
-
-      if (hasRecorder) {
-        const blob = await done;
-        if (cancelledRef.current) return;
-        if (canvasStreamRef.current) {
-          try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
-          canvasStreamRef.current = null;
-        }
-        recorderRef.current = null;
-        const url = URL.createObjectURL(blob);
-        setVideoUrl(url);
-        setVideoMime(mimeType);
-      } else {
-        await new Promise<void>((resolve) => setTimeout(resolve, duration + 200));
-        if (cancelledRef.current) return;
-        const dataUrl = canvas.toDataURL('image/png');
-        const blob = await (await fetch(dataUrl)).blob();
-        if (cancelledRef.current) return;
-        const url = URL.createObjectURL(blob);
-        setVideoUrl(url);
-        setVideoMime('image/png');
+        if (mountedRef.current) { setState('done'); setProgress(100); }
       }
-      if (mountedRef.current) { setState('done'); setProgress(100); }
     } catch (err) {
       if (canvasStreamRef.current) {
         try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}

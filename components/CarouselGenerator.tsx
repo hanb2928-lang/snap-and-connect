@@ -18,6 +18,7 @@ import type { StickerPosition } from '@/components/TemplateCard';
 import { VideoProgressIndicator } from '@/components/VideoProgressIndicator';
 import { TemplateBadge } from '@/components/TemplateBadge';
 import { useHybridTemplate } from '@/hooks/useHybridTemplate';
+import { isWebCodecsSupported, isWebCodecsEncoderConfigSupported, encodeCanvasToWebM } from '@/lib/webCodecsEncoder';
 import type { DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -174,132 +175,216 @@ export function CarouselGenerator({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('canvas unsupported');
 
-      const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
-      if (!hasRecorder) {
-        setExportState('error');
-        showToast('이 브라우저는 동영상 생성을 지원하지 않아요');
-        return;
-      }
+      const useWebCodecs = isWebCodecsSupported() && isWebCodecsEncoderConfigSupported(VIDEO_W, VIDEO_H);
 
-      const canvasStream = (canvas as any).captureStream(FPS);
-      canvasStreamRef.current = canvasStream;
-      const mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-          ? 'video/webm;codecs=vp8'
-          : 'video/webm';
-      const recorder = new (window as any).MediaRecorder(canvasStream, {
-        mimeType,
-        videoBitsPerSecond: 8000000,
-      });
-      recorderRef.current = recorder;
-      const chunks: any[] = [];
-      recorder.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data); };
+      if (useWebCodecs) {
+        const result = await encodeCanvasToWebM(
+          canvas, VIDEO_W, VIDEO_H, FPS, VIDEO_DURATION,
+          (frameCtx, progress) => {
+            const elapsed = progress * VIDEO_DURATION;
+            const slideIndex = Math.min(Math.floor(elapsed / slideDuration), images.length - 1);
+            const localT = (elapsed - slideIndex * slideDuration) / slideDuration;
+            const img = images[slideIndex];
 
-      const done = new Promise<Blob>((resolve) => {
-        recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-      });
+            frameCtx.fillStyle = '#0a0f1e';
+            frameCtx.fillRect(0, 0, VIDEO_W, VIDEO_H);
 
-      recorder.start();
-      const startTime = performance.now();
-      let lastPct = -1;
+            const scale = 1.05 + localT * 0.12;
+            const imgRatio = img.width / img.height;
+            const canvasRatio = VIDEO_W / VIDEO_H;
+            let drawW: number, drawH: number;
+            if (imgRatio > canvasRatio) {
+              drawH = VIDEO_H * scale;
+              drawW = drawH * imgRatio;
+            } else {
+              drawW = VIDEO_W * scale;
+              drawH = drawW / imgRatio;
+            }
+            const panY = (VIDEO_H - drawH) / 2 - localT * 20;
+            const panX = (VIDEO_W - drawW) / 2;
 
-      const drawFrame = () => {
-        const elapsed = performance.now() - startTime;
-        if (elapsed >= VIDEO_DURATION) {
-          recorder.stop();
+            const transitionWidth = 0.08;
+            let alpha = 1;
+            if (localT < transitionWidth) {
+              alpha = localT / transitionWidth;
+            } else if (localT > 1 - transitionWidth) {
+              alpha = (1 - localT) / transitionWidth;
+            }
+            frameCtx.globalAlpha = alpha;
+            frameCtx.drawImage(img, panX, panY, drawW, drawH);
+            frameCtx.globalAlpha = 1;
+
+            if (slideIndex < images.length - 1 && localT > 0.92) {
+              const nextImg = images[slideIndex + 1];
+              const nextAlpha = (localT - 0.92) / 0.08;
+              const nextScale = 1.05;
+              const nextImgRatio = nextImg.width / nextImg.height;
+              let nDrawW: number, nDrawH: number;
+              if (nextImgRatio > canvasRatio) {
+                nDrawH = VIDEO_H * nextScale;
+                nDrawW = nDrawH * nextImgRatio;
+              } else {
+                nDrawW = VIDEO_W * nextScale;
+                nDrawH = nDrawW / nextImgRatio;
+              }
+              const nPanY = (VIDEO_H - nDrawH) / 2;
+              const nPanX = (VIDEO_W - nDrawW) / 2;
+              frameCtx.globalAlpha = nextAlpha;
+              frameCtx.drawImage(nextImg, nPanX, nPanY, nDrawW, nDrawH);
+              frameCtx.globalAlpha = 1;
+            }
+
+            frameCtx.fillStyle = 'rgba(10,15,30,0.55)';
+            frameCtx.fillRect(0, 0, VIDEO_W, VIDEO_H);
+
+            const dotY = VIDEO_H - 60;
+            const dotSpacing = 40;
+            const totalDotsW = (images.length - 1) * dotSpacing;
+            const dotStartX = (VIDEO_W - totalDotsW) / 2;
+            for (let d = 0; d < images.length; d++) {
+              const dx = dotStartX + d * dotSpacing;
+              const isActive = d === slideIndex;
+              frameCtx.fillStyle = isActive ? '#FFD600' : 'rgba(255,255,255,0.35)';
+              frameCtx.beginPath();
+              frameCtx.arc(dx, dotY, isActive ? 8 : 5, 0, Math.PI * 2);
+              frameCtx.fill();
+            }
+          },
+          { onProgress: (pct) => setExportProgress(30 + Math.round(pct * 0.7)) },
+        );
+
+        const url = URL.createObjectURL(result.blob);
+        setVideoUrl(url);
+        if (mountedRef.current) { setExportState('done'); setExportProgress(100); }
+        showToast('20초 동영상이 생성됐어요');
+      } else {
+        const hasRecorder = typeof (window as any).MediaRecorder !== 'undefined' && typeof (canvas as any).captureStream === 'function';
+        if (!hasRecorder) {
+          setExportState('error');
+          showToast('이 브라우저는 동영상 생성을 지원하지 않아요');
           return;
         }
 
-        const globalT = elapsed / VIDEO_DURATION;
-        const pct = Math.round(globalT * 100);
-        if (pct !== lastPct) {
-          lastPct = pct;
-          setExportProgress(30 + Math.round(pct * 0.7));
-        }
+        const canvasStream = (canvas as any).captureStream(FPS);
+        canvasStreamRef.current = canvasStream;
+        const mimeType = (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : (window as any).MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+            ? 'video/webm;codecs=vp8'
+            : 'video/webm';
+        const recorder = new (window as any).MediaRecorder(canvasStream, {
+          mimeType,
+          videoBitsPerSecond: 8000000,
+        });
+        recorderRef.current = recorder;
+        const chunks: any[] = [];
+        recorder.ondataavailable = (e: any) => { if (e.data.size > 0) chunks.push(e.data); };
 
-        const slideIndex = Math.min(Math.floor(elapsed / slideDuration), images.length - 1);
-        const localT = (elapsed - slideIndex * slideDuration) / slideDuration;
-        const img = images[slideIndex];
+        const done = new Promise<Blob>((resolve) => {
+          recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+        });
 
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
+        recorder.start();
+        const startTime = performance.now();
+        let lastPct = -1;
 
-        const scale = 1.05 + localT * 0.12;
-        const imgRatio = img.width / img.height;
-        const canvasRatio = VIDEO_W / VIDEO_H;
-        let drawW: number, drawH: number;
-        if (imgRatio > canvasRatio) {
-          drawH = VIDEO_H * scale;
-          drawW = drawH * imgRatio;
-        } else {
-          drawW = VIDEO_W * scale;
-          drawH = drawW / imgRatio;
-        }
-        const panY = (VIDEO_H - drawH) / 2 - localT * 20;
-        const panX = (VIDEO_W - drawW) / 2;
-
-        const transitionWidth = 0.08;
-        let alpha = 1;
-        if (localT < transitionWidth) {
-          alpha = localT / transitionWidth;
-        } else if (localT > 1 - transitionWidth) {
-          alpha = (1 - localT) / transitionWidth;
-        }
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(img, panX, panY, drawW, drawH);
-        ctx.globalAlpha = 1;
-
-        if (slideIndex < images.length - 1 && localT > 0.92) {
-          const nextImg = images[slideIndex + 1];
-          const nextAlpha = (localT - 0.92) / 0.08;
-          const nextScale = 1.05;
-          const nextImgRatio = nextImg.width / nextImg.height;
-          let nDrawW: number, nDrawH: number;
-          if (nextImgRatio > canvasRatio) {
-            nDrawH = VIDEO_H * nextScale;
-            nDrawW = nDrawH * nextImgRatio;
-          } else {
-            nDrawW = VIDEO_W * nextScale;
-            nDrawH = nDrawW / nextImgRatio;
+        const drawFrame = () => {
+          const elapsed = performance.now() - startTime;
+          if (elapsed >= VIDEO_DURATION) {
+            recorder.stop();
+            return;
           }
-          const nPanY = (VIDEO_H - nDrawH) / 2;
-          const nPanX = (VIDEO_W - nDrawW) / 2;
-          ctx.globalAlpha = nextAlpha;
-          ctx.drawImage(nextImg, nPanX, nPanY, nDrawW, nDrawH);
+
+          const globalT = elapsed / VIDEO_DURATION;
+          const pct = Math.round(globalT * 100);
+          if (pct !== lastPct) {
+            lastPct = pct;
+            setExportProgress(30 + Math.round(pct * 0.7));
+          }
+
+          const slideIndex = Math.min(Math.floor(elapsed / slideDuration), images.length - 1);
+          const localT = (elapsed - slideIndex * slideDuration) / slideDuration;
+          const img = images[slideIndex];
+
+          ctx.fillStyle = '#0a0f1e';
+          ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
+
+          const scale = 1.05 + localT * 0.12;
+          const imgRatio = img.width / img.height;
+          const canvasRatio = VIDEO_W / VIDEO_H;
+          let drawW: number, drawH: number;
+          if (imgRatio > canvasRatio) {
+            drawH = VIDEO_H * scale;
+            drawW = drawH * imgRatio;
+          } else {
+            drawW = VIDEO_W * scale;
+            drawH = drawW / imgRatio;
+          }
+          const panY = (VIDEO_H - drawH) / 2 - localT * 20;
+          const panX = (VIDEO_W - drawW) / 2;
+
+          const transitionWidth = 0.08;
+          let alpha = 1;
+          if (localT < transitionWidth) {
+            alpha = localT / transitionWidth;
+          } else if (localT > 1 - transitionWidth) {
+            alpha = (1 - localT) / transitionWidth;
+          }
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(img, panX, panY, drawW, drawH);
           ctx.globalAlpha = 1;
-        }
 
-        ctx.fillStyle = 'rgba(10,15,30,0.55)';
-        ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
+          if (slideIndex < images.length - 1 && localT > 0.92) {
+            const nextImg = images[slideIndex + 1];
+            const nextAlpha = (localT - 0.92) / 0.08;
+            const nextScale = 1.05;
+            const nextImgRatio = nextImg.width / nextImg.height;
+            let nDrawW: number, nDrawH: number;
+            if (nextImgRatio > canvasRatio) {
+              nDrawH = VIDEO_H * nextScale;
+              nDrawW = nDrawH * nextImgRatio;
+            } else {
+              nDrawW = VIDEO_W * nextScale;
+              nDrawH = nDrawW / nextImgRatio;
+            }
+            const nPanY = (VIDEO_H - nDrawH) / 2;
+            const nPanX = (VIDEO_W - nDrawW) / 2;
+            ctx.globalAlpha = nextAlpha;
+            ctx.drawImage(nextImg, nPanX, nPanY, nDrawW, nDrawH);
+            ctx.globalAlpha = 1;
+          }
 
-        const dotY = VIDEO_H - 60;
-        const dotSpacing = 40;
-        const totalDotsW = (images.length - 1) * dotSpacing;
-        const dotStartX = (VIDEO_W - totalDotsW) / 2;
-        for (let d = 0; d < images.length; d++) {
-          const dx = dotStartX + d * dotSpacing;
-          const isActive = d === slideIndex;
-          ctx.fillStyle = isActive ? '#FFD600' : 'rgba(255,255,255,0.35)';
-          ctx.beginPath();
-          ctx.arc(dx, dotY, isActive ? 8 : 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+          ctx.fillStyle = 'rgba(10,15,30,0.55)';
+          ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
 
+          const dotY = VIDEO_H - 60;
+          const dotSpacing = 40;
+          const totalDotsW = (images.length - 1) * dotSpacing;
+          const dotStartX = (VIDEO_W - totalDotsW) / 2;
+          for (let d = 0; d < images.length; d++) {
+            const dx = dotStartX + d * dotSpacing;
+            const isActive = d === slideIndex;
+            ctx.fillStyle = isActive ? '#FFD600' : 'rgba(255,255,255,0.35)';
+            ctx.beginPath();
+            ctx.arc(dx, dotY, isActive ? 8 : 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          rafRef.current = requestAnimationFrame(drawFrame);
+        };
         rafRef.current = requestAnimationFrame(drawFrame);
-      };
-      rafRef.current = requestAnimationFrame(drawFrame);
 
-      const blob = await done;
-      recorderRef.current = null;
-      if (canvasStreamRef.current) {
-        try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
-        canvasStreamRef.current = null;
+        const blob = await done;
+        recorderRef.current = null;
+        if (canvasStreamRef.current) {
+          try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+          canvasStreamRef.current = null;
+        }
+        const url = URL.createObjectURL(blob);
+        setVideoUrl(url);
+        if (mountedRef.current) { setExportState('done'); setExportProgress(100); }
+        showToast('20초 동영상이 생성됐어요');
       }
-      const url = URL.createObjectURL(blob);
-      setVideoUrl(url);
-      if (mountedRef.current) { setExportState('done'); setExportProgress(100); }
-      showToast('20초 동영상이 생성됐어요');
     } catch {
       recorderRef.current = null;
       if (canvasStreamRef.current) {

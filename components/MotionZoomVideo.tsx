@@ -13,6 +13,7 @@ import { ZoomIn, ZoomOut, Move, Film, Check, Loader, Download, Shuffle } from 'l
 import { theme } from '@/lib/theme';
 import { buildDataUrl, cleanBase64, urlToDataUrl } from '@/lib/base64';
 import { generateVisualParams, type VisualRandomizationParams } from '@/lib/humanLikeEngine';
+import { isWebCodecsSupported, isWebCodecsEncoderConfigSupported, encodeCanvasToWebM } from '@/lib/webCodecsEncoder';
 
 type MotionPreset = 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right' | 'tilt-up' | 'cinematic';
 
@@ -154,6 +155,7 @@ export function MotionZoomVideo({
       const H = 1920;
       const FPS = 30;
       const DURATION_SEC = 5;
+      const durationMs = DURATION_SEC * 1000;
 
       const canvas = document.createElement('canvas');
       canvas.width = W;
@@ -161,45 +163,6 @@ export function MotionZoomVideo({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
       canvasRef.current = canvas;
-
-      // Set up MediaRecorder with codec fallback
-      const stream = canvas.captureStream(FPS);
-      const codecCandidates = [
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=vp8',
-        'video/webm',
-        'video/mp4;codecs=h264',
-        'video/mp4',
-      ];
-      let mimeType = '';
-      for (const candidate of codecCandidates) {
-        try {
-          if ((window as unknown as { MediaRecorder: typeof MediaRecorder }).MediaRecorder.isTypeSupported(candidate)) {
-            mimeType = candidate;
-            break;
-          }
-        } catch {
-          // continue to next candidate
-        }
-      }
-      if (!mimeType) {
-        throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다');
-      }
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      const done = new Promise<void>((resolve, reject) => {
-        const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 60000);
-        recorder.onstop = () => { clearTimeout(stopTimeout); resolve(); };
-        recorder.onerror = () => { clearTimeout(stopTimeout); reject(new Error('영상 인코딩 중 오류')); };
-      });
-
-      recorder.start();
 
       // Calculate image draw dimensions (contain fit)
       const imgAspect = img.naturalWidth / img.naturalHeight;
@@ -213,73 +176,143 @@ export function MotionZoomVideo({
         baseW = H * imgAspect;
       }
 
-      const startTime = performance.now();
-      const durationMs = DURATION_SEC * 1000;
+      const useWebCodecs = isWebCodecsSupported() && isWebCodecsEncoderConfigSupported(W, H);
 
-      const drawFrame = () => {
-        const elapsed = performance.now() - startTime;
-        const t = Math.min(elapsed / durationMs, 1);
-        setProgress(Math.round(t * 100));
+      if (useWebCodecs) {
+        const result = await encodeCanvasToWebM(
+          canvas, W, H, FPS, durationMs,
+          (frameCtx, t) => {
+            frameCtx.fillStyle = '#000';
+            frameCtx.fillRect(0, 0, W, H);
 
-        // Clear with black
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, W, H);
+            const { scale, panX, panY } = getMotionParams(selectedMotion, t, vp);
+            const drawW = baseW * scale;
+            const drawH = baseH * scale;
+            const drawX = (W - drawW) / 2 + panX;
+            const drawY = (H - drawH) / 2 + panY;
 
-        const { scale, panX, panY } = getMotionParams(selectedMotion, t, vp);
-        const drawW = baseW * scale;
-        const drawH = baseH * scale;
-        const drawX = (W - drawW) / 2 + panX;
-        const drawY = (H - drawH) / 2 + panY;
+            frameCtx.drawImage(img, drawX, drawY, drawW, drawH);
 
-        ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-        // Apply subtle pixel noise for fingerprint randomization
-        if (vp && Math.abs(vp.hueShift) > 0.01 && t > 0.98) {
-          try {
-            const noiseStrength = vp.hueShift / 100;
-            const imageData = ctx.getImageData(0, 0, W, H);
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = Math.max(0, Math.min(255, data[i] + noiseStrength * 2));
+            if (vp && Math.abs(vp.hueShift) > 0.01 && t > 0.98) {
+              try {
+                const noiseStrength = vp.hueShift / 100;
+                const imageData = frameCtx.getImageData(0, 0, W, H);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                  data[i] = Math.max(0, Math.min(255, data[i] + noiseStrength * 2));
+                }
+                frameCtx.putImageData(imageData, 0, 0);
+              } catch {
+                // tainted canvas, skip
+              }
             }
-            ctx.putImageData(imageData, 0, 0);
+
+            if (selectedMotion === 'cinematic') {
+              const vignette = frameCtx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
+              vignette.addColorStop(0, 'rgba(0,0,0,0)');
+              vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
+              frameCtx.fillStyle = vignette;
+              frameCtx.fillRect(0, 0, W, H);
+            }
+          },
+          { onProgress: (pct) => setProgress(pct) },
+        );
+
+        if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+        const url = URL.createObjectURL(result.blob);
+        videoUrlRef.current = url;
+        setVideoUrl(url);
+        setVideoMime(result.mimeType);
+        if (onVideoReady) onVideoReady(url);
+      } else {
+        // MediaRecorder fallback
+        const stream = canvas.captureStream(FPS);
+        const codecCandidates = [
+          'video/webm;codecs=vp9',
+          'video/webm;codecs=vp8',
+          'video/webm',
+          'video/mp4;codecs=h264',
+          'video/mp4',
+        ];
+        let mimeType = '';
+        for (const candidate of codecCandidates) {
+          try {
+            if ((window as unknown as { MediaRecorder: typeof MediaRecorder }).MediaRecorder.isTypeSupported(candidate)) {
+              mimeType = candidate;
+              break;
+            }
           } catch {
-            // getImageData may fail if tainted, skip noise
+            // continue to next candidate
           }
         }
+        if (!mimeType) {
+          throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다');
+        }
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+        recorderRef.current = recorder;
+        chunksRef.current = [];
 
-        // Subtle cinematic vignette for cinematic mode
-        if (selectedMotion === 'cinematic') {
-          const vignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
-          vignette.addColorStop(0, 'rgba(0,0,0,0)');
-          vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
-          ctx.fillStyle = vignette;
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        const done = new Promise<void>((resolve, reject) => {
+          const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 60000);
+          recorder.onstop = () => { clearTimeout(stopTimeout); resolve(); };
+          recorder.onerror = () => { clearTimeout(stopTimeout); reject(new Error('영상 인코딩 중 오류')); };
+        });
+
+        recorder.start();
+
+        const startTime = performance.now();
+
+        const drawFrame = () => {
+          const elapsed = performance.now() - startTime;
+          const t = Math.min(elapsed / durationMs, 1);
+          setProgress(Math.round(t * 100));
+
+          ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, W, H);
-        }
 
-        if (t < 1) {
-          animFrameRef.current = requestAnimationFrame(drawFrame);
-        } else {
-          // Stop recording
-          setTimeout(() => {
-            if (recorderRef.current && recorderRef.current.state === 'recording') {
-              recorderRef.current.stop();
-            }
-          }, 100);
-        }
-      };
+          const { scale, panX, panY } = getMotionParams(selectedMotion, t, vp);
+          const drawW = baseW * scale;
+          const drawH = baseH * scale;
+          const drawX = (W - drawW) / 2 + panX;
+          const drawY = (H - drawH) / 2 + panY;
 
-      animFrameRef.current = requestAnimationFrame(drawFrame);
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
-      await done;
+          if (selectedMotion === 'cinematic') {
+            const vignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.3)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, W, H);
+          }
 
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
-      const url = URL.createObjectURL(blob);
-      videoUrlRef.current = url;
-      setVideoUrl(url);
-      setVideoMime(mimeType);
-      if (onVideoReady) onVideoReady(url);
+          if (t < 1) {
+            animFrameRef.current = requestAnimationFrame(drawFrame);
+          } else {
+            setTimeout(() => {
+              if (recorderRef.current && recorderRef.current.state === 'recording') {
+                recorderRef.current.stop();
+              }
+            }, 100);
+          }
+        };
+
+        animFrameRef.current = requestAnimationFrame(drawFrame);
+
+        await done;
+
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        videoUrlRef.current = url;
+        setVideoUrl(url);
+        setVideoMime(mimeType);
+        if (onVideoReady) onVideoReady(url);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '영상 생성 실패');
     } finally {
