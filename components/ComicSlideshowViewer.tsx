@@ -56,9 +56,13 @@ export function ComicSlideshowViewer({
       audioRef.current = null;
     }
     if (!muted) {
-      const audio = new Audio(audioDataUrl);
-      audio.play().catch(() => {});
-      audioRef.current = audio;
+      try {
+        const audio = new Audio(audioDataUrl);
+        audio.play().catch((e) => console.warn('[ComicSlideshowViewer] audio play failed', e));
+        audioRef.current = audio;
+      } catch (e) {
+        console.warn('[ComicSlideshowViewer] audio creation failed', e);
+      }
     }
   }, [audioDataUrl, muted]);
 
@@ -142,9 +146,16 @@ export function ComicSlideshowViewer({
     }
   }, [isPlaying]);
 
-  if (totalPanels === 0) return null;
+  if (totalPanels === 0) {
+    console.warn('[ComicSlideshowViewer] rendered with 0 panels');
+    return null;
+  }
 
   const panel = panels[currentIndex];
+  if (!panel) {
+    console.warn(`[ComicSlideshowViewer] panel at index ${currentIndex} is undefined (total: ${totalPanels})`);
+    return null;
+  }
   const isLastPanel = currentIndex >= totalPanels - 1;
   const progressPercent = ((currentIndex + 1) / totalPanels) * 100;
 

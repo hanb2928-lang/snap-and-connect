@@ -1692,8 +1692,8 @@ export function ComicShortGenerator({
       try {
         const converted = await urlToDataUrl(imageUrl);
         if (!cancelled) setSafeImageUrl(converted);
-      } catch {
-        // keep original URL as fallback
+      } catch (e) {
+        console.warn('[ComicShortGenerator] urlToDataUrl failed, using original URL', e);
       }
     })();
     return () => { cancelled = true; };
@@ -1713,8 +1713,8 @@ export function ComicShortGenerator({
           if (!cancelled && result.hashtags.length > 0) {
             setTrendingKeywords(result.hashtags.slice(0, 5));
           }
-        } catch {
-          // trending fetch failed, continue without
+        } catch (e) {
+          console.warn('[ComicShortGenerator] trending hashtags fetch failed', e);
         }
         if (!cancelled) setTrendingLoading(false);
       })();
@@ -1765,7 +1765,8 @@ export function ComicShortGenerator({
       setResultUri(null);
       setResultBlob(null);
       showToast('상품 사진이 준비됐어요. AI 만화 숏폼을 생성해보세요');
-    } catch {
+    } catch (e) {
+      console.warn('[ComicShortGenerator] product image pick failed', e);
       showToast('상품 사진을 불러오지 못했어요. 다시 시도해주세요');
     }
   }, [showToast]);
@@ -1867,6 +1868,7 @@ export function ComicShortGenerator({
         }
       } catch (e) {
         const errMsg = (e as Error)?.message || '';
+        console.warn('[ComicShortGenerator] scenario generation failed', e);
         if (errMsg.includes('timeout') || errMsg.includes('abort')) {
           showToast('AI 시나리오 생성 시간이 초과됐어요. 기본 시나리오로 진행합니다.');
         }
@@ -1928,8 +1930,8 @@ export function ComicShortGenerator({
                     return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
                   }
                 }
-              } catch {
-                // retry on network error
+              } catch (e) {
+                console.warn(`[ComicShortGenerator] panel image ${idx} attempt ${attempt} failed`, e);
               }
             }
             panelImageErrorCount++;
@@ -1937,7 +1939,8 @@ export function ComicShortGenerator({
           })
         );
         panelImages = imageResults;
-      } catch {
+      } catch (e) {
+        console.warn('[ComicShortGenerator] all panel image generation failed', e);
         panelImageErrorCount = imagePrompts.length;
       }
       setScenarioLoading(false);
@@ -1970,8 +1973,8 @@ export function ComicShortGenerator({
             setTtsVoice(resolvedVoiceKey);
             setTtsSpeed(resolvedSpeed);
             setTtsPitch(resolvedPitch);
-          } catch {
-            // use default
+          } catch (e) {
+            console.warn('[ComicShortGenerator] getUserSettings for TTS failed', e);
           }
         }
         let dubVoice: string;
@@ -2009,7 +2012,8 @@ export function ComicShortGenerator({
             finalNarrationAudioDataUrl = `data:audio/mpeg;base64,${ttsData.audioBase64}`;
           }
         }
-      } catch {
+      } catch (e) {
+        console.warn('[ComicShortGenerator] TTS generation failed', e);
         showToast('AI 내레이션 생성에 실패했어요. 영상만으로 완성됩니다.');
       }
       setTtsLoading(false);
@@ -2140,7 +2144,8 @@ export function ComicShortGenerator({
           mimeType: resultMime,
           dialogTitle: 'SNS 공유',
         });
-      } catch {
+      } catch (e) {
+        console.warn(`[ComicShortGenerator] platform share (${platform}) failed`, e);
         const { Linking } = await import('react-native');
         Linking.openURL(platformUrls[platform]).catch(() => {});
       }
@@ -2169,8 +2174,8 @@ export function ComicShortGenerator({
       const asset = await MediaLibrary.createAssetAsync(resultUri);
       try {
         await MediaLibrary.createAlbumAsync('숏커넥트만화', asset, false);
-      } catch {
-        // Album creation can fail on scoped storage; the asset is already saved to gallery.
+      } catch (e) {
+        console.warn('[ComicShortGenerator] album creation failed (scoped storage)', e);
       }
       showToast('갤러리에 저장됐어요');
     } catch (err) {
@@ -2209,7 +2214,8 @@ export function ComicShortGenerator({
         affiliate_platform: affiliatePlatforms.join(',') || null,
       });
       showToast('클라우드에 저장됐어요. 내 제작물 탭에서 확인하세요');
-    } catch {
+    } catch (e) {
+      console.warn('[ComicShortGenerator] cloud save failed', e);
       showToast('저장 중 오류가 발생했어요');
     }
     setCloudSaving(false);
@@ -2261,7 +2267,8 @@ export function ComicShortGenerator({
       } else {
         setPreviewingVoiceKey(null);
       }
-    } catch {
+    } catch (e) {
+      console.warn('[ComicShortGenerator] voice preview failed', e);
       setPreviewingVoiceKey(null);
     }
   }, [previewingVoiceKey]);
