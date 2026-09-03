@@ -421,13 +421,19 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
         video.src = videoUrl;
         video.muted = true;
         video.playsInline = true;
+        video.preload = 'auto';
         if (!videoUrl.startsWith('blob:')) video.crossOrigin = 'anonymous';
         videoElRef.current = video;
 
         await new Promise<void>((resolve, reject) => {
           if (!video) { reject(new Error('영상을 로드할 수 없습니다')); return; }
-          video.onloadeddata = () => resolve();
-          video.onerror = () => reject(new Error('영상을 로드할 수 없습니다'));
+          const loadTimer = setTimeout(() => {
+            video!.onloadeddata = null;
+            video!.onerror = null;
+            reject(new Error('영상 로딩 시간 초과'));
+          }, 45000);
+          video.onloadeddata = () => { clearTimeout(loadTimer); resolve(); };
+          video.onerror = () => { clearTimeout(loadTimer); reject(new Error('영상을 로드할 수 없습니다')); };
         });
       }
 
@@ -532,6 +538,8 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
             video.currentTime = segments[segIdx].start;
             video.play().catch(() => {});
             segStartPerf = performance.now();
+            rafRef.current = requestAnimationFrame(drawFrame);
+            return;
           }
         } else {
           contentElapsed = (performance.now() - startTime) / 1000;
@@ -619,6 +627,17 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       rafRef.current = requestAnimationFrame(drawFrame);
 
+      const genTimeoutMs = totalDuration * 1000 + 30000;
+      const genTimer = setTimeout(() => {
+        cancelledRef.current = true;
+        if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+        if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+          try { recorderRef.current.stop(); } catch {}
+        }
+        if (videoElRef.current) videoElRef.current.pause();
+      }, genTimeoutMs);
+
+      try {
       if (hasRecorder) {
         const blob = await done;
         if (cancelledRef.current) return;
@@ -643,6 +662,9 @@ export function VideoImportGenerator({ affiliatePlatforms = [], shortUrl = '', o
 
       if (video) video.pause();
       if (mountedRef.current) { setState('done'); setProgress(100); }
+      } finally {
+        clearTimeout(genTimer);
+      }
     } catch (err) {
       if (canvasStreamRef.current) {
         try { canvasStreamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}

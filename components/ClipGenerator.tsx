@@ -819,6 +819,8 @@ function WebClipGenerator({
       setVideoUrl(null);
     }
 
+    let wallClockTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
       if (!imageUrl) {
         throw new Error('이미지가 아직 준비되지 않았어요. 잠시 후 다시 시도해주세요');
@@ -1156,11 +1158,24 @@ function WebClipGenerator({
 
       rafRef.current = requestAnimationFrame(drawFrame);
 
+      // Wall-clock fallback: if RAF stops (tab backgrounded), force-stop at clipDuration + 5s
+      const wallClockFallbackMs = (clipDuration + 5) * 1000;
+      wallClockTimer = setTimeout(() => {
+        if (cancelledRef.current) return;
+        if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+        if (recorder && recorder.state !== 'inactive') {
+          try { recorder.stop(); } catch {
+            if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
+          }
+        }
+      }, wallClockFallbackMs);
+
       // Overall render timeout: clipDuration + 30s buffer
       const renderTimeoutMs = (clipDuration + 30) * 1000;
       renderTimeoutRef.current = setTimeout(() => {
         if (cancelledRef.current) return;
         cancelledRef.current = true;
+        if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
         if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
         // Stop recorder to unblock the await done below
@@ -1197,11 +1212,13 @@ function WebClipGenerator({
         setVideoMime('image/png');
       }
       if (cancelledRef.current) return;
+      if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
       setState('done');
       setProgress(100);
       generatingRef.current = false;
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
     } catch (err) {
+      if (wallClockTimer) { clearTimeout(wallClockTimer); wallClockTimer = null; }
       if (renderTimeoutRef.current !== null) { clearTimeout(renderTimeoutRef.current); renderTimeoutRef.current = null; }
       if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
       if (canvasStreamRef.current) {
@@ -1225,7 +1242,7 @@ function WebClipGenerator({
     } finally {
       generatingRef.current = false;
     }
-  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure, mascotEnabled]);
+  }, [imageUrl, hook, title, hashtags, accentColor, category, affiliatePlatforms, videoUrl, showToast, clipDuration, format, cardStyle, musicMood, motionPreset, hybridMode, templateData, customReview, shortUrl, setVideoMime, autoDisclosure, mascotEnabled, renderAccentColor]);
 
   const handleDownload = useCallback(() => {
     if (!videoUrl) return;
