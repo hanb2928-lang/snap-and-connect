@@ -657,7 +657,6 @@ export function ComicShortGenerator({
     }
 
     setProgress(20);
-    const fallbackImage = safeImageUrl || '';
     let panelImages: (string | null)[] = new Array(panels.length).fill(null);
     const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
     let panelImageErrorCount = 0;
@@ -709,7 +708,7 @@ export function ComicShortGenerator({
       setScenarioLoading(false);
       setProgress(40);
       if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
-        showToast('일부 컷을 상품 사진으로 대체했어요. 대사와 연출로 감쌌습니다.');
+        showToast('일부 컷 이미지를 생성하지 못했어요. 해당 컷은 대사 배경으로 표시됩니다.');
       }
     }
 
@@ -799,7 +798,7 @@ export function ComicShortGenerator({
     setPanelImages(panelImages);
 
     const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
-      imageUri: panelImages[i] || fallbackImage || '',
+      imageUri: panelImages[i] || '',
       speech: panel.speech || '',
       sfx: panel.sfx || '',
       emotion: panel.emotion || '',
@@ -820,7 +819,7 @@ export function ComicShortGenerator({
     setState('done');
     setProgress(100);
     if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
-      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 상품 사진으로 대체됐습니다.');
+      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 대사 배경으로 표시됩니다.');
     } else {
       showToast('만화 슬라이드쇼가 완성됐어요!');
     }
