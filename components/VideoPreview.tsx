@@ -40,7 +40,7 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
   const videoSrc = Platform.OS === 'web' ? uri : (dataUri || uri);
 
   const videoHtml = useMemo(
-    () => `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:contain;}</style></head><body><video src="${videoSrc}" controls autoplay loop playsinline webkit-playsinline></video></body></html>`,
+    () => `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:contain;}</style></head><body><video src="${videoSrc}" controls autoplay loop muted playsinline webkit-playsinline></video></body></html>`,
     [videoSrc],
   );
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
@@ -72,6 +72,7 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
         controls
         autoPlay
         loop
+        muted
         playsInline
         style={{
           width: '100%',

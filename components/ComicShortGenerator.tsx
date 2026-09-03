@@ -2087,7 +2087,7 @@ export function ComicShortGenerator({
 
     let panelImages: (string | null)[] = new Array(panels.length).fill(null);
     const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
-    let panelImageError = false;
+    let panelImageErrorCount = 0;
     if (imagePrompts.length > 0) {
       setScenarioLoading(true);
       try {
@@ -2098,37 +2098,45 @@ export function ComicShortGenerator({
               ? `, ${ART_STYLES[finalArtStyle]?.label || 'webtoon style'}, comic panel illustration`
               : ', webtoon style, comic panel illustration';
             const fullPrompt = panel.imagePrompt + artStyleSuffix;
-            const imgResponse = await safeFetch(GENERATE_IMAGE_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${supabaseAnonKey}`,
-              },
-              body: JSON.stringify({
-                prompt: fullPrompt,
-                size: '1024x1024',
-                quality: 'standard',
-                style: 'vivid',
-              }),
-              timeoutMs: 60000,
-            });
-            if (imgResponse.ok) {
-              const imgData = await imgResponse.json();
-              if (imgData.image) {
-                return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                const imgResponse = await safeFetch(GENERATE_IMAGE_URL, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${supabaseAnonKey}`,
+                  },
+                  body: JSON.stringify({
+                    prompt: fullPrompt,
+                    size: '1024x1024',
+                    quality: 'standard',
+                    style: 'vivid',
+                  }),
+                  timeoutMs: 60000,
+                });
+                if (imgResponse.ok) {
+                  const imgData = await imgResponse.json();
+                  if (imgData.image) {
+                    return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
+                  }
+                }
+              } catch {
+                // retry on network error
               }
             }
-            panelImageError = true;
+            panelImageErrorCount++;
             return null;
           })
         );
         panelImages = imageResults;
       } catch {
-        panelImageError = true;
+        panelImageErrorCount = imagePrompts.length;
       }
       setScenarioLoading(false);
-      if (panelImageError) {
-        showToast('일부 만화 컷 이미지 생성에 실패했어요. 컷별 대사가 표시된 그라데이션 배경으로 대체됩니다.');
+      if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
+        showToast(`${panelImageErrorCount}개 컷 이미지 생성에 실패했어요. 해당 컷은 대사 배경으로 표시됩니다.`);
+      } else if (panelImageErrorCount === panels.length && imagePrompts.length > 0) {
+        showToast('컷 이미지 생성에 실패했어요. 대사가 표시된 배경으로 만들어집니다.');
       }
     }
 
