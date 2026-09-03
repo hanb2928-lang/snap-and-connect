@@ -171,6 +171,7 @@ export function ComicSlideshowViewer({
           />
         ) : (
           <View style={styles.panelImagePlaceholder}>
+            <View style={styles.placeholderGradientLayer} pointerEvents="none" />
             <View style={styles.placeholderInner}>
               {panel.emotion ? (
                 <Text style={styles.placeholderEmotion}>{panel.emotion}</Text>
@@ -178,7 +179,6 @@ export function ComicSlideshowViewer({
               {panel.speech ? (
                 <Text style={styles.placeholderSpeech}>{panel.speech}</Text>
               ) : null}
-              <Text style={styles.placeholderHint}>컷 이미지 없음</Text>
             </View>
           </View>
         )}
@@ -316,34 +316,36 @@ const styles = StyleSheet.create({
   panelImagePlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#111827',
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    overflow: 'hidden',
   },
+  placeholderGradientLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundImage: Platform.OS === 'web'
+      ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 40%, #1a1a2e 100%)'
+      : undefined,
+  } as ViewStyle,
   placeholderInner: {
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
+    zIndex: 1,
   },
   placeholderEmotion: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.accent[300],
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   placeholderSpeech: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#e2e8f0',
     textAlign: 'center',
-    lineHeight: 24,
-  },
-  placeholderHint: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: '#64748b',
-    marginTop: 4,
+    lineHeight: 26,
   },
   gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
