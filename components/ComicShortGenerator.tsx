@@ -1920,7 +1920,7 @@ export function ComicShortGenerator({
                     quality: 'standard',
                     style: 'vivid',
                   }),
-                  timeoutMs: 60000,
+                  timeoutMs: 25000,
                 });
                 if (imgResponse.ok) {
                   const imgData = await imgResponse.json();
@@ -2016,17 +2016,7 @@ export function ComicShortGenerator({
     }
     setProgress(80);
 
-    let finalImageUrl = safeImageUrl;
-    if (!finalImageUrl.startsWith('data:')) {
-      try {
-        finalImageUrl = await urlToDataUrl(finalImageUrl);
-      } catch {
-        if (!panelImages.some(img => img !== null)) {
-          showToast('상품 이미지를 불러오지 못했어요. 만화가 대사만으로 표시됩니다.');
-        }
-      }
-    }
-    setSafeImageUrl(finalImageUrl);
+    setSafeImageUrl(safeImageUrl);
     setMoodTemplate(finalMood);
     if (finalArtStyle) {
       const artConfig = ART_STYLES[finalArtStyle];
@@ -2045,7 +2035,7 @@ export function ComicShortGenerator({
     setPanelImages(panelImages);
 
     const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
-      imageUri: panelImages[i] || finalImageUrl || '',
+      imageUri: panelImages[i] || '',
       speech: panel.speech || '',
       sfx: panel.sfx || '',
       emotion: panel.emotion || '',
@@ -2056,7 +2046,7 @@ export function ComicShortGenerator({
     slideshowPanelsRef.current = slideshowPanelsFromGen;
     setSlideshowMode(true);
     setResultMime('image/png');
-    setResultUri(slideshowPanelsFromGen[0]?.imageUri || finalImageUrl);
+    setResultUri(slideshowPanelsFromGen[0]?.imageUri || '');
     setResultBlob(null);
     setResultSize(0);
 

@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     const enhancedPrompt = enhancePrompt(body.prompt);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     let response: Response;
     try {
       response = await fetch("https://api.openai.com/v1/images/generations", {
