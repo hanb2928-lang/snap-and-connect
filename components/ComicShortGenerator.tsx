@@ -330,6 +330,65 @@ function autoDecideConfig(category: string, advantages: string[], artStyleOverri
   return { mood, duration, panelCount, artStyle: style };
 }
 
+const PLACEHOLDER_GRADIENTS = [
+  ['#1a1428', '#2d1b4e'],
+  ['#0a0f1e', '#16213e'],
+  ['#1e0a0a', '#3d1212'],
+  ['#0f0f12', '#1a1a2e'],
+  ['#1e1410', '#3d2817'],
+];
+
+function generateGradientPlaceholder(speech: string, emotion: string, panelIndex: number): string {
+  if (Platform.OS !== 'web') return '';
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    const [c1, c2] = PLACEHOLDER_GRADIENTS[panelIndex % PLACEHOLDER_GRADIENTS.length];
+    const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+    grad.addColorStop(0, c1);
+    grad.addColorStop(1, c2);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1080, 1080);
+    if (emotion) {
+      ctx.font = '700 42px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText(emotion, 540, 360);
+    }
+    if (speech) {
+      ctx.font = '700 56px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const words = speech.split('');
+      const maxCharsPerLine = 16;
+      const lines: string[] = [];
+      let current = '';
+      for (const ch of words) {
+        if ((current + ch).length > maxCharsPerLine) {
+          lines.push(current);
+          current = ch;
+        } else {
+          current += ch;
+        }
+      }
+      if (current) lines.push(current);
+      const startY = 540 - ((lines.length - 1) * 70) / 2;
+      lines.forEach((line, i) => ctx.fillText(line, 540, startY + i * 70));
+    }
+    ctx.font = '400 28px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.textAlign = 'center';
+    ctx.fillText('AI 컷 생성 실패', 540, 980);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return '';
+  }
+}
+
 function fallbackSplitHook(hook: string, title: string, count: number): string[] {
   if (count <= 1) return [hook];
   const parts: string[] = [hook];
@@ -681,7 +740,7 @@ export function ComicShortGenerator({
               ? `, ${ART_STYLES[finalArtStyle]?.label || 'webtoon style'}, comic panel illustration`
               : ', webtoon style, comic panel illustration';
             const fullPrompt = panel.imagePrompt + artStyleSuffix;
-            for (let attempt = 0; attempt < 2; attempt++) {
+            for (let attempt = 0; attempt < 3; attempt++) {
               try {
                 const imgResponse = await safeFetch(GENERATE_IMAGE_URL, {
                   method: 'POST',
@@ -695,7 +754,7 @@ export function ComicShortGenerator({
                     quality: 'standard',
                     style: 'vivid',
                   }),
-                  timeoutMs: 15000,
+                  timeoutMs: 25000,
                 });
                 if (imgResponse.ok) {
                   const imgData = await imgResponse.json();
@@ -806,10 +865,20 @@ export function ComicShortGenerator({
     setScenarioPanels(panels);
     scenarioPanelsRef.current = panels;
 
-    setPanelImages(panelImages);
+    const finalPanelImages = panelImages.map((img, i) => {
+      if (img) return img;
+      const placeholder = generateGradientPlaceholder(
+        panels[i]?.speech || '',
+        panels[i]?.emotion || '',
+        i,
+      );
+      return placeholder || '';
+    });
+
+    setPanelImages(finalPanelImages);
 
     const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
-      imageUri: panelImages[i] || '',
+      imageUri: finalPanelImages[i] || '',
       speech: panel.speech || '',
       sfx: panel.sfx || '',
       emotion: panel.emotion || '',
