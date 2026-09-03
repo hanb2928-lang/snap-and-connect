@@ -796,7 +796,6 @@ export function ComicShortGenerator({
                     customPrompt: customPrompt.trim() || undefined,
                     productName,
                     productCategory,
-                    heroImageDataUrl: heroImageUrl.startsWith('data:') ? heroImageUrl : undefined,
                   }),
                   timeoutMs: 45000,
                 });
@@ -830,7 +829,7 @@ export function ComicShortGenerator({
       if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
         showToast('일부 컷 이미지를 생성하지 못했어요. 해당 컷은 대사 배경으로 표시됩니다.');
       } else if (panelImageErrorCount >= panels.length && panels.length > 0) {
-        showToast('AI 컷 이미지 생성에 실패했어요. 상품 사진으로 만화를 완성합니다.');
+        showToast('AI 컷 이미지 생성에 실패했어요. 만화 대사가 담긴 플레이스홀더로 표시됩니다.');
       }
     }
 

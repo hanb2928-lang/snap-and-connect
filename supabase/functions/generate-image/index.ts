@@ -18,7 +18,6 @@ interface GenerateImageRequest {
   customPrompt?: string;
   productName?: string;
   productCategory?: string;
-  heroImageDataUrl?: string;
 }
 
 Deno.serve(async (req: Request) => {
