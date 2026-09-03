@@ -2245,63 +2245,32 @@ export function ComicShortGenerator({
 
     setPanelImages(panelImages);
 
-    if (Platform.OS === 'web') {
-      try {
-        const comicParams = {
-          imageUrl: finalImageUrl,
-          panelImages,
-          hook,
-          title,
-          hashtags,
-          accentColor,
-          shortUrl: shortUrl || null,
-          moodTemplate: finalMood,
-          panelLayout: finalPanelLayout,
-          disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
-          stickerPosition,
-          stickerStyle,
-          stickerSize,
-          panels,
-          duration: finalDuration,
-          episodeMode,
-          narrationAudioDataUrl: finalNarrationAudioDataUrl,
-          punchMarkers: punchAudioDataUrl ? punchMarkers : [],
-          punchAudioDataUrl: punchAudioDataUrl || null,
-          mbtiCommentary: mbtiMode ? finalMbtiCommentary : [],
-          emotionOverlay,
-          localStoreInfo,
-          genId: currentGenId,
-          babyImgUrl: babyImgDataUrl,
-          snapshotMode: true,
-        };
-        const scriptBody = buildComicScriptBody(comicParams);
-        const payload = buildComicDataPayload(comicParams);
-        runWebComicGeneration(scriptBody, payload);
-      } catch (e) {
-        generatingLockRef.current = false;
-        if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-        setErrorDetail('만화 스크립트 생성 오류: ' + ((e as Error)?.message || 'unknown').slice(0, 80));
-        setState('error');
-      }
-    } else {
+    const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
+      imageUri: panelImages[i] || finalImageUrl,
+      speech: panel.speech || '',
+      sfx: panel.sfx || '',
+      emotion: panel.emotion || '',
+      episodeLabel: panel.episodeLabel,
+    }));
+
+    setSlideshowPanels(slideshowPanelsFromGen);
+    slideshowPanelsRef.current = slideshowPanelsFromGen;
+    setSlideshowMode(true);
+    setResultMime('image/png');
+    setResultUri(slideshowPanelsFromGen[0]?.imageUri || finalImageUrl);
+    setResultBlob(null);
+    setResultSize(0);
+
+    if (Platform.OS !== 'web') {
       setWebviewKey((k) => k + 1);
     }
 
-    generateTimeoutRef.current = setTimeout(() => {
-      generatingLockRef.current = false;
-      setState((prev) => {
-        if (prev === 'generating') {
-          if (webGenCleanupRef.current) {
-            webGenCleanupRef.current();
-            webGenCleanupRef.current = null;
-          }
-          setErrorDetail('생성 시간이 초과됐어요');
-          return 'error';
-        }
-        return prev;
-      });
-    }, finalDuration + 120000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant, customPrompt]);
+    if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    generatingLockRef.current = false;
+    setState('done');
+    setProgress(100);
+    showToast('만화 슬라이드쇼가 완성됐어요!');
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant, customPrompt]);
 
 
 
