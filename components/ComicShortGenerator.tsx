@@ -1358,6 +1358,7 @@ export function ComicShortGenerator({
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioFallback, setScenarioFallback] = useState(false);
   const [episodeMode, setEpisodeMode] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsLoading, setTtsLoading] = useState(false);
   const [narrationAudioDataUrl, setNarrationAudioDataUrl] = useState<string | null>(null);
@@ -1698,6 +1699,7 @@ export function ComicShortGenerator({
             mbtiMode,
             brandPersona: brandPersona || undefined,
             artStyle: selectedArtStyle || undefined,
+            customPrompt: customPrompt.trim() || undefined,
           }),
           timeoutMs: 20000,
         });
@@ -1792,7 +1794,7 @@ export function ComicShortGenerator({
       }
       setScenarioLoading(false);
       if (panelImageError) {
-        showToast('일부 만화 컷 이미지 생성에 실패했어요. 입력 사진으로 대체됩니다.');
+        showToast('일부 만화 컷 이미지 생성에 실패했어요. 컷별 대사가 표시된 그라데이션 배경으로 대체됩니다.');
       }
     }
 
@@ -1940,7 +1942,7 @@ export function ComicShortGenerator({
         return prev;
       });
     }, finalDuration + 120000);
-  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant]);
+  }, [state, productName, productCategory, priceEstimate, oneLiner, productAdvantages, hook, title, safeImageUrl, showToast, trendingKeywords, hashtags, episodeMode, ttsEnabled, ttsVoice, ttsSpeed, ttsPitch, mbtiMode, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, emotionOverlay, localStoreInfo, brandPersona, runWebComicGeneration, punchMarkers, punchAudioDataUrl, accentColor, shortUrl, autoDisclosure, selectedArtStyle, voiceCategory, selectedVoiceKey, multilingualDubLang, preloadedVariant, customPrompt]);
 
 
 
@@ -2341,6 +2343,18 @@ export function ComicShortGenerator({
                   영상 길이: {comicDuration / 1000}초 (설정에서 변경)
                 </Text>
               </View>
+
+              <Text style={styles.optionLabel}>만화 연출 지시 (선택)</Text>
+              <TextInput
+                style={styles.customPromptInput}
+                value={customPrompt}
+                onChangeText={setCustomPrompt}
+                placeholder="예: B급 감성 실패담, 역발상 유머, 드라마틱 반전, 특정 상황 연출 등"
+                placeholderTextColor={theme.colors.dark.textDim}
+                multiline
+                maxLength={300}
+              />
+              <Text style={styles.customPromptHint}>AI가 만화 대사와 분위기를 이 지시에 맞춰 창의적으로 반영해요. 비워두면 자동으로 결정됩니다.</Text>
 
               <Text style={styles.optionLabel}>웹툰 화풍 선택</Text>
               <View style={styles.artStyleScroll}>
@@ -3157,6 +3171,25 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  customPromptInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    marginBottom: 4,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  customPromptHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+    marginBottom: theme.spacing.md,
   },
   generateButton: {
     flexDirection: 'row',

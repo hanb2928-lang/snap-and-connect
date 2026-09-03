@@ -34,6 +34,7 @@ interface ComicScenarioRequest {
   multiverseMode?: boolean;
   brandPersona?: string | null;
   artStyle?: ArtStyle;
+  customPrompt?: string;
   productContext?: {
     productName?: string;
     description?: string;
@@ -271,6 +272,13 @@ async function generateWithOpenAI(
 
   const multiverseMode = data.multiverseMode === true;
   const mbtiMode = data.mbtiMode === true;
+
+  const customPromptGuidance = data.customPrompt && data.customPrompt.trim()
+    ? `\n## 사용자 커스텀 연출 지시 (최우선 반영)\n"${data.customPrompt.trim()}"\n이 지시사항을 만화 시나리오와 대사, 분위기에 최우선으로 반영해. 사용자의 창의적 요청이 핵심 스토리 방향을 결정하도록 해.\n`
+    : "";
+
+  const multiverseMode = data.multiverseMode === true;
+  const mbtiMode = data.mbtiMode === true;
   const episodeGuidance = episodeMode
     ? "\n이 만화는 연작(시리즈물) 에피소드형으로, 각 패널이 '1일차 → 3일차 → 7일차' 또는 '문제 → 해결 → 결과'의 시간 흐름을 가져야 해.\n" +
       "각 패널에 episodeLabel 필드로 '1일차', '3일차', '7일차' 같은 라벨을 추가해.\n"
@@ -298,11 +306,12 @@ async function generateWithOpenAI(
     "- 대사는 일상적이고 자연스러운 한국어 대화체. 과장된 마케팅 톤 절대 금지.\n" +
     "- 효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!, 샤방~, 따봉!)를 사용.\n" +
     "- 감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
-    "- 각 패널의 imagePrompt는 해당 장면을 시각적으로 묘사하는 영어 프롬프트야. 제품이 자연스럽게 등장하는 장면을 상세히 묘사해. 예: 'A frustrated young woman sitting at a messy desk surrounded by skincare bottles, warm lighting, webtoon style'\n" +
+    "- 각 패널의 imagePrompt는 해당 장면을 시각적으로 묘사하는 영어 프롬프트야. 제품 사진을 그대로 묘사하지 말고, 만화적 상황과 인물 표정, 배경을 창의적으로 묘사해. 원본 제품 사진은 참고용일 뿐, imagePrompt에 원본 사진을 복사하지 마.\n" +
     "- imagePrompt는 매 패널마다 서로 다른 장면과 구도를 묘사해야 해. 같은 장면 반복 금지.\n" +
     "- 패널 레이아웃: 정렬된 깔끔한 그리드 피하기. 과장된 표정, 거친 대사 포맷, 고감정 대비 스파이크 활용.\n" +
     "- 펀치라인은 전환 프레임에서 즉시 터져야 한다. 읽는 시간을 마이크로 도파민 히트로.\n" +
     archetypeInjection +
+    `${customPromptGuidance}` +
     `${styleGuidance}` +
     `${episodeGuidance}` +
     (mbtiMode ? "\n추가로 MBTI 유형별 구매 가이드를 만들어. 4개 유형(INTJ, ENFP, ISTP, ENFJ) 각각에 대해 이 제품을 왜 좋아할지 위트 있는 한 줄 멘트를 작성해.\n형식: \"type\": \"INTJ\", \"label\": \"계획형\", \"comment\": \"시간 절약템 - 이건 효율성이니까\"\n" : "") +
