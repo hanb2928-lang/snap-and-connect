@@ -179,19 +179,42 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error('Canvas 2D 컨텍스트를 생성할 수 없습니다.');
 
-  // Load video
+  // Load video with retry
   const video = document.createElement('video');
   video.crossOrigin = 'anonymous';
-  video.src = clip.videoUrl;
   video.muted = true;
   video.playsInline = true;
   video.loop = true;
 
-  await new Promise<void>((resolve, reject) => {
-    const loadTimeout = setTimeout(() => reject(new Error('영상 로딩 시간 초과')), 15000);
-    video.onloadeddata = () => { clearTimeout(loadTimeout); resolve(); };
-    video.onerror = () => { clearTimeout(loadTimeout); reject(new Error('원본 영상을 불러올 수 없습니다.')); };
-  });
+  const loadVideoOnce = (url: string, timeoutMs: number): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const v = document.createElement('video');
+      v.crossOrigin = 'anonymous';
+      v.muted = true;
+      v.playsInline = true;
+      v.loop = true;
+      const loadTimeout = setTimeout(() => {
+        v.onerror = null;
+        v.onloadeddata = null;
+        reject(new Error('영상 로딩 시간 초과'));
+      }, timeoutMs);
+      v.onloadeddata = () => { clearTimeout(loadTimeout); resolve(); };
+      v.onerror = () => { clearTimeout(loadTimeout); reject(new Error('원본 영상을 불러올 수 없습니다.')); };
+      v.src = url;
+    });
+  };
+
+  let videoLoaded = false;
+  for (let attempt = 0; attempt < 3 && !videoLoaded; attempt++) {
+    try {
+      await loadVideoOnce(clip.videoUrl, 30000);
+      videoLoaded = true;
+    } catch (e) {
+      if (attempt === 2) throw e;
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  video.src = clip.videoUrl;
 
   // Setup MediaRecorder
   const stream = canvas.captureStream(fps);
@@ -212,7 +235,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   };
 
   const donePromise = new Promise<Blob>((resolve, reject) => {
-    const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 60000);
+    const stopTimeout = setTimeout(() => reject(new Error('영상 인코딩 시간 초과')), 180000);
     recorder.onstop = () => {
       clearTimeout(stopTimeout);
       resolve(new Blob(chunks, { type: mimeType }));
