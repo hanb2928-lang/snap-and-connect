@@ -7,9 +7,6 @@ verify_jwt = false
 [functions.analyze-photo]
 verify_jwt = false
 
-[functions.generate-comic-scenario]
-verify_jwt = false
-
 [functions.generate-copy]
 verify_jwt = false
 
@@ -70,9 +67,6 @@ verify_jwt = false
 [functions.virtual-fitting]
 verify_jwt = false
 
-[functions.generate-virtual-cuts]
-verify_jwt = false
-
 [functions.weather-check]
 verify_jwt = false
 
@@ -85,5 +79,3 @@ verify_jwt = false
 [functions.render-video]
 verify_jwt = false
 
-[functions.generate-viral-shortform]
-verify_jwt = false

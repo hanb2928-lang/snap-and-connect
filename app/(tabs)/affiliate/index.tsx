@@ -41,7 +41,6 @@ import { generateEmotionCurve, splitTextForEmotionCurve } from '@/lib/ttsEmotion
 import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { recordProsodyOutcome, type ProsodyGenerationMeta } from '@/lib/prosodyLearning';
 import { AidcaProgressTracker } from '@/components/AidcaProgressTracker';
-import { ViralShortformArchitect } from '@/components/ViralShortformArchitect';
 import { BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
@@ -2424,16 +2423,6 @@ export default function AffiliateScreen() {
                     ) : null}
                   </View>
                 </View>
-              )}
-
-              {/* Viral Shortform Architect — AIDCA 4컷 만화숏폼 자동 생성 */}
-              {imagePreviewUri && (
-                <ViralShortformArchitect
-                  imageDataUrl={imagePreviewUri}
-                  mimeType={selectedImageMime}
-                  affiliatePlatform={selectedPlatform || undefined}
-                  productName={productMeta?.productName || undefined}
-                />
               )}
 
               {/* Next button */}

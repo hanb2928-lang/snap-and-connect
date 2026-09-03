@@ -67,7 +67,6 @@ import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch'
 import type { LocalStoreInfo } from '@/types/database';
 import { ReviewInput } from '@/components/ReviewInput';
 import { CopyWriter } from '@/components/CopyWriter';
-import { ComicShortGenerator } from '@/components/ComicShortGenerator';
 import { VariantGenerator, type Variant } from '@/components/VariantGenerator';
 import { SmartScheduler } from '@/components/SmartScheduler';
 import { OcrTextExtractor } from '@/components/OcrTextExtractor';
@@ -112,7 +111,6 @@ import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
 import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
-import { AICutGenerator } from '@/components/AICutGenerator';
 import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 
@@ -1010,20 +1008,6 @@ export default function ResultScreen() {
             />
           ),
         },
-        {
-          key: 'aiCut',
-          label: 'AI 컷 분할',
-          description: 'AI가 소스를 분석하여 템포에 맞춘 하이라이트/전환/디테일 컷 자동 분할',
-          category: 'template',
-          modes: ['single', 'multi', 'template'] as ScanMode[],
-          icon: <ScissorsIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />,
-          mediaType: 'video',
-          render: () => (
-            <AICutGenerator
-              sourceImage={captureImageUrl || scan.edited_image_url || scan.image_url}
-            />
-          ),
-        },
       ],
     },
     {
@@ -1889,38 +1873,6 @@ export default function ResultScreen() {
               </View>
             </View>
           ) : null}
-
-          <View style={styles.section}>
-            <View style={styles.comicTileHeader}>
-              <FilmIcon size={18} color={theme.colors.success[400]} strokeWidth={2} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.comicTileTitle}>3단계 · AI 만화 숏폼 생성</Text>
-                <Text style={styles.comicTileDesc}>상품 사진으로 만화 컷 숏폼 자동 생성 · 미리보기 후 저장</Text>
-              </View>
-            </View>
-            <ComicShortGenerator
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              hook={activeHook}
-              title={activeProductName || scan.title || 'Product'}
-              hashtags={allDisplayHashtags}
-              accentColor={td?.accentColor || theme.colors.accent[400]}
-              fileName={`snap-connect-comic-${scan.id}.png`}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              shortUrl={shortUrl || ''}
-              stickerPosition={stickerPosition}
-              stickerStyle={stickerStyle}
-              stickerSize={stickerSize}
-              productName={activeProductName || scan.product_name || ''}
-              productCategory={selectedProduct?.productCategory || scan.product_category || ''}
-              priceEstimate={activePriceEstimate || ''}
-              oneLiner={activeOneLiner || ''}
-              productAdvantages={td?.productAdvantages || []}
-              localStoreInfo={localStoreInfo}
-              brandPersona={settings?.brand_persona}
-              preloadedVariant={selectedVariant}
-            />
-          </View>
 
           <View style={styles.section}>
             <View style={styles.comicTileHeader}>
