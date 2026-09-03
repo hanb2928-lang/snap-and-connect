@@ -1785,7 +1785,7 @@ export function ComicShortGenerator({
     genIdRef.current += 1;
     const currentGenId = genIdRef.current;
     setState('generating');
-    setProgress(0);
+    setProgress(5);
     setResultUri(null);
     setResultBlob(null);
     setErrorDetail(null);
@@ -1816,6 +1816,7 @@ export function ComicShortGenerator({
       finalScenarioFallback = false;
     } else if (productName) {
       setScenarioLoading(true);
+      setProgress(10);
       try {
         const response = await safeFetch(COMIC_SCENARIO_FUNCTION_URL, {
           method: 'POST',
@@ -1864,8 +1865,11 @@ export function ComicShortGenerator({
             panelCount = ac.panelCount;
           }
         }
-      } catch {
-        // fallback below
+      } catch (e) {
+        const errMsg = (e as Error)?.message || '';
+        if (errMsg.includes('timeout') || errMsg.includes('abort')) {
+          showToast('AI 시나리오 생성 시간이 초과됐어요. 기본 시나리오로 진행합니다.');
+        }
       }
       setScenarioLoading(false);
     }
@@ -1888,6 +1892,7 @@ export function ComicShortGenerator({
       }
     }
 
+    setProgress(20);
     let panelImages: (string | null)[] = new Array(panels.length).fill(null);
     const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
     let panelImageErrorCount = 0;
@@ -1936,6 +1941,7 @@ export function ComicShortGenerator({
         panelImageErrorCount = imagePrompts.length;
       }
       setScenarioLoading(false);
+      setProgress(40);
       if (panelImageErrorCount > 0 && panelImageErrorCount < panels.length) {
         showToast(`${panelImageErrorCount}개 컷 이미지 생성에 실패했어요. 해당 컷은 대사 배경으로 표시됩니다.`);
       } else if (panelImageErrorCount === panels.length && imagePrompts.length > 0) {
@@ -1946,6 +1952,7 @@ export function ComicShortGenerator({
     if (!narrationText) {
       narrationText = panels.map((p) => p.speech).join('. ');
     }
+    setProgress(60);
 
     let finalNarrationAudioDataUrl: string | null = null;
     if (ttsEnabled && narrationText) {
@@ -2007,13 +2014,16 @@ export function ComicShortGenerator({
       }
       setTtsLoading(false);
     }
+    setProgress(80);
 
     let finalImageUrl = safeImageUrl;
     if (!finalImageUrl.startsWith('data:')) {
       try {
         finalImageUrl = await urlToDataUrl(finalImageUrl);
       } catch {
-        // keep original URL; WebView fetch will retry
+        if (!panelImages.some(img => img !== null)) {
+          showToast('상품 이미지를 불러오지 못했어요. 만화가 대사만으로 표시됩니다.');
+        }
       }
     }
     setSafeImageUrl(finalImageUrl);
@@ -2035,7 +2045,7 @@ export function ComicShortGenerator({
     setPanelImages(panelImages);
 
     const slideshowPanelsFromGen: SlideshowPanel[] = panels.map((panel, i) => ({
-      imageUri: panelImages[i] || finalImageUrl,
+      imageUri: panelImages[i] || finalImageUrl || '',
       speech: panel.speech || '',
       sfx: panel.sfx || '',
       emotion: panel.emotion || '',

@@ -151,12 +151,16 @@ export function ComicSlideshowViewer({
   return (
     <View style={[styles.container, { maxHeight }]}>
       <View style={styles.stage}>
-        <Image
-          source={{ uri: panel.imageUri }}
-          style={styles.panelImage}
-          resizeMode="cover"
-          accessibilityLabel={`만화 ${currentIndex + 1}번째 컷`}
-        />
+        {panel.imageUri ? (
+          <Image
+            source={{ uri: panel.imageUri }}
+            style={styles.panelImage}
+            resizeMode="cover"
+            accessibilityLabel={`만화 ${currentIndex + 1}번째 컷`}
+          />
+        ) : (
+          <View style={styles.panelImagePlaceholder} />
+        )}
         <View style={styles.gradientOverlay} pointerEvents="none" />
 
         {panel.episodeLabel && (
@@ -287,6 +291,11 @@ const styles = StyleSheet.create({
   panelImage: {
     width: '100%',
     height: '100%',
+  },
+  panelImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#111827',
   },
   gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
