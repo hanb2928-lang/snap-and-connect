@@ -201,7 +201,12 @@ export function WebCameraView({
   }, [cameraReady, facing]);
 
   const startRecording = useCallback(() => {
+    if (Platform.OS !== 'web') return;
     if (!streamRef.current || !cameraReady) return;
+    if (typeof MediaRecorder === 'undefined') {
+      setError('이 브라우저에서는 영상 녹화를 지원하지 않습니다.');
+      return;
+    }
     recordedChunksRef.current = [];
     setRecordingSec(0);
 

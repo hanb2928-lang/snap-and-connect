@@ -159,6 +159,17 @@ export function ComicSlideshowViewer({
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const nextIdx = currentIndex + 1;
+    if (nextIdx >= totalPanels) return;
+    const nextUri = panels[nextIdx]?.imageUri;
+    if (nextUri && nextUri.length > 20) {
+      const img = new window.Image();
+      img.src = nextUri;
+    }
+  }, [currentIndex, totalPanels, panels]);
+
   if (totalPanels === 0) {
     console.warn('[ComicSlideshowViewer] rendered with 0 panels');
     return null;
