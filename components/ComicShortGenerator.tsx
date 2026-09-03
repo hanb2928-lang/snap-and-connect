@@ -416,7 +416,7 @@ function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown
   };
 }
 
-function buildComicScriptBody(params: ComicBuildParams): string {
+export function buildComicScriptBody(params: ComicBuildParams): string {
   return `(function(){ 
   try{
   var W=${W}, H=${H};
@@ -670,7 +670,7 @@ function buildComicScriptBody(params: ComicBuildParams): string {
       var lineCount=1;
       for(var ci=0;ci<chars.length;ci++){
         var ch=chars[ci];
-        if(ch==='\n'){line='';lineCount++;continue;}
+        if(ch==='\\n'){line='';lineCount++;continue;}
         var tl=line+ch;
         if(ctx.measureText(tl).width>maxW&&line!==''){line=ch;lineCount++;}
         else{line=tl;}
