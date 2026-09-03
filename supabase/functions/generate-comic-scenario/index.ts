@@ -277,8 +277,6 @@ async function generateWithOpenAI(
     ? `\n## 사용자 커스텀 연출 지시 (최우선 반영)\n"${data.customPrompt.trim()}"\n이 지시사항을 만화 시나리오와 대사, 분위기에 최우선으로 반영해. 사용자의 창의적 요청이 핵심 스토리 방향을 결정하도록 해.\n`
     : "";
 
-  const multiverseMode = data.multiverseMode === true;
-  const mbtiMode = data.mbtiMode === true;
   const episodeGuidance = episodeMode
     ? "\n이 만화는 연작(시리즈물) 에피소드형으로, 각 패널이 '1일차 → 3일차 → 7일차' 또는 '문제 → 해결 → 결과'의 시간 흐름을 가져야 해.\n" +
       "각 패널에 episodeLabel 필드로 '1일차', '3일차', '7일차' 같은 라벨을 추가해.\n"

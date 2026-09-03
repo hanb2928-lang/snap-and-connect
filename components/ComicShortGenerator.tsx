@@ -3084,7 +3084,7 @@ export function ComicShortGenerator({
           <View style={styles.resultButtons}>
             <TouchableOpacity style={styles.downloadButton} onPress={handleSaveToGallery} activeOpacity={0.8}>
               <Download size={18} color="#fff" strokeWidth={2} />
-              <Text style={styles.downloadButtonText}>저장</Text>
+              <Text style={styles.downloadButtonText}>다운로드</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cloudSaveButton}
@@ -3103,7 +3103,7 @@ export function ComicShortGenerator({
             </TouchableOpacity>
             <TouchableOpacity style={styles.remakeButton} onPress={handleReset} activeOpacity={0.7}>
               <RefreshCw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.remakeButtonText}>다시</Text>
+              <Text style={styles.remakeButtonText}>다시 만들기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -3181,6 +3181,7 @@ export function ComicShortGenerator({
             mediaPlaybackRequiresUserAction={false}
             mixedContentMode="always"
             originWhitelist={['*']}
+            allowFileAccess
             style={styles.webView as ViewStyle}
             scrollEnabled={false}
           />
