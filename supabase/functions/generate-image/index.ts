@@ -15,6 +15,10 @@ interface GenerateImageRequest {
   quality?: "standard" | "hd";
   style?: "vivid" | "natural";
   n?: number;
+  customPrompt?: string;
+  productName?: string;
+  productCategory?: string;
+  heroImageDataUrl?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -51,7 +55,7 @@ Deno.serve(async (req: Request) => {
     const style = body.style ?? "vivid";
     const n = Math.min(body.n ?? 1, 4);
 
-    const enhancedPrompt = enhancePrompt(body.prompt);
+    const enhancedPrompt = enhancePrompt(body.prompt, body.customPrompt, body.productName, body.productCategory);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -117,12 +121,18 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function enhancePrompt(prompt: string): string {
+function enhancePrompt(prompt: string, customPrompt?: string, productName?: string, productCategory?: string): string {
   const isComicArt = /comic|webtoon|illustration|cartoon|manga|panel|toon|sketch|art/i.test(prompt);
+  const productContext = productName || productCategory
+    ? ` Product: ${productName || 'unknown'}${productCategory ? `, category: ${productCategory}` : ''}.`
+    : '';
+  const directingNotes = customPrompt?.trim()
+    ? ` Director's notes: ${customPrompt.trim()}.`
+    : '';
   if (isComicArt) {
-    return `${prompt}. High quality digital illustration, clean linework, vibrant colors, expressive characters, detailed comic panel art style. Maintain consistent character design across panels.`;
+    return `${prompt}${productContext}${directingNotes}. High quality digital illustration, clean linework, vibrant colors, expressive characters, detailed comic panel art style. Maintain consistent character design across panels.`;
   }
-  return `${prompt}. High quality, professional product photography style, clean composition, vibrant colors, detailed. CRITICAL: Do NOT distort, warp, stretch, or morph the product's original shape, proportions, colors, patterns, or text. Preserve the product exactly as it appears — maintain exact shape, color accuracy, pattern integrity, and all labels/logos/text without alteration or hallucination.`;
+  return `${prompt}${productContext}${directingNotes}. High quality, professional product photography style, clean composition, vibrant colors, detailed. CRITICAL: Do NOT distort, warp, stretch, or morph the product's original shape, proportions, colors, patterns, or text. Preserve the product exactly as it appears — maintain exact shape, color accuracy, pattern integrity, and all labels/logos/text without alteration or hallucination.`;
 }
 
 async function resolveOpenAIKey(): Promise<string | null> {
