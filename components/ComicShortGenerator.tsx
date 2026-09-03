@@ -10,9 +10,8 @@ import {
   Modal,
   ScrollView,
   TextInput,
-  type ViewStyle,
 } from 'react-native';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -1681,28 +1680,11 @@ export function ComicShortGenerator({
   const [soundPunchEnabled, setSoundPunchEnabled] = useState(false);
   const [punchMarkers, setPunchMarkers] = useState<PunchMarker[]>([]);
   const [punchAudioDataUrl, setPunchAudioDataUrl] = useState<string | null>(null);
-  const webViewRef = useRef<WebView>(null);
   const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const webGenCleanupRef = useRef<(() => void) | null>(null);
   const genIdRef = useRef(0);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [safeImageUrl, setSafeImageUrl] = useState(imageUrl);
-  const [webviewKey, setWebviewKey] = useState(0);
-  const [babyImgDataUrl, setBabyImgDataUrl] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const converted = await urlToDataUrl('/baby-crawl.webp');
-        if (!cancelled) setBabyImgDataUrl(converted);
-      } catch {
-        // fallback to pink circle in WebView script
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1748,10 +1730,6 @@ export function ComicShortGenerator({
         previewAudioRef.current.pause();
         previewAudioRef.current = null;
       }
-      if (webGenCleanupRef.current) {
-        webGenCleanupRef.current();
-        webGenCleanupRef.current = null;
-      }
       if (resultUri && Platform.OS === 'web' && resultUri.startsWith('blob:')) {
         URL.revokeObjectURL(resultUri);
       }
@@ -1792,193 +1770,6 @@ export function ComicShortGenerator({
     }
   }, [showToast]);
 
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
-
-  const chunkBufferRef = useRef<string[]>([]);
-  const chunkTotalRef = useRef<number>(0);
-  const handleWebViewMessage = useCallback(async (event: WebViewMessageEvent) => {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.genId !== undefined && msg.genId !== genIdRef.current) return;
-      if (msg.type === 'progress') {
-        if (stateRef.current !== 'generating') return;
-        setProgress(msg.data.progress);
-      } else if (msg.type === 'chunk') {
-        if (stateRef.current !== 'generating') return;
-        const { index, total, chunk } = msg.data;
-        if (index === 0) { chunkBufferRef.current = []; chunkTotalRef.current = total; }
-        chunkBufferRef.current[index] = chunk;
-      } else if (msg.type === 'snapshot') {
-        if (stateRef.current !== 'generating') return;
-        const { index, total, base64 } = msg.data;
-        setSlideshowPanels((prev) => {
-          const next = [...prev];
-          while (next.length < total) next.push({ imageUri: '', speech: '', sfx: '', emotion: '' });
-          const imgUri = Platform.OS === 'web'
-            ? URL.createObjectURL(new Blob([Uint8Array.from(atob(base64), c => c.charCodeAt(0))], { type: 'image/png' }))
-            : `data:image/png;base64,${base64}`;
-          const sp = scenarioPanelsRef.current[index];
-          next[index] = {
-            imageUri: imgUri,
-            speech: sp?.speech || '',
-            sfx: sp?.sfx || '',
-            emotion: sp?.emotion || '',
-            episodeLabel: sp?.episodeLabel,
-          };
-          return next;
-        });
-        setProgress(Math.round(((index + 1) / total) * 100));
-      } else if (msg.type === 'done') {
-        if (stateRef.current !== 'generating') return;
-        const { size, mimeType } = msg.data;
-        const isImage = msg.data.isImage === true;
-        const isSnapshot = msg.data.snapshotMode === true;
-        const mime = mimeType || 'video/webm';
-        const ext = isImage ? 'png' : (mime.includes('webm') ? 'webm' : 'mp4');
-        if (isSnapshot) {
-          if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-          generatingLockRef.current = false;
-          setSlideshowMode(true);
-          setResultMime('image/png');
-          const firstPanel = slideshowPanelsRef.current.find(p => p.imageUri);
-          if (firstPanel) {
-            try {
-              const imgResp = await fetch(firstPanel.imageUri);
-              const blob = await imgResp.blob();
-              if (Platform.OS === 'web') {
-                const blobUrl = URL.createObjectURL(blob);
-                setResultUri(blobUrl);
-                setResultBlob(blob);
-              }
-            } catch {
-              setResultUri(firstPanel.imageUri);
-            }
-          }
-          setState('done');
-          setProgress(100);
-          showToast('만화 슬라이드쇼가 완성됐어요!');
-          return;
-        }
-        const expectedTotal = chunkTotalRef.current;
-        const receivedChunks = chunkBufferRef.current.filter((c) => c !== undefined).length;
-        const base64 = chunkBufferRef.current.join('');
-        chunkBufferRef.current = [];
-        chunkTotalRef.current = 0;
-        if (!base64 || (expectedTotal > 0 && receivedChunks < expectedTotal)) {
-          generatingLockRef.current = false;
-          setErrorDetail('영상 데이터를 받지 못했어요');
-          setState('error');
-          return;
-        }
-        setResultMime(mime);
-        setResultSize(size || 0);
-        try {
-          if (Platform.OS === 'web') {
-            const byteChars = atob(base64);
-            const byteArr = new Uint8Array(byteChars.length);
-            for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-            const blob = new Blob([byteArr], { type: mime });
-            const blobUrl = URL.createObjectURL(blob);
-            setResultUri(blobUrl);
-            setResultBlob(blob);
-          } else {
-            const fileUri = `${FileSystem.cacheDirectory}${fileName.replace(/\.png$|\.webm$/, '')}-comic-${Date.now()}.${ext}`;
-            await FileSystem.writeAsStringAsync(fileUri, base64, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
-            setResultUri(fileUri);
-          }
-          if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-          generatingLockRef.current = false;
-          setState('done');
-          setProgress(100);
-          const hasAudio = !!narrationAudioDataUrl;
-          showToast(isImage ? '만화 숏폼 이미지가 완성됐어요!' : hasAudio ? 'AI 내레이션 만화 숏폼 완성!' : '만화 숏폼 동영상이 완성됐어요!');
-        } catch {
-          generatingLockRef.current = false;
-          setErrorDetail('파일 저장에 실패했어요');
-          setState('error');
-       }
-      } else if (msg.type === 'error') {
-        if (stateRef.current !== 'generating') return;
-        if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
-        generatingLockRef.current = false;
-        setState('error');
-        const errMsg = msg.data?.msg || '';
-        let detail = '만화 숏폼 생성에 실패했어요';
-        if (errMsg.includes('timeout')) {
-          detail = '이미지 로드 시간이 초과됐어요';
-        } else if (errMsg.includes('image load')) {
-          detail = '이미지를 불러올 수 없어요';
-        } else if (errMsg.includes('image blob read') || errMsg.includes('CORS')) {
-          detail = '이미지 보안 정책(CORS) 문제로 불러오지 못했어요';
-        } else if (errMsg.includes('frame render')) {
-          detail = '영상 렌더링 중 오류가 발생했어요';
-        } else if (errMsg.includes('recorder') || errMsg.includes('recording')) {
-          detail = '영상 녹화 중 오류가 발생했어요';
-        } else if (errMsg.includes('blob read') || errMsg.includes('canvas toDataURL')) {
-          detail = '영상 변환 중 오류가 발생했어요';
-        } else if (errMsg) {
-          detail = '만화 숏폼 오류: ' + errMsg.slice(0, 80);
-        }
-        setErrorDetail(detail);
-      }
-    } catch {
-      // ignore parse errors
-    }
-  }, [fileName, showToast, narrationAudioDataUrl]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const handler = (event: MessageEvent) => {
-      if (!event.data || typeof event.data !== 'string') return;
-      handleWebViewMessage({ nativeEvent: { data: event.data } } as WebViewMessageEvent);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [handleWebViewMessage]);
-
-  const runWebComicGeneration = useCallback((scriptBody: string, payload: Record<string, unknown>) => {
-    if (webGenCleanupRef.current) {
-      webGenCleanupRef.current();
-      webGenCleanupRef.current = null;
-    }
-    const prevCallback = (window as any).__comicPostMsg;
-    const prevPayload = (window as any).__comicPayload;
-
-    const canvas = document.createElement('canvas');
-    canvas.id = 'cv';
-    canvas.width = 1080;
-    canvas.height = 1920;
-    canvas.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;opacity:0;pointer-events:none;';
-    document.body.appendChild(canvas);
-
-    (window as any).__comicPostMsg = (rawMsg: string) => {
-      handleWebViewMessage({ nativeEvent: { data: rawMsg } } as WebViewMessageEvent);
-    };
-    (window as any).__comicPayload = payload;
-
-    const scriptEl = document.createElement('script');
-    const scriptUrl = URL.createObjectURL(new Blob([scriptBody], { type: 'text/javascript' }));
-    scriptEl.src = scriptUrl;
-    scriptEl.onerror = () => {
-      handleWebViewMessage({
-        nativeEvent: { data: JSON.stringify({ type: 'error', genId: genIdRef.current, data: { msg: 'render script load failed' } }) },
-      } as WebViewMessageEvent);
-    };
-    scriptEl.onload = () => URL.revokeObjectURL(scriptUrl);
-    document.body.appendChild(scriptEl);
-
-    webGenCleanupRef.current = () => {
-      (window as any).__comicPostMsg = prevCallback;
-      (window as any).__comicPayload = prevPayload;
-      URL.revokeObjectURL(scriptUrl);
-      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
-      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
-    };
-  }, [handleWebViewMessage]);
-
   const generatingLockRef = useRef(false);
   const scenarioPanelsRef = useRef<ComicPanel[]>([]);
   const slideshowPanelsRef = useRef<SlideshowPanel[]>([]);
@@ -2000,8 +1791,6 @@ export function ComicShortGenerator({
     setErrorDetail(null);
     setSlideshowPanels([]);
     setSlideshowMode(false);
-    chunkBufferRef.current = [];
-    chunkTotalRef.current = 0;
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
 
     const autoConfig = autoDecideConfig(productCategory, productAdvantages, selectedArtStyle || undefined);
@@ -2261,10 +2050,6 @@ export function ComicShortGenerator({
     setResultBlob(null);
     setResultSize(0);
 
-    if (Platform.OS !== 'web') {
-      setWebviewKey((k) => k + 1);
-    }
-
     if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
     generatingLockRef.current = false;
     setState('done');
@@ -2520,10 +2305,6 @@ export function ComicShortGenerator({
       previewAudioRef.current = null;
     }
     setPreviewingVoiceKey(null);
-    if (webGenCleanupRef.current) {
-      webGenCleanupRef.current();
-      webGenCleanupRef.current = null;
-    }
     if (resultUri && Platform.OS === 'web') URL.revokeObjectURL(resultUri);
     if (resultUri && Platform.OS !== 'web') {
       FileSystem.deleteAsync(resultUri, { idempotent: true }).catch(() => {});
@@ -2542,39 +2323,6 @@ export function ComicShortGenerator({
     setFittingModalOpen(false);
   }, [resultUri]);
 
-  const html = useMemo(() => buildComicHTML({
-    imageUrl: safeImageUrl,
-    hook,
-    title,
-    hashtags,
-    accentColor,
-    shortUrl: shortUrl || null,
-    moodTemplate,
-    panelLayout,
-    disclosureText: getDisclosureShortForPlatforms(affiliatePlatforms, autoDisclosure),
-    stickerPosition,
-    stickerStyle,
-    stickerSize,
-    panels: scenarioPanels.length > 0 ? scenarioPanels : fallbackSplitHook(hook, title, panelLayout === 'single' ? 1 : panelLayout === 'split-2' ? 2 : 3).map((speech, i) => ({
-      speech,
-      sfx: ['KWAANG!', 'BOOM!', 'ZAP!'][i % 3],
-      emotion: '',
-    })),
-    duration: comicDuration,
-    episodeMode,
-    narrationAudioDataUrl,
-    punchMarkers: punchAudioDataUrl ? punchMarkers : [],
-    punchAudioDataUrl: punchAudioDataUrl || null,
-    mbtiCommentary: mbtiMode ? mbtiCommentary : [],
-    emotionOverlay,
-    localStoreInfo,
-    genId: genIdRef.current,
-    panelImages,
-    babyImgUrl: babyImgDataUrl,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, webviewKey, babyImgDataUrl, panelImages]);
-
-  const webViewSource = useMemo(() => ({ html }), [html]);
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -2591,7 +2339,7 @@ export function ComicShortGenerator({
 
       <Text style={styles.description}>
         {Platform.OS === 'ios'
-          ? '사진 한 장으로 9:16 만화 이미지를 원터치로 만들어요. AI가 상품에 맞춰 스타일과 스토리를 자동으로 구성해서 대사 풍선과 효과음 스티커에 담아냅니다. iOS에서는 정지 이미지로 저장돼요.'
+          ? '사진 한 장으로 9:16 만화 숏폼을 원터치로 만들어요. AI가 상품에 맞춰 스타일과 스토리를 자동으로 구성해서 대사 풍선과 효과음 스티커에 담아냅니다.'
           : '사진 한 장으로 9:16 만화 숏폼을 원터치로 만들어요. AI가 상품에 맞춰 스타일과 스토리를 자동으로 구성해서 대사 풍선과 효과음 스티커에 담아냅니다.'}
       </Text>
 
@@ -3262,31 +3010,6 @@ export function ComicShortGenerator({
         </View>
       )}
 
-      {Platform.OS !== 'web' && (
-        <View style={styles.webViewHidden}>
-          <WebView
-            key={webviewKey}
-            ref={webViewRef}
-            source={webViewSource}
-            onMessage={handleWebViewMessage}
-            onError={() => {
-              if (stateRef.current === 'generating') {
-                setErrorDetail('웹뷰 로드에 실패했어요');
-                setState('error');
-              }
-            }}
-            javaScriptEnabled
-            domStorageEnabled
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            mixedContentMode="always"
-            originWhitelist={['*']}
-            allowFileAccess
-            style={styles.webView as ViewStyle}
-            scrollEnabled={false}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -4287,20 +4010,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 15,
-  },
-  webViewHidden: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    overflow: 'hidden',
-    opacity: 0.01,
-    left: 0,
-    top: 0,
-    zIndex: -1,
-  },
-  webView: {
-    width: 1,
-    height: 1,
   },
   directShareBox: {
     backgroundColor: theme.colors.dark.surfaceLight,
