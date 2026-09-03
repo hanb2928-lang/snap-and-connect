@@ -1109,7 +1109,14 @@ export default function AffiliateScreen() {
               const safeUri = await urlToDataUrl(uri);
               return await new Promise<HTMLImageElement>((resolve, reject) => {
                 const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-                el.onload = () => resolve(el);
+                el.crossOrigin = 'anonymous';
+                el.onload = () => {
+                  if (el.complete && el.naturalWidth > 0) {
+                    resolve(el);
+                  } else {
+                    reject(new Error('이미지 디코딩 실패 - 빈 프레임'));
+                  }
+                };
                 el.onerror = () => reject(new Error('이미지 로드 실패'));
                 el.src = safeUri;
               });
@@ -1132,7 +1139,14 @@ export default function AffiliateScreen() {
           const safeImageUrl = await urlToDataUrl(imagePreviewUri);
           fallbackImg = await new Promise<HTMLImageElement>((resolve, reject) => {
             const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-            el.onload = () => resolve(el);
+            el.crossOrigin = 'anonymous';
+            el.onload = () => {
+              if (el.complete && el.naturalWidth > 0) {
+                resolve(el);
+              } else {
+                reject(new Error('이미지 디코딩 실패 - 빈 프레임'));
+              }
+            };
             el.onerror = () => reject(new Error('이미지 로드 실패'));
             el.src = safeImageUrl;
           });
@@ -1232,13 +1246,19 @@ export default function AffiliateScreen() {
       const codecCandidates = isPreview
         ? ['video/webm;codecs=vp8', 'video/webm', 'video/mp4']
         : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+      let recorder: MediaRecorder | null = null;
       let mimeType = '';
       for (const c of codecCandidates) {
         try {
-          if (MediaRecorder.isTypeSupported(c)) { mimeType = c; break; }
-        } catch { /* try next */ }
+          if (!MediaRecorder.isTypeSupported(c)) continue;
+          recorder = new MediaRecorder(combinedStream, { mimeType: c, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
+          mimeType = c;
+          break;
+        } catch {
+          // try next codec candidate
+        }
       }
-      if (!mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
+      if (!recorder || !mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
 
       // Detect tainted canvas before recording — if crossOrigin images lacked CORS headers,
       // getImageData throws SecurityError here instead of silently producing a black video
@@ -1311,12 +1331,19 @@ export default function AffiliateScreen() {
         } catch { /* TTS is optional — BGM still plays */ }
       }
 
-      const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
       recorderForFinally = recorder;
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onerror = (e) => {
+        console.error('[VideoRender] MediaRecorder error:', e);
+        try { if (recorder.state === 'recording') recorder.stop(); } catch { /* already stopped */ }
+      };
       const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
       recorder.start();
+
+      // Prime the canvas stream by drawing a black frame before recording starts
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, W, H);
 
       // Safety timeout: force-stop recorder after 60s to prevent infinite recording
       recorderTimeout = setTimeout(() => {
@@ -2069,6 +2096,9 @@ export default function AffiliateScreen() {
         masterGainRef.current = null;
       } catch { /* cleanup best-effort */ }
       const blob = new Blob(chunks, { type: mimeType });
+      if (blob.size < 1000) {
+        throw new Error('영상 데이터가 너무 작습니다. 브라우저 코덱 호환성 문제일 수 있습니다. 다른 브라우저에서 시도해주세요.');
+      }
       const url = URL.createObjectURL(blob);
       setRenderedVideoUrl(url);
       setRenderedVideoMime(mimeType);
