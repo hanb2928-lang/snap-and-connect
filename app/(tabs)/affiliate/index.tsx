@@ -1086,9 +1086,7 @@ export default function AffiliateScreen() {
     if (videoRenderingRef.current) return;
     videoRenderingRef.current = true;
     const isPreview = quality === 'preview';
-    let recorderTimeout: ReturnType<typeof setTimeout> | null = null;
-    let recorderForFinally: MediaRecorder | null = null;
-    let wallClockCheck: ReturnType<typeof setInterval> | null = null;
+
     setVideoRendering(true);
     setVideoRenderComplete(false);
     setRenderError(null);
@@ -1234,33 +1232,7 @@ export default function AffiliateScreen() {
       melodyGain.connect(bgmGain);
       } // end audio setup (high-quality only)
 
-      // Combine canvas video stream + audio stream (audio only for high-quality)
-      const canvasStream = (canvas as unknown as { captureStream: (fps: number) => MediaStream }).captureStream(FPS);
-      const combinedStream = audioDest
-        ? new MediaStream([
-            ...canvasStream.getVideoTracks(),
-            ...audioDest.stream.getAudioTracks(),
-          ])
-        : canvasStream;
-
-      const codecCandidates = isPreview
-        ? ['video/webm;codecs=vp8', 'video/webm', 'video/mp4']
-        : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-      let recorder: MediaRecorder | null = null;
-      let mimeType = '';
-      for (const c of codecCandidates) {
-        try {
-          if (!MediaRecorder.isTypeSupported(c)) continue;
-          recorder = new MediaRecorder(combinedStream, { mimeType: c, videoBitsPerSecond: isPreview ? 2_000_000 : 6_000_000 });
-          mimeType = c;
-          break;
-        } catch {
-          // try next codec candidate
-        }
-      }
-      if (!recorder || !mimeType) throw new Error('이 브라우저는 영상 생성을 지원하지 않습니다.');
-
-      // Detect tainted canvas before recording — if crossOrigin images lacked CORS headers,
+      // Detect tainted canvas before rendering — if crossOrigin images lacked CORS headers,
       // getImageData throws SecurityError here instead of silently producing a black video
       if (stockVid || sceneImgs.some((img) => img !== null) || fallbackImg) {
         try {
@@ -1271,9 +1243,10 @@ export default function AffiliateScreen() {
         }
       }
 
-      // Pre-generate TTS audio buffers BEFORE recording starts to avoid playback delay
+      // Pre-generate TTS audio buffers (for later playback alongside video)
       const scenes = videoPreviewScenes!;
       const totalScenes = scenes.length;
+      let ttsAudioDataUrl: string | null = null;
       if (!isPreview && audioCtx) {
         try {
           const narrationText = scenes.map(s => s.textOverlay).join('. ');
@@ -1316,41 +1289,18 @@ export default function AffiliateScreen() {
             });
             if (ttsResp.ok) {
               const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };
-              let playbackOffset = 0.2;
               for (const result of ttsData.results) {
                 if (!result.audioBase64 || result.error) continue;
                 try {
                   const audioBytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
                   const audioBuf = await audioCtx.decodeAudioData(audioBytes.buffer.slice(0));
-                  preloadedTtsBuffers.push({ buffer: audioBuf, offset: playbackOffset });
-                  playbackOffset += audioBuf.duration + 0.15;
+                  preloadedTtsBuffers.push({ buffer: audioBuf, offset: 0.2 });
                 } catch { /* skip failed segment decode */ }
               }
             }
           }
-        } catch { /* TTS is optional — BGM still plays */ }
+        } catch { /* TTS is optional */ }
       }
-
-      recorderForFinally = recorder;
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onerror = (e) => {
-        console.error('[VideoRender] MediaRecorder error:', e);
-        try { if (recorder.state === 'recording') recorder.stop(); } catch { /* already stopped */ }
-      };
-      const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
-      recorder.start();
-
-      // Prime the canvas stream by drawing a black frame before recording starts
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, W, H);
-
-      // Safety timeout: force-stop recorder after 60s to prevent infinite recording
-      recorderTimeout = setTimeout(() => {
-        if (recorder.state === 'recording') {
-          try { recorder.stop(); } catch { /* already stopped */ }
-        }
-      }, 60000);
 
       // Compute base dimensions for each scene image
       const getBaseDims = (imgEl: HTMLImageElement | null) => {
@@ -1362,75 +1312,6 @@ export default function AffiliateScreen() {
       };
 
       const sceneDuration = DURATION / totalScenes;
-      const startTime = performance.now();
-      const durationMs = DURATION * 1000;
-
-      // Wall-clock fallback: if requestAnimationFrame freezes (tab background),
-      // this timer independently checks elapsed time and stops the recorder
-      wallClockCheck = setInterval(() => {
-        const elapsed = performance.now() - startTime;
-        if (elapsed >= durationMs + 500 && recorder.state === 'recording') {
-          try { recorder.stop(); } catch { /* already stopped */ }
-        }
-      }, 1000);
-
-      // Schedule all audio relative to recording start time for proper sync
-      if (!isPreview && audioCtx && masterGainRef.current) {
-        const audioStartOffset = audioCtx.currentTime;
-
-        // Start BGM oscillators and schedule beats in sync with video
-        if (bgmOsc) bgmOsc.start(audioStartOffset);
-        if (melodyOsc) melodyOsc.start(audioStartOffset);
-        const beatInterval = 60 / bpm;
-        const totalBeats = Math.floor(DURATION / beatInterval);
-        if (bgmOscGain) {
-          for (let b = 0; b < totalBeats; b++) {
-            const beatTime = audioStartOffset + b * beatInterval;
-            bgmOscGain.gain.setValueAtTime(0.3, beatTime);
-            bgmOscGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.15);
-          }
-        }
-        const melodyNotes = [261.63, 293.66, 329.63, 392.00, 329.63, 293.66];
-        if (melodyOsc && melodyGain) {
-          for (let b = 0; b < totalBeats; b += 2) {
-            const noteTime = audioStartOffset + b * beatInterval;
-            const freq = melodyNotes[(b / 2) % melodyNotes.length];
-            melodyOsc.frequency.setValueAtTime(freq, noteTime);
-            melodyGain.gain.setValueAtTime(0.08, noteTime);
-            melodyGain.gain.exponentialRampToValueAtTime(0.001, noteTime + beatInterval * 1.5);
-          }
-        }
-
-        // Schedule preloaded TTS buffers in sync with video timeline
-        for (const { buffer, offset } of preloadedTtsBuffers) {
-          const src = audioCtx.createBufferSource();
-          src.buffer = buffer;
-          const ttsGain = audioCtx.createGain();
-          ttsGain.gain.value = 0.85;
-          src.connect(ttsGain);
-          ttsGain.connect(masterGainRef.current);
-          src.start(audioStartOffset + offset);
-        }
-
-        // Schedule transition SFX at scene boundaries
-        const sfxGain = audioCtx.createGain();
-        sfxGain.gain.value = 0.2;
-        sfxGain.connect(masterGainRef.current);
-        for (let i = 1; i < totalScenes; i++) {
-          const sfxTime = audioStartOffset + (DURATION / totalScenes) * i;
-          const sfxOsc = audioCtx.createOscillator();
-          const sfxOscGain = audioCtx.createGain();
-          sfxOsc.type = 'sawtooth';
-          sfxOsc.frequency.setValueAtTime(800, sfxTime);
-          sfxOsc.frequency.exponentialRampToValueAtTime(200, sfxTime + 0.1);
-          sfxOscGain.gain.setValueAtTime(0.15, sfxTime);
-          sfxOscGain.gain.exponentialRampToValueAtTime(0.001, sfxTime + 0.12);
-          sfxOsc.connect(sfxOscGain);
-          sfxOscGain.connect(sfxGain);
-          sfxOsc.start(sfxTime);
-          sfxOsc.stop(sfxTime + 0.15);
-        }
-      }
 
       const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
         ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
@@ -1634,12 +1515,9 @@ export default function AffiliateScreen() {
       const CLOSING_START = DURATION - 2;
       const TRUST_END = CLOSING_START;
 
-      const drawFrame = () => {
-        const elapsed = performance.now() - startTime;
-        const globalT = Math.min(elapsed / durationMs, 1);
+      const renderFrame = (drawCtx: CanvasRenderingContext2D, globalT: number) => {
         const pct = Math.round(globalT * 100);
-        renderProgress.value = globalT;
-        const elapsedSec = elapsed / 1000;
+        const elapsedSec = globalT * DURATION;
 
         // AIDCA phase determination
         const isHookPhase = elapsedSec < HOOK_END;
@@ -1849,7 +1727,7 @@ export default function AffiliateScreen() {
 
           // Blinking cursor at end of typewriter text
           if (charsRevealed < totalDescChars) {
-            const cursorBlink = Math.sin(elapsed / 100) > 0;
+            const cursorBlink = Math.sin(globalT * DURATION * 10) > 0;
             if (cursorBlink) {
               const lastLine = descLines[Math.min(Math.floor(charsRevealed / 24), descLines.length - 1)];
               const lastLineWidth = ctx.measureText(lastLine.slice(0, charsRevealed % 24)).width;
@@ -1871,7 +1749,6 @@ export default function AffiliateScreen() {
 
         // Auto-insert affiliate disclosure text at the bottom of every frame
         if (disclosureText) {
-          const elapsedSec = elapsed / 1000;
           const isCtaPhase = elapsedSec >= DURATION - 2;
 
           if (isCtaPhase) {
@@ -1962,7 +1839,7 @@ export default function AffiliateScreen() {
             ctx.globalAlpha = 1;
           } else {
             // ── 0-13s: Small disclosure at bottom ──
-            const elapsedSecInner = elapsed / 1000;
+            const elapsedSecInner = elapsedSec;
             const isTrustPhase = elapsedSecInner >= 3 && elapsedSecInner < DURATION - 2;
             const discOpacity = isTrustPhase ? 0.75 : 0.5;
             const discFontSize = Math.round(W * 0.02);
@@ -1986,7 +1863,7 @@ export default function AffiliateScreen() {
         }
 
         // ── Product metadata overlays during trust phase (4-12s) ──
-        const elapsedSecMeta = elapsed / 1000;
+        const elapsedSecMeta = elapsedSec;
         const isTrustPhaseMeta = elapsedSecMeta >= 3 && elapsedSecMeta < DURATION - 2;
         if (isTrustPhaseMeta && productMeta && (productMeta.price || productMeta.productName)) {
           const trustLocalT = (elapsedSecMeta - 3) / (DURATION - 5);
@@ -2056,7 +1933,7 @@ export default function AffiliateScreen() {
           ctx.globalAlpha = 1;
         }
 
-        const beatPhase = (elapsed / 1000) * (bpm / 60) * Math.PI * 2;
+        const beatPhase = elapsedSec * (bpm / 60) * Math.PI * 2;
         const beatPulse = Math.sin(beatPhase) * 0.5 + 0.5;
         ctx.globalAlpha = 0.3 + beatPulse * 0.15;
         ctx.fillStyle = '#fff';
@@ -2077,17 +1954,22 @@ export default function AffiliateScreen() {
         ctx.globalAlpha = 1;
 
         if (globalT < 1) {
-          requestAnimationFrame(drawFrame);
-        } else {
-          setTimeout(() => {
-            if (recorder.state === 'recording') recorder.stop();
-          }, 200);
+          // Frame will be called again by offline renderer
         }
       };
-      requestAnimationFrame(drawFrame);
 
-      await done;
-      // Clean up audio resources (high-quality mode only has audio to clean up)
+      // Render video using offline WebCodecs encoder — no real-time constraints
+      const { renderVideoOffline } = await import('@/lib/offlineVideoRenderer');
+      const result = await renderVideoOffline({
+        canvas,
+        fps: FPS,
+        durationSec: DURATION,
+        bitrate: isPreview ? 2_000_000 : 6_000_000,
+        renderFrame,
+        onProgress: (p) => { renderProgress.value = p / 100; },
+      });
+
+      // Clean up audio resources
       try {
         if (bgmOsc) bgmOsc.stop();
         if (melodyOsc) melodyOsc.stop();
@@ -2095,13 +1977,10 @@ export default function AffiliateScreen() {
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         masterGainRef.current = null;
       } catch { /* cleanup best-effort */ }
-      const blob = new Blob(chunks, { type: mimeType });
-      if (blob.size < 1000) {
-        throw new Error('영상 데이터가 너무 작습니다. 브라우저 코덱 호환성 문제일 수 있습니다. 다른 브라우저에서 시도해주세요.');
-      }
-      const url = URL.createObjectURL(blob);
+
+      const url = URL.createObjectURL(result.blob);
       setRenderedVideoUrl(url);
-      setRenderedVideoMime(mimeType);
+      setRenderedVideoMime(result.mimeType);
       setVideoRenderComplete(true);
       recordProsodyOutcome({
         generationMeta: prosodyMetaRef.current ?? {
@@ -2134,11 +2013,6 @@ export default function AffiliateScreen() {
         durationSec: 0,
       }).catch(() => {});
     } finally {
-      if (recorderTimeout) clearTimeout(recorderTimeout);
-      if (wallClockCheck) clearInterval(wallClockCheck);
-      if (recorderForFinally && recorderForFinally.state === 'recording') {
-        try { recorderForFinally.stop(); } catch { /* already stopped */ }
-      }
       videoRenderingRef.current = false;
       setVideoRendering(false);
       renderProgress.value = 1;
