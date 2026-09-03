@@ -1020,53 +1020,6 @@ export function ComicShortGenerator({
     setSlideshowPanels(slideshowPanelsFromGen);
     slideshowPanelsRef.current = slideshowPanelsFromGen;
     setSlideshowMode(true);
-
-    // On web, render the panels into a real video using the offline WebCodecs encoder
-    if (Platform.OS === 'web' && slideshowPanelsFromGen.length > 0) {
-      try {
-        const { isOfflineRenderingSupported, renderVideoOffline } = await import('@/lib/offlineVideoRenderer');
-        const { createComicRenderFrame } = await import('@/lib/comicVideoRenderer');
-
-        if (isOfflineRenderingSupported()) {
-          const videoCanvas = document.createElement('canvas');
-          videoCanvas.width = 1080;
-          videoCanvas.height = 1920;
-
-          const durationSec = comicDuration / 1000;
-          const renderFrame = await createComicRenderFrame({
-            panels: slideshowPanelsFromGen,
-            durationSec,
-            width: videoCanvas.width,
-            height: videoCanvas.height,
-            accentColor: accentColor || '#FF6B9D',
-            episodeLabel: episodeMode ? '에피소드' : undefined,
-          });
-
-          const result = await renderVideoOffline({
-            canvas: videoCanvas,
-            fps: 30,
-            durationSec,
-            bitrate: 4_000_000,
-            renderFrame,
-            onProgress: (p) => setProgress(p),
-          });
-
-          const videoUrl = URL.createObjectURL(result.blob);
-          setResultUri(videoUrl);
-          setResultBlob(result.blob);
-          setResultMime(result.mimeType);
-          setResultSize(result.blob.size);
-          setSlideshowMode(false);
-          setState('done');
-          setProgress(100);
-          showToast('만화 영상이 완성됐어요!');
-          return;
-        }
-      } catch (e) {
-        console.warn('[ComicShortGenerator] offline video render failed, falling back to slideshow', e);
-      }
-    }
-
     setResultMime('image/png');
     setResultUri(slideshowPanelsFromGen[0]?.imageUri || '');
     setResultBlob(null);

@@ -1958,18 +1958,7 @@ export default function AffiliateScreen() {
         }
       };
 
-      // Render video using offline WebCodecs encoder — no real-time constraints
-      const { renderVideoOffline } = await import('@/lib/offlineVideoRenderer');
-      const result = await renderVideoOffline({
-        canvas,
-        fps: FPS,
-        durationSec: DURATION,
-        bitrate: isPreview ? 2_000_000 : 6_000_000,
-        renderFrame,
-        onProgress: (p) => { renderProgress.value = p / 100; },
-      });
-
-      // Clean up audio resources
+      // Clean up audio resources (audio was prepared but we no longer encode video)
       try {
         if (bgmOsc) bgmOsc.stop();
         if (melodyOsc) melodyOsc.stop();
@@ -1978,10 +1967,10 @@ export default function AffiliateScreen() {
         masterGainRef.current = null;
       } catch { /* cleanup best-effort */ }
 
-      const url = URL.createObjectURL(result.blob);
-      setRenderedVideoUrl(url);
-      setRenderedVideoMime(result.mimeType);
+      // No browser-side video encoding — storyboard preview is the final output.
+      // The scene data is available for a future server-side FFmpeg render pipeline.
       setVideoRenderComplete(true);
+      renderProgress.value = 1;
       recordProsodyOutcome({
         generationMeta: prosodyMetaRef.current ?? {
           voiceKey: 'bright_female_1',
