@@ -1982,6 +1982,11 @@ export function ComicShortGenerator({
   const generatingLockRef = useRef(false);
   const scenarioPanelsRef = useRef<ComicPanel[]>([]);
   const slideshowPanelsRef = useRef<SlideshowPanel[]>([]);
+
+  useEffect(() => {
+    slideshowPanelsRef.current = slideshowPanels;
+  }, [slideshowPanels]);
+
   const handleGenerate = useCallback(async () => {
     if (generatingLockRef.current) return;
     generatingLockRef.current = true;
@@ -2238,9 +2243,6 @@ export function ComicShortGenerator({
     setScenarioPanels(panels);
     scenarioPanelsRef.current = panels;
 
-  useEffect(() => {
-    slideshowPanelsRef.current = slideshowPanels;
-  }, [slideshowPanels]);
     setPanelImages(panelImages);
 
     if (Platform.OS === 'web') {
