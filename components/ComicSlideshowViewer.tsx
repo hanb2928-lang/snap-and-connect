@@ -134,9 +134,22 @@ export function ComicSlideshowViewer({
   }, [isPlaying, currentIndex, playAudio]);
 
   useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearTimer();
+        stopAudio();
+        setIsPlaying(false);
+      }
+    };
+    if (Platform.OS === 'web') {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
     return () => {
       clearTimer();
       stopAudio();
+      if (Platform.OS === 'web') {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
     };
   }, [clearTimer, stopAudio]);
 
@@ -156,13 +169,14 @@ export function ComicSlideshowViewer({
     console.warn(`[ComicSlideshowViewer] panel at index ${currentIndex} is undefined (total: ${totalPanels})`);
     return null;
   }
+  const isValidImageUri = panel.imageUri && panel.imageUri.length > 20;
   const isLastPanel = currentIndex >= totalPanels - 1;
   const progressPercent = ((currentIndex + 1) / totalPanels) * 100;
 
   return (
     <View style={[styles.container, { maxHeight }]}>
       <View style={styles.stage}>
-        {panel.imageUri ? (
+        {isValidImageUri ? (
           <Image
             source={{ uri: panel.imageUri }}
             style={styles.panelImage}
