@@ -915,10 +915,18 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
     }
   }
   
-  img.onload=function(){
-    checkAllImagesReady();
-  };
+  var readyCheckRetry=setTimeout(function(){
+    if(!(img.complete&&img.naturalWidth>0&&panelImgsLoaded>=panelImgsNeeded)){
+      if(img.complete&&img.naturalWidth>0&&panelImgsLoaded>=panelImgsNeeded){
+        return;
+      }
+      checkAllImagesReady();
+    }
+  },5000);
+  
+  img.onload=function(){clearTimeout(readyCheckRetry);checkAllImagesReady();};
   img.onerror=function(){
+    clearTimeout(readyCheckRetry);
     clearTimeout(imgLoadTimeout);
     postMsg('error',{msg:'image load failed (CORS or network)'});
   };
@@ -1183,6 +1191,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
 
     function drawFrame(elapsedOverride){
       try{
+      if(!img||!img.complete||img.naturalWidth<=0){if(!snapshotMode){setTimeout(function(){drawFrame(elapsedOverride);},16);}return;}
       var elapsed=elapsedOverride!==undefined?elapsedOverride:(performance.now()-startTime);
       var t=Math.min(elapsed/duration,1);
       var pct=Math.round(t*100);
