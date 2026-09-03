@@ -186,35 +186,50 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
   video.playsInline = true;
   video.loop = true;
 
-  const loadVideoOnce = (url: string, timeoutMs: number): Promise<void> => {
+  const loadVideoOnce = (url: string, timeoutMs: number): Promise<HTMLVideoElement> => {
     return new Promise((resolve, reject) => {
       const v = document.createElement('video');
       v.crossOrigin = 'anonymous';
       v.muted = true;
       v.playsInline = true;
       v.loop = true;
+      v.preload = 'auto';
       const loadTimeout = setTimeout(() => {
         v.onerror = null;
         v.onloadeddata = null;
+        v.oncanplay = null;
         reject(new Error('영상 로딩 시간 초과'));
       }, timeoutMs);
-      v.onloadeddata = () => { clearTimeout(loadTimeout); resolve(); };
+      v.onloadeddata = () => { clearTimeout(loadTimeout); resolve(v); };
       v.onerror = () => { clearTimeout(loadTimeout); reject(new Error('원본 영상을 불러올 수 없습니다.')); };
       v.src = url;
     });
   };
 
-  let videoLoaded = false;
-  for (let attempt = 0; attempt < 3 && !videoLoaded; attempt++) {
-    try {
-      await loadVideoOnce(clip.videoUrl, 30000);
-      videoLoaded = true;
-    } catch (e) {
-      if (attempt === 2) throw e;
-      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+  const loadWithRetry = async (url: string, retries: number): Promise<HTMLVideoElement> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await loadVideoOnce(url, attempt === retries ? 45000 : 30000);
+      } catch (e) {
+        lastErr = e;
+        if (attempt < retries) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
     }
+    throw lastErr;
+  };
+
+  const loadedVideo = await loadWithRetry(clip.videoUrl, 2);
+  Object.assign(video, {
+    crossOrigin: 'anonymous',
+    muted: true,
+    playsInline: true,
+    loop: true,
+  });
+  video.src = loadedVideo.src;
+  if (loadedVideo.readyState >= 2) {
+    video.currentTime = loadedVideo.currentTime;
   }
-  video.src = clip.videoUrl;
 
   // Setup MediaRecorder
   const stream = canvas.captureStream(fps);

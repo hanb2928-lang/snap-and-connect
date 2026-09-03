@@ -1021,8 +1021,31 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         var pFilter=panelFilters[pi%panelFilters.length];
         var pFlip=panelFlips[pi%panelFlips.length];
         var pCrop=panelCrops[pi%panelCrops.length];
-        var pImg=(panelImgs[pi]&&panelImgs[pi].complete&&panelImgs[pi].naturalWidth>0)?panelImgs[pi]:img;
-        drawImageInPanel(ctx,pImg,r.x,r.y,r.w,r.h,pFilter,panScale,pFlip,pCrop.ox,pCrop.oy);
+        var hasPanelImg=panelImgs[pi]&&panelImgs[pi].complete&&panelImgs[pi].naturalWidth>0;
+        if(hasPanelImg){
+          drawImageInPanel(ctx,panelImgs[pi],r.x,r.y,r.w,r.h,pFilter,panScale,pFlip,pCrop.ox,pCrop.oy);
+        } else {
+          ctx.save();
+          ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();
+          var grad=ctx.createLinearGradient(r.x,r.y,r.x,r.y+r.h);
+          grad.addColorStop(0,moodConfig.bgColor);
+          grad.addColorStop(1,effectiveAccent);
+          ctx.fillStyle=grad;
+          ctx.fillRect(r.x,r.y,r.w,r.h);
+          if(moodConfig.halftone){drawHalftonePattern(ctx,r.x,r.y,r.w,r.h,4,16,moodConfig.halftoneColor,moodConfig.halftoneAlpha);}
+          ctx.fillStyle='rgba(255,255,255,0.9)';
+          ctx.font='700 '+Math.round(r.h*0.12)+'px sans-serif';
+          ctx.textAlign='center';
+          ctx.textBaseline='middle';
+          ctx.shadowColor='rgba(0,0,0,0.4)';
+          ctx.shadowBlur=10;ctx.shadowOffsetY=2;
+          var phText=panelSpeeches[pi]||hook||'';
+          if(phText.length>20)phText=phText.slice(0,20)+'...';
+          drawTextLines(ctx,phText,r.x+r.w/2,r.y+r.h/2,r.w-40,Math.round(r.h*0.14));
+          ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+          ctx.textAlign='left';
+          ctx.restore();
+        }
 
         if(moodConfig.halftone){
           drawHalftonePattern(ctx,r.x,r.y,r.w,r.h,3,12,moodConfig.halftoneColor,moodConfig.halftoneAlpha);
