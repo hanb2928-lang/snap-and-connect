@@ -853,6 +853,12 @@ function WebClipGenerator({
       let done: Promise<any> = Promise.resolve(new (window as any).Blob([], { type: 'image/png' }));
       let chunks: any[] = [];
       let doneResolveRef: ((blob: any) => void) | null = null;
+      let doneResolved = false;
+      const resolveDone = () => {
+        if (doneResolved) return;
+        doneResolved = true;
+        if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
+      };
       if (hasRecorder) {
         const canvasStream = (canvas as any).captureStream(FPS);
 
@@ -903,8 +909,8 @@ function WebClipGenerator({
         };
 
         done = new Promise<any>((resolve, reject) => {
-          doneResolveRef = resolve;
-          recorder.onstop = () => resolve(new (window as any).Blob(chunks, { type: mimeType }));
+          doneResolveRef = (blob) => { doneResolved = true; resolve(blob); };
+          recorder.onstop = () => resolveDone();
           recorder.onerror = () => reject(new Error('영상 인코딩 오류가 발생했습니다.'));
         });
 
@@ -1133,9 +1139,9 @@ function WebClipGenerator({
         } else {
           recorderTimerRef.current = setTimeout(() => {
             if (recorder && recorder.state !== 'inactive') {
-              try { recorder.stop(); } catch {
-                if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
-              }
+              try { recorder.stop(); } catch { resolveDone(); }
+            } else {
+              resolveDone();
             }
           }, 150);
         }
@@ -1164,9 +1170,9 @@ function WebClipGenerator({
         if (cancelledRef.current) return;
         if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
         if (recorder && recorder.state !== 'inactive') {
-          try { recorder.stop(); } catch {
-            if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
-          }
+          try { recorder.stop(); } catch { resolveDone(); }
+        } else {
+          resolveDone();
         }
       }, wallClockFallbackMs);
 
@@ -1180,9 +1186,9 @@ function WebClipGenerator({
         if (bgmStopRef.current) { bgmStopRef.current(); bgmStopRef.current = null; }
         // Stop recorder to unblock the await done below
         if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-          try { recorderRef.current.stop(); } catch {
-            if (doneResolveRef) doneResolveRef(new (window as any).Blob(chunks, { type: mimeType }));
-          }
+          try { recorderRef.current.stop(); } catch { resolveDone(); }
+        } else {
+          resolveDone();
         }
         setRenderTimedOut(true);
         setState('error');

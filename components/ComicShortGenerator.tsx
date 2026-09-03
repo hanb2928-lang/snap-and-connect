@@ -935,18 +935,26 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       recorder=new MediaRecorder(combinedStream,{mimeType:mimeType,videoBitsPerSecond:6000000});
       var chunks=[];
       recorder.ondataavailable=function(e){if(e.data.size>0)chunks.push(e.data);};
+      var doneResolved=false;
+      var stopResolveRef=null;
+      function resolveDone(){
+        if(doneResolved)return;
+        doneResolved=true;
+        if(stopResolveRef)stopResolveRef(new Blob(chunks,{type:mimeType}));
+      }
       donePromise=new Promise(function(resolve,reject){
+        stopResolveRef=resolve;
         var stopTimeout=setTimeout(function(){
           try{if(recorder&&recorder.state!=='inactive')recorder.stop();}catch(e){}
-          reject(new Error('recorder stop timeout'));
+          resolveDone();
         },duration+60000);
         recorder.onstop=function(){
           clearTimeout(stopTimeout);
-          resolve(new Blob(chunks,{type:mimeType}));
+          resolveDone();
         };
         recorder.onerror=function(e){
           clearTimeout(stopTimeout);
-          reject(new Error('recorder error: '+((e&&e.error&&e.error.message)||'unknown')));
+          resolveDone();
         };
       });
       recorder.start(2000);
@@ -955,10 +963,16 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
     var startTime=performance.now();
     var lastPct=-1;
     var watchdog=setTimeout(function(){
-      if(lastPct<0||lastPct===0){
+      if(lastPct<0){
         postMsg('error',{msg:'generation watchdog: no progress within '+Math.round((duration+30000)/1000)+'s'});
       }
     },duration+30000);
+    var wallClockFallback=setTimeout(function(){
+      if(lastPct>=0&&lastPct<100){
+        if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(e){}}
+        resolveDone();
+      }
+    },duration+5000);
 
     function drawFrame(){
       try{
@@ -1237,15 +1251,19 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       if(t<1){setTimeout(drawFrame,16);}
       else{
         clearTimeout(watchdog);
+        clearTimeout(wallClockFallback);
         setTimeout(function(){
           if(narrationAudio){try{narrationAudio.pause();}catch(e){}}
           if(punchAudioEl){try{punchAudioEl.pause();}catch(e){}}
-          if(recorder&&recorder.state!=='inactive')recorder.stop();
+          if(recorder&&recorder.state!=='inactive'){try{recorder.stop();}catch(e){}}
+          resolveDone();
         },300);
       }
       }catch(e){
         clearTimeout(watchdog);
+        clearTimeout(wallClockFallback);
         if(recorder&&recorder.state!=='inactive')recorder.stop();
+        resolveDone();
         postMsg('error',{msg:'frame render failed: '+(e&&e.message||'unknown')});
       }
     }
@@ -1263,6 +1281,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
     if(donePromise){
       donePromise.then(function(blob){
         clearTimeout(watchdog);
+        clearTimeout(wallClockFallback);
         var reader=new FileReader();
         reader.onloadend=function(){
           var base64=reader.result.split(',')[1];
@@ -1274,11 +1293,13 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         reader.readAsDataURL(blob);
       }).catch(function(err){
         clearTimeout(watchdog);
+        clearTimeout(wallClockFallback);
         postMsg('error',{msg:'recording failed: '+(err&&err.message||'unknown')});
       });
     } else {
       setTimeout(function(){
         clearTimeout(watchdog);
+        clearTimeout(wallClockFallback);
         try{
           var dataUrl=canvas.toDataURL('image/png');
           var base64=dataUrl.split(',')[1];
