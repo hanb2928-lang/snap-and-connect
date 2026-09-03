@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     const enhancedPrompt = enhancePrompt(body.prompt);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     let response: Response;
     try {
       response = await fetch("https://api.openai.com/v1/images/generations", {
@@ -118,6 +118,10 @@ Deno.serve(async (req: Request) => {
 });
 
 function enhancePrompt(prompt: string): string {
+  const isComicArt = /comic|webtoon|illustration|cartoon|manga|panel|toon|sketch|art/i.test(prompt);
+  if (isComicArt) {
+    return `${prompt}. High quality digital illustration, clean linework, vibrant colors, expressive characters, detailed comic panel art style. Maintain consistent character design across panels.`;
+  }
   return `${prompt}. High quality, professional product photography style, clean composition, vibrant colors, detailed. CRITICAL: Do NOT distort, warp, stretch, or morph the product's original shape, proportions, colors, patterns, or text. Preserve the product exactly as it appears — maintain exact shape, color accuracy, pattern integrity, and all labels/logos/text without alteration or hallucination.`;
 }
 

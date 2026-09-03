@@ -1728,6 +1728,7 @@ export function ComicShortGenerator({
 
     let panelImages: (string | null)[] = new Array(panels.length).fill(null);
     const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
+    let panelImageError = false;
     if (imagePrompts.length > 0) {
       setScenarioLoading(true);
       try {
@@ -1750,7 +1751,7 @@ export function ComicShortGenerator({
                 quality: 'standard',
                 style: 'vivid',
               }),
-              timeoutMs: 30000,
+              timeoutMs: 60000,
             });
             if (imgResponse.ok) {
               const imgData = await imgResponse.json();
@@ -1758,14 +1759,18 @@ export function ComicShortGenerator({
                 return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
               }
             }
+            panelImageError = true;
             return null;
           })
         );
         panelImages = imageResults;
       } catch {
-        // fall back to original image for all panels
+        panelImageError = true;
       }
       setScenarioLoading(false);
+      if (panelImageError) {
+        showToast('일부 만화 컷 이미지 생성에 실패했어요. 입력 사진으로 대체됩니다.');
+      }
     }
 
     if (!narrationText) {
