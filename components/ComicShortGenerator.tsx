@@ -22,7 +22,7 @@ import { theme } from '@/lib/theme';
 import { getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { uploadAssetFromFileUri, uploadAssetBlob, saveAssetRecord } from '@/lib/savedAssets';
 import { urlToDataUrl } from '@/lib/base64';
-import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { COMIC_SCENARIO_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey, GENERATE_IMAGE_URL } from '@/lib/supabase';
 import { getOpenAiVoiceParams, getVoicesByCategory, VOICE_CATEGORIES, type VoiceCategory, type TtsVoice, MULTILINGUAL_VOICES, getMultilingualVoice, type MultilingualVoice } from '@/lib/ttsVoices';
 import { getUserSettings } from '@/lib/settings';
 import { fetchMatchedTrendingHashtags } from '@/lib/trendingHashtags';
@@ -43,6 +43,7 @@ export interface ComicPanel {
   sfx: string;
   emotion: string;
   episodeLabel?: string;
+  imagePrompt?: string;
 }
 
 interface MbtiCommentary {
@@ -349,6 +350,7 @@ type ComicDuration = 10000 | 15000 | 20000 | 30000;
 
 type ComicBuildParams = {
   imageUrl: string;
+  panelImages: (string | null)[];
   hook: string;
   title: string;
   hashtags: string[];
@@ -409,6 +411,7 @@ function buildComicDataPayload(params: ComicBuildParams): Record<string, unknown
     emotionOverlay,
     localStoreInfo: params.localStoreInfo ?? null,
     imageUrl: params.imageUrl,
+    panelImages: params.panelImages,
     genId,
     panelEmotions: params.panels.map(p => p.emotion || ''),
     panels: params.panels,
@@ -449,6 +452,7 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
   var emotionOverlay=P.emotionOverlay;
   var localStoreInfo=P.localStoreInfo;
   var imageUrl=P.imageUrl;
+  var panelImages=P.panelImages||[];
   var genId=P.genId;
   var panels=P.panels;
   var panelEmotions=P.panelEmotions;
@@ -758,13 +762,24 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
 
   var img=new Image();
   img.crossOrigin='anonymous';
-  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},45000);
-  img.onload=function(){
-    clearTimeout(imgLoadTimeout);
-    postMsg('ready',{});
-    try{startGeneration();}catch(e){
-      postMsg('error',{msg:'generation failed: '+(e&&e.message||'unknown')});
+  var imgLoadTimeout=setTimeout(function(){postMsg('error',{msg:'image load timeout'});},60000);
+  
+  var panelImgs=[];
+  var panelImgsLoaded=0;
+  var panelImgsNeeded=0;
+  
+  function checkAllImagesReady(){
+    if(img.complete&&img.naturalWidth>0&&panelImgsLoaded>=panelImgsNeeded){
+      clearTimeout(imgLoadTimeout);
+      postMsg('ready',{});
+      try{startGeneration();}catch(e){
+        postMsg('error',{msg:'generation failed: '+(e&&e.message||'unknown')});
+      }
     }
+  }
+  
+  img.onload=function(){
+    checkAllImagesReady();
   };
   img.onerror=function(){
     clearTimeout(imgLoadTimeout);
@@ -786,8 +801,28 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
       img.src=imageUrl;
     });
   }
-
+  
+  function loadPanelImage(idx,dataUrl){
+    if(!dataUrl){
+      panelImgsLoaded++;
+      checkAllImagesReady();
+      return;
+    }
+    var pi=new Image();
+    pi.crossOrigin='anonymous';
+    pi.onload=function(){panelImgsLoaded++;checkAllImagesReady();};
+    pi.onerror=function(){panelImgsLoaded++;checkAllImagesReady();};
+    pi.src=dataUrl;
+    panelImgs[idx]=pi;
+  }
+  
   var panelCount=panelLayout==='single'?1:panelLayout==='split-2'?2:3;
+  for(var pidx=0;pidx<panelCount;pidx++){
+    if(panelImages[pidx]){
+      panelImgsNeeded++;
+      loadPanelImage(pidx,panelImages[pidx]);
+    }
+  }
   var panelSpeeches=panels.map(function(p){return p.speech;});
   var panelSfx=panels.map(function(p){return p.sfx||'KWAANG!';});
   var panelLabels=panels.map(function(p){return p.episodeLabel||'';});
@@ -986,7 +1021,8 @@ export function buildComicScriptBody(params: ComicBuildParams): string {
         var pFilter=panelFilters[pi%panelFilters.length];
         var pFlip=panelFlips[pi%panelFlips.length];
         var pCrop=panelCrops[pi%panelCrops.length];
-        drawImageInPanel(ctx,img,r.x,r.y,r.w,r.h,pFilter,panScale,pFlip,pCrop.ox,pCrop.oy);
+        var pImg=(panelImgs[pi]&&panelImgs[pi].complete&&panelImgs[pi].naturalWidth>0)?panelImgs[pi]:img;
+        drawImageInPanel(ctx,pImg,r.x,r.y,r.w,r.h,pFilter,panScale,pFlip,pCrop.ox,pCrop.oy);
 
         if(moodConfig.halftone){
           drawHalftonePattern(ctx,r.x,r.y,r.w,r.h,3,12,moodConfig.halftoneColor,moodConfig.halftoneAlpha);
@@ -1295,6 +1331,7 @@ export function ComicShortGenerator({
   const [sharing, setSharing] = useState(false);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [scenarioPanels, setScenarioPanels] = useState<ComicPanel[]>([]);
+  const [panelImages, setPanelImages] = useState<(string | null)[]>([]);
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioFallback, setScenarioFallback] = useState(false);
   const [episodeMode, setEpisodeMode] = useState(false);
@@ -1689,6 +1726,48 @@ export function ComicShortGenerator({
       }
     }
 
+    let panelImages: (string | null)[] = new Array(panels.length).fill(null);
+    const imagePrompts = panels.map(p => p.imagePrompt).filter(Boolean);
+    if (imagePrompts.length > 0) {
+      setScenarioLoading(true);
+      try {
+        const imageResults = await Promise.all(
+          panels.map(async (panel, idx) => {
+            if (!panel.imagePrompt) return null;
+            const artStyleSuffix = finalArtStyle
+              ? `, ${ART_STYLES[finalArtStyle]?.label || 'webtoon style'}, comic panel illustration`
+              : ', webtoon style, comic panel illustration';
+            const fullPrompt = panel.imagePrompt + artStyleSuffix;
+            const imgResponse = await safeFetch(GENERATE_IMAGE_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${supabaseAnonKey}`,
+              },
+              body: JSON.stringify({
+                prompt: fullPrompt,
+                size: '1024x1024',
+                quality: 'standard',
+                style: 'vivid',
+              }),
+              timeoutMs: 30000,
+            });
+            if (imgResponse.ok) {
+              const imgData = await imgResponse.json();
+              if (imgData.image) {
+                return `data:${imgData.mimeType || 'image/png'};base64,${imgData.image}`;
+              }
+            }
+            return null;
+          })
+        );
+        panelImages = imageResults;
+      } catch {
+        // fall back to original image for all panels
+      }
+      setScenarioLoading(false);
+    }
+
     if (!narrationText) {
       narrationText = panels.map((p) => p.speech).join('. ');
     }
@@ -1776,11 +1855,13 @@ export function ComicShortGenerator({
     setScenarioFallback(finalScenarioFallback);
     setNarrationAudioDataUrl(finalNarrationAudioDataUrl);
     setScenarioPanels(panels);
+    setPanelImages(panelImages);
 
     if (Platform.OS === 'web') {
       try {
         const comicParams = {
           imageUrl: finalImageUrl,
+          panelImages,
           hook,
           title,
           hashtags,
@@ -2126,8 +2207,9 @@ export function ComicShortGenerator({
     emotionOverlay,
     localStoreInfo,
     genId: genIdRef.current,
+    panelImages,
     babyImgUrl: babyImgDataUrl,
-  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, webviewKey, babyImgDataUrl]);
+  }), [safeImageUrl, hook, title, hashtags, accentColor, shortUrl, moodTemplate, panelLayout, affiliatePlatforms, stickerPosition, stickerStyle, stickerSize, scenarioPanels, comicDuration, episodeMode, narrationAudioDataUrl, punchMarkers, punchAudioDataUrl, mbtiMode, mbtiCommentary, emotionOverlay, localStoreInfo, autoDisclosure, webviewKey, babyImgDataUrl, panelImages]);
 
   const webViewSource = useMemo(() => ({ html }), [html]);
 

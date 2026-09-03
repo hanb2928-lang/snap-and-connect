@@ -138,6 +138,7 @@ interface ComicPanel {
   sfx: string;
   emotion: string;
   episodeLabel?: string;
+  imagePrompt?: string;
 }
 
 interface MbtiCommentary {
@@ -297,6 +298,8 @@ async function generateWithOpenAI(
     "- 대사는 일상적이고 자연스러운 한국어 대화체. 과장된 마케팅 톤 절대 금지.\n" +
     "- 효과음은 만화식 의성어(KWAANG!, BOOM!, 촤악!, 번쩍!, 샤방~, 따봉!)를 사용.\n" +
     "- 감정은 해당 패널의 분위기를 한 단어로(예: 고민, 놀람, 행복, 확신, 설렘, 도전, 수다, 감동).\n" +
+    "- 각 패널의 imagePrompt는 해당 장면을 시각적으로 묘사하는 영어 프롬프트야. 제품이 자연스럽게 등장하는 장면을 상세히 묘사해. 예: 'A frustrated young woman sitting at a messy desk surrounded by skincare bottles, warm lighting, webtoon style'\n" +
+    "- imagePrompt는 매 패널마다 서로 다른 장면과 구도를 묘사해야 해. 같은 장면 반복 금지.\n" +
     "- 패널 레이아웃: 정렬된 깔끔한 그리드 피하기. 과장된 표정, 거친 대사 포맷, 고감정 대비 스파이크 활용.\n" +
     "- 펀치라인은 전환 프레임에서 즉시 터져야 한다. 읽는 시간을 마이크로 도파민 히트로.\n" +
     archetypeInjection +
@@ -306,10 +309,10 @@ async function generateWithOpenAI(
     (multiverseMode ? "\n이 만화는 '멀티버스 A/B 결말' 형식이야. 만화 마지막에 시청자가 선택할 수 있는 두 가지 갈림길을 제시해.\nchoicePrompt는 시청자에게 던지는 질문(예: '이 원피스, 데이트룩? vs 오피스룩?')이고,\nendings는 2개의 다른 결말 패널이야. 각 결말은 서로 다른 상황/감정을 보여줘.\n" : "") +
     `정확히 ${panelCount}개의 패널을 만들어.\n` +
     (multiverseMode
-      ? "결과는 JSON만 반환: { \"panels\": [...], \"narrationText\": \"...\", \"multiverse\": { \"choicePrompt\": \"...\", \"endings\": [{ \"label\": \"A결말\", \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\" }, { \"label\": \"B결말\", \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\" }] } }\n"
+      ? "결과는 JSON만 반환: { \"panels\": [{ \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\", \"episodeLabel\": \"...\", \"imagePrompt\": \"English visual description of this panel scene\" }], \"narrationText\": \"...\", \"multiverse\": { \"choicePrompt\": \"...\", \"endings\": [{ \"label\": \"A결말\", \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\" }, { \"label\": \"B결말\", \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\" }] } }\n"
       : mbtiMode
-        ? "결과는 JSON만 반환: { \"panels\": [...], \"narrationText\": \"...\", \"mbtiCommentary\": [{ \"type\": \"...\", \"label\": \"...\", \"comment\": \"...\" }] }\n"
-        : "결과는 JSON만 반환: { \"panels\": [{ \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\", \"episodeLabel\": \"...\" }], \"narrationText\": \"...\" }\n") +
+        ? "결과는 JSON만 반환: { \"panels\": [{ \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\", \"episodeLabel\": \"...\", \"imagePrompt\": \"English visual description of this panel scene\" }], \"narrationText\": \"...\", \"mbtiCommentary\": [{ \"type\": \"...\", \"label\": \"...\", \"comment\": \"...\" }] }\n"
+        : "결과는 JSON만 반환: { \"panels\": [{ \"speech\": \"...\", \"sfx\": \"...\", \"emotion\": \"...\", \"episodeLabel\": \"...\", \"imagePrompt\": \"English visual description of this panel scene\" }], \"narrationText\": \"...\" }\n") +
     "narrationText는 만화 전체를 한 줄로 설명하는 내레이션 문장이야. AI 음성 더빙에 사용될 거야.";
 
   const systemPrompt = buildPsychoSystemPrompt(
@@ -374,6 +377,7 @@ async function generateWithOpenAI(
     sfx: String(p.sfx || "").slice(0, 20),
     emotion: String(p.emotion || "").slice(0, 20),
     episodeLabel: p.episodeLabel ? String(p.episodeLabel).slice(0, 15) : undefined,
+    imagePrompt: p.imagePrompt ? String(p.imagePrompt).slice(0, 500) : undefined,
   }));
 
   if (panels.length < panelCount) {
@@ -436,24 +440,28 @@ function generateLocalScenario(data: ComicScenarioRequest, panelCount: number, m
   const episodeLabels = episodeMode ? ['1일차', '3일차', '7일차'] : [];
   const trendTag = trendingKeywords.length > 0 ? ` #${trendingKeywords[0]}` : '';
 
+  const styleSuffix = data.artStyle ? STYLE_LABELS[data.artStyle] : 'webtoon style';
   const allPanels: ComicPanel[] = [
     {
       speech: `아 ${nameShort} 때문에 고민이었는데…`,
       sfx: '촤악!',
       emotion: '고민',
       episodeLabel: episodeLabels[0],
+      imagePrompt: `A frustrated young person looking troubled while thinking about ${nameShort}, worried expression, everyday life scene, ${styleSuffix}, warm tones`,
     },
     {
       speech: `이거 ${topAdvantage}이라니까? 진짜임?${trendTag}`,
       sfx: '?!',
       emotion: '놀람',
       episodeLabel: episodeLabels[1],
+      imagePrompt: `A surprised person discovering ${nameShort} with ${topAdvantage}, shocked expression, product reveal moment, ${styleSuffix}, vibrant colors`,
     },
     {
       speech: `와 진짜 ${topAdvantage}네. 지금바로 가자!`,
       sfx: 'KWAANG!',
       emotion: '확신',
       episodeLabel: episodeLabels[2],
+      imagePrompt: `A happy confident person holding ${nameShort} with satisfied expression, success pose, ${styleSuffix}, bright cheerful lighting`,
     },
   ];
 
@@ -479,6 +487,7 @@ function generateLocalScenario(data: ComicScenarioRequest, panelCount: number, m
       sfx: 'KWAANG!',
       emotion: '행복',
       episodeLabel: episodeLabels[0],
+      imagePrompt: `A cheerful person excited about ${nameShort}, happy expression, product highlight scene, ${data.artStyle ? STYLE_LABELS[data.artStyle] : 'webtoon style'}, bright lighting`,
     };
   } else if (panelCount === 2) {
     panels[0] = {
@@ -486,12 +495,14 @@ function generateLocalScenario(data: ComicScenarioRequest, panelCount: number, m
       sfx: '촤악!',
       emotion: '고민',
       episodeLabel: episodeLabels[0],
+      imagePrompt: `A worried person contemplating ${nameShort}, troubled expression, ${data.artStyle ? STYLE_LABELS[data.artStyle] : 'webtoon style'}, moody lighting`,
     };
     panels[1] = {
       speech: `이거 ${topAdvantage}! 진짜 추천해${trendTag}`,
       sfx: 'BOOM!',
       emotion: '확신',
       episodeLabel: episodeLabels[1],
+      imagePrompt: `A confident person recommending ${nameShort} with thumbs up, enthusiastic expression, ${data.artStyle ? STYLE_LABELS[data.artStyle] : 'webtoon style'}, vibrant lighting`,
     };
   }
 
