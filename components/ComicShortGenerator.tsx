@@ -417,7 +417,12 @@ async function createComicPanelFromPhoto(
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, 1080, 1080);
 
-    return canvas.toDataURL('image/png');
+    try {
+      return canvas.toDataURL('image/png');
+    } catch (canvasErr) {
+      console.warn(`[ComicShortGenerator] createComicPanelFromPhoto(${panelIndex}) toDataURL blocked (CORS/tainted canvas)`, canvasErr);
+      return null;
+    }
   } catch (e) {
     console.warn(`[ComicShortGenerator] createComicPanelFromPhoto(${panelIndex}) failed`, e);
     return null;
@@ -892,11 +897,15 @@ export function ComicShortGenerator({
                 });
                 if (imgResponse.ok) {
                   const imgData = await imgResponse.json();
-                  const b64 = imgData.image || imgData.b64_json || imgData.imageUrl || imgData.url;
-                  if (b64) {
+                  const b64 = imgData.image || imgData.b64_json || imgData.imageUrl || imgData.url || imgData.data?.[0]?.b64_json;
+                  if (b64 && typeof b64 === 'string') {
                     if (b64.startsWith('data:') || b64.startsWith('http')) return b64;
                     return `data:${imgData.mimeType || 'image/png'};base64,${b64}`;
                   }
+                  console.warn(`[ComicShortGenerator] panel image ${idx} attempt ${attempt}: response missing image field`, Object.keys(imgData));
+                } else {
+                  const errBody = await imgResponse.text().catch(() => '');
+                  console.warn(`[ComicShortGenerator] panel image ${idx} attempt ${attempt}: HTTP ${imgResponse.status}`, errBody.slice(0, 200));
                 }
               } catch (e) {
                 console.warn(`[ComicShortGenerator] panel image ${idx} attempt ${attempt} failed`, e);
@@ -1010,9 +1019,10 @@ export function ComicShortGenerator({
         if (heroImageUrl) {
           const comicPanel = await createComicPanelFromPhoto(heroImageUrl, i, moodConfig);
           if (comicPanel) return comicPanel;
-          return heroImageUrl;
         }
-        return generateGradientFallback(panels[i]?.speech || '', panels[i]?.emotion || '', i) || '';
+        const gradient = generateGradientFallback(panels[i]?.speech || '', panels[i]?.emotion || '', i);
+        if (gradient) return gradient;
+        return '';
       }),
     );
 
