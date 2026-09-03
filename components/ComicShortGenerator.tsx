@@ -330,105 +330,6 @@ function autoDecideConfig(category: string, advantages: string[], artStyleOverri
   return { mood, duration, panelCount, artStyle: style };
 }
 
-const PANEL_TRANSFORMS = [
-  { scale: 1.15, ox: -40, oy: -30, rot: 0 },
-  { scale: 1.25, ox: 60, oy: 40, rot: 2 },
-  { scale: 1.1, ox: -30, oy: 60, rot: -1 },
-];
-
-async function createComicPanelFromPhoto(
-  photoDataUrl: string,
-  panelIndex: number,
-  mood: MoodConfig,
-): Promise<string | null> {
-  if (Platform.OS !== 'web') return null;
-  if (!photoDataUrl || !photoDataUrl.startsWith('data:')) return null;
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new window.Image();
-      el.crossOrigin = 'anonymous';
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error('photo load failed'));
-      el.src = photoDataUrl;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = 1080;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.fillStyle = mood.bgColor;
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    const t = PANEL_TRANSFORMS[panelIndex % PANEL_TRANSFORMS.length];
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    let drawW: number, drawH: number;
-    if (imgAspect > 1) {
-      drawH = 1080 * t.scale;
-      drawW = drawH * imgAspect;
-    } else {
-      drawW = 1080 * t.scale;
-      drawH = drawW / imgAspect;
-    }
-    const dx = (1080 - drawW) / 2 + t.ox;
-    const dy = (1080 - drawH) / 2 + t.oy;
-
-    ctx.save();
-    if (t.rot) {
-      ctx.translate(540, 540);
-      ctx.rotate((t.rot * Math.PI) / 180);
-      ctx.translate(-540, -540);
-    }
-    ctx.filter = mood.filter;
-    ctx.drawImage(img, dx, dy, drawW, drawH);
-    ctx.restore();
-
-    if (mood.overlayColor) {
-      ctx.fillStyle = mood.overlayColor;
-      ctx.fillRect(0, 0, 1080, 1080);
-    }
-
-    if (mood.halftone && mood.halftoneAlpha > 0) {
-      ctx.globalAlpha = mood.halftoneAlpha;
-      ctx.fillStyle = mood.halftoneColor;
-      const dotSpacing = 16;
-      for (let y = 0; y < 1080; y += dotSpacing) {
-        for (let x = 0; x < 1080; x += dotSpacing) {
-          ctx.beginPath();
-          ctx.arc(x, y, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    ctx.strokeStyle = mood.panelBorder;
-    ctx.lineWidth = mood.panelBorderWidth;
-    ctx.strokeRect(
-      mood.panelBorderWidth / 2,
-      mood.panelBorderWidth / 2,
-      1080 - mood.panelBorderWidth,
-      1080 - mood.panelBorderWidth,
-    );
-
-    const vignette = ctx.createRadialGradient(540, 540, 400, 540, 540, 760);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    try {
-      return canvas.toDataURL('image/png');
-    } catch (canvasErr) {
-      console.warn(`[ComicShortGenerator] createComicPanelFromPhoto(${panelIndex}) toDataURL blocked (CORS/tainted canvas)`, canvasErr);
-      return null;
-    }
-  } catch (e) {
-    console.warn(`[ComicShortGenerator] createComicPanelFromPhoto(${panelIndex}) failed`, e);
-    return null;
-  }
-}
-
 function generateGradientFallback(speech: string, emotion: string, panelIndex: number): string {
   if (Platform.OS !== 'web') return '';
   try {
@@ -892,6 +793,10 @@ export function ComicShortGenerator({
                     size: '1024x1024',
                     quality: 'standard',
                     style: 'vivid',
+                    customPrompt: customPrompt.trim() || undefined,
+                    productName,
+                    productCategory,
+                    heroImageDataUrl: heroImageUrl.startsWith('data:') ? heroImageUrl : undefined,
                   }),
                   timeoutMs: 45000,
                 });
@@ -1016,10 +921,6 @@ export function ComicShortGenerator({
     const finalPanelImages = await Promise.all(
       panelImages.map(async (img, i) => {
         if (img) return img;
-        if (heroImageUrl) {
-          const comicPanel = await createComicPanelFromPhoto(heroImageUrl, i, moodConfig);
-          if (comicPanel) return comicPanel;
-        }
         const gradient = generateGradientFallback(panels[i]?.speech || '', panels[i]?.emotion || '', i);
         if (gradient) return gradient;
         return '';
@@ -1047,9 +948,9 @@ export function ComicShortGenerator({
     setState('done');
     setProgress(100);
     if (panelImageErrorCount >= panels.length && panels.length > 0 && imagePrompts.length > 0) {
-      showToast('만화 슬라이드쇼가 완성됐어요! AI 이미지 생성 실패로 상품 사진을 사용했어요.');
+      showToast('만화 슬라이드쇼가 완성됐어요! AI 이미지 생성 실패로 플레이스홀더 카드로 표시됩니다.');
     } else if (panelImageErrorCount > 0 && imagePrompts.length > 0) {
-      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 상품 사진으로 표시됩니다.');
+      showToast('만화 슬라이드쇼가 완성됐어요! 일부 컷은 플레이스홀더로 표시됩니다.');
     } else {
       showToast('만화 슬라이드쇼가 완성됐어요!');
     }
