@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
-import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video, PenLine } from 'lucide-react-native';
+import { ShoppingBag, Send, Globe, Store, ExternalLink, Settings as SettingsIcon, TrendingUp, Link2, Copy, Check, Camera, Image as ImageIcon, Film, Sparkles, FileText, Hash, Type, Youtube, ChevronDown, ChevronUp, Loader, Plus, X, ScanSearch, Palette, Share2, ShieldCheck, TriangleAlert as AlertTriangle, ArrowRight, RefreshCw, Music2, Play, Clapperboard, Download, Video, PenLine, Maximize2, Lock, Zap, Smile, Sun, Moon, Flame, Coffee } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
@@ -36,12 +36,13 @@ import { friendlyError } from '@/lib/errors';
 import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import { addSnippet } from '@/lib/marketingSnippets';
 import { fetchAiRecommendBundle, type AiRecommendBundle } from '@/lib/aiRecommend';
-import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory, getOpenAiVoiceParams } from '@/lib/ttsVoices';
-import { generateEmotionCurve, splitTextForEmotionCurve } from '@/lib/ttsEmotionCurve';
-import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
-import { recordProsodyOutcome, type ProsodyGenerationMeta } from '@/lib/prosodyLearning';
+import { TTS_VOICES, VOICE_CATEGORIES, type VoiceCategory } from '@/lib/ttsVoices';
 import { AidcaProgressTracker } from '@/components/AidcaProgressTracker';
-import { BATCH_TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { InteractiveSlideshowViewer } from '@/components/InteractiveSlideshowViewer';
+import { StickyHeroPreview, type PreviewStep } from '@/components/StickyHeroPreview';
+import { InlineBeforeAfter } from '@/components/InlineBeforeAfter';
+import { FullScreenGalleryModal } from '@/components/FullScreenGalleryModal';
+import { StepGuideBanner, type GuideStepKey } from '@/components/StepGuideBanner';
 import { getDeepLink, getCaptionTemplate, buildPlatformCaption, type UploadPlatformKey, type DisclosurePlacement } from '@/lib/platformUpload';
 import { PlatformCaptionOptimizer } from '@/components/PlatformCaptionOptimizer';
 import { generatePsychAnalysis, generateNanoFusedAnalysis, getLearningStats, type PsychAnalysis, type PsychScene } from '@/lib/psychologyEngine';
@@ -223,6 +224,15 @@ const STEP_META: Record<StepKey, { num: number; color: string }> = {
   publish: { num: 3, color: theme.colors.primary[400] },
 };
 
+const STYLE_PRESETS: { label: string; value: string; icon: typeof Zap }[] = [
+  { label: '힙한 감성', value: '힙하고 트렌디한 인스타 감성', icon: Zap },
+  { label: '깔끔한 제품컷', value: '깔끔하고 고급스러운 제품 중심 연출', icon: Sun },
+  { label: '유머러스', value: '유머러스한 말투와 반말 대사', icon: Smile },
+  { label: '네온사인 배경', value: '네온사인 배경 연출', icon: Moon },
+  { label: '따뜻한 일상', value: '따뜻하고 자연스러운 일상 감성', icon: Coffee },
+  { label: '강렬한 임팩트', value: '강렬하고 시선을 끄는 임팩트 연출', icon: Flame },
+];
+
 export default function AffiliateScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
@@ -266,17 +276,11 @@ export default function AffiliateScreen() {
   const [videoPreviewScenes, setVideoPreviewScenes] = useState<PsychScene[] | null>(null);
   const [previewMediaMode, setPreviewMediaMode] = useState<'video' | 'image'>('video');
   const videoPreviewProgress = useSharedValue(0);
-  const [videoRendering, setVideoRendering] = useState(false);
   const [videoRenderComplete, setVideoRenderComplete] = useState(false);
-  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
-  const [renderedVideoMime, setRenderedVideoMime] = useState<string>('video/webm');
   const [renderError, setRenderError] = useState<string | null>(null);
   const [stockVideoClip, setStockVideoClip] = useState<StockVideoClip | null>(null);
   const [videoEditPlan, setVideoEditPlan] = useState<EditPlan | null>(null);
   const renderProgress = useSharedValue(0);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const prosodyMetaRef = useRef<ProsodyGenerationMeta | null>(null);
-  const videoRenderingRef = useRef(false);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${videoPreviewProgress.value * 100}%`,
@@ -338,12 +342,15 @@ export default function AffiliateScreen() {
   const [previewUpload, setPreviewUpload] = useState<UploadPreviewData | null>(null);
   const [deepLinkFeedback, setDeepLinkFeedback] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
   const [disclosurePlacement, setDisclosurePlacement] = useState<DisclosurePlacement>('body');
   const [showUploadConfirm, setShowUploadConfirm] = useState<string | null>(null);
   const [pendingUploadPlatform, setPendingUploadPlatform] = useState<string | null>(null);
   const [importedMedia, setImportedMedia] = useState<{ uri: string; type: 'video' | 'image'; name: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryInitialTab, setGalleryInitialTab] = useState<'beforeAfter' | 'comic'>('comic');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -671,11 +678,11 @@ export default function AffiliateScreen() {
         const scene = videoPreviewScenes[i];
         if (i < multiImages.length) continue;
         const promptMap: Record<string, string> = {
-          curiosity: `Professional product photography of ${productName}, clean studio lighting, minimalist background, hero shot angle`,
-          shock: `Dramatic close-up shot of ${productName}, high contrast lighting, bold composition, premium product photography`,
-          empathy: `Lifestyle scene with ${productName} being used naturally, warm ambient lighting, authentic moment, soft focus background`,
-          desire: `Luxurious product shot of ${productName}, golden hour lighting, shallow depth of field, aspirational mood, premium aesthetic`,
-          action: `Dynamic product shot of ${productName} with bold colored background, vibrant energy, call-to-action mood, commercial advertising style`,
+          curiosity: `Professional product photography of ${productName}, clean studio lighting, minimalist background, hero shot angle${customPrompt.trim() ? `, ${customPrompt.trim()}` : ''}`,
+          shock: `Dramatic close-up shot of ${productName}, high contrast lighting, bold composition, premium product photography${customPrompt.trim() ? `, ${customPrompt.trim()}` : ''}`,
+          empathy: `Lifestyle scene with ${productName} being used naturally, warm ambient lighting, authentic moment, soft focus background${customPrompt.trim() ? `, ${customPrompt.trim()}` : ''}`,
+          desire: `Luxurious product shot of ${productName}, golden hour lighting, shallow depth of field, aspirational mood, premium aesthetic${customPrompt.trim() ? `, ${customPrompt.trim()}` : ''}`,
+          action: `Dynamic product shot of ${productName} with bold colored background, vibrant energy, call-to-action mood, commercial advertising style${customPrompt.trim() ? `, ${customPrompt.trim()}` : ''}`,
         };
         const prompt = promptMap[scene.emotion] || `Professional product photography of ${productName}, ${productDesc}`;
         prompts.push(prompt);
@@ -849,28 +856,23 @@ export default function AffiliateScreen() {
   const [videoSaved, setVideoSaved] = useState(false);
 
   const handleSaveRenderedVideo = useCallback(async () => {
-    if (!renderedVideoUrl) return;
+    if (!videoPreviewScenes) return;
     setSavingVideo(true);
     setVideoSaved(false);
     try {
       if (Platform.OS === 'web') {
-        const ext = renderedVideoMime.includes('mp4') ? 'mp4' : 'webm';
-        const a = document.createElement('a');
-        a.href = renderedVideoUrl;
-        a.download = `snapconnect-${Date.now()}.${ext}`;
-        a.click();
+        const allImages = [...multiImages.map((m) => m.uri), ...aiSceneImages];
+        for (let i = 0; i < allImages.length; i++) {
+          try {
+            const a = document.createElement('a');
+            a.href = allImages[i];
+            a.download = `snapconnect-cut-${i + 1}-${Date.now()}.png`;
+            a.click();
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          } catch { /* skip failed download */ }
+        }
         setVideoSaved(true);
         setTimeout(() => setVideoSaved(false), 3000);
-        if (prosodyMetaRef.current) {
-          recordProsodyOutcome({
-            generationMeta: prosodyMetaRef.current,
-            completed: true,
-            retried: false,
-            shared: true,
-            durationSec: 0,
-          }).catch(() => {});
-        }
-        // Auto-copy short URL + disclosure caption to clipboard
         if (affiliateUrl.trim()) {
           const built = buildPlatformCaption(
             (selectedUploadPlatform ?? 'instagram') as UploadPlatformKey,
@@ -882,58 +884,13 @@ export default function AffiliateScreen() {
           );
           try { await navigator.clipboard.writeText(built.fullText); } catch { /* clipboard best-effort */ }
         }
-        return;
       }
-      const FileSystem = await import('expo-file-system/legacy');
-      const MediaLibrary = await import('expo-media-library');
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '갤러리에 저장하려면 미디어 접근 권한이 필요합니다. 설정에서 허용해주세요.', [
-          { text: '설정으로', onPress: () => Linking.openSettings() },
-          { text: '취소', style: 'cancel' },
-        ]);
-        return;
-      }
-      const fileName = `snapconnect_${Date.now()}.mp4`;
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      const downloadRes = await FileSystem.downloadAsync(renderedVideoUrl, fileUri);
-      if (downloadRes.status !== 200) {
-        throw new Error('영상 다운로드에 실패했습니다.');
-      }
-      const asset = await MediaLibrary.createAssetAsync(downloadRes.uri);
-      await MediaLibrary.createAlbumAsync('SnapConnect', asset, false);
-      setVideoSaved(true);
-      setTimeout(() => setVideoSaved(false), 3000);
-      if (prosodyMetaRef.current) {
-        recordProsodyOutcome({
-          generationMeta: prosodyMetaRef.current,
-          completed: true,
-          retried: false,
-          shared: true,
-          durationSec: 0,
-        }).catch(() => {});
-      }
-      // Auto-copy short URL + disclosure caption to clipboard
-      if (affiliateUrl.trim()) {
-        const built = buildPlatformCaption(
-          (selectedUploadPlatform ?? 'instagram') as UploadPlatformKey,
-          contentText,
-          affiliateUrl,
-          selectedPlatform ? [selectedPlatform] : [],
-          autoDisclosure,
-          disclosurePlacement,
-        );
-        try {
-          const { default: Clipboard } = await import('expo-clipboard');
-          await Clipboard.setStringAsync(built.fullText);
-        } catch { /* clipboard best-effort */ }
-      }
-    } catch (err) {
-      Alert.alert('저장 실패', err instanceof Error ? err.message : '갤러리 저장 중 오류가 발생했습니다.');
+    } catch {
+      // download failed
     } finally {
       setSavingVideo(false);
     }
-  }, [renderedVideoUrl, renderedVideoMime, affiliateUrl, contentText, selectedUploadPlatform, selectedPlatform, autoDisclosure, disclosurePlacement]);
+  }, [videoPreviewScenes, multiImages, aiSceneImages, affiliateUrl, contentText, selectedUploadPlatform, selectedPlatform, autoDisclosure, disclosurePlacement]);
 
   const handleCopyText = async (text: string) => {
     try {
@@ -966,7 +923,10 @@ export default function AffiliateScreen() {
         await Clipboard.setStringAsync(script);
       }
       setCopyFeedback(key);
+      const platformLabel = UPLOAD_PLATFORMS.find((p) => p.key === key)?.label ?? '플랫폼';
+      setCopyToast(`링크와 홍보 문구가 복사되었습니다! ${platformLabel} 앱을 열어 붙여넣으세요`);
       setTimeout(() => setCopyFeedback(null), 2000);
+      setTimeout(() => setCopyToast(null), 4000);
     } catch {
       // clipboard failed
     }
@@ -979,10 +939,13 @@ export default function AffiliateScreen() {
 
   const handleConfirmUploadComplete = () => {
     if (!showUploadConfirm) return;
+    const platformLabel = UPLOAD_PLATFORMS.find((p) => p.key === showUploadConfirm)?.label ?? '플랫폼';
     setUploadedPlatforms((prev) => new Set(prev).add(showUploadConfirm));
     setUploadPlatform(showUploadConfirm);
     setShowUploadConfirm(null);
     setPendingUploadPlatform(null);
+    setCopyToast(`${platformLabel} 발행 완료! 수고하셨습니다. 제휴 링크를 통해 수익이 발생하면 여기에 표시됩니다.`);
+    setTimeout(() => setCopyToast(null), 5000);
     markCompleted('publish');
   };
 
@@ -1073,939 +1036,47 @@ export default function AffiliateScreen() {
     return getDisclosureForPlatforms(platforms, autoDisclosure);
   }, [selectedPlatform, autoDisclosure]);
 
-  const generatePreviewVideo = useCallback(async (quality: 'preview' | 'high' = 'high') => {
-    if (Platform.OS !== 'web') {
-      setRenderError('웹 브라우저에서만 영상 생성이 가능합니다.');
-      return;
-    }
+  const heroPreviewStep: PreviewStep = useMemo(() => {
+    if (videoRenderComplete && videoPreviewScenes && videoPreviewScenes.length > 0) return 'comic';
+    if (imagePreviewUri && (completedSteps.has('upload') || aiSceneImages.length > 0)) return 'edited';
+    if (imagePreviewUri) return 'photo';
+    return 'idle';
+  }, [videoRenderComplete, videoPreviewScenes, imagePreviewUri, completedSteps, aiSceneImages]);
+
+  const gallerySceneImages = useMemo(() => {
+    if (!sceneImageMap) return undefined;
+    const allImgs = [...multiImages.map((m) => m.uri), ...aiSceneImages];
+    return sceneImageMap.map((idx) => allImgs[idx] ?? null);
+  }, [sceneImageMap, multiImages, aiSceneImages]);
+
+  const comicFirstImage = useMemo(() => {
+    if (!gallerySceneImages) return null;
+    return gallerySceneImages.find((img) => img !== null) ?? null;
+  }, [gallerySceneImages]);
+
+  const openGallery = useCallback((tab: 'beforeAfter' | 'comic') => {
+    setGalleryInitialTab(tab);
+    setGalleryVisible(true);
+  }, []);
+
+  const guideStep: GuideStepKey = useMemo(() => {
+    if (completedSteps.has('publish')) return 'complete';
+    if (completedSteps.has('upload') && !videoRenderComplete) return 'publish';
+    if (videoRenderComplete && videoPreviewScenes && videoPreviewScenes.length > 0) return 'comic';
+    if (completedSteps.has('platform')) return 'upload';
+    if (imagePreviewUri) return 'upload';
+    return 'platform';
+  }, [completedSteps, videoRenderComplete, videoPreviewScenes, imagePreviewUri]);
+
+  const generatePreviewVideo = useCallback(async (_quality: 'preview' | 'high' = 'high') => {
     if (!videoPreviewScenes) {
       setRenderError('먼저 스토리보드를 생성해주세요.');
       return;
     }
-    if (videoRenderingRef.current) return;
-    videoRenderingRef.current = true;
-    const isPreview = quality === 'preview';
+    setVideoRenderComplete(true);
+    renderProgress.value = 1;
+  }, [videoPreviewScenes, renderProgress]);
 
-    setVideoRendering(true);
-    setVideoRenderComplete(false);
-    setRenderError(null);
-    setRenderedVideoUrl(null);
-    renderProgress.value = 0;
-
-    try {
-      // Load all available images: user multi-angle photos + AI-generated scene images
-      const allImageUris = [...multiImages.map((m) => m.uri), ...aiSceneImages];
-      const sceneImgs: (HTMLImageElement | null)[] = [];
-
-      if (allImageUris.length > 0 && sceneImageMap) {
-        const uniqueUris = [...new Set(allImageUris)];
-        const loadedImgs = await Promise.all(
-          uniqueUris.map(async (uri): Promise<HTMLImageElement | null> => {
-            try {
-              const { urlToDataUrl } = await import('@/lib/base64');
-              const safeUri = await urlToDataUrl(uri);
-              return await new Promise<HTMLImageElement>((resolve, reject) => {
-                const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-                el.crossOrigin = 'anonymous';
-                el.onload = () => {
-                  if (el.complete && el.naturalWidth > 0) {
-                    resolve(el);
-                  } else {
-                    reject(new Error('이미지 디코딩 실패 - 빈 프레임'));
-                  }
-                };
-                el.onerror = () => reject(new Error('이미지 로드 실패'));
-                el.src = safeUri;
-              });
-            } catch {
-              return null;
-            }
-          }),
-        );
-        const uriToImg = new Map(uniqueUris.map((uri, i) => [uri, loadedImgs[i]]));
-        for (const uri of allImageUris) {
-          sceneImgs.push(uriToImg.get(uri) ?? null);
-        }
-      }
-
-      // Fallback: load single image if no multi-images
-      let fallbackImg: HTMLImageElement | null = null;
-      if (sceneImgs.length === 0 && imagePreviewUri) {
-        try {
-          const { urlToDataUrl } = await import('@/lib/base64');
-          const safeImageUrl = await urlToDataUrl(imagePreviewUri);
-          fallbackImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const el = new (global as unknown as { Image: typeof HTMLImageElement }).Image();
-            el.crossOrigin = 'anonymous';
-            el.onload = () => {
-              if (el.complete && el.naturalWidth > 0) {
-                resolve(el);
-              } else {
-                reject(new Error('이미지 디코딩 실패 - 빈 프레임'));
-              }
-            };
-            el.onerror = () => reject(new Error('이미지 로드 실패'));
-            el.src = safeImageUrl;
-          });
-        } catch {
-          fallbackImg = null;
-        }
-      }
-
-      // Load stock video clip as background layer (upper tile)
-      // Load directly via URL — Pexels CDN supports CORS, so canvas can draw frames
-      let stockVid: HTMLVideoElement | null = null;
-      if (stockVideoClip?.videoUrl) {
-        try {
-          stockVid = await new Promise<HTMLVideoElement>((resolve, reject) => {
-            const el = document.createElement('video');
-            el.crossOrigin = 'anonymous';
-            el.muted = true;
-            el.loop = true;
-            el.playsInline = true;
-            el.preload = 'auto';
-            el.oncanplay = () => { el.play().then(() => resolve(el)).catch(() => resolve(el)); };
-            el.onerror = () => reject(new Error('스톡 영상 로드 실패'));
-            el.src = stockVideoClip!.videoUrl;
-            setTimeout(() => reject(new Error('스톡 영상 로드 시간 초과')), 20000);
-          });
-        } catch {
-          stockVid = null;
-        }
-      }
-
-      const analysis = viralAnalysisResult;
-      const specsRatio = analysis?.specs.ratio ?? '9:16';
-      const isPortrait = specsRatio.includes('9:16') || specsRatio.includes('16:9') === false;
-      const W = isPortrait ? (isPreview ? 540 : 1080) : (isPreview ? 960 : 1920);
-      const H = isPortrait ? (isPreview ? 960 : 1920) : (isPreview ? 540 : 1080);
-      const FPS = isPreview ? 24 : 30;
-      const totalSec = parseInt(analysis?.specs.maxDuration ?? '60', 10) || 60;
-      const DURATION = isPreview ? Math.min(totalSec, 30) : Math.min(totalSec, 60);
-      const cg = analysis?.colorGrading ?? { warm: 10, contrast: 20, saturation: 15, vignette: 30 };
-      const bpm = analysis?.pacingBpm ?? 100;
-
-      const canvas = document.createElement('canvas');
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('캔버스를 생성할 수 없습니다.');
-
-      // Set up audio context for BGM + TTS voiceover (high-quality only — preview skips audio for speed)
-      let audioCtx: AudioContext | null = null;
-      let audioDest: MediaStreamAudioDestinationNode | null = null;
-      let bgmOsc: OscillatorNode | null = null;
-      let melodyOsc: OscillatorNode | null = null;
-      let bgmOscGain: GainNode | null = null;
-      let melodyGain: GainNode | null = null;
-      let preloadedTtsBuffers: { buffer: AudioBuffer; offset: number }[] = [];
-
-      if (!isPreview) {
-      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      audioDest = audioCtx.createMediaStreamDestination();
-      const masterGain = audioCtx.createGain();
-      masterGain.gain.value = 0.7;
-      masterGain.connect(audioDest);
-      masterGainRef.current = masterGain;
-
-      // BGM oscillators created but not started — started after recording begins for sync
-      const bgmGain = audioCtx.createGain();
-      bgmGain.gain.value = 0.15;
-      bgmGain.connect(masterGain);
-
-      bgmOsc = audioCtx.createOscillator();
-      bgmOscGain = audioCtx.createGain();
-      bgmOsc.type = 'sine';
-      bgmOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 80 : selectedUploadPlatform === 'instagram' ? 60 : 70;
-      bgmOsc.connect(bgmOscGain);
-      bgmOscGain.gain.value = 0;
-      bgmOsc.connect(bgmGain);
-      bgmOscGain.connect(bgmGain);
-
-      melodyOsc = audioCtx.createOscillator();
-      melodyGain = audioCtx.createGain();
-      melodyOsc.type = 'triangle';
-      melodyOsc.frequency.value = selectedUploadPlatform === 'tiktok' ? 220 : selectedUploadPlatform === 'instagram' ? 165 : 196;
-      melodyGain.gain.value = 0;
-      melodyOsc.connect(melodyGain);
-      melodyGain.connect(bgmGain);
-      } // end audio setup (high-quality only)
-
-      // Detect tainted canvas before rendering — if crossOrigin images lacked CORS headers,
-      // getImageData throws SecurityError here instead of silently producing a black video
-      if (stockVid || sceneImgs.some((img) => img !== null) || fallbackImg) {
-        try {
-          ctx.fillRect(0, 0, 1, 1);
-          ctx.getImageData(0, 0, 1, 1);
-        } catch {
-          throw new Error('이미지 CORS 권한 문제로 영상을 생성할 수 없습니다. 다른 이미지를 사용해주세요.');
-        }
-      }
-
-      // Pre-generate TTS audio buffers (for later playback alongside video)
-      const scenes = videoPreviewScenes!;
-      const totalScenes = scenes.length;
-      let ttsAudioDataUrl: string | null = null;
-      if (!isPreview && audioCtx) {
-        try {
-          const narrationText = scenes.map(s => s.textOverlay).join('. ');
-          if (narrationText.trim()) {
-            const voiceKey = selectedVoiceKey ?? settings?.default_tts_voice ?? 'bright_female_1';
-            const voiceParams = getOpenAiVoiceParams(voiceKey, settings?.tts_speed ?? null);
-            const prosodyProfile = mapVoiceKeyToProsody(voiceKey);
-            const emotionCurve = generateEmotionCurve(DURATION, prosodyProfile);
-            const segments = splitTextForEmotionCurve(
-              narrationText,
-              emotionCurve,
-              voiceParams.voice,
-              voiceParams.instructions,
-              prosodyProfile,
-            );
-            const prosodyMeta: ProsodyGenerationMeta = {
-              voiceKey,
-              prosodyProfileId: prosodyProfile.id,
-              phase: 'full',
-              speed: segments[0]?.speed ?? 1.0,
-              timestamp: Date.now(),
-              textLength: narrationText.length,
-            };
-            prosodyMetaRef.current = prosodyMeta;
-            const batchItems = segments.map((seg) => ({
-              languageCode: 'ko',
-              text: seg.text,
-              voice: seg.voice,
-              instructions: seg.instructions,
-              speed: seg.speed,
-            }));
-            const ttsResp = await fetch(BATCH_TTS_FUNCTION_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${supabaseAnonKey}`,
-                apikey: supabaseAnonKey,
-              },
-              body: JSON.stringify({ items: batchItems, ttsApiKey: settings?.tts_api_key ?? undefined }),
-            });
-            if (ttsResp.ok) {
-              const ttsData = await ttsResp.json() as { results: Array<{ audioBase64: string; error?: string }> };
-              for (const result of ttsData.results) {
-                if (!result.audioBase64 || result.error) continue;
-                try {
-                  const audioBytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
-                  const audioBuf = await audioCtx.decodeAudioData(audioBytes.buffer.slice(0));
-                  preloadedTtsBuffers.push({ buffer: audioBuf, offset: 0.2 });
-                } catch { /* skip failed segment decode */ }
-              }
-            }
-          }
-        } catch { /* TTS is optional */ }
-      }
-
-      // Compute base dimensions for each scene image
-      const getBaseDims = (imgEl: HTMLImageElement | null) => {
-        if (!imgEl) return { baseW: W, baseH: H };
-        const imgAspect = imgEl.naturalWidth / imgEl.naturalHeight;
-        const canvasAspect = W / H;
-        if (imgAspect > canvasAspect) return { baseW: W, baseH: W / imgAspect };
-        return { baseH: H, baseW: H * imgAspect };
-      };
-
-      const sceneDuration = DURATION / totalScenes;
-
-      const applyColorGrading = (brightness: number, contrast: number, saturation: number) => {
-        ctx.filter = `brightness(${brightness}) contrast(${1 + contrast}) saturate(${1 + saturation})`;
-      };
-      const resetFilter = () => { ctx.filter = 'none'; };
-
-      const getMotionTransform = (motionType: PsychScene['motionType'], t: number, baseW: number, baseH: number) => {
-        switch (motionType) {
-          case 'zoom-in': return { scale: 1.0 + t * 0.35, offsetX: 0, offsetY: 0 };
-          case 'zoom-out': return { scale: 1.35 - t * 0.35, offsetX: 0, offsetY: 0 };
-          case 'pan-right': return { scale: 1.2, offsetX: -baseW * 0.15 * t, offsetY: 0 };
-          case 'pan-left': return { scale: 1.2, offsetX: baseW * 0.15 * t, offsetY: 0 };
-          case 'tilt-up': return { scale: 1.2, offsetX: 0, offsetY: baseH * 0.15 * t };
-          case 'shake': return { scale: 1.1 + t * 0.1, offsetX: Math.sin(t * Math.PI * 8) * 12, offsetY: Math.cos(t * Math.PI * 6) * 8 };
-          case 'pulse': return { scale: 1.0 + Math.sin(t * Math.PI * 3) * 0.08, offsetX: 0, offsetY: 0 };
-          default: return { scale: 1.0 + t * 0.2, offsetX: 0, offsetY: 0 };
-        }
-      };
-
-      const getTextY = (position: PsychScene['textPosition']) => {
-        if (position === 'top') return H * 0.12;
-        if (position === 'center') return H * 0.42;
-        return H * 0.72;
-      };
-
-      // TV commercial style: advanced transitions between scenes
-      const getSceneTransitionAlpha = (localT: number, sceneIdx: number) => {
-        const fadeIn = Math.min(localT * 8, 1);
-        const fadeOut = Math.min((1 - localT) * 8, 1);
-        const cutFlash = localT < 0.05 ? 1 - localT * 20 : 0;
-        return Math.min(fadeIn * fadeOut + cutFlash * 0.3, 1);
-      };
-
-      // Advanced transition effects: whip pan, zoom blur, glitch, match cut
-      const drawTransitionEffect = (
-        transitionType: 'whip-pan' | 'zoom-blur' | 'glitch' | 'match-cut' | 'cross-fade',
-        localT: number,
-        sceneIdx: number,
-      ) => {
-        if (localT > 0.15 && localT < 0.85) return; // Only at boundaries
-
-        const isEnter = localT < 0.15;
-        const t = isEnter ? localT / 0.15 : (1 - localT) / 0.15;
-
-        switch (transitionType) {
-          case 'whip-pan': {
-            const blurX = isEnter ? (1 - t) * 80 : t * 80;
-            ctx.filter = `blur(${blurX}px)`;
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = '#0a0f1e';
-            ctx.fillRect(0, 0, W, H);
-            ctx.filter = 'none';
-            ctx.globalAlpha = 1;
-            break;
-          }
-          case 'zoom-blur': {
-            const scale = isEnter ? 1 + (1 - t) * 0.3 : 1 + t * 0.3;
-            ctx.filter = `blur(${(1 - t) * 6}px)`;
-            ctx.globalAlpha = 0.4;
-            ctx.fillRect(0, 0, W, H);
-            ctx.filter = 'none';
-            ctx.globalAlpha = 1;
-            break;
-          }
-          case 'glitch': {
-            if (t > 0.3) {
-              const glitchY = Math.random() * H;
-              const glitchH = 20 + Math.random() * 40;
-              ctx.globalAlpha = 0.6 * (1 - t);
-              ctx.fillStyle = '#ff0044';
-              ctx.fillRect(0, glitchY, W, glitchH);
-              ctx.fillStyle = '#00ffff';
-              ctx.fillRect(-10 + Math.random() * 20, glitchY, W, glitchH);
-              ctx.globalAlpha = 1;
-            }
-            break;
-          }
-          case 'match-cut': {
-            const flash = isEnter ? (1 - t) * 0.3 : t * 0.3;
-            ctx.fillStyle = `rgba(255,255,255,${flash})`;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-          case 'cross-fade':
-          default: {
-            // Standard cross-fade handled by transitionAlpha
-            break;
-          }
-        }
-      };
-
-      // Assign transition types to scene boundaries (cycling through)
-      const transitionTypes: Array<'whip-pan' | 'zoom-blur' | 'glitch' | 'match-cut' | 'cross-fade'> = ['whip-pan', 'zoom-blur', 'glitch', 'match-cut', 'cross-fade'];
-
-      // Emotion-specific overlay rendering — TV commercial style
-      const drawEmotionOverlay = (
-        emotion: PsychScene['emotion'],
-        localT: number,
-        color: { primary: string; accent: string; overlay: string },
-      ) => {
-        switch (emotion) {
-          case 'curiosity': {
-            const spotR = W * (0.3 + localT * 0.25);
-            const spotGrad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, spotR);
-            spotGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            spotGrad.addColorStop(1, color.overlay);
-            ctx.fillStyle = spotGrad;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-          case 'shock': {
-            const flashIntensity = Math.max(0, 1 - localT * 3) * 0.4;
-            ctx.fillStyle = `rgba(255,40,40,${flashIntensity})`;
-            ctx.fillRect(0, 0, W, H);
-            const shockVignette = ctx.createRadialGradient(W / 2, H / 2, W * 0.2, W / 2, H / 2, W * 0.6);
-            shockVignette.addColorStop(0, 'rgba(0,0,0,0)');
-            shockVignette.addColorStop(1, `rgba(20,0,0,${0.5 + localT * 0.2})`);
-            ctx.fillStyle = shockVignette;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-          case 'empathy': {
-            const warmth = 0.15 + Math.sin(localT * Math.PI) * 0.1;
-            const warmGrad = ctx.createLinearGradient(0, H * 0.3, 0, H);
-            warmGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            warmGrad.addColorStop(0.5, `rgba(255,200,100,${warmth * 0.3})`);
-            warmGrad.addColorStop(1, `rgba(255,180,80,${warmth * 0.5})`);
-            ctx.fillStyle = warmGrad;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-          case 'desire': {
-            const desireGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.1, W / 2, H / 2, W * 0.65);
-            desireGrad.addColorStop(0, 'rgba(0,0,0,0)');
-            desireGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
-            desireGrad.addColorStop(1, `rgba(15,5,0,${0.6 + localT * 0.2})`);
-            ctx.fillStyle = desireGrad;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-          case 'action': {
-            const pulse = Math.sin(localT * Math.PI * 4) * 0.5 + 0.5;
-            const borderW = 8 + pulse * 6;
-            ctx.strokeStyle = color.accent;
-            ctx.lineWidth = borderW;
-            ctx.globalAlpha = 0.6 + pulse * 0.3;
-            ctx.strokeRect(borderW / 2, borderW / 2, W - borderW, H - borderW);
-            ctx.globalAlpha = 1;
-            const actionGrad = ctx.createLinearGradient(0, H, 0, H * 0.7);
-            actionGrad.addColorStop(0, color.primary + '50');
-            actionGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = actionGrad;
-            ctx.fillRect(0, 0, W, H);
-            break;
-          }
-        }
-      };
-
-      // Draw decorative particles for text-only scenes
-      const drawDecorativeElements = (
-        emotion: PsychScene['emotion'],
-        localT: number,
-        color: { primary: string; accent: string },
-      ) => {
-        const particleCount = emotion === 'shock' ? 12 : emotion === 'action' ? 8 : 6;
-        for (let i = 0; i < particleCount; i++) {
-          const seed = i * 137.5;
-          const angle = (seed + localT * 180) * (Math.PI / 180);
-          const radius = W * (0.15 + (i % 3) * 0.12) + Math.sin(localT * Math.PI * 2 + seed) * 30;
-          const px = W / 2 + Math.cos(angle) * radius;
-          const py = H / 2 + Math.sin(angle) * radius * 0.6;
-          const size = 3 + Math.sin(localT * Math.PI * 3 + seed) * 2;
-          ctx.globalAlpha = 0.15 + Math.sin(localT * Math.PI * 2 + seed) * 0.1;
-          ctx.fillStyle = i % 2 === 0 ? color.primary : color.accent;
-          ctx.beginPath();
-          ctx.arc(px, py, size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-      };
-
-      // TV commercial style: draw a quick brand bumper between scenes
-      const drawBrandBumper = (alpha: number) => {
-        if (alpha <= 0) return;
-        ctx.globalAlpha = alpha * 0.8;
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#fff';
-        ctx.font = '900 64px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 20;
-        ctx.fillText(productMeta?.productName || 'CHECK THIS OUT', W / 2, H / 2);
-        ctx.shadowColor = 'transparent';
-        ctx.globalAlpha = 1;
-      };
-
-      // AIDCA phase boundaries (seconds): hook 0-3, trust 3-(D-2), closing (D-2)-D
-      const HOOK_END = Math.min(3, DURATION * 0.2);
-      const CLOSING_START = DURATION - 2;
-      const TRUST_END = CLOSING_START;
-
-      const renderFrame = (drawCtx: CanvasRenderingContext2D, globalT: number) => {
-        const pct = Math.round(globalT * 100);
-        const elapsedSec = globalT * DURATION;
-
-        // AIDCA phase determination
-        const isHookPhase = elapsedSec < HOOK_END;
-        const isClosingPhase = elapsedSec >= CLOSING_START;
-        const isTrustPhase = !isHookPhase && !isClosingPhase;
-
-        const sceneIdx = Math.min(Math.floor(globalT * totalScenes), totalScenes - 1);
-        const scene = scenes[sceneIdx];
-        const sceneLocalT = (globalT * totalScenes) - sceneIdx;
-        const transitionAlpha = getSceneTransitionAlpha(sceneLocalT, sceneIdx);
-
-        ctx.fillStyle = '#0a0f1e';
-        ctx.fillRect(0, 0, W, H);
-
-        // ── HYBRID LAYER: Stock video background (upper tile) ──
-        if (stockVid && isHookPhase) {
-          const stockT = (elapsedSec / HOOK_END);
-          const stockZoom = 1.05 + Math.sin(stockT * Math.PI) * 0.08;
-          const sw = W * stockZoom;
-          const sh = H * stockZoom;
-          const sx = (W - sw) / 2;
-          const sy = (H - sh) / 2;
-          ctx.globalAlpha = 0.9;
-          applyColorGrading(1.0 + cg.warm * 0.003, cg.contrast * 0.005, cg.saturation * 0.005);
-          try { ctx.drawImage(stockVid, sx, sy, sw, sh); } catch { /* video not ready */ }
-          resetFilter();
-          ctx.globalAlpha = 1;
-        } else if (stockVid && isTrustPhase) {
-          // Trust phase: stock video as dimmed background, product image on top
-          const trustT = (elapsedSec - HOOK_END) / (TRUST_END - HOOK_END);
-          const stockZoom = 1.1 + trustT * 0.15;
-          const sw = W * stockZoom;
-          const sh = H * stockZoom;
-          const sx = (W - sw) / 2;
-          const sy = (H - sh) / 2 - H * 0.1 * trustT;
-          ctx.globalAlpha = 0.35;
-          try { ctx.drawImage(stockVid, sx, sy, sw, sh); } catch { /* video not ready */ }
-          ctx.globalAlpha = 1;
-        }
-
-        if (scene) {
-          // Determine which image to use for this scene
-          let sceneImg: HTMLImageElement | null = null;
-          if (sceneImageMap && sceneImgs.length > 0) {
-            const imgIdx = sceneImageMap[sceneIdx] ?? 0;
-            sceneImg = sceneImgs[imgIdx] ?? null;
-          } else if (fallbackImg) {
-            sceneImg = fallbackImg;
-          }
-
-          // TV commercial: show brand bumper at start of first scene
-          if (sceneIdx === 0 && sceneLocalT < 0.08) {
-            drawBrandBumper(1 - sceneLocalT * 12);
-          }
-
-          if (sceneImg) {
-            // Multi-angle / AI-generated image scene with motion
-            const { baseW, baseH } = getBaseDims(sceneImg);
-            const motion = getMotionTransform(scene.motionType, sceneLocalT, baseW, baseH);
-            const drawW = baseW * motion.scale;
-            const drawH = baseH * motion.scale;
-            const drawX = (W - drawW) / 2 + motion.offsetX;
-            const drawY = (H - drawH) / 2 + motion.offsetY;
-
-            // During trust phase with stock video: composite product image as lower tile (bottom 60%)
-            if (stockVid && isTrustPhase) {
-              const trustT = (elapsedSec - HOOK_END) / (TRUST_END - HOOK_END);
-              const slideIn = Math.min(trustT * 3, 1);
-              const overlayH = H * 0.6;
-              const overlayY = H * 0.4 + (1 - slideIn) * overlayH;
-              const { baseW: pBaseW, baseH: pBaseH } = getBaseDims(sceneImg);
-              const pScale = Math.min(W / pBaseW, overlayH / pBaseH) * motion.scale;
-              const pDrawW = pBaseW * pScale;
-              const pDrawH = pBaseH * pScale;
-              const pDrawX = (W - pDrawW) / 2 + motion.offsetX * 0.3;
-              const pDrawY = overlayY + (overlayH - pDrawH) / 2;
-
-              // Gradient blend at top of product image
-              const blendGrad = ctx.createLinearGradient(0, overlayY - 20, 0, overlayY + 40);
-              blendGrad.addColorStop(0, 'rgba(10,15,30,0)');
-              blendGrad.addColorStop(1, 'rgba(10,15,30,0.8)');
-              ctx.fillStyle = blendGrad;
-              ctx.fillRect(0, overlayY - 20, W, 60);
-
-              ctx.globalAlpha = transitionAlpha * slideIn;
-              applyColorGrading(1.0 + cg.warm * 0.003, cg.contrast * 0.005, cg.saturation * 0.005);
-              ctx.drawImage(sceneImg, pDrawX, pDrawY, pDrawW, pDrawH);
-              resetFilter();
-              ctx.globalAlpha = 1;
-            } else {
-              ctx.globalAlpha = transitionAlpha;
-              applyColorGrading(
-                1.0 + cg.warm * 0.003,
-                cg.contrast * 0.005,
-                cg.saturation * 0.005,
-              );
-              ctx.drawImage(sceneImg, drawX, drawY, drawW, drawH);
-              resetFilter();
-              ctx.globalAlpha = 1;
-            }
-          } else {
-            // Text-only story scene: gradient background + decorative elements
-            const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-            bgGrad.addColorStop(0, scene.colorTheme.primary + '30');
-            bgGrad.addColorStop(0.5, scene.colorTheme.accent + '20');
-            bgGrad.addColorStop(1, '#0a0f1e');
-            ctx.fillStyle = bgGrad;
-            ctx.fillRect(0, 0, W, H);
-
-            ctx.globalAlpha = transitionAlpha;
-            drawDecorativeElements(scene.emotion, sceneLocalT, scene.colorTheme);
-            ctx.globalAlpha = 1;
-          }
-
-          // Advanced transition effect at scene boundaries
-          if (sceneIdx > 0) {
-            const transitionType = transitionTypes[sceneIdx % transitionTypes.length];
-            drawTransitionEffect(transitionType, sceneLocalT, sceneIdx);
-          }
-
-          // Emotion-specific overlay
-          ctx.globalAlpha = transitionAlpha;
-          drawEmotionOverlay(scene.emotion, sceneLocalT, scene.colorTheme);
-          ctx.globalAlpha = 1;
-
-          // Standard color overlay
-          const overlayGrad = ctx.createLinearGradient(0, 0, 0, H);
-          const overlayColor = scene.colorTheme.overlay;
-          overlayGrad.addColorStop(0, overlayColor);
-          overlayGrad.addColorStop(0.4, 'rgba(10,15,30,0.2)');
-          overlayGrad.addColorStop(1, overlayColor);
-          ctx.fillStyle = overlayGrad;
-          ctx.globalAlpha = transitionAlpha * 0.7;
-          ctx.fillRect(0, 0, W, H);
-          ctx.globalAlpha = 1;
-
-          // Vignette
-          const vignetteGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
-          vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
-          vignetteGrad.addColorStop(1, `rgba(0,0,0,${cg.vignette * 0.01})`);
-          ctx.fillStyle = vignetteGrad;
-          ctx.fillRect(0, 0, W, H);
-
-          // Kinetic caption animation: word-by-word reveal with bounce
-          ctx.globalAlpha = transitionAlpha;
-          const textY = getTextY(scene.textPosition);
-          const words = scene.textOverlay.split(' ');
-          const totalWords = words.length;
-          // Reveal words progressively: each word appears at 1/totalWords of scene duration
-          const wordsRevealed = Math.min(Math.floor(sceneLocalT * totalWords * 1.5) + 1, totalWords);
-
-          ctx.font = `900 ${scene.fontSize}px sans-serif`;
-          ctx.textBaseline = 'top';
-          ctx.textAlign = 'center';
-          ctx.shadowColor = 'rgba(0,0,0,0.95)';
-          ctx.shadowBlur = 20;
-          ctx.shadowOffsetY = 4;
-
-          // Measure total text width for centering
-          const visibleWords = words.slice(0, wordsRevealed);
-          const fullText = visibleWords.join(' ');
-          const lines = fullText.match(/.{1,14}/g) || [fullText];
-
-          lines.slice(0, 3).forEach((line, lineI) => {
-            const lineWords = line.split(' ');
-            let xOffset = 0;
-            // Measure each word for kinetic positioning
-            const lineWidth = ctx.measureText(line).width;
-            let wordX = (W - lineWidth) / 2;
-
-            lineWords.forEach((word, wordI) => {
-              const globalWordIdx = lines.slice(0, lineI).reduce((sum, l) => sum + l.split(' ').length, 0) + wordI;
-              const wordProgress = Math.min(sceneLocalT * totalWords * 1.5 - globalWordIdx + 1, 1);
-              const wordAlpha = Math.max(0, Math.min(wordProgress, 1));
-              const bounce = wordProgress < 1 ? Math.sin(wordProgress * Math.PI) * 8 : 0;
-              const scale = wordProgress < 1 ? 0.8 + wordProgress * 0.2 : 1;
-
-              ctx.globalAlpha = transitionAlpha * wordAlpha;
-              ctx.save();
-              ctx.translate(wordX + ctx.measureText(word).width / 2, textY + lineI * (scene.fontSize + 12) - bounce);
-              ctx.scale(scale, scale);
-              ctx.fillStyle = '#fff';
-              ctx.fillText(word, 0, 0);
-              ctx.restore();
-
-              wordX += ctx.measureText(word + ' ').width;
-            });
-          });
-
-          // Subtext with typewriter effect
-          ctx.font = `600 ${scene.subFontSize}px sans-serif`;
-          ctx.fillStyle = scene.colorTheme.accent + 'DD';
-          ctx.shadowBlur = 10;
-          const descLines = scene.subtext.match(/.{1,24}/g) || [scene.subtext];
-          const descY = textY + lines.length * (scene.fontSize + 12) + 16;
-          const totalDescChars = scene.subtext.length;
-          const charsRevealed = Math.min(Math.floor(sceneLocalT * totalDescChars * 1.2) + 1, totalDescChars);
-
-          descLines.slice(0, 3).forEach((line, i) => {
-            const charsBeforeLine = descLines.slice(0, i).reduce((sum, l) => sum + l.length, 0);
-            const lineChars = Math.max(0, Math.min(charsRevealed - charsBeforeLine, line.length));
-            const visibleLine = line.slice(0, lineChars);
-            if (visibleLine) {
-              ctx.fillText(visibleLine, W / 2, descY + i * (scene.subFontSize + 8));
-            }
-          });
-
-          // Blinking cursor at end of typewriter text
-          if (charsRevealed < totalDescChars) {
-            const cursorBlink = Math.sin(globalT * DURATION * 10) > 0;
-            if (cursorBlink) {
-              const lastLine = descLines[Math.min(Math.floor(charsRevealed / 24), descLines.length - 1)];
-              const lastLineWidth = ctx.measureText(lastLine.slice(0, charsRevealed % 24)).width;
-              ctx.fillStyle = scene.colorTheme.accent;
-              ctx.fillRect(W / 2 + lastLineWidth / 2 + 4, descY + Math.min(Math.floor(charsRevealed / 24), 2) * (scene.subFontSize + 8), 3, scene.subFontSize);
-            }
-          }
-
-          ctx.fillStyle = scene.colorTheme.primary;
-          ctx.font = '700 18px sans-serif';
-          ctx.textAlign = 'left';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.fillText(`[${scene.emotion.toUpperCase()}]`, 30, textY - 28);
-
-          ctx.shadowColor = 'transparent';
-          ctx.globalAlpha = 1;
-        }
-
-        // Auto-insert affiliate disclosure text at the bottom of every frame
-        if (disclosureText) {
-          const isCtaPhase = elapsedSec >= DURATION - 2;
-
-          if (isCtaPhase) {
-            // ── LAST 2 SECONDS: Full-screen CTA + mandatory disclosure overlay ──
-            const ctaLocalT = (elapsedSec - (DURATION - 2)) / 2;
-            const ctaFadeIn = Math.min(ctaLocalT * 3, 1);
-
-            // Dark overlay
-            ctx.globalAlpha = ctaFadeIn * 0.85;
-            ctx.fillStyle = '#0a0f1e';
-            ctx.fillRect(0, 0, W, H);
-            ctx.globalAlpha = 1;
-
-            ctx.globalAlpha = ctaFadeIn;
-
-            // Product name (large, gold)
-            ctx.font = '900 48px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0,0,0,0.9)';
-            ctx.shadowBlur = 20;
-            ctx.fillStyle = '#fbbf24';
-            const pName = productMeta?.productName || '지금 확인하세요';
-            const pNameLines = pName.match(/.{1,12}/g) || [pName];
-            pNameLines.slice(0, 2).forEach((line, i) => {
-              ctx.fillText(line, W / 2, H * 0.25 + i * 56);
-            });
-
-            // CTA pill button
-            const ctaText = '구매하러 가기 →';
-            ctx.font = '700 28px sans-serif';
-            const ctaW = ctx.measureText(ctaText).width + 80;
-            const ctaH = 64;
-            const ctaX = (W - ctaW) / 2;
-            const ctaY = H * 0.45;
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            if (typeof ctx.roundRect === 'function') {
-              ctx.roundRect(ctaX, ctaY - ctaH / 2, ctaW, ctaH, ctaH / 2);
-            } else {
-              ctx.moveTo(ctaX + ctaH / 2, ctaY - ctaH / 2);
-              ctx.arcTo(ctaX + ctaW, ctaY - ctaH / 2, ctaX + ctaW, ctaY + ctaH / 2, ctaH / 2);
-              ctx.arcTo(ctaX + ctaW, ctaY + ctaH / 2, ctaX, ctaY + ctaH / 2, ctaH / 2);
-              ctx.arcTo(ctaX, ctaY + ctaH / 2, ctaX, ctaY - ctaH / 2, ctaH / 2);
-              ctx.arcTo(ctaX, ctaY - ctaH / 2, ctaX + ctaW, ctaY - ctaH / 2, ctaH / 2);
-              ctx.closePath();
-            }
-            ctx.fill();
-            ctx.fillStyle = '#0a0f1e';
-            ctx.fillText(ctaText, W / 2, ctaY);
-
-            // Short URL
-            if (affiliateUrl.trim()) {
-              ctx.font = '600 20px sans-serif';
-              ctx.fillStyle = '#fff';
-              ctx.shadowBlur = 8;
-              const urlDisplay = affiliateUrl.trim().length > 40
-                ? affiliateUrl.trim().substring(0, 40) + '...'
-                : affiliateUrl.trim();
-              ctx.fillText(urlDisplay, W / 2, H * 0.56);
-            }
-
-            // Mandatory disclosure — large, high-contrast, bottom third
-            const discY = H * 0.68;
-            ctx.font = '700 22px sans-serif';
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(0,0,0,0.95)';
-            ctx.shadowBlur = 12;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            const discLines = disclosureText.match(/.{1,24}/g) || [disclosureText];
-            const discLineH = 30;
-            // Background bar for readability
-            const discBgH = Math.min(discLines.length, 4) * discLineH + 24;
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(0, discY - 12, W, discBgH);
-            // Disclosure text
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 6;
-            discLines.slice(0, 4).forEach((line, i) => {
-              ctx.fillText(line, W / 2, discY + i * discLineH);
-            });
-
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
-          } else {
-            // ── 0-13s: Small disclosure at bottom ──
-            const elapsedSecInner = elapsedSec;
-            const isTrustPhase = elapsedSecInner >= 3 && elapsedSecInner < DURATION - 2;
-            const discOpacity = isTrustPhase ? 0.75 : 0.5;
-            const discFontSize = Math.round(W * 0.02);
-
-            ctx.globalAlpha = discOpacity;
-            ctx.font = `600 ${discFontSize}px sans-serif`;
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.shadowColor = 'rgba(0,0,0,0.85)';
-            ctx.shadowBlur = 6;
-            const discLines = disclosureText.match(/.{1,32}/g) || [disclosureText];
-            const discLineH = discFontSize + 6;
-            discLines.slice(0, 1).forEach((line, i) => {
-              ctx.fillText(line, W / 2, H - 12 - (discLines.length - 1 - i) * discLineH);
-            });
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1;
-          }
-        }
-
-        // ── Product metadata overlays during trust phase (4-12s) ──
-        const elapsedSecMeta = elapsedSec;
-        const isTrustPhaseMeta = elapsedSecMeta >= 3 && elapsedSecMeta < DURATION - 2;
-        if (isTrustPhaseMeta && productMeta && (productMeta.price || productMeta.productName)) {
-          const trustLocalT = (elapsedSecMeta - 3) / (DURATION - 5);
-          const metaFadeIn = Math.min(trustLocalT * 4, 1);
-          const metaFadeOut = Math.min((1 - trustLocalT) * 4, 1);
-          const metaAlpha = Math.min(metaFadeIn, metaFadeOut);
-
-          ctx.globalAlpha = metaAlpha;
-
-          // Price badge (top-right)
-          if (productMeta.price) {
-            const priceText = productMeta.price;
-            ctx.font = '900 32px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'top';
-            ctx.shadowColor = 'rgba(0,0,0,0.9)';
-            ctx.shadowBlur = 16;
-            ctx.fillStyle = '#fbbf24';
-            ctx.fillText(priceText, W - 30, 60);
-
-            // Discount rate badge above price
-            const discountLabel = productMeta.discountRate
-              ? `${productMeta.discountRate} 할인`
-              : '오늘만 특가';
-            ctx.font = '700 16px sans-serif';
-            ctx.fillStyle = '#ef4444';
-            ctx.fillText(discountLabel, W - 30, 40);
-
-            // Original price (strikethrough) if available
-            if (productMeta.originPrice) {
-              ctx.font = '500 18px sans-serif';
-              ctx.fillStyle = 'rgba(255,255,255,0.5)';
-              ctx.fillText(productMeta.originPrice, W - 30, 96);
-              // Strikethrough line
-              const opWidth = ctx.measureText(productMeta.originPrice).width;
-              ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-              ctx.lineWidth = 1.5;
-              ctx.beginPath();
-              ctx.moveTo(W - 30 - opWidth, 105);
-              ctx.lineTo(W - 30, 105);
-              ctx.stroke();
-            }
-          }
-
-          // Rocket delivery badge (bottom-left)
-          ctx.font = '700 18px sans-serif';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'bottom';
-          ctx.shadowColor = 'rgba(0,0,0,0.85)';
-          ctx.shadowBlur = 8;
-          ctx.fillStyle = '#3b82f6';
-          ctx.fillText('🚀 로켓배송', 30, H - 50);
-
-          // Discount highlight with actual rate
-          if (productMeta.discountRate) {
-            ctx.font = '700 22px sans-serif';
-            ctx.fillStyle = '#ef4444';
-            ctx.fillText(`${productMeta.discountRate} 할인 특가`, 30, H - 80);
-          } else if (productMeta.price) {
-            ctx.font = '700 22px sans-serif';
-            ctx.fillStyle = '#ef4444';
-            ctx.fillText('할인 특가', 30, H - 80);
-          }
-
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.globalAlpha = 1;
-        }
-
-        const beatPhase = elapsedSec * (bpm / 60) * Math.PI * 2;
-        const beatPulse = Math.sin(beatPhase) * 0.5 + 0.5;
-        ctx.globalAlpha = 0.3 + beatPulse * 0.15;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, H - 4, W * globalT, 4);
-        ctx.globalAlpha = 1;
-
-        ctx.globalAlpha = Math.min(globalT * 5, 1);
-        ctx.fillStyle = scene?.colorTheme.primary ?? theme.colors.accent[400];
-        ctx.font = '700 22px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'top';
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 8;
-        ctx.fillText(`${pct}%`, W - 30, 30);
-        ctx.textAlign = 'left';
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-
-        if (globalT < 1) {
-          // Frame will be called again by offline renderer
-        }
-      };
-
-      // Clean up audio resources (audio was prepared but we no longer encode video)
-      try {
-        if (bgmOsc) bgmOsc.stop();
-        if (melodyOsc) melodyOsc.stop();
-        if (audioCtx) audioCtx.close();
-        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-        masterGainRef.current = null;
-      } catch { /* cleanup best-effort */ }
-
-      // No browser-side video encoding — storyboard preview is the final output.
-      // The scene data is available for a future server-side FFmpeg render pipeline.
-      setVideoRenderComplete(true);
-      renderProgress.value = 1;
-      recordProsodyOutcome({
-        generationMeta: prosodyMetaRef.current ?? {
-          voiceKey: 'bright_female_1',
-          prosodyProfileId: 'energetic_reviewer',
-          phase: 'full',
-          speed: 1.0,
-          timestamp: Date.now(),
-          textLength: 0,
-        },
-        completed: true,
-        retried: false,
-        shared: false,
-        durationSec: DURATION,
-      }).catch(() => {});
-    } catch (err) {
-      setRenderError(err instanceof Error ? err.message : '영상 생성에 실패했습니다.');
-      recordProsodyOutcome({
-        generationMeta: prosodyMetaRef.current ?? {
-          voiceKey: 'bright_female_1',
-          prosodyProfileId: 'energetic_reviewer',
-          phase: 'full',
-          speed: 1.0,
-          timestamp: Date.now(),
-          textLength: 0,
-        },
-        completed: false,
-        retried: true,
-        shared: false,
-        durationSec: 0,
-      }).catch(() => {});
-    } finally {
-      videoRenderingRef.current = false;
-      setVideoRendering(false);
-      renderProgress.value = 1;
-    }
-  }, [videoPreviewScenes, viralAnalysisResult, renderProgress, disclosureText, imagePreviewUri, multiImages, aiSceneImages, sceneImageMap, productMeta, affiliateUrl, stockVideoClip]);
 
   const scrollToStep = (stepNum: number) => {
     setTimeout(() => {
@@ -2023,7 +1094,10 @@ export default function AffiliateScreen() {
   // ── One-click auto-edit pipeline ──
   // Orchestrates: viral analysis → storyboard generation → high-quality render
   const [autoEditing, setAutoEditing] = useState(false);
+  const autoEditingRef = useRef(false);
   const [autoEditStep, setAutoEditStep] = useState<string>('');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [oneClickHint, setOneClickHint] = useState(false);
 
   const handleAutoEdit = useCallback(async () => {
     if (autoEditing) return;
@@ -2031,11 +1105,22 @@ export default function AffiliateScreen() {
       setRenderError('먼저 발행 플랫폼을 선택해주세요.');
       return;
     }
+    autoEditingRef.current = true;
     setAutoEditing(true);
-    setAutoEditStep('분석 중...');
+    setAutoEditStep('AI가 상품을 분석하고 있어요...');
     setRenderError(null);
-    setRenderedVideoUrl(null);
     setVideoRenderComplete(false);
+    setOneClickHint(true);
+    setTimeout(() => setOneClickHint(false), 3500);
+
+    const timeoutId = setTimeout(() => {
+      if (autoEditingRef.current) {
+        setRenderError('AI 생성이 시간 초과로 중단되었습니다. 다시 시도해주세요.');
+        autoEditingRef.current = false;
+        setAutoEditing(false);
+        setAutoEditStep('');
+      }
+    }, 60000);
 
     try {
       // Step 1: Generate psych analysis + storyboard
@@ -2044,7 +1129,7 @@ export default function AffiliateScreen() {
 
       let analysis: PsychAnalysis;
       if (selectedStrategy === 'nano_analysis' || selectedStrategy === 'psychology_sniping') {
-        setAutoEditStep('상위 1% 문구 나노 분석 중...');
+        setAutoEditStep('상위 1% 문구 패턴을 학습 중이에요...');
         const nanoResult = await generateNanoFusedAnalysis(
           selectedUploadPlatform ?? 'tiktok',
           selectedBoard ?? 'reels',
@@ -2064,6 +1149,7 @@ export default function AffiliateScreen() {
             affiliateUrl,
             { ratio: '9:16', resolution: '1080×1920', maxDuration: selectedPacing, format: 'MP4' },
             { productName: productMeta?.productName, price: productMeta?.price, brand: productMeta?.brand, description: productMeta?.description },
+            customPrompt.trim() || undefined,
           ),
           scenes: nanoResult.fusedScenes,
         };
@@ -2088,29 +1174,36 @@ export default function AffiliateScreen() {
             brand: productMeta?.brand,
             description: productMeta?.description,
           },
+          customPrompt.trim() || undefined,
         );
         setNanoReport(null);
       }
       setViralAnalysisResult(analysis);
-      setAutoEditStep('스토리보드 생성 중...');
+      setAutoEditStep('AI가 컷 카드를 조립 중입니다...');
 
       // Step 2: Build scenes
       videoPreviewProgress.value = 0;
       videoPreviewProgress.value = withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) });
-      await new Promise<void>((resolve) => setTimeout(resolve, 2200));
+      await new Promise<void>((resolve) => setTimeout(resolve, 700));
+      setAutoEditStep('스마트 조명과 배경을 연출하고 있어요...');
+      await new Promise<void>((resolve) => setTimeout(resolve, 800));
+      setAutoEditStep('컷별 대사와 자막을 배치하고 있어요...');
+      await new Promise<void>((resolve) => setTimeout(resolve, 700));
       setVideoPreviewScenes(analysis.scenes);
 
       // Step 3: Render high-quality video
-      setAutoEditStep('영상 렌더링 중...');
+      setAutoEditStep('만화 컷 이미지를 완성하고 있어요...');
       await generatePreviewVideo('high');
       markCompleted('upload');
     } catch {
       setRenderError('자동 편집 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
+      clearTimeout(timeoutId);
+      autoEditingRef.current = false;
       setAutoEditing(false);
       setAutoEditStep('');
     }
-  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo, selectedPacing]);
+  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo, selectedPacing, customPrompt]);
 
   return (
     <View style={styles.container}>
@@ -2137,11 +1230,22 @@ export default function AffiliateScreen() {
           </Text>
         </View>
 
+        {/* Sticky Hero Preview - shows current step's result */}
+        <StickyHeroPreview
+          step={heroPreviewStep}
+          originalImage={imagePreviewUri}
+          editedImage={aiSceneImages.length > 0 ? aiSceneImages[0] : imagePreviewUri}
+          comicFirstImage={comicFirstImage}
+          productName={productMeta?.productName}
+          onExpand={() => openGallery(heroPreviewStep === 'comic' ? 'comic' : 'beforeAfter')}
+        />
+
         {/* ─────────── STEP 1: 발행 플랫폼 선택 ─────────── */}
         <View
           ref={(ref) => { stepRefs.current[1] = ref; }}
           collapsable={false}
         />
+        <StepGuideBanner step="platform" visible={guideStep === 'platform'} />
         <PillNavCard
           icon={<Share2 size={22} color={theme.colors.accent[400]} strokeWidth={2.5} />}
           title="발행 플랫폼 선택"
@@ -2217,6 +1321,12 @@ export default function AffiliateScreen() {
           )}
 
           {/* Affiliate link input (optional, for disclosure) */}
+          <View style={styles.affiliateGuideBox}>
+            <Link2 size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />
+            <Text style={styles.affiliateGuideText}>
+              쿠팡 파트너스 등 제휴 상품 링크를 여기에 붙여넣으면, AI가 상품 정보를 자동으로 가져오고 공정위 고지문구를 생성합니다. 링크가 없어도 사진만으로 진행할 수 있어요.
+            </Text>
+          </View>
           <Text style={styles.chipGroupLabel}>제휴 링크 (선택)</Text>
           <View style={styles.affiliateUrlInputWrap}>
             <View style={styles.affiliateUrlInputRow}>
@@ -2332,6 +1442,7 @@ export default function AffiliateScreen() {
           ref={(ref) => { stepRefs.current[2] = ref; }}
           collapsable={false}
         />
+        <StepGuideBanner step="upload" visible={guideStep === 'upload'} />
         <PillNavCard
           icon={<Camera size={22} color={theme.colors.warning[400]} strokeWidth={2.5} />}
           title="상품 사진 업로드"
@@ -2425,19 +1536,192 @@ export default function AffiliateScreen() {
                 </View>
               )}
 
-              {/* Next button */}
+              {/* Inline before/after comparison */}
+              {imagePreviewUri && (
+                <InlineBeforeAfter
+                  beforeImage={imagePreviewUri}
+                  afterImage={aiSceneImages.length > 0 ? aiSceneImages[0] : imagePreviewUri}
+                  productName={productMeta?.productName}
+                  onExpand={() => openGallery('beforeAfter')}
+                />
+              )}
+
+              {/* Quick proceed — enabled as soon as a photo is uploaded */}
               <TouchableOpacity
-                style={[styles.aiOneTapBtn, { marginTop: theme.spacing.md }, !imagePreviewUri && { opacity: 0.5 }]}
+                style={[styles.quickProceedBtn, !imagePreviewUri && { opacity: 0.4 }]}
                 onPress={() => markCompleted('upload')}
                 disabled={!imagePreviewUri}
                 activeOpacity={0.85}
               >
-                <ArrowRight size={20} color="#fff" strokeWidth={2} />
-                <View style={styles.aiOneTapTextWrap}>
-                  <Text style={styles.aiOneTapBtnTitle}>다음: 발행</Text>
-                </View>
-                <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+                <ArrowRight size={18} color={theme.colors.primary[300]} strokeWidth={2.5} />
+                <Text style={styles.quickProceedBtnText}>
+                  {imagePreviewUri ? '바로 다음 단계로' : '사진을 업로드하면 다음으로 넘어갈 수 있어요'}
+                </Text>
+                <ChevronDown size={16} color={theme.colors.primary[300]} strokeWidth={2.5} style={{ transform: [{ rotate: '-90deg' }] }} />
               </TouchableOpacity>
+
+              {/* Custom AI prompt - tappable style keyword chips */}
+              {imagePreviewUri && selectedUploadPlatform && (
+                <View style={styles.customPromptWrap}>
+                  <Text style={styles.customPromptLabel}>AI 만화 연출 스타일 (선택)</Text>
+                  <View style={styles.styleChipRow}>
+                    {STYLE_PRESETS.map((preset) => {
+                      const isSelected = customPrompt.includes(preset.value);
+                      const Icon = preset.icon;
+                      return (
+                        <TouchableOpacity
+                          key={preset.value}
+                          style={[styles.styleChip, isSelected && styles.styleChipActive]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setCustomPrompt(prev => prev.replace(preset.value, '').replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '').trim());
+                            } else {
+                              setCustomPrompt(prev => {
+                                const parts = prev.split(',').map(s => s.trim()).filter(Boolean);
+                                parts.push(preset.value);
+                                return parts.join(', ');
+                              });
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Icon size={13} color={isSelected ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.styleChipText, isSelected && styles.styleChipTextActive]}>
+                            {preset.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.customPromptHint}>
+                    원하는 스타일을 터치하세요. 선택하지 않으면 서비스 기본 스타일(제품 홍보용 스냅툰)이 자동 적용됩니다
+                  </Text>
+                </View>
+              )}
+
+              {/* AI 만화숏폼 자동 생성 버튼 */}
+              {imagePreviewUri && selectedUploadPlatform && (
+                <View style={{ marginTop: theme.spacing.md }}>
+                  {/* One-click mode hint tooltip */}
+                  {oneClickHint && (
+                    <View style={styles.oneClickHintTooltip}>
+                      <Sparkles size={14} color={theme.colors.success[400]} strokeWidth={2} />
+                      <Text style={styles.oneClickHintText}>
+                        한 번의 터치로 촬영·보정·컷 생성이 자동 완료됩니다
+                      </Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.aiOneTapBtn, { backgroundColor: theme.colors.success[500] }, autoEditing && { opacity: 0.6 }]}
+                    onPress={handleAutoEdit}
+                    disabled={autoEditing}
+                    activeOpacity={0.85}
+                  >
+                    {autoEditing ? (
+                      <Loader size={20} color="#fff" strokeWidth={2} />
+                    ) : (
+                      <Sparkles size={20} color="#fff" strokeWidth={2} />
+                    )}
+                    <View style={styles.aiOneTapTextWrap}>
+                      <Text style={styles.aiOneTapBtnTitle}>
+                        {autoEditing ? (autoEditStep || 'AI가 만화숏폼을 만들고 있어요...') : 'AI 만화숏폼 자동 생성'}
+                      </Text>
+                      <Text style={styles.aiOneTapBtnSub}>
+                        {autoEditing ? '거의 다 됐어요, 조금만 기다려주세요' : '클릭 한 번으로 촬영·보정·컷 생성이 자동 완료'}
+                      </Text>
+                    </View>
+                    {!autoEditing && (
+                      <ChevronDown size={18} color="#fff" strokeWidth={2} style={{ transform: [{ rotate: '-90deg' }] }} />
+                    )}
+                  </TouchableOpacity>
+
+                  {renderError && (
+                    <View style={styles.renderErrorBox}>
+                      <AlertTriangle size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                      <Text style={styles.renderErrorText}>{renderError}</Text>
+                    </View>
+                  )}
+
+                  {/* AI scene image generation button */}
+                  {videoPreviewScenes && videoPreviewScenes.length > 0 && multiImages.length < videoPreviewScenes.length && (
+                    <TouchableOpacity
+                      style={[styles.aiSceneGenBtn, aiImageGenerating && { opacity: 0.6 }]}
+                      onPress={handleGenerateAiSceneImages}
+                      disabled={aiImageGenerating}
+                      activeOpacity={0.85}
+                    >
+                      {aiImageGenerating ? (
+                        <Loader size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                      ) : (
+                        <Sparkles size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+                      )}
+                      <Text style={styles.aiSceneGenBtnText}>
+                        {aiImageGenerating ? 'AI 이미지 생성 중...' : 'AI 컷 이미지 자동 생성'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Interactive Slideshow Viewer */}
+                  {videoPreviewScenes && videoPreviewScenes.length > 0 && videoRenderComplete && (
+                    <>
+                      <InteractiveSlideshowViewer
+                        scenes={videoPreviewScenes}
+                        sceneImages={gallerySceneImages}
+                        productName={productMeta?.productName}
+                        disclosureText={disclosureText}
+                        affiliateUrl={affiliateUrl}
+                      />
+                      <TouchableOpacity
+                        style={styles.fullScreenBtn}
+                        onPress={() => openGallery('comic')}
+                        activeOpacity={0.7}
+                      >
+                        <Maximize2 size={14} color="#fff" strokeWidth={2} />
+                        <Text style={styles.fullScreenBtnText}>전체 화면 갤러리로 보기</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {/* Download all cut images button */}
+                  {videoPreviewScenes && videoPreviewScenes.length > 0 && videoRenderComplete && (
+                    <TouchableOpacity
+                      style={[styles.aiOneTapBtn, { backgroundColor: theme.colors.primary[500], marginTop: theme.spacing.sm }, savingVideo && { opacity: 0.6 }]}
+                      onPress={handleSaveRenderedVideo}
+                      disabled={savingVideo}
+                      activeOpacity={0.85}
+                    >
+                      {savingVideo ? (
+                        <Loader size={20} color="#fff" strokeWidth={2} />
+                      ) : videoSaved ? (
+                        <Check size={20} color="#fff" strokeWidth={2} />
+                      ) : (
+                        <Download size={20} color="#fff" strokeWidth={2} />
+                      )}
+                      <View style={styles.aiOneTapTextWrap}>
+                        <Text style={styles.aiOneTapBtnTitle}>
+                          {savingVideo ? '다운로드 중...' : videoSaved ? '다운로드 완료' : '전체 컷 이미지 다운로드'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Reassurance banner */}
+                  <View style={styles.reassuranceBanner}>
+                    <Sparkles size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+                    <Text style={styles.reassuranceText}>
+                      스타일 선택은 선택사항이에요. 그냥 'AI 만화숏폼 자동 생성' 버튼만 눌러도 한 번에 끝납니다.
+                    </Text>
+                  </View>
+
+                  {/* Beginner guide box */}
+                  <View style={styles.beginnerGuideBox}>
+                    <Text style={styles.beginnerGuideTitle}>초보자 가이드</Text>
+                    <Text style={styles.beginnerGuideText}>
+                      컷 이미지를 모두 다운로드하셨나요? 인스타그램 릴스나 쇼츠 앱을 켜고 사진들을 슬라이드로 선택해 올려보세요!
+                    </Text>
+                  </View>
+                </View>
+              )}
             </>
           )}
         </PillNavCard>
@@ -2447,6 +1731,7 @@ export default function AffiliateScreen() {
           ref={(ref) => { stepRefs.current[3] = ref; }}
           collapsable={false}
         />
+        <StepGuideBanner step="publish" visible={guideStep === 'publish'} />
         <PillNavCard
           icon={<Send size={22} color={theme.colors.primary[400]} strokeWidth={2.5} />}
           title="발행"
@@ -2456,18 +1741,21 @@ export default function AffiliateScreen() {
           stepNumber={3}
           expanded={expandedStep === 'publish'}
           completed={completedSteps.has('publish')}
-          onToggle={() => setExpandedStep(expandedStep === 'publish' ? null : 'publish')}
+          onToggle={() => {
+            if (!completedSteps.has('upload')) return;
+            setExpandedStep(expandedStep === 'publish' ? null : 'publish');
+          }}
         >
-          {!imagePreviewUri && (
+          {!completedSteps.has('upload') && (
             <View style={styles.videoPreviewEmptyInline}>
-              <Send size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
+              <Lock size={32} color="rgba(255,255,255,0.3)" strokeWidth={1.5} />
               <Text style={styles.videoPreviewEmptyInlineText}>
-                2단계에서 상품 사진을 업로드하고 AI 만화숏폼을 생성해주세요
+                2단계에서 사진을 업로드하고 다음 단계로 넘어가면 발행이 열립니다
               </Text>
             </View>
           )}
 
-          {imagePreviewUri && selectedUploadPlatform && (() => {
+          {completedSteps.has('upload') && imagePreviewUri && selectedUploadPlatform && (() => {
             const p = UPLOAD_PLATFORMS.find((up) => up.key === selectedUploadPlatform);
             if (!p) return null;
             const Icon = p.icon;
@@ -2567,10 +1855,20 @@ export default function AffiliateScreen() {
                     </View>
                   </View>
                 )}
+                {/* Reassurance banner */}
+                <View style={styles.reassuranceBanner}>
+                  <Sparkles size={13} color={theme.colors.primary[400]} strokeWidth={2} />
+                  <Text style={styles.reassuranceText}>
+                    '열기' 버튼을 누르면 홍보 문구가 자동 복사되고 플랫폼 앱이 열립니다. 그대로 붙여넣기만 하면 발행 완료!
+                  </Text>
+                </View>
               </>
             );
           })()}
         </PillNavCard>
+
+        {/* Completion feedback */}
+        <StepGuideBanner step="complete" visible={guideStep === 'complete'} />
 
         {/* Recent revenue */}
         <Text style={styles.sectionTitle}>최근 수익 기록</Text>
@@ -2622,6 +1920,29 @@ export default function AffiliateScreen() {
           </View>
         </View>
       )}
+
+      {/* Copy / publish success toast */}
+      {copyToast && (
+        <View style={styles.copyToastContainer}>
+          <View style={styles.copyToastBox}>
+            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+            <Text style={styles.copyToastText}>{copyToast}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Full-screen gallery modal */}
+      <FullScreenGalleryModal
+        visible={galleryVisible}
+        onClose={() => setGalleryVisible(false)}
+        scenes={videoPreviewScenes ?? []}
+        sceneImages={gallerySceneImages}
+        beforeImage={imagePreviewUri}
+        afterImage={aiSceneImages.length > 0 ? aiSceneImages[0] : imagePreviewUri}
+        initialTab={galleryInitialTab}
+        productName={productMeta?.productName}
+        disclosureText={disclosureText}
+      />
     </View>
   );
 }
@@ -3060,6 +2381,183 @@ const styles = StyleSheet.create({
     color: '#fff' + 'CC',
     marginTop: 3,
     lineHeight: 15,
+  },
+  quickProceedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '18',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '50',
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  quickProceedBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  renderErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.error[400] + '15',
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '40',
+    marginTop: 8,
+  },
+  renderErrorText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    lineHeight: 17,
+  },
+  aiSceneGenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[400] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '40',
+    marginTop: 8,
+  },
+  aiSceneGenBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  fullScreenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    marginTop: 8,
+  },
+  fullScreenBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#fff',
+  },
+  customPromptWrap: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
+  },
+  customPromptLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 8,
+  },
+  styleChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  styleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  styleChipActive: {
+    backgroundColor: theme.colors.accent[400] + '22',
+    borderColor: theme.colors.accent[400],
+  },
+  styleChipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  styleChipTextActive: {
+    color: '#fff',
+  },
+  customPromptHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 8,
+    lineHeight: 14,
+  },
+  beginnerGuideBox: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.success[400] + '12',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  beginnerGuideTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+    marginBottom: 4,
+  },
+  beginnerGuideText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  reassuranceBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  reassuranceText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  oneClickHintTooltip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.success[400] + '18',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  oneClickHintText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
   },
   autoEditDesc: {
     fontSize: 13,
@@ -4280,6 +3778,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  copyToastContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: theme.spacing.md,
+    right: theme.spacing.md,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  copyToastBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.success[400] + '60',
+    ...theme.shadows.elevated,
+  },
+  copyToastText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    lineHeight: 18,
+  },
+  affiliateGuideBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: theme.colors.accent[400] + '12',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '25',
+  },
+  affiliateGuideText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
   urlWarningBox: {
     flexDirection: 'row',

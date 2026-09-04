@@ -246,6 +246,7 @@ export function generatePsychAnalysis(
   _productUrl: string,
   specsIn?: { ratio: string; resolution: string; maxDuration: string; format: string },
   productMeta?: { productName?: string; price?: string; brand?: string; description?: string },
+  customPrompt?: string,
 ): PsychAnalysis {
   const specs = specsIn ?? { ratio: '16:9', resolution: '1920×1080', maxDuration: '60초', format: 'MP4' };
   const profile = PLATFORM_PROFILES[platform] ?? PLATFORM_PROFILES.tiktok;
@@ -269,10 +270,18 @@ export function generatePsychAnalysis(
   const nameShort = pName.length > 12 ? pName.slice(0, 12) + '...' : pName;
   const brandPrefix = pBrand ? `${pBrand} ` : '';
 
+  const cpLower = customPrompt?.toLowerCase() ?? '';
+  const isHumorous = cpLower.includes('유머') || cpLower.includes('humor') || cpLower.includes('웃긴');
+  const isCasual = cpLower.includes('반말') || cpLower.includes('casual') || cpLower.includes('힙');
+  const isNeon = cpLower.includes('네온') || cpLower.includes('neon');
+  const isInsta = cpLower.includes('인스타') || cpLower.includes('instagram') || cpLower.includes('감성');
+
+  const styleSuffix = customPrompt?.trim() ? ` (${customPrompt.trim()})` : '';
+
   const hookTexts: Record<EmotionPhase, string[]> = {
     curiosity: [
-      `${nameShort} 알아?`,
-      `잠깐, ${nameShort} 봤어?`,
+      isCasual ? `${nameShort} 알아?` : `${nameShort} 알아?`,
+      isHumorous ? `잠깐, ${nameShort} 봤어? 진짜임?` : `잠깐, ${nameShort} 봤어?`,
       `이게 왜 1등인지 알아?`,
       `${nameShort} 진짜야?`,
       `${pBrand ? pBrand + ' ' : ''}${nameShort}이 그냥 넘기지 마`,
@@ -285,7 +294,7 @@ export function generatePsychAnalysis(
       `${nameShort} 진짜 충격이야`,
     ],
     empathy: [
-      `${nameShort} 쓰면 진짜 편해요`,
+      isInsta ? `${nameShort} 인스타 감성으로 일상이 달라짐` : `${nameShort} 쓰면 진짜 편해요`,
       `${nameShort} 쓰는 분들 공감 100%`,
       `${nameShort} 쓰면 왜 몰랐지 싶음`,
       `${nameShort} 쓰면 삶이 바뀜`,
@@ -349,7 +358,7 @@ export function generatePsychAnalysis(
     scenes.push({
       time: `${timeSec}s`,
       hook: triggers[i].name,
-      desc: triggers[i].description,
+      desc: customPrompt?.trim() ? `${triggers[i].description}${styleSuffix}` : triggers[i].description,
       emotion,
       textOverlay: hookTexts[emotion][hookIdx],
       subtext: subTexts[emotion][subIdx],
