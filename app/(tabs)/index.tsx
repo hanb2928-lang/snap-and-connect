@@ -547,13 +547,6 @@ export default function CameraScreen() {
           />
         </View>
 
-        <View style={[styles.modeSelectFooter, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
-          <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
-            <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
-            <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
-          </TouchableOpacity>
-        </View>
-
         <CreditPurchaseModal
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
@@ -903,26 +896,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 18,
-  },
-  modeSelectFooter: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-  },
-  galleryPickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.lg,
-    paddingVertical: 13,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  galleryPickText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
   },
   modeSelectError: {
     position: 'absolute',

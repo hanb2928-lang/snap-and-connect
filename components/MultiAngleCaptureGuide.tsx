@@ -62,6 +62,7 @@ export function MultiAngleCaptureGuide({
   const [shots, setShots] = useState<Record<string, AngleShot>>({});
   const [currentAngle, setCurrentAngle] = useState(0);
   const [processing, setProcessing] = useState(false);
+  const [sourceMode, setSourceMode] = useState<'camera' | 'gallery'>('camera');
   const pickLockRef = useRef(false);
 
   const completedCount = Object.keys(shots).length;
@@ -230,40 +231,59 @@ export function MultiAngleCaptureGuide({
                     </View>
                   ) : (
                     <View style={styles.shotPlaceholder}>
-                      {onCaptureImage && (
+                      {/* Source toggle: camera / gallery */}
+                      <View style={styles.sourceToggle}>
                         <TouchableOpacity
-                          style={styles.captureBtn}
-                          onPress={() => {
-                            setCurrentAngle(idx);
+                          style={[styles.sourceTab, sourceMode === 'camera' && styles.sourceTabActive]}
+                          onPress={() => setSourceMode('camera')}
+                          disabled={processing}
+                          activeOpacity={0.7}
+                        >
+                          <Camera size={15} color={sourceMode === 'camera' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.sourceTabLabel, sourceMode === 'camera' && styles.sourceTabLabelActive]}>카메라</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.sourceTab, sourceMode === 'gallery' && styles.sourceTabActive]}
+                          onPress={() => setSourceMode('gallery')}
+                          disabled={processing}
+                          activeOpacity={0.7}
+                        >
+                          <ImageIcon size={15} color={sourceMode === 'gallery' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+                          <Text style={[styles.sourceTabLabel, sourceMode === 'gallery' && styles.sourceTabLabelActive]}>갤러리</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Single action button */}
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => {
+                          setCurrentAngle(idx);
+                          if (sourceMode === 'camera' && onCaptureImage) {
                             handleCaptureFromCamera(guide.id);
-                          }}
-                          disabled={processing}
-                          activeOpacity={0.7}
-                        >
-                          <Camera size={18} color={theme.colors.dark.text} strokeWidth={2} />
-                          <Text style={styles.galleryBtnText}>촬영하기</Text>
-                        </TouchableOpacity>
-                      )}
-                      {onPickImage && (
-                        <TouchableOpacity
-                          style={styles.galleryBtn}
-                          onPress={() => {
-                            setCurrentAngle(idx);
+                          } else if (sourceMode === 'gallery' && onPickImage) {
                             handlePickFromGallery(guide.id);
-                          }}
-                          disabled={processing}
-                          activeOpacity={0.7}
-                        >
-                          <ImageIcon size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={styles.galleryBtnText}>갤러리에서 선택</Text>
-                        </TouchableOpacity>
-                      )}
-                      {processing && (
-                        <View style={styles.processingRow}>
-                          <Loader size={14} color={theme.colors.primary[400]} strokeWidth={2} />
-                          <Text style={styles.processingText}>이미지 불러오는 중...</Text>
-                        </View>
-                      )}
+                          }
+                        }}
+                        disabled={processing || (sourceMode === 'camera' && !onCaptureImage) || (sourceMode === 'gallery' && !onPickImage)}
+                        activeOpacity={0.7}
+                      >
+                        {processing ? (
+                          <>
+                            <Loader size={16} color="#fff" strokeWidth={2} />
+                            <Text style={styles.actionBtnText}>불러오는 중...</Text>
+                          </>
+                        ) : sourceMode === 'camera' ? (
+                          <>
+                            <Camera size={18} color="#fff" strokeWidth={2} />
+                            <Text style={styles.actionBtnText}>촬영하기</Text>
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon size={18} color="#fff" strokeWidth={2} />
+                            <Text style={styles.actionBtnText}>갤러리에서 선택</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
@@ -459,7 +479,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   shotPlaceholder: {
-    minHeight: 140,
+    minHeight: 120,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
@@ -467,41 +487,50 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 16,
-  },
-  galleryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    gap: 10,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+  },
+  sourceToggle: {
+    flexDirection: 'row',
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surface,
+    padding: 3,
+    gap: 3,
   },
-  captureBtn: {
+  sourceTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500],
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: theme.radius.sm,
   },
-  galleryBtnText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.text,
+  sourceTabActive: {
+    backgroundColor: theme.colors.primary[600],
   },
-  processingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  processingText: {
+  sourceTabLabel: {
     fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  sourceTabLabelActive: {
+    color: '#fff',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 24,
+    paddingVertical: 11,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600],
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   bottomBar: {
     padding: theme.spacing.md,
