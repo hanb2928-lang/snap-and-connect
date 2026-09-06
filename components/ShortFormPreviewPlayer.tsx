@@ -17,6 +17,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { BgmPlayer } from '@/lib/bgmEngine';
 import type { ShortFormEditPlan, EditSegment } from '@/lib/shortFormEditEngine';
 import {
   sampleVideoLuminance,
@@ -51,6 +52,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const bgmPlayerRef = useRef<BgmPlayer | null>(null);
 
   const { width: screenWidth } = useWindowDimensions();
 
@@ -130,6 +132,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (bgmPlayerRef.current) {
+      bgmPlayerRef.current.stop();
+    }
     setIsPlaying(false);
   }, []);
 
@@ -145,9 +150,15 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
       if (currentSec >= TOTAL_DURATION) {
         setCurrentSec(0);
       }
+      if (Platform.OS === 'web' && !bgmPlayerRef.current) {
+        bgmPlayerRef.current = new BgmPlayer();
+      }
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.start(editPlan.bgmTemplate.id, editPlan.pacingBpm);
+      }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop]);
+  }, [isPlaying, currentSec, stop, editPlan.bgmTemplate.id, editPlan.pacingBpm]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -171,7 +182,13 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
   }, [isPlaying, stop]);
 
   useEffect(() => {
-    return () => stop();
+    return () => {
+      stop();
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.dispose();
+        bgmPlayerRef.current = null;
+      }
+    };
   }, [stop]);
 
   const activeSegment = getActiveSegment(editPlan.segments, currentSec);
@@ -258,7 +275,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
               <video
                 ref={webVideoRef}
                 src={videoSrc}
-                muted
                 loop
                 playsInline
                 style={{

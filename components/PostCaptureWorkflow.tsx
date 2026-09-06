@@ -56,6 +56,7 @@ import {
   AVAILABLE_RATIOS,
 } from '@/lib/platformManager';
 import type { PlatformSpec } from '@/lib/platformSpecs';
+import { mixBgmIntoVideo } from '@/lib/bgmEngine';
 
 type PlatformOption = {
   key: string;
@@ -225,23 +226,38 @@ export function PostCaptureWorkflow({
     if (!uri) return;
     setSavingToGallery(true);
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' && videoUri) {
+        const mixedUri = await mixBgmIntoVideo(
+          videoUri,
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          15,
+        );
         const a = document.createElement('a');
-        a.href = uri;
-        a.download = `shortform-${Date.now()}.${imageUri ? 'jpg' : 'mp4'}`;
+        a.href = mixedUri;
+        a.download = `shortform-${Date.now()}.webm`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
       } else {
-        await MediaLibrary.requestPermissionsAsync();
-        await MediaLibrary.saveToLibraryAsync(uri);
+        if (Platform.OS === 'web') {
+          const a = document.createElement('a');
+          a.href = uri;
+          a.download = `shortform-${Date.now()}.${imageUri ? 'jpg' : 'mp4'}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          await MediaLibrary.requestPermissionsAsync();
+          await MediaLibrary.saveToLibraryAsync(uri);
+        }
       }
       setGallerySaved(true);
     } catch {
       // ignore — user can retry
     }
     setSavingToGallery(false);
-  }, [videoUri, imageUri]);
+  }, [videoUri, imageUri, editPlan.bgmTemplate.id, editPlan.pacingBpm]);
 
   const handleLaunchPlatform = useCallback(async () => {
     const deepLink = getDeepLink(selectedPlatformKey);
@@ -309,7 +325,19 @@ export function PostCaptureWorkflow({
 
     let cloudSuccess = false;
 
-    const uploadUri = videoUri || (imageUri || null);
+    let uploadUri = videoUri || (imageUri || null);
+    if (uploadUri && videoUri && Platform.OS === 'web') {
+      try {
+        uploadUri = await mixBgmIntoVideo(
+          videoUri,
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          15,
+        );
+      } catch {
+        uploadUri = videoUri;
+      }
+    }
     if (uploadUri) {
       try {
         const blob = await uriToBlob(uploadUri);
@@ -343,7 +371,7 @@ export function PostCaptureWorkflow({
 
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     setIsUploading(false);
-  }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
+  }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
 
   const handleShareText = useCallback(async () => {
     const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
