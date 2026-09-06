@@ -8,7 +8,6 @@ import {
   ScrollView,
   Linking,
   Platform,
-  Share as RNShare,
   Modal,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
@@ -31,7 +30,6 @@ import {
   Type,
   Crop,
   Wand2,
-  Cloud,
   Plus,
   Trash2,
   Smartphone,
@@ -120,7 +118,6 @@ export function PostCaptureWorkflow({
   const [selectedPlatformKey, setSelectedPlatformKey] = useState<string>('instagram');
   const [customPrompt, setCustomPrompt] = useState('');
   const [platformLink, setPlatformLink] = useState('');
-  const [showPlatformLinkInput, setShowPlatformLinkInput] = useState(false);
   const [selectedHookId, setSelectedHookId] = useState<number | null>(null);
   const [disclosureEnabled, setDisclosureEnabled] = useState(false);
   const [gallerySaved, setGallerySaved] = useState(false);
@@ -427,21 +424,6 @@ export function PostCaptureWorkflow({
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     setIsUploading(false);
   }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry, bgmRecommendation]);
-
-  const handleShareText = useCallback(async () => {
-    const baseText = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
-    const text = platformLink.trim() ? `${baseText}\n\n${platformLink.trim()}` : baseText;
-    setShowPlatformLinkInput(true);
-    if (Platform.OS === 'web') {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch { /* ignore */ }
-    } else {
-      try {
-        await RNShare.share({ message: text });
-      } catch { /* ignore */ }
-    }
-  }, [customPrompt, platformLink]);
 
   if (!visible) return null;
 
@@ -757,13 +739,7 @@ export function PostCaptureWorkflow({
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnSecondary} onPress={handleShareText} activeOpacity={0.7}>
-              <Share2 size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.actionBtnSecondaryText}>공유 문구 복사</Text>
-            </TouchableOpacity>
-
-            {showPlatformLinkInput && (
-              <View style={styles.platformLinkBox}>
+            <View style={styles.platformLinkBox}>
                 <Text style={styles.platformLinkLabel}>플랫폼 링크 직접 입력</Text>
                 <TextInput
                   style={styles.platformLinkInput}
@@ -776,9 +752,8 @@ export function PostCaptureWorkflow({
                   keyboardType="url"
                   returnKeyType="done"
                 />
-                <Text style={styles.platformLinkHint}>다시 복사하면 입력한 링크가 공유 문구에 포함됩니다.</Text>
-              </View>
-            )}
+                <Text style={styles.platformLinkHint}>입력한 링크는 플랫폼 업로드와 함께 사용할 수 있습니다.</Text>
+            </View>
 
             {fallbackUsed && !uploadDone && (
               <Text style={styles.fallbackHint}>
@@ -1501,46 +1476,6 @@ const styles = StyleSheet.create({
   actionBtnShare: {
     backgroundColor: theme.colors.accent[500],
     opacity: 1,
-  },
-  actionBtnSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-  },
-  actionBtnSecondaryText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  stepHint: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.warning[400],
-    textAlign: 'center',
-  },
-  proceedBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.warning[500],
-    marginTop: 4,
-  },
-  proceedBtnText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
-  proceedBtnFallback: {
-    backgroundColor: theme.colors.accent[500],
   },
   fallbackHint: {
     fontSize: 11,
