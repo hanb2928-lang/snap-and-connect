@@ -31,7 +31,6 @@ import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import type { MoodFilterType } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
-import { CreditBalanceBadge } from '@/components/CreditBalanceBadge';
 import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { WebCameraView, type CaptureModeType } from '@/components/WebCameraView';
@@ -553,7 +552,6 @@ export default function CameraScreen() {
             <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
             <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
           </TouchableOpacity>
-          <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} layout="stacked" />
         </View>
 
         <CreditPurchaseModal
