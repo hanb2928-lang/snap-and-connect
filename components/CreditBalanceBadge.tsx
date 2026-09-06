@@ -39,7 +39,7 @@ export function CreditBalanceBadge({ onPress, compact = false }: CreditBalanceBa
       <Text style={[styles.balance, isLow && styles.balanceLow]}>
         {balance ? balance.balance.toLocaleString() : '...'}
       </Text>
-      {!compact && <Text style={styles.unit}>크레딧</Text>}
+      {!compact && <Text style={styles.unit}>크레딧 충전</Text>}
       <View style={[styles.plusIcon, compact && styles.plusIconCompact]}>
         <Plus size={compact ? 10 : 12} color="#fff" strokeWidth={2.5} />
       </View>

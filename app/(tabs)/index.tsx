@@ -518,9 +518,9 @@ export default function CameraScreen() {
       <View style={styles.modeSelectContainer}>
         <View style={[styles.modeSelectHeader, { paddingTop: safeTop + theme.spacing.lg }]}>
           <View style={styles.modeSelectHeaderLeft}>
-            <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} compact />
+            <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} />
           </View>
-          <Text style={styles.modeSelectTitle}>15초 숏폼 만들기</Text>
+          <View style={{ flex: 1 }} />
           <View style={{ width: 80 }} />
         </View>
 
@@ -868,12 +868,6 @@ const styles = StyleSheet.create({
   },
   modeSelectHeaderLeft: {
     width: 80,
-  },
-  modeSelectTitle: {
-    fontSize: 18,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-    textAlign: 'center',
   },
   modeCardsWrap: {
     flex: 1,
