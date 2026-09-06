@@ -7,9 +7,10 @@ import { getCreditBalance, type CreditBalance } from '@/lib/credits';
 interface CreditBalanceBadgeProps {
   onPress?: () => void;
   compact?: boolean;
+  layout?: 'horizontal' | 'stacked';
 }
 
-export function CreditBalanceBadge({ onPress, compact = false }: CreditBalanceBadgeProps) {
+export function CreditBalanceBadge({ onPress, compact = false, layout = 'horizontal' }: CreditBalanceBadgeProps) {
   const [balance, setBalance] = useState<CreditBalance | null>(null);
 
   const loadBalance = useCallback(async () => {
@@ -28,6 +29,28 @@ export function CreditBalanceBadge({ onPress, compact = false }: CreditBalanceBa
   }, [loadBalance]);
 
   const isLow = balance !== null && balance.balance <= 3;
+  const isStacked = layout === 'stacked';
+
+  if (isStacked) {
+    return (
+      <TouchableOpacity
+        style={[styles.stackedContainer, isLow && styles.containerLow]}
+        onPress={onPress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.stackedIconRow}>
+          <Coins size={20} color={isLow ? theme.colors.error[400] : theme.colors.warning[400]} strokeWidth={2} />
+          <View style={[styles.plusIcon, styles.plusIconStacked]}>
+            <Plus size={11} color="#fff" strokeWidth={2.5} />
+          </View>
+        </View>
+        <Text style={[styles.stackedBalance, isLow && styles.balanceLow]}>
+          {balance ? `${balance.balance.toLocaleString()} 크레딧` : '... 크레딧'}
+        </Text>
+        <Text style={styles.stackedLabel}>크레딧 충전</Text>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -90,5 +113,33 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
+  },
+  // Stacked layout (icon on top, text below)
+  stackedContainer: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm + 2,
+    gap: 4,
+    marginTop: theme.spacing.sm,
+  },
+  stackedIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  plusIconStacked: {
+    marginLeft: 0,
+  },
+  stackedBalance: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  stackedLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
 });

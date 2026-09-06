@@ -517,9 +517,7 @@ export default function CameraScreen() {
     return (
       <View style={styles.modeSelectContainer}>
         <View style={[styles.modeSelectHeader, { paddingTop: safeTop + theme.spacing.lg }]}>
-          <View style={styles.modeSelectHeaderLeft}>
-            <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} />
-          </View>
+          <View style={{ width: 80 }} />
           <View style={{ flex: 1 }} />
           <View style={{ width: 80 }} />
         </View>
@@ -555,6 +553,7 @@ export default function CameraScreen() {
             <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
             <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
           </TouchableOpacity>
+          <CreditBalanceBadge onPress={() => setCreditModalVisible(true)} layout="stacked" />
         </View>
 
         <CreditPurchaseModal
