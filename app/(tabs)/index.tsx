@@ -25,6 +25,7 @@ import Animated, {
 import { theme } from '@/lib/theme';
 import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
 import { saveManualScan, uploadImage } from '@/lib/analysis';
+import { supabase } from '@/lib/supabase';
 import { isOnline } from '@/hooks/useNetworkStatus';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
@@ -392,6 +393,21 @@ export default function CameraScreen() {
       try {
         const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
         const scanId = await saveManualScan(imageUrl);
+        // Upload remaining 4 photos and save as additional_image_urls
+        const additionalShots = sorted.slice(1);
+        if (additionalShots.length > 0) {
+          const additionalUrls: string[] = [];
+          for (const shot of additionalShots) {
+            if (!shot.base64) continue;
+            try {
+              const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
+              additionalUrls.push(url);
+            } catch { /* skip failed uploads */ }
+          }
+          if (additionalUrls.length > 0) {
+            await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+          }
+        }
         router.push({ pathname: '/editor', params: { id: scanId } });
       } catch (err) {
         if (!isMountedRef.current) return;

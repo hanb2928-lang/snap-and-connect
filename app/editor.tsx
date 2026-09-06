@@ -10,18 +10,15 @@ import {
   TextInput,
   Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
-  Scissors,
-  Type,
-  Sticker,
   Check,
   X,
   Trash2,
   Undo2,
-  Zap,
   Instagram,
   AtSign,
   Pin,
@@ -92,6 +89,8 @@ const STICKER_EMOJIS = ['🔥', '✨', '💯', '👍', '❤️', '🛒', '💰',
 const STICKER_DISPLAY_SIZE = 44;
 const STICKER_RENDER_SIZE = 88;
 
+const ANGLE_LABELS = ['정면', '좌측', '우측', '후면', '상부'];
+
 function emojiToDataUrl(emoji: string, size: number): string {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return '';
   const canvas = document.createElement('canvas');
@@ -116,6 +115,8 @@ export default function EditorScreen() {
   const [loading, setLoading] = useState(true);
   const [imageUri, setImageUri] = useState<string>('');
   const [originalUri, setOriginalUri] = useState<string>('');
+  const [allImages, setAllImages] = useState<string[]>([]);
+  const [selectedThumbIndex, setSelectedThumbIndex] = useState(0);
   const [imageSize, setImageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [editMode, setEditMode] = useState<EditMode>('none');
   const [processing, setProcessing] = useState(false);
@@ -213,6 +214,9 @@ export default function EditorScreen() {
 
         setImageUri(uri);
         setOriginalUri(scanData.image_url);
+        // Build all-images list: primary + additional
+        const additional = (scanData.additional_image_urls || []).filter(Boolean) as string[];
+        setAllImages([scanData.image_url, ...additional]);
         try {
           const size = await getImageSize(uri);
           setImageSize(size);
@@ -541,28 +545,15 @@ export default function EditorScreen() {
       const hasOverlays = textOverlays.length > 0 || stickers.length > 0;
 
       if (hasOverlays && imageWrapRef.current) {
-        if (Platform.OS === 'web') {
-          // Canvas capture removed — use captureRef instead
-          const capturedUri = await captureRef(imageWrapRef, {
-            format: 'png',
-            quality: 1,
-            fileName: `${scan.id}-edited.png`,
-          });
-          const result = await readUriAsBase64(capturedUri);
-          base64 = result.base64;
-          mimeType = result.mimeType;
-        } else {
-          const capturedUri = await captureRef(imageWrapRef, {
-            format: 'png',
-            quality: 1,
-            fileName: `${scan.id}-edited.png`,
-          });
-          const result = await readUriAsBase64(capturedUri);
-          base64 = result.base64;
-          mimeType = result.mimeType;
-        }
+        const capturedUri = await captureRef(imageWrapRef, {
+          format: 'png',
+          quality: 1,
+          fileName: `${scan.id}-edited.png`,
+        });
+        const result = await readUriAsBase64(capturedUri);
+        base64 = result.base64;
+        mimeType = result.mimeType;
       } else if (Platform.OS === 'web') {
-        // imageUri is already a data URL on web
         mimeType = imageUri.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
         base64 = cleanBase64(imageUri);
       } else {
@@ -587,7 +578,7 @@ export default function EditorScreen() {
         await supabase.from('scans').update({ custom_affiliate_links: customLinks }).eq('id', scan.id);
       }
       setProcessing(false);
-      router.back();
+      router.replace({ pathname: '/result/[id]', params: { id: scan.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장 실패');
       setProcessing(false);
@@ -608,11 +599,12 @@ export default function EditorScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: safeTop + 12 }]}>
         <TouchableOpacity style={styles.iconButton} onPress={() => router.back()} activeOpacity={0.7}>
           <ArrowLeft size={22} color={theme.colors.dark.text} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.topTitle}>사진 편집</Text>
+        <Text style={styles.topTitle}>스틸컷 편집</Text>
         <View style={styles.topActions}>
           {canUndo && (
             <TouchableOpacity style={styles.iconButton} onPress={handleUndo} activeOpacity={0.7}>
@@ -622,17 +614,41 @@ export default function EditorScreen() {
           <TouchableOpacity style={styles.iconButton} onPress={handleReset} activeOpacity={0.7}>
             <Trash2 size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.iconButton, styles.saveIconButton]}
-            onPress={handleSave}
-            disabled={processing}
-            activeOpacity={0.7}
-          >
-            <Check size={20} color="#fff" strokeWidth={2} />
-          </TouchableOpacity>
         </View>
       </View>
 
+      {/* Section 1: Thumbnail carousel */}
+      {allImages.length > 0 && (
+        <View style={styles.carouselSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+          >
+            {allImages.map((uri, i) => (
+              <TouchableOpacity
+                key={`thumb-${i}`}
+                style={[
+                  styles.thumbnail,
+                  selectedThumbIndex === i && styles.thumbnailActive,
+                ]}
+                onPress={() => {
+                  setSelectedThumbIndex(i);
+                  setImageUri(uri);
+                }}
+                activeOpacity={0.8}
+              >
+                <Image source={{ uri }} style={styles.thumbnailImg} resizeMode="cover" />
+                <View style={styles.thumbnailLabelWrap}>
+                  <Text style={styles.thumbnailLabel}>{ANGLE_LABELS[i] || `사진 ${i + 1}`}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Section 2: Main preview with overlays */}
       <View style={styles.previewWrap} onLayout={(e) => setPreviewArea({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         <View ref={imageWrapRef} style={[styles.imageWrap, { width: imageDisplayWidth, height: imageDisplayHeight }]}>
           {imageUri ? (
@@ -686,7 +702,6 @@ export default function EditorScreen() {
               </View>
             );
           })}
-
         </View>
 
         {error && (
@@ -699,200 +714,181 @@ export default function EditorScreen() {
         )}
       </View>
 
-      {/* Platform & Link Panel */}
-      {editMode === 'none' && !loading && (
-        <View style={[styles.linkPanel, { paddingBottom: theme.spacing.sm + insets.bottom }]}>
-          <TouchableOpacity
-            style={styles.linkPanelHeader}
-            onPress={() => setLinkPanelVisible((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.linkPanelHeaderLeft}>
-              <LinkIcon size={18} color={theme.colors.primary[400]} strokeWidth={2} />
-              <Text style={styles.linkPanelTitle}>플랫폼 & 링크</Text>
-              {linkEntries.length > 0 && (
-                <View style={styles.linkCountBadge}>
-                  <Text style={styles.linkCountText}>{linkEntries.length}</Text>
+      {/* Section 3: Platform chips — horizontal scroll */}
+      <View style={styles.platformSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.platformChipRow}
+        >
+          {PLATFORM_OPTIONS.map((opt) => {
+            const selected = selectedPlatforms.includes(opt.key);
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.platformChip,
+                  { borderColor: selected ? opt.color : theme.colors.dark.border },
+                  selected && { backgroundColor: opt.color + '22' },
+                ]}
+                onPress={() => {
+                  setSelectedPlatforms((prev) =>
+                    prev.includes(opt.key)
+                      ? prev.filter((k) => k !== opt.key)
+                      : [...prev, opt.key],
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.platformChipIcon, { backgroundColor: selected ? opt.color : theme.colors.dark.surfaceLight }]}>
+                  {opt.icon}
                 </View>
-              )}
-            </View>
-            {linkPanelVisible ? (
-              <ChevronDown size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronUp size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.platformChipLabel,
+                    { color: selected ? theme.colors.dark.text : theme.colors.dark.textDim },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-          {linkPanelVisible && (
-            <View style={styles.linkPanelBody}>
-              {/* Platform selection */}
-              <Text style={styles.linkSectionLabel}>게시 플랫폼</Text>
-              <View style={styles.platformRow}>
-                {PLATFORM_OPTIONS.map((opt) => {
-                  const selected = selectedPlatforms.includes(opt.key);
+      {/* Section 4: Collapsible link panel */}
+      <View style={styles.linkPanelContainer}>
+        <TouchableOpacity
+          style={styles.linkPanelHeader}
+          onPress={() => setLinkPanelVisible((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.linkPanelHeaderLeft}>
+            <LinkIcon size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+            <Text style={styles.linkPanelTitle}>맞춤 링크</Text>
+            {linkEntries.length > 0 && (
+              <View style={styles.linkCountBadge}>
+                <Text style={styles.linkCountText}>{linkEntries.length}</Text>
+              </View>
+            )}
+          </View>
+          {linkPanelVisible ? (
+            <ChevronDown size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+          ) : (
+            <ChevronUp size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
+
+        {linkPanelVisible && (
+          <ScrollView style={styles.linkPanelScroll} nestedScrollEnabled>
+            {/* Link input row */}
+            <View style={styles.linkInputRow}>
+              <TouchableOpacity
+                style={styles.linkPlatformPickerBtn}
+                onPress={() => setNewLinkPlatform(
+                  PLATFORM_OPTIONS[(PLATFORM_OPTIONS.findIndex((p) => p.key === newLinkPlatform) + 1) % PLATFORM_OPTIONS.length].key,
+                )}
+                activeOpacity={0.7}
+              >
+                {(() => {
+                  const opt = PLATFORM_OPTIONS.find((p) => p.key === newLinkPlatform);
                   return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[
-                        styles.platformChip,
-                        { borderColor: selected ? opt.color : theme.colors.dark.border },
-                        selected && { backgroundColor: opt.color + '22' },
-                      ]}
-                      onPress={() => {
-                        setSelectedPlatforms((prev) =>
-                          prev.includes(opt.key)
-                            ? prev.filter((k) => k !== opt.key)
-                            : [...prev, opt.key],
-                        );
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.platformChipIcon, { backgroundColor: selected ? opt.color : theme.colors.dark.surfaceLight }]}>
-                        {opt.icon}
+                    <>
+                      <View style={[styles.linkPlatformDot, { backgroundColor: opt?.color || theme.colors.dark.surfaceLight }]}>
+                        {opt?.icon}
                       </View>
-                      <Text
-                        style={[
-                          styles.platformChipLabel,
-                          { color: selected ? theme.colors.dark.text : theme.colors.dark.textDim },
-                        ]}
+                      <Text style={styles.linkPlatformPickerLabel}>{opt?.label}</Text>
+                    </>
+                  );
+                })()}
+              </TouchableOpacity>
+              <TextInput
+                style={styles.linkTextInput}
+                value={newLinkLabel}
+                onChangeText={setNewLinkLabel}
+                placeholder="링크 이름 (선택)"
+                placeholderTextColor={theme.colors.dark.textFaint}
+              />
+              <TextInput
+                style={styles.linkUrlInput}
+                value={newLinkUrl}
+                onChangeText={setNewLinkUrl}
+                placeholder="https://..."
+                placeholderTextColor={theme.colors.dark.textFaint}
+                keyboardType="url"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.linkAddBtn}
+                onPress={() => {
+                  if (!newLinkUrl.trim()) return;
+                  setLinkEntries((prev) => [
+                    ...prev,
+                    {
+                      id: `link-${Date.now()}`,
+                      platform: newLinkPlatform,
+                      label: newLinkLabel.trim() || '',
+                      url: newLinkUrl.trim(),
+                    },
+                  ]);
+                  setNewLinkLabel('');
+                  setNewLinkUrl('');
+                  setSelectedPlatforms((prev) =>
+                    prev.includes(newLinkPlatform) ? prev : [...prev, newLinkPlatform],
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <Plus size={22} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Saved links list */}
+            {linkEntries.length > 0 && (
+              <View style={styles.linkList}>
+                {linkEntries.map((entry) => {
+                  const platformOpt = PLATFORM_OPTIONS.find((p) => p.key === entry.platform);
+                  return (
+                    <View key={entry.id} style={styles.linkItem}>
+                      <View style={[styles.linkItemIcon, { backgroundColor: platformOpt?.color || theme.colors.dark.surfaceLight }]}>
+                        {platformOpt?.icon}
+                      </View>
+                      <View style={styles.linkItemText}>
+                        <Text style={styles.linkItemLabel} numberOfLines={1}>
+                          {entry.label || platformOpt?.label || '링크'}
+                        </Text>
+                        <Text style={styles.linkItemUrl} numberOfLines={1}>{entry.url}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.linkItemDelete}
+                        onPress={() => setLinkEntries((prev) => prev.filter((l) => l.id !== entry.id))}
+                        activeOpacity={0.7}
                       >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
+                        <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                      </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
+            )}
+          </ScrollView>
+        )}
+      </View>
 
-              {/* Link input */}
-              <Text style={styles.linkSectionLabel}>링크 추가</Text>
-              <View style={styles.linkInputRow}>
-                <View style={styles.linkPlatformSelect}>
-                  {PLATFORM_OPTIONS.map((opt) => {
-                    const selected = newLinkPlatform === opt.key;
-                    return (
-                      <TouchableOpacity
-                        key={opt.key}
-                        style={[
-                          styles.linkPlatformDot,
-                          { backgroundColor: selected ? opt.color : theme.colors.dark.surfaceLight },
-                        ]}
-                        onPress={() => setNewLinkPlatform(opt.key)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.linkPlatformDotLabel} numberOfLines={1}>
-                          {opt.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <TextInput
-                  style={styles.linkTextInput}
-                  value={newLinkLabel}
-                  onChangeText={setNewLinkLabel}
-                  placeholder="링크 이름"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                />
-                <TextInput
-                  style={styles.linkUrlInput}
-                  value={newLinkUrl}
-                  onChangeText={setNewLinkUrl}
-                  placeholder="https://..."
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={styles.linkAddBtn}
-                  onPress={() => {
-                    if (!newLinkUrl.trim()) return;
-                    setLinkEntries((prev) => [
-                      ...prev,
-                      {
-                        id: `link-${Date.now()}`,
-                        platform: newLinkPlatform,
-                        label: newLinkLabel.trim() || '',
-                        url: newLinkUrl.trim(),
-                      },
-                    ]);
-                    setNewLinkLabel('');
-                    setNewLinkUrl('');
-                    setSelectedPlatforms((prev) =>
-                      prev.includes(newLinkPlatform) ? prev : [...prev, newLinkPlatform],
-                    );
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={20} color="#fff" strokeWidth={2.5} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Saved links list */}
-              {linkEntries.length > 0 && (
-                <View style={styles.linkList}>
-                  {linkEntries.map((entry) => {
-                    const platformOpt = PLATFORM_OPTIONS.find((p) => p.key === entry.platform);
-                    return (
-                      <View key={entry.id} style={styles.linkItem}>
-                        <View style={[styles.linkItemIcon, { backgroundColor: platformOpt?.color || theme.colors.dark.surfaceLight }]}>
-                          {platformOpt?.icon}
-                        </View>
-                        <View style={styles.linkItemText}>
-                          <Text style={styles.linkItemLabel} numberOfLines={1}>
-                            {entry.label || platformOpt?.label || '링크'}
-                          </Text>
-                          <Text style={styles.linkItemUrl} numberOfLines={1}>{entry.url}</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.linkItemDelete}
-                          onPress={() => setLinkEntries((prev) => prev.filter((l) => l.id !== entry.id))}
-                          activeOpacity={0.7}
-                        >
-                          <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      )}
-
-      {editMode === 'none' && (
-        <View style={[styles.toolBar, { paddingBottom: theme.spacing.md + insets.bottom }]}>
-          <View style={styles.toolRow}>
-            <ToolButton
-              icon={<Zap size={18} color={theme.colors.warning[400]} strokeWidth={2} />}
-              label="0.1초 누끼"
-              onPress={handleQuickRemoveBg}
-              disabled={processing}
-              highlight
-            />
-            <ToolButton
-              icon={<Scissors size={18} color={theme.colors.accent[400]} strokeWidth={2} />}
-              label="AI 배경제거"
-              onPress={handleRemoveBg}
-              disabled={processing}
-              highlight
-            />
-            <ToolButton
-              icon={<Type size={18} color={theme.colors.warning[400]} strokeWidth={2} />}
-              label="텍스트"
-              onPress={handleAddText}
-              disabled={processing}
-            />
-            <ToolButton
-              icon={<Sticker size={18} color={theme.colors.success[400]} strokeWidth={2} />}
-              label="스티커"
-              onPress={() => setStickerModalVisible(true)}
-              disabled={processing}
-            />
-          </View>
-        </View>
-      )}
+      {/* Section 5: Sticky CTA */}
+      <View style={[styles.stickyCtaWrap, { paddingBottom: insets.bottom + theme.spacing.sm }]}>
+        <TouchableOpacity
+          style={styles.stickyCtaBtn}
+          onPress={handleSave}
+          disabled={processing}
+          activeOpacity={0.8}
+        >
+          <Check size={22} color="#fff" strokeWidth={2.5} />
+          <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
+        </TouchableOpacity>
+      </View>
 
       <BackgroundPicker
         visible={bgPickerVisible}
@@ -1007,32 +1003,6 @@ export default function EditorScreen() {
   );
 }
 
-function ToolButton({
-  icon,
-  label,
-  onPress,
-  disabled,
-  highlight,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  highlight?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.toolButton, highlight && styles.toolButtonHighlight]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-    >
-      <View style={styles.toolIconWrap}>{icon}</View>
-      <Text style={styles.toolLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1071,8 +1041,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  saveIconButton: {
-    backgroundColor: theme.colors.primary[500],
+  // Carousel
+  carouselSection: {
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.bg,
+  },
+  carouselContent: {
+    paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  thumbnail: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: theme.colors.dark.border,
+    position: 'relative',
+  },
+  thumbnailActive: {
+    borderColor: theme.colors.primary[400],
+  },
+  thumbnailImg: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailLabelWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(10,15,30,0.6)',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  thumbnailLabel: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#fff',
+    textAlign: 'center',
   },
   previewWrap: {
     flex: 1,
@@ -1126,37 +1133,6 @@ const styles = StyleSheet.create({
   },
   stickerText: {
     fontSize: 40,
-  },
-  toolBar: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.dark.surface,
-  },
-  toolRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
-  },
-  toolButton: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 2,
-  },
-  toolButtonHighlight: {},
-  toolIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toolLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
   },
   overlaySummary: {
     flexDirection: 'row',
@@ -1345,12 +1321,23 @@ const styles = StyleSheet.create({
   stickerCellText: {
     fontSize: 32,
   },
-  // Link panel
-  linkPanel: {
+  // Platform chips section
+  platformSection: {
+    paddingVertical: theme.spacing.xs,
+    backgroundColor: theme.colors.dark.surface,
     borderTopWidth: 1,
     borderTopColor: theme.colors.dark.border,
+  },
+  platformChipRow: {
+    paddingHorizontal: theme.spacing.md,
+    gap: theme.spacing.xs,
+  },
+  // Link panel
+  linkPanelContainer: {
     backgroundColor: theme.colors.dark.surface,
-    maxHeight: '55%',
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+    maxHeight: 240,
   },
   linkPanelHeader: {
     flexDirection: 'row',
@@ -1382,23 +1369,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
   },
-  linkPanelBody: {
+  linkPanelScroll: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    gap: theme.spacing.sm,
-  },
-  linkSectionLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: theme.spacing.xs,
-  },
-  platformRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.xs,
   },
   platformChip: {
     flexDirection: 'row',
@@ -1427,22 +1400,26 @@ const styles = StyleSheet.create({
     gap: 6,
     flexWrap: 'wrap',
   },
-  linkPlatformSelect: {
+  linkPlatformPickerBtn: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    width: '100%',
-    marginBottom: 4,
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  linkPlatformPickerLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
   },
   linkPlatformDot: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: theme.radius.sm,
-  },
-  linkPlatformDotLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: '#fff',
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   linkTextInput: {
     flex: 1,
@@ -1514,5 +1491,28 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Sticky CTA
+  stickyCtaWrap: {
+    backgroundColor: theme.colors.dark.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+  },
+  stickyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    paddingVertical: theme.spacing.md + 2,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[600],
+  },
+  stickyCtaText: {
+    fontSize: 17,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
