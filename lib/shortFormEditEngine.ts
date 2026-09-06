@@ -89,12 +89,6 @@ export function generateHookOptions(customPrompt: string, productName?: string):
     for (const template of trigger.templates) {
       if (hooks.length >= 3) break;
       let text = template.replace('이거', nameShort);
-      if (customPrompt.trim()) {
-        const promptHint = customPrompt.trim().split(/[,.]/)[0].trim();
-        if (promptHint.length <= 15) {
-          text = `${text} · ${promptHint}`;
-        }
-      }
       if (!usedTexts.has(text)) {
         usedTexts.add(text);
         hooks.push({
@@ -201,11 +195,11 @@ const BENEFIT_TEMPLATES: Record<EmotionPhase, string[]> = {
 };
 
 const CTA_TEMPLATES: Record<EmotionPhase, string[]> = {
-  curiosity: ['더 자세히 보려면 링크 클릭', '프로필에서 전체 정보 확인', '궁금하면 지금 바로가기'],
-  shock: ['지금 안 가면 손해입니다', '품절 전 프로필 링크 클릭', '서둘러야 예약 가능'],
-  empathy: ['쓸 분들은 바로 확인', '프로필 링크에서 만나보기', '경험자 추천 링크 확인'],
-  desire: ['지금 경험하러 가기', '프로필 링크에서 바로', '이 순간이 시작입니다'],
-  action: ['주문하러 프로필 링크로', '지금 클릭하면 혜택 적용', '바로 구매 가능합니다'],
+  curiosity: ['지금 바로 확인해보세요', '더 알고 싶다면 영상 끝까지', '이거 진짜였어요'],
+  shock: ['지금 안 보면 손해입니다', '품절 전에 빠르게 확인', '서둘러야 놓치지 않아요'],
+  empathy: ['쓸 분들은 주목하세요', '진짜 후기가 말해줘요', '경험해보면 알게 돼요'],
+  desire: ['지금 바로 시작하세요', '이 순간이 시작입니다', '경험해보면 차이를 느껴요'],
+  action: ['함께 확인해볼까요', '지금이 최적 타이밍', '누구나 만족하는 선택'],
 };
 
 function pickTemplate(
