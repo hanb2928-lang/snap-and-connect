@@ -197,22 +197,10 @@ export default function CameraScreen() {
   }, []);
 
   const handleVideoRecorded = useCallback(async (videoUri: string) => {
-    const genId = genIdRef.current;
-    try {
-      const { base64, mimeType } = await withTimeout(
-        compressImageToBase64(videoUri, 1080, 0.7),
-        PICK_TIMEOUT_MS,
-        '동영상 압축',
-      );
-      if (!isMountedRef.current || genIdRef.current !== genId) return;
-      setPostCaptureBase64(base64);
-      setPostCaptureMime(mimeType);
-      setPostCaptureVideoUri(videoUri);
-      setPostCaptureVisible(true);
-    } catch (err) {
-      if (!isMountedRef.current || genIdRef.current !== genId) return;
-      setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
-    }
+    setPostCaptureVideoUri(videoUri);
+    setPostCaptureBase64(null);
+    setPostCaptureMime('video/webm');
+    setPostCaptureVisible(true);
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -256,8 +244,21 @@ export default function CameraScreen() {
     setPostCaptureVisible(false);
     if (postCaptureBase64) {
       await runAutoAnalysis(postCaptureBase64, postCaptureMime);
+      return;
     }
-  }, [runAutoAnalysis, postCaptureBase64, postCaptureMime]);
+    if (!postCaptureVideoUri) return;
+    try {
+      const { base64, mimeType } = await withTimeout(
+        compressImageToBase64(postCaptureVideoUri, 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '동영상 압축',
+      );
+      await runAutoAnalysis(base64, mimeType);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
+    }
+  }, [runAutoAnalysis, postCaptureBase64, postCaptureMime, postCaptureVideoUri]);
 
   const handlePostCaptureClose = useCallback(() => {
     setPostCaptureVisible(false);
@@ -465,7 +466,10 @@ export default function CameraScreen() {
   };
 
   const handleWebCapture = async (base64: string, mimeType: string) => {
-    await runAutoAnalysis(base64, mimeType);
+    setPostCaptureBase64(base64);
+    setPostCaptureMime(mimeType);
+    setPostCaptureVideoUri(null);
+    setPostCaptureVisible(true);
   };
 
   const handleModeSelect = (mode: CaptureModeType) => {
