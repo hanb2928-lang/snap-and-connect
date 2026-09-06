@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   Play,
   Pause,
@@ -41,7 +44,58 @@ function getSegmentPositionStyle(position: EditSegment['position']): ViewStyle {
 export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const webVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Resolve video URI to a playable source on all platforms
+  useEffect(() => {
+    if (!videoUri) {
+      setVideoSrc(null);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      setVideoSrc(videoUri);
+      return;
+    }
+    // Native: convert file URI to base64 data URI for WebView playback
+    if (videoUri.startsWith('data:') || videoUri.startsWith('blob:')) {
+      setVideoSrc(videoUri);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(videoUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (cancelled) return;
+        setVideoSrc(`data:video/mp4;base64,${base64}`);
+      } catch {
+        if (!cancelled) setVideoSrc(videoUri);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [videoUri]);
+
+  // Sync web video element play/pause with isPlaying state
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
+    if (isPlaying) {
+      webVideoRef.current.play().catch(() => {});
+    } else {
+      webVideoRef.current.pause();
+    }
+  }, [isPlaying, videoSrc]);
+
+  // Sync web video element current time with preview timer
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
+    const targetTime = currentSec;
+    if (Math.abs(webVideoRef.current.currentTime - targetTime) > 0.5) {
+      webVideoRef.current.currentTime = targetTime;
+    }
+  }, [currentSec, videoSrc]);
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
@@ -100,6 +154,15 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
   const progressPercent = (currentSec / TOTAL_DURATION) * 100;
   const isBgmActive = currentSec > 0 && currentSec < TOTAL_DURATION;
 
+  // Build HTML for native WebView video playback
+  const videoHtml = useMemo(() => {
+    if (!videoSrc) return '';
+    const playCmd = isPlaying ? 'play()' : 'pause()';
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" muted loop playsinline webkit-playsinline></video><script>var v=document.getElementById('v');v.${playCmd};</script></body></html>`;
+  }, [videoSrc, isPlaying]);
+
+  const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
+
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
@@ -109,11 +172,36 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {videoUri ? (
-            <View style={styles.videoPlaceholder}>
-              <Text style={styles.videoPlaceholderText}>촬영된 영상</Text>
-              <Text style={styles.videoPlaceholderHint}>{editPlan.platformLabel} · {editPlan.spec?.ratio ?? '9:16'}</Text>
-            </View>
+          {videoSrc ? (
+            Platform.OS === 'web' ? (
+              // @ts-ignore web-only video element
+              <video
+                ref={webVideoRef}
+                src={videoSrc}
+                muted
+                loop
+                playsInline
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover' as const,
+                  backgroundColor: '#000',
+                }}
+              />
+            ) : (
+              <WebView
+                key={videoSrc}
+                source={webviewSource}
+                style={styles.webViewFill}
+                javaScriptEnabled
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                scrollEnabled={false}
+                mixedContentMode="always"
+                originWhitelist={['*']}
+                allowFileAccess
+              />
+            )
           ) : (
             <View style={styles.videoPlaceholder}>
               <Text style={styles.videoPlaceholderText}>영상 없음</Text>
@@ -246,6 +334,11 @@ const styles = StyleSheet.create({
   videoArea: {
     flex: 1,
     position: 'relative',
+  },
+  webViewFill: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
   },
   videoPlaceholder: {
     flex: 1,

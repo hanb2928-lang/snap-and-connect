@@ -86,6 +86,10 @@ export function PostCaptureWorkflow({
   const [platformLaunched, setPlatformLaunched] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadDone, setUploadDone] = useState(false);
+  const [uploadRetrying, setUploadRetrying] = useState(false);
+  const [uploadRetryCount, setUploadRetryCount] = useState(0);
+  const [fallbackUsed, setFallbackUsed] = useState(false);
+  const [uploadErrorMsg, setUploadErrorMsg] = useState<string | null>(null);
 
   const selectedOption = PLATFORM_OPTIONS.find((o) => o.key === selectedPlatformKey) ?? PLATFORM_OPTIONS[0];
   const platformInfo = useMemo(() => getPlatformInfo(selectedOption.platformKey), [selectedOption.platformKey]);
@@ -150,42 +154,88 @@ export function PostCaptureWorkflow({
     }
   }, [selectedPlatformKey]);
 
+  const uriToBlob = useCallback(async (uri: string): Promise<Blob> => {
+    if (uri.startsWith('data:')) {
+      const resp = await fetch(uri);
+      return resp.blob();
+    }
+    if (uri.startsWith('blob:') || uri.startsWith('http') || uri.startsWith('file:')) {
+      const resp = await fetch(uri);
+      return resp.blob();
+    }
+    const resp = await fetch(uri);
+    return resp.blob();
+  }, []);
+
+  const uploadWithRetry = useCallback(async (
+    blob: Blob,
+    fileName: string,
+    maxRetries: number,
+  ): Promise<boolean> => {
+    let lastError: string | null = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          setUploadRetrying(true);
+          setUploadRetryCount(attempt);
+          const delayMs = Math.min(1000 * Math.pow(2, attempt), 8000);
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+        const { error } = await supabase.storage
+          .from('videos')
+          .upload(fileName, blob, { contentType: 'video/mp4', upsert: false });
+        if (error) throw error;
+        setUploadRetrying(false);
+        return true;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        setUploadErrorMsg(lastError);
+      }
+    }
+    setUploadRetrying(false);
+    return false;
+  }, []);
+
   const handleProceed = useCallback(async () => {
     if (isUploading || uploadDone) return;
     setIsUploading(true);
-    try {
-      if (videoUri) {
-        const fileName = `shortform-${Date.now()}.mp4`;
-        if (Platform.OS === 'web') {
-          const resp = await fetch(videoUri);
-          const blob = await resp.blob();
-          await supabase.storage.from('videos').upload(fileName, blob, { contentType: 'video/mp4' });
-        } else {
-          const fileResp = await fetch(videoUri);
-          const blob = await fileResp.blob();
-          await supabase.storage.from('videos').upload(fileName, blob, { contentType: 'video/mp4' });
-        }
-      }
-      setUploadDone(true);
-      const deepLink = getDeepLink(selectedPlatformKey);
+    setUploadErrorMsg(null);
+    setUploadRetryCount(0);
+
+    let cloudSuccess = false;
+
+    if (videoUri) {
       try {
-        const canOpen = await Linking.canOpenURL(deepLink.appUrl);
-        if (canOpen) {
-          await Linking.openURL(deepLink.appUrl);
-        } else {
-          await Linking.openURL(deepLink.webUrl);
-        }
-        setPlatformLaunched(true);
+        const blob = await uriToBlob(videoUri);
+        const fileName = `shortform-${Date.now()}.mp4`;
+        cloudSuccess = await uploadWithRetry(blob, fileName, 3);
       } catch {
-        // platform launch is best-effort
+        cloudSuccess = false;
       }
-      onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
-    } catch {
-      // upload failed — still proceed to analysis so user isn't blocked
-      onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     }
+
+    if (cloudSuccess) {
+      setUploadDone(true);
+    } else {
+      setFallbackUsed(true);
+    }
+
+    const deepLink = getDeepLink(selectedPlatformKey);
+    try {
+      const canOpen = await Linking.canOpenURL(deepLink.appUrl);
+      if (canOpen) {
+        await Linking.openURL(deepLink.appUrl);
+      } else {
+        await Linking.openURL(deepLink.webUrl);
+      }
+      setPlatformLaunched(true);
+    } catch {
+      // platform launch is best-effort
+    }
+
+    onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     setIsUploading(false);
-  }, [isUploading, uploadDone, videoUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis]);
+  }, [isUploading, uploadDone, videoUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
 
   const handleShareText = useCallback(async () => {
     const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
@@ -488,20 +538,35 @@ export function PostCaptureWorkflow({
             )}
 
             <TouchableOpacity
-              style={[styles.proceedBtn, uploadDone && styles.actionBtnDone]}
+              style={[styles.proceedBtn, uploadDone && styles.actionBtnDone, fallbackUsed && styles.proceedBtnFallback]}
               onPress={handleProceed}
               disabled={isUploading || uploadDone}
               activeOpacity={0.85}
             >
               {uploadDone ? (
                 <Check size={18} color="#fff" strokeWidth={2.5} />
+              ) : fallbackUsed ? (
+                <Share2 size={18} color="#fff" strokeWidth={2.2} />
               ) : (
                 <Cloud size={18} color="#fff" strokeWidth={2.2} />
               )}
               <Text style={styles.proceedBtnText}>
-                {isUploading ? '클라우드 저장 중...' : uploadDone ? '클라우드 저장 & 공유 완료' : `클라우드 저장 & ${platformLabel} 공유`}
+                {isUploading && !uploadRetrying
+                  ? '클라우드 저장 중...'
+                  : uploadRetrying
+                  ? `재시도 중 (${uploadRetryCount}/3)...`
+                  : uploadDone
+                  ? '클라우드 저장 & 공유 완료'
+                  : fallbackUsed
+                  ? '로컬 공유로 전환됨'
+                  : `클라우드 저장 & ${platformLabel} 공유`}
               </Text>
             </TouchableOpacity>
+            {fallbackUsed && !uploadDone && (
+              <Text style={styles.fallbackHint}>
+                클라우드 업로드 실패 — 로컬 다운로드 및 {platformLabel} 공유로 자동 전환되었습니다. 발행을 계속 진행하세요.
+              </Text>
+            )}
           </StepCard>
         </ScrollView>
       </View>
@@ -1044,5 +1109,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  proceedBtnFallback: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  fallbackHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
