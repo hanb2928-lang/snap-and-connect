@@ -141,6 +141,12 @@ export function PostCaptureWorkflow({
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
   useEffect(() => {
+    if (selectedPlatformKey === 'instagram' && !platformLink) {
+      setPlatformLink('https://www.instagram.com/reel/');
+    }
+  }, [selectedPlatformKey, platformLink]);
+
+  useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     (async () => {

@@ -15,9 +15,9 @@ export interface PlatformDeepLink {
 const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   instagram: {
     appUrl: 'instagram://story-camera',
-    webUrl: 'https://www.instagram.com/',
+    webUrl: 'https://www.instagram.com/reel/',
     uploadAppUrl: 'instagram://library?mediaType=video',
-    uploadWebUrl: 'https://www.instagram.com/create/select/',
+    uploadWebUrl: 'https://www.instagram.com/reel/',
     label: '인스타그램 릴스',
   },
   blog: {
