@@ -9,13 +9,44 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { Sparkles, Check, RefreshCw, CircleAlert as AlertCircle, Wand as Wand2, Image as ImageIcon, Download } from 'lucide-react-native';
+import { Sparkles, Check, RefreshCw, CircleAlert as AlertCircle, Wand as Wand2, Image as ImageIcon, Download, Store } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { friendlyError } from '@/lib/errors';
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { buildDataUrl } from '@/lib/base64';
 
 type GenStep = 'idle' | 'processing' | 'done' | 'error';
+
+type IndustryKey =
+  | 'bakery'
+  | 'cafe'
+  | 'restaurant'
+  | 'fashion'
+  | 'beauty'
+  | 'grocery'
+  | 'electronics'
+  | 'home'
+  | 'fitness'
+  | 'general';
+
+interface IndustryOption {
+  key: IndustryKey;
+  label: string;
+  emoji: string;
+}
+
+const INDUSTRY_OPTIONS: IndustryOption[] = [
+  { key: 'general', label: '일반', emoji: '📦' },
+  { key: 'bakery', label: '베이커리', emoji: '🥖' },
+  { key: 'cafe', label: '카페', emoji: '☕' },
+  { key: 'restaurant', label: '요식업', emoji: '🍽️' },
+  { key: 'fashion', label: '의류/패션', emoji: '👕' },
+  { key: 'beauty', label: '뷰티/화장품', emoji: '💄' },
+  { key: 'grocery', label: '식료품/마트', emoji: '🥬' },
+  { key: 'electronics', label: '전자기기', emoji: '📱' },
+  { key: 'home', label: '홈/리빙', emoji: '🛋️' },
+  { key: 'fitness', label: '피트니스', emoji: '💪' },
+];
 
 const SIZE_PRESETS = [
   { key: '1024x1024', label: '정사각', desc: '1:1' },
@@ -38,15 +69,21 @@ const PROMPT_SUGGESTIONS = [
 
 interface PromptImageGeneratorProps {
   onResult?: (imageBase64: string, mimeType: string) => void;
+  productName?: string;
+  productCategory?: string;
 }
 
-export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
+export function PromptImageGenerator({ onResult, productName, productCategory }: PromptImageGeneratorProps) {
   const [step, setStep] = useState<GenStep>('idle');
   const [prompt, setPrompt] = useState('');
   const [size, setSize] = useState<string>('1024x1024');
   const [stylePreset, setStylePreset] = useState<string>('vivid');
+  const [industry, setIndustry] = useState<IndustryKey>('general');
+  const [keepSeed, setKeepSeed] = useState(false);
+  const [seedValue, setSeedValue] = useState<number | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
@@ -81,6 +118,10 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
           style: stylePreset,
           quality: 'standard',
           n: 1,
+          industry,
+          productName,
+          productCategory,
+          seed: keepSeed && seedValue !== null ? seedValue : undefined,
         }),
         signal: controller.signal,
       });
@@ -100,6 +141,10 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
       if (!mountedRef.current) return;
       setResultImage(data.image);
       setRevisedPrompt(data.revisedPrompt ?? null);
+      setExpandedPrompt(data.expandedPrompt ?? null);
+      if (data.seed !== undefined && data.seed !== null) {
+        setSeedValue(data.seed);
+      }
       setStep('done');
 
       if (onResult) {
@@ -117,12 +162,13 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
     } finally {
       abortRef.current = null;
     }
-  }, [prompt, size, stylePreset, onResult]);
+  }, [prompt, size, stylePreset, industry, keepSeed, seedValue, productName, productCategory, onResult]);
 
   const handleReset = useCallback(() => {
     setStep('idle');
     setResultImage(null);
     setRevisedPrompt(null);
+    setExpandedPrompt(null);
     setError(null);
   }, []);
 
@@ -168,6 +214,47 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
             ))}
           </ScrollView>
         </View>
+      )}
+
+      {/* Industry Picker */}
+      {step !== 'processing' && step !== 'done' && (
+        <View style={styles.industryWrap}>
+          <View style={styles.industryHeader}>
+            <Store size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.industryLabel}>업종 선택 (스타일 자동 반영)</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.industryList}>
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.industryChip, industry === opt.key && styles.industryChipActive]}
+                onPress={() => setIndustry(opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.industryEmoji}>{opt.emoji}</Text>
+                <Text style={[styles.industryChipText, industry === opt.key && styles.industryChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Seed consistency toggle */}
+      {step !== 'processing' && step !== 'done' && (
+        <TouchableOpacity
+          style={[styles.seedToggle, keepSeed && styles.seedToggleActive]}
+          onPress={() => setKeepSeed((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.seedCheckbox, keepSeed && styles.seedCheckboxActive]}>
+            {keepSeed && <Check size={12} color="#fff" strokeWidth={3} />}
+          </View>
+          <Text style={[styles.seedToggleText, keepSeed && styles.seedToggleTextActive]}>
+            시드 고정 (연속 생성 시 일관성 유지){seedValue !== null ? ` · 현재 시드 #${seedValue}` : ''}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {/* Size & Style Options */}
@@ -262,6 +349,15 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
               <Text style={styles.revisedPromptText}>{revisedPrompt}</Text>
             </View>
           )}
+          {expandedPrompt && (
+            <View style={styles.expandedPromptBox}>
+              <View style={styles.expandedPromptHeader}>
+                <Wand2 size={11} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.expandedPromptLabel}>LLM 확장 프롬프트</Text>
+              </View>
+              <Text style={styles.expandedPromptText}>{expandedPrompt}</Text>
+            </View>
+          )}
           <View style={styles.resultBtnRow}>
             <TouchableOpacity style={styles.resultBtnSecondary} onPress={handleReset} activeOpacity={0.7}>
               <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
@@ -292,7 +388,7 @@ export function PromptImageGenerator({ onResult }: PromptImageGeneratorProps) {
         <View style={styles.infoNote}>
           <ImageIcon size={12} color={theme.colors.primary[400]} strokeWidth={2} />
           <Text style={styles.infoNoteText}>
-            프롬프트(문장)를 입력하면 AI가 새로운 이미지를 생성합니다. 제품 사진, 라이프스타일 씬, 배경 등 원하는 장면을 자유롭게 묘사하세요. DALL-E 3 기반으로 고품질 이미지를 생성합니다.
+            업종을 선택하고 프롬프트를 입력하면 AI가 구조화된 프롬프트로 자동 확장하여 고품질 이미지를 생성합니다. 업종별 맞춤 환경·조명·카메라 앵글이 자동 반영되며, 시드 고정 시 연속 생성에서 시각적 일관성이 유지됩니다.
           </Text>
         </View>
       )}
@@ -364,6 +460,112 @@ const styles = StyleSheet.create({
   optionsRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  industryWrap: {
+    gap: 6,
+  },
+  industryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  industryLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  industryList: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  industryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  industryChipActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '15',
+  },
+  industryEmoji: {
+    fontSize: 14,
+  },
+  industryChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  industryChipTextActive: {
+    color: theme.colors.accent[400],
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  seedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  seedToggleActive: {
+    borderColor: theme.colors.accent[400],
+    backgroundColor: theme.colors.accent[500] + '10',
+  },
+  seedCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: theme.colors.dark.textDim,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seedCheckboxActive: {
+    backgroundColor: theme.colors.accent[500],
+    borderColor: theme.colors.accent[500],
+  },
+  seedToggleText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  seedToggleTextActive: {
+    color: theme.colors.accent[400],
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  expandedPromptBox: {
+    padding: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '08',
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '20',
+    gap: 4,
+  },
+  expandedPromptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  expandedPromptLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  expandedPromptText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
   optionGroup: {
     flex: 1,

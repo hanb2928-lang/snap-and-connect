@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Platform,
   Image,
-  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -469,51 +468,44 @@ export default function CameraScreen() {
 
         <TriggerBanner />
 
-        <ScrollView
-          style={styles.modeScroll}
-          contentContainerStyle={[styles.modeScrollContent, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.modeCardsWrap}>
-            <ModeCard
-              icon={<Zap size={32} color="#fff" strokeWidth={2.5} />}
-              title="원클릭 촬영"
-              desc="탭 한 번으로 15초 동영상을 촬영해 바로 숏폼으로 완성"
-              color={theme.colors.warning[500]}
-              onPress={() => handleModeSelect('oneclick')}
-            />
-            <ModeCard
-              icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
-              title="스틸컷"
-              desc="상품 사진 한 장으로 깔끔한 15초 홍보 영상 제작"
-              color={theme.colors.primary[600]}
-              onPress={() => handleModeSelect('single')}
-            />
-            <ModeCard
-              icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
-              title="다각도 촬영"
-              desc="전면, 측면, 디테일을 연달아 촬영해 역동적인 숏폼 생성"
-              color={theme.colors.accent[500]}
-              onPress={() => handleModeSelect('multi')}
-            />
-          </View>
+        <View style={styles.modeCardsWrap}>
+          <ModeCard
+            icon={<Zap size={32} color="#fff" strokeWidth={2.5} />}
+            title="원클릭 촬영"
+            desc="탭 한 번으로 15초 동영상을 촬영해 바로 숏폼으로 완성"
+            color={theme.colors.warning[500]}
+            onPress={() => handleModeSelect('oneclick')}
+          />
+          <ModeCard
+            icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
+            title="스틸컷"
+            desc="상품 사진 한 장으로 깔끔한 15초 홍보 영상 제작"
+            color={theme.colors.primary[600]}
+            onPress={() => handleModeSelect('single')}
+          />
+          <ModeCard
+            icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
+            title="다각도 촬영"
+            desc="전면, 측면, 디테일을 연달아 촬영해 역동적인 숏폼 생성"
+            color={theme.colors.accent[500]}
+            onPress={() => handleModeSelect('multi')}
+          />
+        </View>
 
-          <View style={styles.modeSelectFooter}>
-            <TouchableOpacity
-              style={[styles.galleryPickBtn, { marginBottom: theme.spacing.sm }]}
-              onPress={() => router.push('/(tabs)/marketing' as never)}
-              activeOpacity={0.8}
-            >
-              <Sparkles size={22} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={[styles.galleryPickText, { color: theme.colors.primary[300] }]}>AI 템플릿으로 만들기 (텍스트 입력)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
-              <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
-              <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        <View style={[styles.modeSelectFooter, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+          <TouchableOpacity
+            style={[styles.galleryPickBtn, { marginBottom: theme.spacing.sm }]}
+            onPress={() => router.push('/(tabs)/marketing' as never)}
+            activeOpacity={0.8}
+          >
+            <Sparkles size={22} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={[styles.galleryPickText, { color: theme.colors.primary[300] }]}>AI 템플릿으로 만들기 (텍스트 입력)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
+            <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
+            <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
+          </TouchableOpacity>
+        </View>
 
         <OnboardingModal
           visible={showOnboardingModal}
@@ -810,7 +802,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.md,
   },
   modeSelectHeaderLeft: {
     width: 80,
@@ -821,13 +813,8 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     textAlign: 'center',
   },
-  modeScroll: {
-    flex: 1,
-  },
-  modeScrollContent: {
-    flexGrow: 1,
-  },
   modeCardsWrap: {
+    flex: 1,
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
   },
@@ -838,13 +825,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.xl,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xl,
+    paddingVertical: theme.spacing.md + 2,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
   },
   modeCardIcon: {
-    width: 56,
-    height: 56,
+    width: 50,
+    height: 50,
     borderRadius: theme.radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
@@ -866,7 +853,7 @@ const styles = StyleSheet.create({
   },
   modeSelectFooter: {
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
   },
   galleryPickBtn: {
     flexDirection: 'row',
@@ -875,7 +862,7 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderRadius: theme.radius.lg,
-    paddingVertical: 16,
+    paddingVertical: 13,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
   },
