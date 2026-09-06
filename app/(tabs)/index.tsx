@@ -493,14 +493,6 @@ export default function CameraScreen() {
         </View>
 
         <View style={[styles.modeSelectFooter, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
-          <TouchableOpacity
-            style={[styles.galleryPickBtn, { marginBottom: theme.spacing.sm }]}
-            onPress={() => router.push('/(tabs)/marketing' as never)}
-            activeOpacity={0.8}
-          >
-            <Sparkles size={22} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={[styles.galleryPickText, { color: theme.colors.primary[300] }]}>AI 템플릿으로 만들기 (텍스트 입력)</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
             <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
             <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
