@@ -29,16 +29,16 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   },
   tiktok: {
     appUrl: 'snssdk1128://',
-    webUrl: 'https://www.tiktok.com/upload',
+    webUrl: 'https://www.tiktok.com/trending',
     uploadAppUrl: 'snssdk1128://upload',
-    uploadWebUrl: 'https://www.tiktok.com/upload',
+    uploadWebUrl: 'https://www.tiktok.com/trending',
     label: '틱톡',
   },
   youtube: {
     appUrl: 'youtube://',
-    webUrl: 'https://www.youtube.com/upload',
+    webUrl: 'https://youtube.com/shorts/',
     uploadAppUrl: 'youtube://upload',
-    uploadWebUrl: 'https://www.youtube.com/upload',
+    uploadWebUrl: 'https://youtube.com/shorts/',
     label: '유튜브 숏츠',
   },
   twitter: {
@@ -57,9 +57,9 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   },
   naver_clip: {
     appUrl: 'com.naverapp://open',
-    webUrl: 'https://clip.navercast.com/',
+    webUrl: 'https://naver.me/',
     uploadAppUrl: 'com.naverapp://clip/upload',
-    uploadWebUrl: 'https://clip.navercast.com/upload',
+    uploadWebUrl: 'https://naver.me/',
     label: '네이버 클립',
   },
 };

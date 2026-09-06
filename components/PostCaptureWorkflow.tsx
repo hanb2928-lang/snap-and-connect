@@ -143,6 +143,12 @@ export function PostCaptureWorkflow({
   useEffect(() => {
     if (selectedPlatformKey === 'instagram' && !platformLink) {
       setPlatformLink('https://www.instagram.com/reel/');
+    } else if (selectedPlatformKey === 'tiktok' && !platformLink) {
+      setPlatformLink('https://www.tiktok.com/trending');
+    } else if (selectedPlatformKey === 'youtube' && !platformLink) {
+      setPlatformLink('https://youtube.com/shorts/');
+    } else if (selectedPlatformKey === 'naver_clip' && !platformLink) {
+      setPlatformLink('https://naver.me/');
     }
   }, [selectedPlatformKey, platformLink]);
 
