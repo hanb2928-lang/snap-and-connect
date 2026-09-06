@@ -134,6 +134,9 @@ export interface BgmTemplate {
   label: string;
   mood: string;
   bpm: number;
+  highlightStartSec?: number;
+  highlightDurationSec?: number;
+  energyCurve?: number[];
 }
 
 export interface AutoEnhancement {
@@ -259,7 +262,7 @@ export function buildShortFormEditPlan(
   autoDisclosure = true,
   disclosureEnabled = false,
   customSpec?: PlatformSpec,
-  bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string },
+  bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
 ): ShortFormEditPlan {
   const { label, spec, safeZone } = getPlatformInfo(platform, customSpec);
   const totalDurationSec = 15;
@@ -292,19 +295,30 @@ export function buildShortFormEditPlan(
 
   const bgmTemplate: BgmTemplate = (() => {
     if (bgmOverride) {
-      return { id: bgmOverride.templateId, label: bgmOverride.label, mood: bgmOverride.mood, bpm: bgmOverride.bpm };
+      return {
+        id: bgmOverride.templateId,
+        label: bgmOverride.label,
+        mood: bgmOverride.mood,
+        bpm: bgmOverride.bpm,
+        highlightStartSec: bgmOverride.highlightStartSec,
+        highlightDurationSec: bgmOverride.highlightDurationSec,
+        energyCurve: bgmOverride.energyCurve,
+      };
     }
     const promptLower = customPrompt.toLowerCase();
-    if (promptLower.includes('할인') || promptLower.includes('재고') || promptLower.includes('매진') || promptLower.includes('품절')) {
-      return { id: 'urgent_upbeat', label: '업비트 긴장감', mood: '긴박·액션', bpm: pacingBpm };
+    if (promptLower.includes('의류') || promptLower.includes('신발') || promptLower.includes('런칭') || promptLower.includes('새제품') || promptLower.includes('패션')) {
+      return { id: 'energy_hiphop', label: '다이나믹 힙합 비트', mood: '강렬·후킹', bpm: 140 };
     }
-    if (promptLower.includes('감성') || promptLower.includes('따뜻') || promptLower.includes('힐링') || promptLower.includes('일상')) {
-      return { id: 'warm_acoustic', label: '따뜻한 어쿠스틱', mood: '감성·일상', bpm: Math.round(pacingBpm * 0.7) };
+    if (promptLower.includes('카페') || promptLower.includes('베이커리') || promptLower.includes('소품') || promptLower.includes('힐링') || promptLower.includes('일상')) {
+      return { id: 'lofi_chill', label: '감성 로파이 비트', mood: '감성·편안', bpm: 85 };
     }
-    if (promptLower.includes('빠른') || promptLower.includes('꿀팁') || promptLower.includes('해결')) {
-      return { id: 'snappy_pop', label: '스내피 팝', mood: '경쾌·정보', bpm: pacingBpm };
+    if (promptLower.includes('수제') || promptLower.includes('디저트') || promptLower.includes('자연') || promptLower.includes('친환경') || promptLower.includes('따뜻')) {
+      return { id: 'acoustic_indie', label: '어쿠스틱 인디 기타', mood: '따뜻·선율', bpm: 95 };
     }
-    return { id: 'trendy_neutral', label: '트렌디 중간 템포', mood: '범용·무드', bpm: pacingBpm };
+    if (promptLower.includes('할인') || promptLower.includes('재고') || promptLower.includes('매진') || promptLower.includes('품절') || promptLower.includes('꿀팁') || promptLower.includes('해결')) {
+      return { id: 'upbeat_pop', label: '트렌디 업비트 팝', mood: '경쾌·트렌드', bpm: 128 };
+    }
+    return { id: 'upbeat_pop', label: '트렌디 업비트 팝', mood: '경쾌·트렌드', bpm: 128 };
   })();
 
   const autoEnhancements: AutoEnhancement[] = [
@@ -323,7 +337,7 @@ export function buildShortFormEditPlan(
     {
       id: 'bgm_sync',
       label: 'BGM 템플릿 싱크',
-      description: '프롬프트 분석 기반 업종 분위기 BGM 자동 매칭',
+      description: 'AI 이미지 분석 기반 실제 음악 트랙 카테고리 자동 매칭 + 핵심 구간 추출 싱크',
       icon: 'music',
     },
   ];

@@ -154,11 +154,17 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
         bgmPlayerRef.current = new BgmPlayer();
       }
       if (bgmPlayerRef.current) {
-        bgmPlayerRef.current.start(editPlan.bgmTemplate.id, editPlan.pacingBpm);
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
       }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop, editPlan.bgmTemplate.id, editPlan.pacingBpm]);
+  }, [isPlaying, currentSec, stop, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   useEffect(() => {
     if (isPlaying) {

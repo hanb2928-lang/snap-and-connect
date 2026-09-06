@@ -9,16 +9,68 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-type BgmMood = "urgent" | "warm" | "snappy" | "neutral";
+export type BgmCategory = "upbeat_pop" | "lofi_chill" | "acoustic_indie" | "energy_hiphop";
 
-interface BgmRecommendation {
-  mood: BgmMood;
+export interface BgmRecommendation {
+  category: BgmCategory;
   templateId: string;
   label: string;
-  moodDescription: string;
+  description: string;
   bpm: number;
   reason: string;
+  highlightStartSec: number;
+  highlightDurationSec: number;
+  energyCurve: number[];
 }
+
+interface CategoryMeta {
+  templateId: string;
+  label: string;
+  description: string;
+  bpm: number;
+  defaultHighlightStart: number;
+  defaultHighlightDuration: number;
+  energyCurve: number[];
+}
+
+const CATEGORY_META: Record<BgmCategory, CategoryMeta> = {
+  upbeat_pop: {
+    templateId: "upbeat_pop",
+    label: "트렌디 업비트 팝",
+    description: "틱톡 및 릴스에서 가장 인기 있는 경쾌한 리듬의 보컬/악기 믹스",
+    bpm: 128,
+    defaultHighlightStart: 7,
+    defaultHighlightDuration: 8,
+    energyCurve: [0.3, 0.5, 0.7, 0.85, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5],
+  },
+  lofi_chill: {
+    templateId: "lofi_chill",
+    label: "감성 로파이 비트",
+    description: "카페, 베이커리, 소품샵에 어울리는 감성적인 재즈/힙합 비트",
+    bpm: 85,
+    defaultHighlightStart: 5,
+    defaultHighlightDuration: 10,
+    energyCurve: [0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.6, 0.58, 0.55, 0.5, 0.45, 0.4, 0.35],
+  },
+  acoustic_indie: {
+    templateId: "acoustic_indie",
+    label: "어쿠스틱 인디 기타",
+    description: "수제 디저트나 자연 친화적 상품에 어울리는 따뜻한 어쿠스틱 기타 선율",
+    bpm: 95,
+    defaultHighlightStart: 6,
+    defaultHighlightDuration: 9,
+    energyCurve: [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.7, 0.72, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45, 0.4],
+  },
+  energy_hiphop: {
+    templateId: "energy_hiphop",
+    label: "다이나믹 힙합 비트",
+    description: "의류, 신제품 런칭 등 강렬한 후킹이 필요할 때 시선을 사로잡는 비트",
+    bpm: 140,
+    defaultHighlightStart: 3,
+    defaultHighlightDuration: 7,
+    energyCurve: [0.4, 0.6, 0.8, 1.0, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5],
+  },
+};
 
 function stripJsonFence(s: string): string {
   let t = s.trim();
@@ -64,16 +116,19 @@ async function resolveOpenAIKey(): Promise<string | null> {
   return null;
 }
 
-const MOOD_TO_TEMPLATE: Record<BgmMood, Omit<BgmRecommendation, "reason" | "mood">> = {
-  urgent: { templateId: "urgent_upbeat", label: "업비트 긴장감", moodDescription: "긴박·액션", bpm: 130 },
-  warm: { templateId: "warm_acoustic", label: "따뜻한 어쿠스틱", moodDescription: "감성·일상", bpm: 80 },
-  snappy: { templateId: "snappy_pop", label: "스내피 팝", moodDescription: "경쾌·정보", bpm: 110 },
-  neutral: { templateId: "trendy_neutral", label: "트렌디 중간 템포", moodDescription: "범용·무드", bpm: 100 },
-};
-
 function fallbackRecommendation(): BgmRecommendation {
-  const base = MOOD_TO_TEMPLATE.neutral;
-  return { ...base, mood: "neutral", reason: "이미지 분석 없이 범용 BGM을 추천했습니다." };
+  const c = CATEGORY_META.upbeat_pop;
+  return {
+    category: "upbeat_pop",
+    templateId: c.templateId,
+    label: c.label,
+    description: c.description,
+    bpm: c.bpm,
+    reason: "이미지 분석 없이 트렌디 업비트 팝을 기본 추천했습니다.",
+    highlightStartSec: c.defaultHighlightStart,
+    highlightDurationSec: c.defaultHighlightDuration,
+    energyCurve: c.energyCurve,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -111,16 +166,22 @@ Deno.serve(async (req: Request) => {
     const sanitizedDataUrl = ensureDataUrl(imageDataUrl, cleanMime);
 
     const systemPrompt =
-      "You are a music supervisor for short-form marketing videos. " +
-      "Analyze the product/scene in the image and recommend the most fitting BGM mood.\n" +
-      "Choose exactly ONE mood from these options:\n" +
-      "- \"urgent\": High-energy, creates urgency/FOMO. Best for sales, discounts, limited stock, breaking news.\n" +
-      "- \"warm\": Soft, emotional, cozy. Best for lifestyle, daily essentials, food, family, healing products.\n" +
-      "- \"snappy\": Upbeat, catchy, information-driven. Best for tips, tutorials, product demos, comparisons.\n" +
-      "- \"neutral\": Versatile mid-tempo. Best when the scene doesn't fit a strong mood.\n" +
+      "You are a music supervisor for short-form marketing videos (15 seconds).\n" +
+      "Analyze the product/scene in the image and recommend the most fitting BGM track category.\n\n" +
+      "Choose exactly ONE category from these options:\n" +
+      "- \"upbeat_pop\": Trendy upbeat pop — light, catchy vocal/instrumental mix. Best for TikTok/Reels trending content, general product showcases, lifestyle products.\n" +
+      "- \"lofi_chill\": Emotional lofi beats — jazzy/hiphop instrumental. Best for cafes, bakeries, small shops, cozy atmosphere, daily essentials.\n" +
+      "- \"acoustic_indie\": Warm acoustic indie guitar — gentle string melodies. Best for handmade desserts, natural/eco-friendly products, warm storytelling.\n" +
+      "- \"energy_hiphop\": Dynamic hiphop beats — hard-hitting rhythm. Best for fashion/clothing, new product launches, bold hooks, high-energy content.\n\n" +
+      "ALSO identify the highlight segment — the most impactful part of the track for a 15-second video:\n" +
+      "- highlightStartSec: when the highlight should begin (0-12, integer)\n" +
+      "- highlightDurationSec: how long the highlight lasts (3-10, integer)\n" +
+      "  The highlight should align with the video's hook moment (typically 3-7 seconds in).\n\n" +
       "Return a JSON object with exactly these fields:\n" +
-      "- mood: one of \"urgent\", \"warm\", \"snappy\", \"neutral\"\n" +
-      "- reason: 1-2 sentence explanation in Korean of why this BGM mood fits the image content";
+      "- category: one of \"upbeat_pop\", \"lofi_chill\", \"acoustic_indie\", \"energy_hiphop\"\n" +
+      "- reason: 1-2 sentence explanation in Korean of why this track fits the image content\n" +
+      "- highlightStartSec: integer (0-12)\n" +
+      "- highlightDurationSec: integer (3-10)";
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -135,12 +196,12 @@ Deno.serve(async (req: Request) => {
           {
             role: "user",
             content: [
-              { type: "text", text: "이 이미지에 가장 어울리는 BGM 무드를 추천해주세요." },
+              { type: "text", text: "이 이미지에 가장 어울리는 음악 트랙 카테고리와 핵심 구간을 추천해주세요." },
               { type: "image_url", image_url: { url: sanitizedDataUrl } },
             ],
           },
         ],
-        max_tokens: 200,
+        max_tokens: 300,
         temperature: 0.3,
       }),
     });
@@ -158,18 +219,24 @@ Deno.serve(async (req: Request) => {
     const content = data.choices?.[0]?.message?.content ?? "";
     const parsed = JSON.parse(stripJsonFence(content));
 
-    const validMoods: BgmMood[] = ["urgent", "warm", "snappy", "neutral"];
-    const mood = validMoods.includes(parsed.mood) ? parsed.mood : "neutral";
-    const base = MOOD_TO_TEMPLATE[mood];
+    const validCategories: BgmCategory[] = ["upbeat_pop", "lofi_chill", "acoustic_indie", "energy_hiphop"];
+    const category = validCategories.includes(parsed.category) ? parsed.category : "upbeat_pop";
+    const meta = CATEGORY_META[category];
+
+    const highlightStartSec = Math.max(0, Math.min(12, Math.round(parsed.highlightStartSec ?? meta.defaultHighlightStart)));
+    const highlightDurationSec = Math.max(3, Math.min(10, Math.round(parsed.highlightDurationSec ?? meta.defaultHighlightDuration)));
     const reason = typeof parsed.reason === "string" ? parsed.reason : "AI 분석 기반 추천입니다.";
 
     const recommendation: BgmRecommendation = {
-      mood,
-      templateId: base.templateId,
-      label: base.label,
-      moodDescription: base.moodDescription,
-      bpm: base.bpm,
+      category,
+      templateId: meta.templateId,
+      label: meta.label,
+      description: meta.description,
+      bpm: meta.bpm,
       reason,
+      highlightStartSec,
+      highlightDurationSec,
+      energyCurve: meta.energyCurve,
     };
 
     return new Response(

@@ -237,9 +237,12 @@ export function PostCaptureWorkflow({
         ? {
             templateId: bgmRecommendation.templateId,
             label: bgmRecommendation.label,
-            mood: bgmRecommendation.moodDescription,
+            mood: bgmRecommendation.description,
             bpm: bgmRecommendation.bpm,
             reason: bgmRecommendation.reason,
+            highlightStartSec: bgmRecommendation.highlightStartSec,
+            highlightDurationSec: bgmRecommendation.highlightDurationSec,
+            energyCurve: bgmRecommendation.energyCurve,
           }
         : undefined,
     ),
@@ -261,6 +264,9 @@ export function PostCaptureWorkflow({
           editPlan.bgmTemplate.id,
           editPlan.pacingBpm,
           15,
+          bgmRecommendation?.highlightStartSec,
+          bgmRecommendation?.highlightDurationSec,
+          bgmRecommendation?.energyCurve,
         );
         const a = document.createElement('a');
         a.href = mixedUri;
@@ -286,7 +292,7 @@ export function PostCaptureWorkflow({
       // ignore — user can retry
     }
     setSavingToGallery(false);
-  }, [videoUri, imageUri, editPlan.bgmTemplate.id, editPlan.pacingBpm]);
+  }, [videoUri, imageUri, editPlan.bgmTemplate.id, editPlan.pacingBpm, bgmRecommendation]);
 
   const handleLaunchPlatform = useCallback(async () => {
     const deepLink = getDeepLink(selectedPlatformKey);
@@ -362,6 +368,9 @@ export function PostCaptureWorkflow({
           editPlan.bgmTemplate.id,
           editPlan.pacingBpm,
           15,
+          bgmRecommendation?.highlightStartSec,
+          bgmRecommendation?.highlightDurationSec,
+          bgmRecommendation?.energyCurve,
         );
       } catch {
         uploadUri = videoUri;
@@ -400,7 +409,7 @@ export function PostCaptureWorkflow({
 
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     setIsUploading(false);
-  }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
+  }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry, bgmRecommendation]);
 
   const handleShareText = useCallback(async () => {
     const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
@@ -600,12 +609,24 @@ export function PostCaptureWorkflow({
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.metaKey}>BGM</Text>
-                <Text style={styles.metaVal}>{bgmLoading ? 'AI 분석 중...' : `${editPlan.bgmTemplate.label} (${editPlan.bgmTemplate.mood}, ${editPlan.bgmTemplate.bpm} BPM)`}</Text>
+                <Text style={styles.metaVal}>{bgmLoading ? 'AI 음악 분석 중...' : `${editPlan.bgmTemplate.label} · ${editPlan.bgmTemplate.bpm} BPM`}</Text>
               </View>
-              {bgmRecommendation?.reason && (
+              {bgmRecommendation?.description && !bgmLoading && (
+                <View style={styles.bgReasonRow}>
+                  <MusicIcon size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.bgReasonText}>{bgmRecommendation.description}</Text>
+                </View>
+              )}
+              {bgmRecommendation?.reason && !bgmLoading && (
                 <View style={styles.bgReasonRow}>
                   <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
                   <Text style={styles.bgReasonText}>AI 추천: {bgmRecommendation.reason}</Text>
+                </View>
+              )}
+              {bgmRecommendation && !bgmLoading && (
+                <View style={styles.bgReasonRow}>
+                  <Wand2 size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.bgReasonText}>핵심 구간: {bgmRecommendation.highlightStartSec}초~{bgmRecommendation.highlightStartSec + bgmRecommendation.highlightDurationSec}초 (에너지 피크 싱크)</Text>
                 </View>
               )}
             </View>
