@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ViewStyle,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -18,6 +19,14 @@ import {
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { ShortFormEditPlan, EditSegment } from '@/lib/shortFormEditEngine';
+import {
+  sampleVideoLuminance,
+  classifyLuminance,
+  getCaptionStyle,
+  getSafeZonePadding,
+  type LuminanceLevel,
+  type CaptionStyle,
+} from '@/lib/captionStyling';
 
 interface ShortFormPreviewPlayerProps {
   editPlan: ShortFormEditPlan;
@@ -26,29 +35,25 @@ interface ShortFormPreviewPlayerProps {
 
 const TOTAL_DURATION = 15;
 const TICK_MS = 100;
+const LUMINANCE_SAMPLE_MS = 500;
+const PREVIEW_FRAME_WIDTH = 135;
+const PREVIEW_FRAME_HEIGHT = 240;
 
 function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegment | null {
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
-}
-
-function getSegmentPositionStyle(position: EditSegment['position']): ViewStyle {
-  if (position === 'top') {
-    return { justifyContent: 'flex-start', paddingTop: 60 };
-  }
-  if (position === 'bottom') {
-    return { justifyContent: 'flex-end', paddingBottom: 80 };
-  }
-  return { justifyContent: 'center' };
 }
 
 export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [luminanceLevel, setLuminanceLevel] = useState<LuminanceLevel>('dark');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Resolve video URI to a playable source on all platforms
+  const { width: screenWidth } = useWindowDimensions();
+
   useEffect(() => {
     if (!videoUri) {
       setVideoSrc(null);
@@ -58,7 +63,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
       setVideoSrc(videoUri);
       return;
     }
-    // Native: convert file URI to base64 data URI for WebView playback
     if (videoUri.startsWith('data:') || videoUri.startsWith('blob:')) {
       setVideoSrc(videoUri);
       return;
@@ -78,7 +82,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
     return () => { cancelled = true; };
   }, [videoUri]);
 
-  // Sync web video element play/pause with isPlaying state
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
     if (isPlaying) {
@@ -88,7 +91,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
     }
   }, [isPlaying, videoSrc]);
 
-  // Sync web video element current time with preview timer
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
     const targetTime = currentSec;
@@ -96,6 +98,30 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
       webVideoRef.current.currentTime = targetTime;
     }
   }, [currentSec, videoSrc]);
+
+  // Rule 1: Real-time luminance sampling for dynamic caption color
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !videoSrc) {
+      setLuminanceLevel('dark');
+      return;
+    }
+    const sampleLuminance = () => {
+      const video = webVideoRef.current;
+      if (!video || video.readyState < 2) return;
+      const activeSeg = getActiveSegment(editPlan.segments, currentSec);
+      const region = activeSeg?.position ?? 'center';
+      const lum = sampleVideoLuminance(video, region);
+      setLuminanceLevel(classifyLuminance(lum));
+    };
+    sampleLuminance();
+    luminanceIntervalRef.current = setInterval(sampleLuminance, LUMINANCE_SAMPLE_MS);
+    return () => {
+      if (luminanceIntervalRef.current) {
+        clearInterval(luminanceIntervalRef.current);
+        luminanceIntervalRef.current = null;
+      }
+    };
+  }, [videoSrc, currentSec, editPlan.segments]);
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
@@ -154,7 +180,30 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
   const progressPercent = (currentSec / TOTAL_DURATION) * 100;
   const isBgmActive = currentSec > 0 && currentSec < TOTAL_DURATION;
 
-  // Build HTML for native WebView video playback
+  // Rule 2: Responsive font scaling based on screen width
+  const responsiveWidth = Math.min(PREVIEW_FRAME_WIDTH, screenWidth * 0.4);
+  const captionStyle: CaptionStyle = useMemo(
+    () => getCaptionStyle(luminanceLevel, activeSegment?.position ?? 'center', responsiveWidth),
+    [luminanceLevel, activeSegment, responsiveWidth],
+  );
+
+  // Rule 3: Safe-zone-aware positioning
+  const safeZonePadding = useMemo(
+    () => getSafeZonePadding(editPlan.safeZone, editPlan.spec, PREVIEW_FRAME_HEIGHT),
+    [editPlan.safeZone, editPlan.spec],
+  );
+
+  const segmentPositionStyle: ViewStyle = useMemo(() => {
+    if (!activeSegment) return { justifyContent: 'center' };
+    if (activeSegment.position === 'top') {
+      return { justifyContent: 'flex-start', paddingTop: safeZonePadding.paddingTop };
+    }
+    if (activeSegment.position === 'bottom') {
+      return { justifyContent: 'flex-end', paddingBottom: safeZonePadding.paddingBottom };
+    }
+    return { justifyContent: 'center' };
+  }, [activeSegment, safeZonePadding]);
+
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
     const playCmd = isPlaying ? 'play()' : 'pause()';
@@ -182,6 +231,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
                 loop
                 playsInline
                 style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover' as const,
@@ -210,17 +262,21 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
           )}
 
           {activeSegment && !isDisclosureActive && (
-            <View style={[styles.captionOverlay, getSegmentPositionStyle(activeSegment.position)]}>
-              <View style={styles.captionBadge}>
+            <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
+              <View style={[styles.captionBadge, { backgroundColor: captionStyle.badgeBg }]}>
                 <Text style={styles.captionSegmentLabel}>{activeSegment.label}</Text>
               </View>
               <Text
-                style={[
-                  styles.captionText,
-                  activeSegment.position === 'center' && styles.captionTextLarge,
-                  activeSegment.position === 'top' && styles.captionTextTop,
-                  activeSegment.position === 'bottom' && styles.captionTextBottom,
-                ]}
+                style={{
+                  fontSize: captionStyle.fontSize,
+                  fontFamily: theme.typography.fontFamily.bold,
+                  color: captionStyle.color,
+                  textAlign: 'center',
+                  textShadowColor: captionStyle.textShadowColor,
+                  textShadowOffset: captionStyle.textShadowOffset,
+                  textShadowRadius: captionStyle.textShadowRadius,
+                  lineHeight: captionStyle.lineHeight,
+                }}
                 numberOfLines={2}
               >
                 {activeSegment.textOverlay}
@@ -323,8 +379,8 @@ const styles = StyleSheet.create({
   },
   previewFrame: {
     alignSelf: 'center',
-    width: 135,
-    height: 240,
+    width: PREVIEW_FRAME_WIDTH,
+    height: PREVIEW_FRAME_HEIGHT,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000',
@@ -363,39 +419,18 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    paddingHorizontal: 10,
     alignItems: 'center',
   },
   captionBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: theme.colors.primary[500] + 'CC',
     marginBottom: 4,
   },
   captionSegmentLabel: {
     fontSize: 8,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
-  },
-  captionText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    lineHeight: 15,
-  },
-  captionTextLarge: {
-    fontSize: 13,
-  },
-  captionTextTop: {
-    fontSize: 10,
-  },
-  captionTextBottom: {
-    fontSize: 10,
   },
   disclosureOverlay: {
     position: 'absolute',

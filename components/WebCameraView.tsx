@@ -282,13 +282,8 @@ export function WebCameraView({
     if (!isRecording && recordedChunksRef.current.length > 0) {
       const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
       recordedChunksRef.current = [];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        const b64 = cleanBase64(dataUrl);
-        onCapture(b64, 'video/webm');
-      };
-      reader.readAsDataURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
+      onCapture(blobUrl, 'video/webm');
       setRecordElapsed(0);
     }
   }, [isRecording, onCapture]);

@@ -466,14 +466,19 @@ export default function CameraScreen() {
     }
   };
 
-  const handleWebCapture = async (base64: string, mimeType: string) => {
+  const handleWebCapture = useCallback(async (payload: string, mimeType: string) => {
     const isVideo = mimeType.startsWith('video/');
-    const dataUri = `data:${mimeType};base64,${base64}`;
-    setPostCaptureBase64(isVideo ? null : base64);
-    setPostCaptureMime(mimeType);
-    setPostCaptureVideoUri(isVideo ? dataUri : null);
+    if (isVideo) {
+      setPostCaptureBase64(null);
+      setPostCaptureMime(mimeType);
+      setPostCaptureVideoUri(payload);
+    } else {
+      setPostCaptureBase64(payload);
+      setPostCaptureMime(mimeType);
+      setPostCaptureVideoUri(null);
+    }
     setPostCaptureVisible(true);
-  };
+  }, []);
 
   const handleModeSelect = (mode: CaptureModeType) => {
     setCaptureMode(mode);
