@@ -31,7 +31,6 @@ import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
 import type { MoodFilterType } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
-import { OnboardingModal } from '@/components/OnboardingModal';
 import { CreditBalanceBadge } from '@/components/CreditBalanceBadge';
 import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
@@ -73,7 +72,6 @@ export default function CameraScreen() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [multiAngleVisible, setMultiAngleVisible] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureModeType>('oneclick');
   const [autoSaving, setAutoSaving] = useState(false);
@@ -132,16 +130,6 @@ export default function CameraScreen() {
       };
     }, [stopAutoSaveAnimation, autoSavePulse]),
   );
-
-  useEffect(() => {
-    (async () => {
-      const seenOnboarding = await getItem('onboarding_seen');
-      if (!seenOnboarding) {
-        setShowOnboardingModal(true);
-        setItem('onboarding_seen', 'true');
-      }
-    })();
-  }, []);
 
   const runAutoAnalysis = useCallback(async (base64: string, mimeType: string, additionalB64s: string[] = []) => {
     if (!isOnline()) {
@@ -569,10 +557,6 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
-        <OnboardingModal
-          visible={showOnboardingModal}
-          onComplete={() => setShowOnboardingModal(false)}
-        />
         <CreditPurchaseModal
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
