@@ -20,9 +20,10 @@ import {
   Sparkles,
   PenLine,
   Instagram,
-  Youtube,
+  Facebook,
+  AtSign,
+  Pin,
   Music as MusicIcon,
-  Monitor as MonitorIcon,
   ArrowRight,
   Shield,
   Clock,
@@ -68,9 +69,10 @@ type PlatformOption = {
 
 const BUILTIN_OPTIONS: PlatformOption[] = [
   { key: 'instagram', label: '인스타그램', icon: Instagram, color: theme.colors.accent[500] },
+  { key: 'threads', label: '스레드', icon: AtSign, color: theme.colors.dark.text },
+  { key: 'pinterest', label: '핀터레스트', icon: Pin, color: theme.colors.error[500] },
   { key: 'tiktok', label: '틱톡', icon: MusicIcon, color: theme.colors.dark.text },
-  { key: 'youtube', label: '유튜브 쇼츠', icon: Youtube, color: theme.colors.error[500] },
-  { key: 'naver_clip', label: '네이버 클립', icon: MonitorIcon, color: theme.colors.primary[400] },
+  { key: 'facebook', label: '페이스북', icon: Facebook, color: theme.colors.primary[600] },
 ];
 
 function managedToOption(mp: ManagedPlatform): PlatformOption {
@@ -143,12 +145,14 @@ export function PostCaptureWorkflow({
   useEffect(() => {
     if (selectedPlatformKey === 'instagram' && !platformLink) {
       setPlatformLink('https://www.instagram.com/reel/');
+    } else if (selectedPlatformKey === 'threads' && !platformLink) {
+      setPlatformLink('https://www.threads.net/');
+    } else if (selectedPlatformKey === 'pinterest' && !platformLink) {
+      setPlatformLink('https://www.pinterest.com/');
     } else if (selectedPlatformKey === 'tiktok' && !platformLink) {
       setPlatformLink('https://www.tiktok.com/trending');
-    } else if (selectedPlatformKey === 'youtube' && !platformLink) {
-      setPlatformLink('https://youtube.com/shorts/');
-    } else if (selectedPlatformKey === 'naver_clip' && !platformLink) {
-      setPlatformLink('https://naver.me/');
+    } else if (selectedPlatformKey === 'facebook' && !platformLink) {
+      setPlatformLink('https://www.facebook.com/');
     }
   }, [selectedPlatformKey, platformLink]);
 
