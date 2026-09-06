@@ -184,6 +184,69 @@ export function getPlatformInfo(platform: ShortFormPlatform) {
   return { label: entry.label, spec, safeZone };
 }
 
+const PRODUCT_INTRO_TEMPLATES: Record<EmotionPhase, string[]> = {
+  curiosity: ['이게 왜 인기인지 알겠더라', '구매 전 꼭 체크하세요', '처음엔 반신반의했는데'],
+  shock: ['이 가격 실화 맞나요', '품절 전에 확인하세요', '재입고 알림 설정 필수'],
+  empathy: ['사용해본 사람만 압니다', '일상이 편리해졌어요', '왜 진작 몰랐을까요'],
+  desire: ['15초면 충분합니다', '이거 하나로 끝나요', '삶의 질이 달라집니다'],
+  action: ['이미 수많은 리뷰가 증명', '구매자들의 선택 이유', '같이 확인해볼까요'],
+};
+
+const BENEFIT_TEMPLATES: Record<EmotionPhase, string[]> = {
+  curiosity: ['직접 확인하면 더 놀라워요', '알면 알수록 좋은 제품', '디테일이 다릅니다'],
+  shock: ['이 기회 놓치면 다시 없어요', '지금이 최적 타이밍', '선착순이라 빠르게'],
+  empathy: ['쓰는 순간 실감합니다', '매일 쓰는 분들의 추천', '진짜 후기가 말해줘요'],
+  desire: ['간편하지만 확실한 효과', '이거 하나면 해결돼요', '경험해보면 차이를 느껴요'],
+  action: ['지금 바로 확인하세요', '주문 전 미리 보기', '누구나 만족하는 선택'],
+};
+
+const CTA_TEMPLATES: Record<EmotionPhase, string[]> = {
+  curiosity: ['더 자세히 보려면 링크 클릭', '프로필에서 전체 정보 확인', '궁금하면 지금 바로가기'],
+  shock: ['지금 안 가면 손해입니다', '품절 전 프로필 링크 클릭', '서둘러야 예약 가능'],
+  empathy: ['쓸 분들은 바로 확인', '프로필 링크에서 만나보기', '경험자 추천 링크 확인'],
+  desire: ['지금 경험하러 가기', '프로필 링크에서 바로', '이 순간이 시작입니다'],
+  action: ['주문하러 프로필 링크로', '지금 클릭하면 혜택 적용', '바로 구매 가능합니다'],
+};
+
+function pickTemplate(
+  pool: Record<EmotionPhase, string[]>,
+  emotion: EmotionPhase,
+  customPrompt: string,
+  productHint: string,
+): string {
+  const promptTrim = customPrompt.trim();
+  if (promptTrim) {
+    const shortPrompt = promptTrim.split(/[,.]/)[0].trim();
+    if (shortPrompt.length >= 4 && shortPrompt.length <= 24) {
+      return shortPrompt;
+    }
+  }
+  const templates = pool[emotion];
+  const idx = Math.floor(Math.random() * templates.length);
+  return templates[idx].replace('이거', productHint);
+}
+
+function buildSegmentTexts(
+  hook: string,
+  hookOptions: HookOption[],
+  customPrompt: string,
+  productName?: string,
+): { intro: string; benefit: string; cta: string } {
+  const matchedHook = hookOptions.find((h) => h.text === hook);
+  const emotion: EmotionPhase = matchedHook?.emotion ?? 'curiosity';
+  const pName = productName?.trim() || '';
+  const productHint = pName.length > 8 ? pName.slice(0, 8) + '...' : pName || '이 제품';
+
+  const intro = pName || customPrompt.trim()
+    ? pName || pickTemplate(PRODUCT_INTRO_TEMPLATES, emotion, customPrompt, productHint)
+    : pickTemplate(PRODUCT_INTRO_TEMPLATES, emotion, customPrompt, productHint);
+
+  const benefit = pickTemplate(BENEFIT_TEMPLATES, emotion, customPrompt, productHint);
+  const cta = pickTemplate(CTA_TEMPLATES, emotion, '', productHint);
+
+  return { intro, benefit, cta };
+}
+
 export function buildShortFormEditPlan(
   platform: ShortFormPlatform,
   customPrompt: string,
@@ -197,12 +260,13 @@ export function buildShortFormEditPlan(
   const totalDurationSec = 15;
   const hookOptions = generateHookOptions(customPrompt, productName);
   const hook = selectedHook || hookOptions[0]?.text || '';
+  const segmentTexts = buildSegmentTexts(hook, hookOptions, customPrompt, productName);
 
   const segments: EditSegment[] = [
     { index: 0, startSec: 0, endSec: 3, label: '후킹', purpose: '시청자 이탈 방지', textOverlay: hook, position: 'center' },
-    { index: 1, startSec: 3, endSec: 7, label: '제품 소개', purpose: '핵심 가치 전달', textOverlay: productName || '제품 소개', position: 'top' },
-    { index: 2, startSec: 7, endSec: 11, label: '사용/혜택', purpose: '체감 효과 시각화', textOverlay: customPrompt.trim() || '지금 확인하세요', position: 'center' },
-    { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: '프로필 링크에서 확인', position: 'bottom' },
+    { index: 1, startSec: 3, endSec: 7, label: '제품 소개', purpose: '핵심 가치 전달', textOverlay: segmentTexts.intro, position: 'top' },
+    { index: 2, startSec: 7, endSec: 11, label: '사용/혜택', purpose: '체감 효과 시각화', textOverlay: segmentTexts.benefit, position: 'center' },
+    { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: segmentTexts.cta, position: 'bottom' },
   ];
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms, autoDisclosure && disclosureEnabled);

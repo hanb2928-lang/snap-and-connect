@@ -105,7 +105,7 @@ export function PostCaptureWorkflow({
       selectedOption.platformKey,
       customPrompt,
       selectedHook?.text ?? null,
-      undefined,
+      customPrompt.trim().split(/[,.]/)[0]?.trim() || undefined,
       [],
       true,
       disclosureEnabled,
