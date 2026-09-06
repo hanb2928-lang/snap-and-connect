@@ -142,19 +142,21 @@ export function PostCaptureWorkflow({
 
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
+  const PLATFORM_DEFAULT_LINKS: Record<string, string> = {
+    instagram: 'https://www.instagram.com/reels/create/',
+    threads: 'https://www.threads.net/',
+    pinterest: 'https://www.pinterest.com/pin-builder/',
+    tiktok: 'https://www.tiktok.com/creator-center/upload',
+    facebook: 'https://www.facebook.com/reels/create/',
+  };
+
   useEffect(() => {
-    if (selectedPlatformKey === 'instagram' && !platformLink) {
-      setPlatformLink('https://www.instagram.com/reel/');
-    } else if (selectedPlatformKey === 'threads' && !platformLink) {
-      setPlatformLink('https://www.threads.net/');
-    } else if (selectedPlatformKey === 'pinterest' && !platformLink) {
-      setPlatformLink('https://www.pinterest.com/');
-    } else if (selectedPlatformKey === 'tiktok' && !platformLink) {
-      setPlatformLink('https://www.tiktok.com/trending');
-    } else if (selectedPlatformKey === 'facebook' && !platformLink) {
-      setPlatformLink('https://www.facebook.com/');
+    const defaultLink = PLATFORM_DEFAULT_LINKS[selectedPlatformKey];
+    if (defaultLink) {
+      setPlatformLink(defaultLink);
     }
-  }, [selectedPlatformKey, platformLink]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlatformKey]);
 
   useEffect(() => {
     if (!visible) return;
@@ -768,7 +770,7 @@ export function PostCaptureWorkflow({
                   keyboardType="url"
                   returnKeyType="done"
                 />
-                <Text style={styles.platformLinkHint}>입력한 링크는 플랫폼 업로드와 함께 사용할 수 있습니다.</Text>
+                <Text style={styles.platformLinkHint}>선택한 플랫폼의 공식 업로드 페이지가 기본값으로 설정됩니다. 필요하면 쇼핑커넥터나 제휴 랜딩 링크로 자유롭게 수정하세요.</Text>
             </View>
 
             {fallbackUsed && !uploadDone && (
