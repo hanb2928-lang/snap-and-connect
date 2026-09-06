@@ -39,6 +39,7 @@ import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleC
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { UploadPlatformKey } from '@/lib/platformUpload';
+import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -240,7 +241,7 @@ export default function CameraScreen() {
   }, [cameraReady, isRecording, stopRecording, handleVideoRecorded]);
 
 
-  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: UploadPlatformKey) => {
+  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: UploadPlatformKey, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
     if (postCaptureBase64) {
       await runAutoAnalysis(postCaptureBase64, postCaptureMime);
