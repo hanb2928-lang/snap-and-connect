@@ -129,7 +129,7 @@ async function storeCopyCache(cacheKey: string, result: any, modelUsed: string):
 }
 
 type CopyType = "deal" | "info" | "viral" | "all";
-type CopyPlatform = "shortform" | "instagram" | "blog" | "x" | "threads" | "naverBlog" | "twitter" | "smartstore" | "pinterest";
+type CopyPlatform = "shortform" | "instagram" | "blog" | "x" | "threads" | "naverBlog" | "twitter" | "smartstore" | "pinterest" | "facebook";
 
 interface CopyItem {
   hook: string;
@@ -190,7 +190,7 @@ Deno.serve(async (req: Request) => {
         return valid.includes(raw?.copyType) ? raw.copyType : 'viral';
       })(),
       platform: ((): CopyPlatform => {
-        const valid: CopyPlatform[] = ['shortform', 'instagram', 'blog', 'naverBlog', 'x', 'twitter', 'threads', 'smartstore', 'pinterest'];
+        const valid: CopyPlatform[] = ['shortform', 'instagram', 'blog', 'naverBlog', 'x', 'twitter', 'threads', 'smartstore', 'pinterest', 'facebook'];
         return valid.includes(raw?.platform) ? raw.platform : 'shortform';
       })(),
       count: Math.min(Math.max(Number(raw?.count) || 3, 1), 5),
@@ -289,6 +289,100 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+// ─── Top 1% Copywriting Pattern Injection ──────────────────────────────
+// Patterns distilled from highest-converting affiliate posts per platform.
+// Each platform has distinct hook architectures, psychological triggers, and CTA styles.
+
+interface TopPattern {
+  name: string;
+  template: string;
+  tactics: string[];
+}
+
+const TOP1_HOOK_PATTERNS: Record<string, TopPattern[]> = {
+  tiktok: [
+    { name: '역설적 금지 후킹', template: '이 제품 {절대} 사지 마세요. 너무 잘 써서 통장이 거덜납니다', tactics: ['금지어로 시선 강제 정지', '역설로 호기심 폭발', '손실 암시'] },
+    { name: '3초 카운트다운', template: '3초 안에 이거 필요한 분만 남아주세요', tactics: ['시간 제한 긴박감', '선택적 잔류 몰입', '스와이프 차단'] },
+    { name: '도파민 루프', template: '잠깐, 이거 봤어? → 어 어떻게? → 진짜 미쳤는데 → 이 가격?', tactics: ['2.7초 간격 시각 자극', '도파민 분비 주기 동기화', '무한 루프'] },
+  ],
+  instagram: [
+    { name: '동경심 라이프스타일 후킹', template: '이거 하나면 내 일상이 달라지더라고요', tactics: ['제품=라이프스타일 등식', '동경심 자극', '번들링 효과'] },
+    { name: '스토리 몰입 후킹', template: '처음엔 반신반의했는데 써보고 생각 바뀌었어요', tactics: ['개인 경험담으로 광고 거부감 70% 감소', '뇌가 스토리를 현실로 착각'] },
+    { name: '카드뉴스 정보 밀집', template: '이거 모르면 손해인 제품 정리해드림', tactics: ['정보 밀도로 저장률 증가', '저장=알고리즘 가시성 상승'] },
+  ],
+  threads: [
+    { name: '진정성 대화형 후킹', template: '이거 진짜임? 얼마 전에 샀는데 폼 미쳤음', tactics: ['반말투 진정성', '혼자 중얼거리듯', '광고 거부감 제로'] },
+    { name: '스레드 몰입 정보 갭', template: '오늘 알게 된 건데 이거 진짜인가 싶어서 적어봄', tactics: ['정보 갭 연속', '다음 스레드 보고 싶게', '대화형 문체'] },
+  ],
+  pinterest: [
+    { name: '미래 자아 투사 후킹', template: 'OO 인테리어 아이디어: 이 아이템 하나면 집이 달라져', tactics: ['명사형 검색 키워드', '미래의 나를 위한 저장', '영감-실행 갭 좁히기'] },
+    { name: '시각적 임팩트 정보형', template: 'OO 가이드: 처음 시작하는 사람을 위한 꿀팁 5가지', tactics: ['정보성 텍스트 오버레이', '0.3초 시각 판단 최적화', '보드 큐레이션 심리'] },
+  ],
+  facebook: [
+    { name: '커뮤니티 질문 후킹', template: '여러분은 이거 알고 계셨나요? 저는 최근에야 알았어요', tactics: ['질문으로 참여 유도', '댓글 참여 기반', '커뮤니티 대화형'] },
+    { name: '사회적 증거 스토리', template: '지난주 이 제품 써보고 너무 좋아서 주변에 다 말했어요', tactics: ['개인 스토리로 신뢰 구축', '사회적 증거 자연스럽게', '공유 유도'] },
+  ],
+  shortform: [
+    { name: '미러 뉴런 후킹', template: '이거 쓰는 순간 진짜 내 이야기인 줄 알았어요', tactics: ['제품 사용 장면 자기 투사', '미러 뉴런 활성화', '광고 거부감 제거'] },
+    { name: 'before/after 시각 충격', template: '이렇게 힘들었고 → 이렇게 편해졌어요', tactics: ['시각적 비교로 뇌 자극', '변화 욕구 활성화', '비교 심리'] },
+  ],
+};
+
+const PSYCHOLOGICAL_TRIGGERS = [
+  { name: '손실 회피 역전', desc: '구매 안 하면 더 비싸게 사게 됨을 암시', example: '지금 안 사면 나중에 2배로 줍게 됩니다' },
+  { name: '사회적 증거', desc: '구체적 숫자로 뇌의 판단을 대체', example: '재구매율 89%, 리뷰 12,847개, 별점 4.8' },
+  { name: '긴급성/희소성', desc: '한정 수량, 시간 제한으로 행동 촉발', example: '재고 3개 남았을 때가 마지막 기회' },
+  { name: '호기심 갭', desc: '정보를 일부 숨겨 끝까지 보게 만듦', example: '이 제품 진짜 살 만한가? 결론은 마지막에' },
+  { name: '커밋먼트 일관성', desc: '작은 행동 먼저 유도 후 구매로 연결', example: '댓글에 O 적어주시면 추가 할인 코드 드려요' },
+  { name: '권위 프레이밍', desc: '전문가 포즈, 데이터 인용으로 신뢰 상승', example: '소비자 보호원 추천 유일한 제품' },
+];
+
+const TOP1_CTA_TEMPLATES = [
+  '고민하는 사이 품절됨 ㅋㅋ — 링크 남겨둠',
+  '이거 아직 모르면 손해인데, 링크 남김',
+  '알아서들 챙겨요 — 링크는 댓글에',
+  '지금 이 가격 유지되는 동안만 — 링크 확인',
+  '좋은 거 먼저 아는 사람이 임자 — 여기 링크',
+];
+
+function buildTop1Injection(platform: string, copyType: string): string {
+  const patterns = TOP1_HOOK_PATTERNS[platform] || TOP1_HOOK_PATTERNS.shortform;
+  const platformName = platformLabel(platform as CopyPlatform);
+
+  const patternSection = patterns
+    .map((p, i) => `  ${i + 1}. [${p.name}] "${p.template}"\n     전술: ${p.tactics.join(' · ')}`)
+    .join('\n');
+
+  const triggerSection = PSYCHOLOGICAL_TRIGGERS
+    .map((t) => `  - ${t.name}: ${t.desc}\n    예: "${t.example}"`)
+    .join('\n');
+
+  const ctaSection = TOP1_CTA_TEMPLATES
+    .map((c) => `  - "${c}"`)
+    .join('\n');
+
+  return `
+## 수익화 전환율 상위 1% 카피라이팅 벤치마킹 — ${platformName}
+
+너는 ${platformName}에서 쇼핑 커넥터 및 제휴 마케팅 수익화 전환율 상위 1% 게시물의 구조와 패턴을 철저히 분석·학습한 카피라이터야.
+단순 정보 전달형 문구가 아닌, 실질적인 구매 전환 및 링크 클릭(CTR)을 유도하는 톤앤매너와 구조를 적용해.
+
+### A. 후킹(Hooking) 핵심 패턴 (반드시 이 중 하나 이상 활용)
+${patternSection}
+
+### B. 인간 심리 기반 설득 기법 (문장 생성에 반영)
+${triggerSection}
+
+### C. 전환 최적화 CTA (기업 명령 금지, 내부자 꿀팁 스타일)
+${ctaSection}
+
+### D. 플랫폼 특성 맞춤 화법
+- ${platformTone(platform as CopyPlatform)}
+- 후킹 → 공감/반전 → 욕구 자극 → CTA의 4단 구조를 따를 것
+- 링크 클릭을 유도하는 자연스러운 문맥을 마지막 줄에 배치할 것
+`;
+}
+
 async function resolveOpenAIKey(): Promise<string | null> {
   const serverKey = Deno.env.get("OPENAI_API_KEY");
   if (serverKey) return serverKey;
@@ -333,15 +427,22 @@ function platformLabel(platform: CopyPlatform): string {
   if (platform === "threads") return "스레드";
   if (platform === "smartstore") return "스마트스토어 상세페이지";
   if (platform === "pinterest") return "핀터레스트";
+  if (platform === "facebook") return "페이스북";
   return "쇼츠/릴스/틱톡";
 }
 
 function platformTone(platform: CopyPlatform): string {
   if (platform === "threads") {
-    return "스레드는 반말투로 써. '해요', '습니다', '세요' 같은 존댓말은 빼고 '한다', '임', '드라고', '거든' 같은 반말로 자연스럽게. 마치 혼자 중얼거리거나 친구한테 툭 던지듯이.";
+    return "스레드는 반말투로 써. '해요', '습니다', '세요' 같은 존댓말은 빼고 '한다', '임', '드라고', '거든' 같은 반말로 자연스럽게. 마치 혼자 중얼거리거나 친구한테 툭 던지듯이. 진정성 있는 대화형 문체가 핵심이야.";
   }
   if (platform === "smartstore") {
     return "스마트스토어 상세페이지용이니까 구매 결정을 돮는 방향으로 써. 상품명, 장점, 가격을 명확히 전달하고 '지금 구매하기', '한정 수량' 같은 구매 유도 문구를 자연스럽게 포함해.";
+  }
+  if (platform === "pinterest") {
+    return "핀터레스트는 시각적 영감과 정보성 텍스트가 핵심이야. 'OO 아이디어', 'OO 인테리어'처럼 검색에 걸릴 만한 명사형 키워드를 후킹에 넣고, 본문은 실용적이고 간결하게. 감성보다 정보 전달과 영감 주는 방향으로.";
+  }
+  if (platform === "facebook") {
+    return "페이스북은 커뮤니티 대화형 글쓰기야. 질문으로 시작해서 댓글 참여를 유도하고, 친근하면서도 신뢰감 있는 톤으로 써. '여러분은 어떠세요?', '경험 공유해주세요' 같은 참여 유도 문구를 자연스럽게 넣어.";
   }
   return "말투는 친근한 존댓말('해요', '요')를 기본으로 하되 너무 격식 차리지 마.";
 }
@@ -377,7 +478,7 @@ async function generateWithOpenAI(
 
   let systemPrompt = buildPsychoSystemPrompt(
     "너는 한국인 SNS 콘텐츠 작가야.",
-    copyChannelSpecific,
+    copyChannelSpecific + buildTop1Injection(data.platform, data.copyType),
     data.brandPersona,
   );
 
@@ -651,6 +752,13 @@ function generateLocalCopies(data: CopyRequest, count: number): CopyItem[] {
     if (data.platform === "smartstore") {
       const ctaTags = ["스마트스토어", "네이버쇼핑", "오늘의딜", "구매하기"];
       iterHashtags = [...iterHashtags, ...ctaTags];
+    }
+    if (data.platform === "facebook") {
+      hook = hook.replace(/해요\?/g, '하나요?').replace(/임$/g, '거든요');
+      iterHashtags = [...iterHashtags, "공유", "추천", "좋아요"];
+    }
+    if (data.platform === "pinterest") {
+      iterHashtags = [...iterHashtags, "아이디어", "인스피레이션", "영감"];
     }
     return {
       hook,

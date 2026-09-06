@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildConversionPrompt } from "../_shared/conversion-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -181,7 +182,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { productName, productCategory, videoDuration, platform, accentColor, hook, oneLiner, psychologyPreset } = body as {
+    const { productName, productCategory, videoDuration, platform, accentColor, hook, oneLiner, psychologyPreset, customLinks } = body as {
       productName?: string;
       productCategory?: string;
       videoDuration?: number;
@@ -190,6 +191,7 @@ Deno.serve(async (req: Request) => {
       hook?: string;
       oneLiner?: string;
       psychologyPreset?: string;
+      customLinks?: string[];
     };
 
     const duration: 15 | 30 = videoDuration === 30 ? 30 : 15;
@@ -209,9 +211,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const conversionPrompt = buildConversionPrompt(pPlatform, "video", customLinks);
+
     const systemPrompt =
       "You are a short-form video editing director and copywriter specializing in affiliate marketing content.\n" +
       "Given a product and a downloaded stock video, create a precise EDIT PLAN for a " + duration + "-second clip.\n\n" +
+      conversionPrompt + "\n" +
       "Key principles:\n" +
       "1. HOOK: The first 1-3 seconds MUST grab attention. Suggest the exact timing and what to show.\n" +
       "2. PSYCHOLOGY: Apply the following persuasion principle: " +

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildConversionPrompt } from "../_shared/conversion-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +45,8 @@ interface VariantRequest {
   productAdvantages: string[];
   hook: string;
   brandPersona?: string | null;
+  platform?: string;
+  customLinks?: string[];
 }
 
 const TONE_CONFIG: Record<VariantTone, { label: string; platform: string; systemGuidance: string }> = {
@@ -144,9 +147,12 @@ async function resolveOpenAIKey(): Promise<string | null> {
 async function generateVariantsWithOpenAI(data: VariantRequest, apiKey: string): Promise<Variant[]> {
   const tones: VariantTone[] = ['informative', 'humor', 'emotional'];
 
+  const conversionPrompt = buildConversionPrompt(data.platform || "shortform", "variant", data.customLinks);
+
   const systemPrompt =
     "너는 한국 숏폼 마케팅 전문가야. 같은 상품에 대해 3가지 다른 톤앤매너의 숏폼 스크립트를 동시에 만들어.\n" +
     "각 변형은 서로 완전히 다른 분위기와 대사를 가져야 해. 중복 문구 금지.\n" +
+    conversionPrompt + "\n" +
     "각 변형마다 다음을 포함해:\n" +
     "- hook: 15자 이내의 후킹 문구 (각 변형마다 다른 스타일)\n" +
     "- caption: SNS 업로드용 캡션 (50자 이내)\n" +

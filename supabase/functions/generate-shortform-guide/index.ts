@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { buildPsychoSystemPrompt } from "../_shared/psycho-engine.ts";
+import { buildConversionPrompt } from "../_shared/conversion-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +41,8 @@ interface GuideRequest {
   priceEstimate: string;
   oneLiner: string;
   productAdvantages: string[];
+  platform?: string;
+  customLinks?: string[];
 }
 
 Deno.serve(async (req: Request) => {
@@ -132,9 +135,11 @@ async function generateWithOpenAI(
     "tips는 3개, hooks는 3개를 만들어. 각각 서로 다른 각도(예: 호기심 유발, 가격 어필, 감정 자극, 사용 후기형 등)로.\n" +
     "한국어로 자연스럽게 작성하고, 실제 숏폼 크리에이터가 쓸 법한 표현을 사용해.";
 
+  const conversionPrompt = buildConversionPrompt(data.platform || "shortform", "video", data.customLinks);
+
   const systemPrompt = buildPsychoSystemPrompt(
     "너는 숏폼 콘텐츠 제작 전문가야.",
-    guideChannelSpecific,
+    guideChannelSpecific + conversionPrompt,
   );
 
   const userPrompt =

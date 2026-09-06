@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { buildConversionPrompt, normalizePlatform } from "../_shared/conversion-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,8 @@ interface GenerateImageRequest {
   industry?: IndustryKey;
   seed?: number;
   referenceImage?: string;
+  platform?: string;
+  customLinks?: string[];
 }
 
 type IndustryKey =
@@ -180,7 +183,7 @@ Deno.serve(async (req: Request) => {
     const preset = INDUSTRY_PRESETS[industry] ?? INDUSTRY_PRESETS.general;
 
     // Step 1: LLM prompt expansion (convert user keyword to structured professional prompt)
-    const expandedPrompt = await expandPromptWithLLM(body.prompt, body.customPrompt, body.productName, body.productCategory, preset, openaiKey);
+    const expandedPrompt = await expandPromptWithLLM(body.prompt, body.customPrompt, body.productName, body.productCategory, preset, openaiKey, body.platform, body.customLinks);
 
     // Step 2: Build structured prompt with industry preset injection
     const structuredPrompt = buildStructuredPrompt(expandedPrompt, preset, size, body.seed);
@@ -263,15 +266,21 @@ async function expandPromptWithLLM(
   productCategory?: string,
   preset?: IndustryPreset,
   openaiKey?: string,
+  platform?: string,
+  customLinks?: string[],
 ): Promise<string> {
   if (!openaiKey) return userPrompt;
 
+  const conversionPrompt = buildConversionPrompt(platform || "shortform", "image", customLinks);
+
   const systemInstruction =
-    "You are a professional AI image prompt engineer. Convert the user's short Korean marketing keyword or phrase " +
-    "into a detailed, professional image generation prompt in English. " +
+    "You are a professional AI image prompt engineer specializing in conversion-optimized affiliate marketing content. " +
+    "Convert the user's short Korean marketing keyword or phrase into a detailed, professional image generation prompt in English. " +
     "Follow this structure: [Subject] + [Environment] + [Lighting & Mood] + [Camera Angle] + [Quality]. " +
     "Keep the product name and key marketing point intact. Add visual detail that matches the industry context. " +
-    "Output ONLY the expanded prompt, nothing else. Keep it under 200 words.";
+    "The image must be designed to stop scrolling and drive purchase conversions, not just look pretty.\n" +
+    conversionPrompt +
+    "\nOutput ONLY the expanded prompt, nothing else. Keep it under 200 words.";
 
   const context = [
     `User input: ${userPrompt}`,
