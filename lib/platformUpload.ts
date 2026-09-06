@@ -7,6 +7,8 @@ export type DisclosurePlacement = 'body' | 'comment';
 export interface PlatformDeepLink {
   appUrl: string;
   webUrl: string;
+  uploadAppUrl: string;
+  uploadWebUrl: string;
   label: string;
 }
 
@@ -14,37 +16,51 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   instagram: {
     appUrl: 'instagram://story-camera',
     webUrl: 'https://www.instagram.com/',
-    label: '인스타그램 앱 열기',
+    uploadAppUrl: 'instagram://library?mediaType=video',
+    uploadWebUrl: 'https://www.instagram.com/create/select/',
+    label: '인스타그램 릴스',
   },
   blog: {
     appUrl: 'com.naver.blog://open',
     webUrl: 'https://blog.naver.com/',
-    label: '네이버 블로그 열기',
+    uploadAppUrl: 'com.naver.blog://write',
+    uploadWebUrl: 'https://blog.editor.naver.com/',
+    label: '네이버 블로그',
   },
   tiktok: {
     appUrl: 'snssdk1128://',
     webUrl: 'https://www.tiktok.com/upload',
-    label: '틱톡 앱 열기',
+    uploadAppUrl: 'snssdk1128://upload',
+    uploadWebUrl: 'https://www.tiktok.com/upload',
+    label: '틱톡',
   },
   youtube: {
     appUrl: 'youtube://',
     webUrl: 'https://www.youtube.com/upload',
-    label: '유튜브 숏츠 앱 열기',
+    uploadAppUrl: 'youtube://upload',
+    uploadWebUrl: 'https://www.youtube.com/upload',
+    label: '유튜브 숏츠',
   },
   twitter: {
     appUrl: 'twitter://post',
     webUrl: 'https://x.com/compose/post',
-    label: 'X(트위터) 열기',
+    uploadAppUrl: 'twitter://post',
+    uploadWebUrl: 'https://x.com/compose/post',
+    label: 'X(트위터)',
   },
   pinterest: {
     appUrl: 'pinterest://',
     webUrl: 'https://www.pinterest.com/pin/create/button/',
-    label: '핀터레스트 앱 열기',
+    uploadAppUrl: 'pinterest://pin/create/button/',
+    uploadWebUrl: 'https://www.pinterest.com/pin/create/button/',
+    label: '핀터레스트',
   },
   naver_clip: {
     appUrl: 'com.naverapp://open',
     webUrl: 'https://clip.navercast.com/',
-    label: '네이버 클립 열기',
+    uploadAppUrl: 'com.naverapp://clip/upload',
+    uploadWebUrl: 'https://clip.navercast.com/upload',
+    label: '네이버 클립',
   },
 };
 
@@ -52,6 +68,8 @@ export function getDeepLink(key: UploadPlatformKey | string): PlatformDeepLink {
   return DEEP_LINKS[key as UploadPlatformKey] ?? {
     appUrl: '',
     webUrl: '',
+    uploadAppUrl: '',
+    uploadWebUrl: '',
     label: key,
   };
 }

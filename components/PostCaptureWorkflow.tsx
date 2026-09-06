@@ -298,14 +298,21 @@ export function PostCaptureWorkflow({
     const deepLink = getDeepLink(selectedPlatformKey);
     setPlatformLaunched(true);
     try {
-      const canOpen = await Linking.canOpenURL(deepLink.appUrl);
+      const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
       if (canOpen) {
-        await Linking.openURL(deepLink.appUrl);
+        await Linking.openURL(deepLink.uploadAppUrl);
       } else {
-        await Linking.openURL(deepLink.webUrl);
+        await Linking.openURL(deepLink.uploadWebUrl);
       }
     } catch {
-      // fallback
+      try {
+        const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
+        if (canOpenFallback) {
+          await Linking.openURL(deepLink.appUrl);
+        } else {
+          await Linking.openURL(deepLink.webUrl);
+        }
+      } catch { /* ignore */ }
     }
   }, [selectedPlatformKey]);
 
@@ -396,15 +403,23 @@ export function PostCaptureWorkflow({
 
     const deepLink = getDeepLink(selectedPlatformKey);
     try {
-      const canOpen = await Linking.canOpenURL(deepLink.appUrl);
+      const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
       if (canOpen) {
-        await Linking.openURL(deepLink.appUrl);
+        await Linking.openURL(deepLink.uploadAppUrl);
       } else {
-        await Linking.openURL(deepLink.webUrl);
+        await Linking.openURL(deepLink.uploadWebUrl);
       }
       setPlatformLaunched(true);
     } catch {
-      // platform launch is best-effort
+      try {
+        const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
+        if (canOpenFallback) {
+          await Linking.openURL(deepLink.appUrl);
+        } else {
+          await Linking.openURL(deepLink.webUrl);
+        }
+        setPlatformLaunched(true);
+      } catch { /* best-effort */ }
     }
 
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
@@ -734,7 +749,7 @@ export function PostCaptureWorkflow({
             >
               <Share2 size={18} color="#fff" strokeWidth={2.5} />
               <Text style={styles.actionBtnText}>
-                {platformLaunched ? `${platformLabel} 앱 실행됨` : `${platformLabel} 앱에서 발행`}
+                {platformLaunched ? `${platformLabel} 업로드 열림` : `${platformLabel} 동영상 업로드`}
               </Text>
             </TouchableOpacity>
 
