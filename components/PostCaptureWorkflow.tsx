@@ -578,7 +578,6 @@ export function PostCaptureWorkflow({
               {disclosureEnabled && (
                 <View style={[styles.timelineSeg]}>
                   <View style={[styles.timelineBar, styles.timelineDisclosure, { flex: 2 }]}>
-                    <Shield size={11} color="#fff" strokeWidth={2.2} />
                     <Text style={styles.timelineLabel}>공정위 문구</Text>
                     <Text style={styles.timelineTime}>13-15s</Text>
                   </View>

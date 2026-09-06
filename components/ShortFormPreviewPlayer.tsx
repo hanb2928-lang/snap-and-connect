@@ -15,8 +15,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Shield,
-  Music,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { ShortFormEditPlan, EditSegment } from '@/lib/shortFormEditEngine';
@@ -296,9 +294,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
 
           {activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
             <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
-              <View style={[styles.captionBadge, { backgroundColor: captionStyle.badgeBg }]}>
-                <Text style={styles.captionSegmentLabel}>{activeSegment.label}</Text>
-              </View>
               <Text
                 style={{
                   fontSize: captionStyle.fontSize,
@@ -319,10 +314,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
 
           {isDisclosureActive && (
             <View style={styles.disclosureOverlay}>
-              <View style={styles.disclosureBadge}>
-                <Shield size={10} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.disclosureBadgeText}>공정위</Text>
-              </View>
               <Text style={styles.disclosureText} numberOfLines={2}>
                 {editPlan.disclosureOverlay.text || '광고·협찬 포함'}
               </Text>
@@ -331,7 +322,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
 
           {isBgmActive && (
             <View style={styles.bgmIndicator}>
-              <Music size={10} color="#fff" strokeWidth={2.5} />
               <Text style={styles.bgmText} numberOfLines={1}>{editPlan.bgmTemplate.label}</Text>
             </View>
           )}
@@ -378,7 +368,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
         ))}
         {editPlan.disclosureEnabled ? (
           <View style={[styles.segmentLabelChip, styles.disclosureChip, { flex: editPlan.disclosureOverlay.durationSec }]}>
-            <Shield size={8} color="#fff" strokeWidth={2.5} />
             <Text style={styles.segmentLabelText} numberOfLines={1}>공정위</Text>
           </View>
         ) : (
