@@ -467,9 +467,11 @@ export default function CameraScreen() {
   };
 
   const handleWebCapture = async (base64: string, mimeType: string) => {
-    setPostCaptureBase64(base64);
+    const isVideo = mimeType.startsWith('video/');
+    const dataUri = `data:${mimeType};base64,${base64}`;
+    setPostCaptureBase64(isVideo ? null : base64);
     setPostCaptureMime(mimeType);
-    setPostCaptureVideoUri(null);
+    setPostCaptureVideoUri(isVideo ? dataUri : null);
     setPostCaptureVisible(true);
   };
 

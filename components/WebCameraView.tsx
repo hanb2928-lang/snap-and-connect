@@ -279,8 +279,9 @@ export function WebCameraView({
   }, []);
 
   useEffect(() => {
-    if (!isRecording && recordElapsed >= ONECLICK_MAX_DURATION_S && recordedChunksRef.current.length > 0) {
+    if (!isRecording && recordedChunksRef.current.length > 0) {
       const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      recordedChunksRef.current = [];
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
@@ -290,7 +291,7 @@ export function WebCameraView({
       reader.readAsDataURL(blob);
       setRecordElapsed(0);
     }
-  }, [isRecording, recordElapsed, onCapture]);
+  }, [isRecording, onCapture]);
 
   useEffect(() => {
     if (autoSaving) {
