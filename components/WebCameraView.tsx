@@ -22,6 +22,7 @@ interface WebCameraViewProps {
   autoSaveStep: number;
   onMultiAnglePress: () => void;
   cameraRole?: 'template' | 'video';
+  simplified?: boolean;
 }
 
 type Facing = 'user' | 'environment';
@@ -49,6 +50,7 @@ export function WebCameraView({
   autoSaveStep,
   onMultiAnglePress,
   cameraRole = 'template',
+  simplified = false,
 }: WebCameraViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -180,12 +182,7 @@ export function WebCameraView({
     const result = await captureFrame();
     if (!result) return;
     const [mime, b64] = result.split('|');
-    if (captureMode === 'oneclick') {
-      onCapture(b64, mime);
-    } else {
-      setPreviewBase64(b64);
-      setPreviewMime(mime);
-    }
+    onCapture(b64, mime);
   }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress]);
 
   const handleConfirm = useCallback(() => {
@@ -332,17 +329,19 @@ export function WebCameraView({
             )}
           </View>
 
-          {/* Top bar: settings space + flip */}
-          <View style={[styles.topBar, { top: safeTop + 8 }]}>
-            <View style={styles.topBarLeft}>
-              <View style={styles.topBtnPlaceholder} />
+          {/* Top bar: flip only */}
+          {!simplified && (
+            <View style={[styles.topBar, { top: safeTop + 8 }]}>
+              <View style={styles.topBarLeft}>
+                <View style={styles.topBtnPlaceholder} />
+              </View>
+              <View style={styles.topBarRight}>
+                <TouchableOpacity style={styles.topBtn} onPress={handleFlip} activeOpacity={0.7} disabled={!cameraReady}>
+                  <RotateCcw size={20} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.topBarRight}>
-              <TouchableOpacity style={styles.topBtn} onPress={handleFlip} activeOpacity={0.7} disabled={!cameraReady}>
-                <RotateCcw size={20} color="#fff" strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
 
           {/* Bottom bar */}
           <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.lg }]}>
@@ -352,41 +351,44 @@ export function WebCameraView({
               </View>
             )}
 
-            {/* Mode capsule toggle (above shutter) */}
-            <View style={styles.modeToggleWrap}>
-              {MODE_META(cameraRole).map((mode, idx) => {
-                const Icon = mode.icon;
-                const isActiveMode = captureMode === mode.key;
-                return (
-                  <TouchableOpacity
-                    key={mode.key}
-                    style={[
-                      styles.modeToggleBtn,
-                      idx === 0 && styles.modeToggleBtnFirst,
-                      idx === MODE_META(cameraRole).length - 1 && styles.modeToggleBtnLast,
-                      isActiveMode && styles.modeToggleBtnActive,
-                      autoSaving && styles.modeToggleBtnDisabled,
-                    ]}
-                    onPress={() => onCaptureModeChange(mode.key)}
-                    disabled={autoSaving}
-                    activeOpacity={0.7}
-                  >
-                    <Icon size={15} color={isActiveMode ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
-                    <Text style={[styles.modeToggleText, isActiveMode && styles.modeToggleTextActive]}>
-                      {mode.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {!simplified && (
+              <View style={styles.modeToggleWrap}>
+                {MODE_META(cameraRole).map((mode, idx) => {
+                  const Icon = mode.icon;
+                  const isActiveMode = captureMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      style={[
+                        styles.modeToggleBtn,
+                        idx === 0 && styles.modeToggleBtnFirst,
+                        idx === MODE_META(cameraRole).length - 1 && styles.modeToggleBtnLast,
+                        isActiveMode && styles.modeToggleBtnActive,
+                        autoSaving && styles.modeToggleBtnDisabled,
+                      ]}
+                      onPress={() => onCaptureModeChange(mode.key)}
+                      disabled={autoSaving}
+                      activeOpacity={0.7}
+                    >
+                      <Icon size={15} color={isActiveMode ? '#fff' : theme.colors.dark.textDim} strokeWidth={2.2} />
+                      <Text style={[styles.modeToggleText, isActiveMode && styles.modeToggleTextActive]}>
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.bottomControlsRow}>
-              {/* Gallery / file pick */}
-              <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
-                <ImageIcon size={22} color="#fff" strokeWidth={2} />
-              </TouchableOpacity>
+              {!simplified ? (
+                <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
+                  <ImageIcon size={22} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: 52 }} />
+              )}
 
-              {/* Shutter button */}
               <TouchableOpacity
                 style={[
                   styles.shutterBtn,
@@ -405,22 +407,25 @@ export function WebCameraView({
                 )}
               </TouchableOpacity>
 
-              {/* Grid toggle */}
-              <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
-                {gridVisible ? (
-                  <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-                ) : (
-                  <Grid3x3 size={24} color="#fff" strokeWidth={2} />
-                )}
-              </TouchableOpacity>
+              {!simplified ? (
+                <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
+                  {gridVisible ? (
+                    <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
+                  ) : (
+                    <Grid3x3 size={24} color="#fff" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: 52 }} />
+              )}
             </View>
 
             <Text style={styles.shutterHint}>
               {autoSaving ? 'AI 자동 분석 중...' :
                capturing ? '촬영 중...' :
-               captureMode === 'oneclick' ? '탭 한 번으로 순간을 잡아 숏폼 소스로 즉시 태우세요!' :
-               captureMode === 'single' ? '흔들림 없이 상품을 한 장 완벽하게 담아내세요' :
-               '전면, 측면, 디테일을 연달아 촬영해 역동적인 전환을 만드세요'}
+               captureMode === 'oneclick' ? '탭 한 번으로 숏폼 완성' :
+               captureMode === 'single' ? '흔들림 없이 한 장 담아내기' :
+               '전면, 측면, 디테일을 연달아 촬영'}
             </Text>
           </View>
         </>

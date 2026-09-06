@@ -4,6 +4,28 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { SavedAsset } from '@/types/database';
 
 const BUCKET = 'assets';
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = MAX_RETRIES,
+  baseDelay = BASE_DELAY_MS,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
 
 export async function uploadAssetBlob(
   blob: any,
@@ -12,11 +34,18 @@ export async function uploadAssetBlob(
 ): Promise<string | null> {
   const path = `${fileName}`;
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, blob, { contentType: mimeType, upsert: true });
-
-  if (error) return null;
+  try {
+    const result = await withRetry(async () => {
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, blob, { contentType: mimeType, upsert: true });
+      if (error) throw error;
+      return true;
+    });
+    if (!result) return null;
+  } catch {
+    return null;
+  }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
@@ -34,38 +63,48 @@ export async function uploadAssetBlobWithProgress(
   }
 
   const path = `${fileName}`;
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token || '';
 
-  const uploadUrl = `${supabaseUrl}/storage/v1/object/${BUCKET}/${path}`;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token || '';
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/${BUCKET}/${path}`;
 
-  return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', uploadUrl, true);
-    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-    xhr.setRequestHeader('Content-Type', mimeType);
-    xhr.setRequestHeader('x-upsert', 'true');
+    const result = await new Promise<string | null>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrl, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      xhr.setRequestHeader('Content-Type', mimeType);
+      xhr.setRequestHeader('x-upsert', 'true');
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    };
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-        resolve(data.publicUrl);
-      } else {
-        resolve(null);
-      }
-    };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+          resolve(data.publicUrl);
+        } else {
+          resolve(null);
+        }
+      };
 
-    xhr.onerror = () => resolve(null);
-    xhr.ontimeout = () => resolve(null);
-    xhr.timeout = 120000;
-    xhr.send(blob);
-  });
+      xhr.onerror = () => resolve(null);
+      xhr.ontimeout = () => resolve(null);
+      xhr.timeout = 120000;
+      xhr.send(blob);
+    });
+
+    if (result) return result;
+    if (attempt < MAX_RETRIES) {
+      onProgress(0);
+      await new Promise((r) => setTimeout(r, BASE_DELAY_MS * Math.pow(2, attempt)));
+    }
+  }
+
+  return null;
 }
 
 export async function uploadAssetDataUrl(
@@ -97,14 +136,19 @@ export async function uploadAssetDataUrl(
         type: mimeType,
       } as unknown as Blob);
 
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(fileName, formData, { contentType: mimeType, upsert: true });
-
-      if (error) return null;
+      const result = await withRetry(async () => {
+        const { error } = await supabase.storage
+          .from(BUCKET)
+          .upload(fileName, formData, { contentType: mimeType, upsert: true });
+        if (error) throw error;
+        return true;
+      });
+      if (!result) return null;
 
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
       return data.publicUrl;
+    } catch {
+      return null;
     } finally {
       await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
     }
@@ -125,14 +169,70 @@ export async function uploadAssetFromFileUri(
     type: mimeType,
   } as unknown as Blob);
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(fileName, formData, { contentType: mimeType, upsert: true });
-
-  if (error) return null;
+  try {
+    const result = await withRetry(async () => {
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(fileName, formData, { contentType: mimeType, upsert: true });
+      if (error) throw error;
+      return true;
+    });
+    if (!result) return null;
+  } catch {
+    return null;
+  }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
   return data.publicUrl;
+}
+
+export async function uploadAssetFromFileUriWithProgress(
+  fileUri: string,
+  fileName: string,
+  mimeType: string,
+  onProgress: (pct: number) => void,
+): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: fileName,
+      type: mimeType,
+    } as unknown as Blob);
+
+    try {
+      const result = await new Promise<string | null>((resolve) => {
+        supabase.storage
+          .from(BUCKET)
+          .upload(fileName, formData, { contentType: mimeType, upsert: true })
+          .then(({ error }) => {
+            if (error) {
+              resolve(null);
+            } else {
+              const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
+              resolve(data.publicUrl);
+            }
+          })
+          .catch(() => resolve(null));
+      });
+
+      if (result) {
+        onProgress(100);
+        return result;
+      }
+    } catch {
+      // fall through to retry
+    }
+
+    if (attempt < MAX_RETRIES) {
+      onProgress(0);
+      await new Promise((r) => setTimeout(r, BASE_DELAY_MS * Math.pow(2, attempt)));
+    }
+  }
+
+  return null;
 }
 
 export async function saveAssetRecord(record: {

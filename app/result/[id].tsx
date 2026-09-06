@@ -18,6 +18,7 @@ import {
   Tag,
   Info,
   Share2,
+  Download,
   Trash2,
   Sparkles,
   ShoppingBag,
@@ -49,6 +50,7 @@ import { getDisclosureForPlatforms } from '@/lib/disclosure';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
+import { uploadAssetBlobWithProgress, uploadAssetFromFileUriWithProgress, saveAssetRecord } from '@/lib/savedAssets';
 import * as MediaLibrary from 'expo-media-library';
 import { Share as RNShare } from 'react-native';
 import type { Scan, UserSettings, AffiliateLink, CustomAffiliateLink, DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
@@ -72,7 +74,6 @@ import { SmartScheduler } from '@/components/SmartScheduler';
 import { OcrTextExtractor } from '@/components/OcrTextExtractor';
 import { BellRing, ScanText as ScanTextIcon } from 'lucide-react-native';
 import { LocalStoreCard } from '@/components/LocalStoreCard';
-import { HybridBannerCard } from '@/components/HybridBannerCard';
 import { ShortFormTipsCard } from '@/components/ShortFormTipsCard';
 import { ViralPredictor } from '@/components/ViralPredictor';
 import { PersonaSimulator } from '@/components/PersonaSimulator';
@@ -111,7 +112,6 @@ import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
 import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
-import { WorkflowGuide } from '@/components/WorkflowGuide';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 
 export default function ResultScreen() {
@@ -553,6 +553,9 @@ export default function ResultScreen() {
   const [captionCopied, setCaptionCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [hookCopied, setHookCopied] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadDone, setUploadDone] = useState(false);
   const [showDisclosure, setShowDisclosure] = useState(false);
 
   const handleCopyCaption = async () => {
@@ -572,6 +575,11 @@ export default function ResultScreen() {
   };
 
   const handleSaveAndShare = async () => {
+    if (uploadProgress !== null) return;
+    setUploadError(null);
+    setUploadDone(false);
+    setUploadProgress(0);
+
     try {
       const uri = await captureRef(cardRef, {
         format: 'png',
@@ -579,45 +587,63 @@ export default function ResultScreen() {
         fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
       });
 
-      if (Platform.OS === 'web') {
-        // On web: download the image, copy text, and open share modal
-        const a = document.createElement('a');
-        a.href = uri;
-        a.download = `snap-connect-${scan?.id ?? 'card'}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`;
 
+      let cloudUrl: string | null = null;
+      if (Platform.OS === 'web') {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'image/png', (pct) => {
+          setUploadProgress(pct);
+        });
+      } else {
+        cloudUrl = await uploadAssetFromFileUriWithProgress(uri, fileName, 'image/png', (pct) => {
+          setUploadProgress(pct);
+        });
+      }
+
+      if (!cloudUrl) {
+        setUploadProgress(null);
+        setUploadError('클라우드 업로드 실패. 네트워크를 확인 후 다시 시도해주세요.');
+        return;
+      }
+
+      await saveAssetRecord({
+        scan_id: scan?.id ?? null,
+        asset_type: 'image',
+        title: activeProductName || scan?.title || '숏폼 카드',
+        file_url: cloudUrl,
+        file_name: fileName,
+        mime_type: 'image/png',
+        platform: activePlatform,
+      });
+
+      setUploadProgress(100);
+      setUploadDone(true);
+      setTimeout(() => {
+        setUploadProgress(null);
+        setUploadDone(false);
+      }, 2500);
+
+      if (Platform.OS === 'web') {
         if (navigator.clipboard) {
-          await navigator.clipboard.writeText(captionWithLink);
+          await navigator.clipboard.writeText(shareText);
         }
         setCaptionCopied(true);
         setTimeout(() => setCaptionCopied(false), 2000);
       } else {
-        // On native: save to gallery then open share sheet
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status === 'granted') {
-          const asset = await MediaLibrary.createAssetAsync(uri);
-          try {
-            await MediaLibrary.createAlbumAsync('숏커넥트', asset, false);
-          } catch {
-            // Album creation can fail on scoped storage; the asset is already saved.
-          }
-        }
         try {
           await Sharing.shareAsync(uri, {
             mimeType: 'image/png',
             dialogTitle: '공유하기',
           });
         } catch {
-          await RNShare.share({
-            message: captionWithLink,
-          });
+          await RNShare.share({ message: shareText });
         }
       }
     } catch {
-      // Fallback: just copy text
-      handleCopyCaption();
+      setUploadProgress(null);
+      setUploadError('저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -865,7 +891,7 @@ export default function ResultScreen() {
                 <View style={styles.noLinkNotice}>
                   <Link2 size={16} color={theme.colors.warning[400]} strokeWidth={2} />
                   <Text style={styles.noLinkNoticeText}>
-                    구매 링크를 입력하면 스티커 링크가 자동으로 만들어져요. 아래 '쇼핑커넥트 & 제휴 링크'를 펼쳐서 플랫폼을 선택하고 내 수수료 링크를 붙여넣으세요.
+                    구매 링크를 입력하면 스티커 링크가 자동으로 만들어져요. 아래 &lsquo;쇼핑커넥트 &amp; 제휴 링크&rsquo;를 펼쳐서 플랫폼을 선택하고 내 수수료 링크를 붙여넣으세요.
                   </Text>
                 </View>
               )}
@@ -1645,16 +1671,7 @@ export default function ResultScreen() {
           />
         ) : null}
 
-        {scan.hybrid_mapping && scan.hybrid_mapping.localStoreContext && (
-          <View style={styles.section}>
-            <HybridBannerCard hybridMapping={scan.hybrid_mapping} />
-          </View>
-        )}
-
         <View style={styles.body}>
-          <View style={styles.workflowGuideWrap}>
-            <WorkflowGuide currentStep={3} />
-          </View>
           <View style={styles.titleRow}>
             <Sparkles size={20} color={theme.colors.primary[400]} strokeWidth={2} />
             <Text style={styles.title} numberOfLines={2}>{scan.title || '제품 분석 결과'}</Text>
@@ -1875,11 +1892,11 @@ export default function ResultScreen() {
           ) : null}
 
           <View style={styles.section}>
-            <View style={styles.comicTileHeader}>
+            <View style={styles.publishTileHeader}>
               <UploadIcon size={18} color={theme.colors.warning[400]} strokeWidth={2} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.comicTileTitle}>4단계 · 발행 · 공유</Text>
-                <Text style={styles.comicTileDesc}>단축 URL 복사 후 선택한 플랫폼에 업로드</Text>
+                <Text style={styles.publishTileTitle}>발행 · 공유</Text>
+                <Text style={styles.publishTileDesc}>단축 URL 복사 후 선택한 플랫폼에 업로드</Text>
               </View>
             </View>
             {shortUrl ? (
@@ -1927,47 +1944,64 @@ export default function ResultScreen() {
       </KeyboardAvoidingView>
 
       <View style={[styles.floatingBar, { paddingBottom: insets.bottom }]}>
+        {uploadProgress !== null && (
+          <View style={styles.uploadProgressWrap}>
+            <View style={styles.uploadProgressTrack}>
+              <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
+            </View>
+            <Text style={styles.uploadProgressText}>
+              {uploadDone ? '클라우드 저장 완료!' : uploadProgress < 100 ? `클라우드 업로드 중... ${uploadProgress}%` : '저장 처리 중...'}
+            </Text>
+          </View>
+        )}
+        {uploadError && (
+          <View style={styles.uploadErrorWrap}>
+            <Text style={styles.uploadErrorText}>{uploadError}</Text>
+            <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
+              <X size={16} color={theme.colors.error[400]} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.floatingBarRow}>
         <TouchableOpacity
-          style={styles.floatingBarBtn}
-          onPress={handleCopyCaption}
+          style={[styles.floatingBarBtn, uploadProgress !== null && { opacity: 0.5 }]}
+          onPress={handleSaveAndShare}
           activeOpacity={0.7}
+          disabled={uploadProgress !== null}
         >
-          {captionCopied ? (
-            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
+          {uploadDone ? (
+            <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
+          ) : uploadProgress !== null ? (
+            <ActivityIndicator size="small" color={theme.colors.dark.text} />
           ) : (
-            <Copy size={16} color={theme.colors.dark.text} strokeWidth={2} />
+            <Download size={18} color={theme.colors.dark.text} strokeWidth={2} />
           )}
-          <Text style={[styles.floatingBarBtnText, captionCopied && { color: theme.colors.success[400] }]}>
-            {captionCopied ? '복사됨' : '카피 복사'}
+          <Text style={styles.floatingBarBtnText}>
+            {uploadDone ? '저장됨' : uploadProgress !== null ? '업로드 중...' : '보관함 저장 / 내보내기'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.floatingBarBtn, styles.floatingBarBtnPrimary]}
           onPress={async () => {
-            const textToCopy = shortUrl || captionWithLink;
             try {
               if (Platform.OS === 'web' && navigator.clipboard) {
-                await navigator.clipboard.writeText(textToCopy);
+                await navigator.clipboard.writeText(shareText);
               } else {
-                await Clipboard.setStringAsync(textToCopy);
+                await Clipboard.setStringAsync(shareText);
               }
-              setLinkCopied(true);
-              setTimeout(() => setLinkCopied(false), 2000);
+              if (Platform.OS !== 'web') {
+                await RNShare.share({ message: shareText });
+              }
             } catch {
-              // clipboard failed silently
+              // clipboard/share failed silently
             }
           }}
           activeOpacity={0.7}
         >
-          {linkCopied ? (
-            <Check size={16} color={theme.colors.success[400]} strokeWidth={2.5} />
-          ) : (
-            <Link2 size={16} color="#fff" strokeWidth={2} />
-          )}
-          <Text style={[styles.floatingBarBtnTextPrimary, linkCopied && { color: theme.colors.success[400] }]}>
-            {linkCopied ? '복사됨' : '링크 복사'}
-          </Text>
+          <Share2 size={18} color="#fff" strokeWidth={2} />
+          <Text style={styles.floatingBarBtnTextPrimary}>SNS 바로 공유</Text>
         </TouchableOpacity>
+        </View>
       </View>
 
       <AccountSafetyChecker
@@ -2148,25 +2182,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.primary[300],
   },
-  workflowGuideWrap: {
-    marginBottom: theme.spacing.lg,
-  },
   section: {
     marginTop: theme.spacing.xl,
   },
-  comicTileHeader: {
+  publishTileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
   },
-  comicTileTitle: {
+  publishTileTitle: {
     fontSize: theme.typography.heading,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.text,
   },
-  comicTileDesc: {
+  publishTileDesc: {
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
@@ -2561,7 +2592,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.sm,
@@ -2570,13 +2601,54 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.dark.border,
     ...theme.shadows.elevated,
   },
+  uploadProgressWrap: {
+    flexDirection: 'column',
+    gap: 6,
+  },
+  uploadProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    overflow: 'hidden',
+  },
+  uploadProgressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: 2,
+  },
+  uploadProgressText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+  },
+  uploadErrorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    backgroundColor: theme.colors.error[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  uploadErrorText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.error[400],
+  },
+  floatingBarRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
   floatingBarBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: 16,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
   },
@@ -2584,12 +2656,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[500],
   },
   floatingBarBtnText: {
-    fontSize: theme.typography.caption,
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
   floatingBarBtnTextPrimary: {
-    fontSize: theme.typography.caption,
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },

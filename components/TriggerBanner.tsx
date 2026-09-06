@@ -350,13 +350,12 @@ function mapInventoryAlert(alert: PushAlert): UnifiedAlert | null {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.radius.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,

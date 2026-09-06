@@ -12,23 +12,20 @@ import { theme } from '@/lib/theme';
 import { useI18n } from '@/hooks/useI18n';
 import {
   Camera,
+  Wand2,
   Folder,
-  Zap,
-  ShoppingBag,
   type LucideIcon,
 } from 'lucide-react-native';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   index: Camera,
-  marketing: Zap,
-  affiliate: ShoppingBag,
+  marketing: Wand2,
   assets: Folder,
 };
 
 const TAB_KEYS: Record<string, string> = {
   index: 'tab.camera',
   marketing: 'tab.create',
-  affiliate: 'tab.affiliate',
   assets: 'tab.library',
 };
 

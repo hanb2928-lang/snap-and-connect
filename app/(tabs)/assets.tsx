@@ -32,11 +32,7 @@ import {
   type UploadPlatformKey,
 } from '@/lib/platformUpload';
 import { getTrendingSuggestions } from '@/lib/trendingHashtags';
-import { ReviewReelAutomation } from '@/components/ReviewReelAutomation';
-import { InventoryAlertAgent } from '@/components/InventoryAlertAgent';
-import { WeatherAlertAgent } from '@/components/WeatherAlertAgent';
-import { WeatherMarketingHistory } from '@/components/WeatherMarketingHistory';
-import { QrReviewDashboard } from '@/components/QrReviewDashboard';
+
 
 const { width: screenWidth } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -369,7 +365,7 @@ export default function AssetsScreen() {
           <View style={styles.headerTextWrap}>
             <Text style={styles.headerTitle}>{t('assets.title')}</Text>
             <Text style={styles.headerSubtext}>
-              완성된 마케팅 자산을 배포하고 리믹스하세요 · {assets.length}개 저장됨
+              클라우드에 저장된 숏폼 자산 · {assets.length}개
             </Text>
           </View>
           <View style={styles.headerActions}>
@@ -528,21 +524,6 @@ export default function AssetsScreen() {
           )}
         </View>
       )}
-
-      {/* QR Review Dashboard — today's review count + QR banner download */}
-      <QrReviewDashboard />
-
-      {/* Review Reel Automation Module */}
-      <ReviewReelAutomation />
-
-      {/* Inventory Alert Agent Module */}
-      <InventoryAlertAgent />
-
-      {/* Weather Alert Agent Module */}
-      <WeatherAlertAgent />
-
-      {/* Weather Marketing History Module */}
-      <WeatherMarketingHistory />
 
       {/* Sort/Filter Bar */}
       {assets.length > 0 && (
