@@ -144,7 +144,7 @@ export interface AutoEnhancement {
 }
 
 export interface ShortFormEditPlan {
-  platform: ShortFormPlatform;
+  platform: ShortFormPlatform | string;
   platformLabel: string;
   spec: PlatformSpec | undefined;
   safeZone: SafeZoneRect | undefined;
@@ -171,8 +171,17 @@ export interface EditSegment {
   position: 'top' | 'center' | 'bottom';
 }
 
-export function getPlatformInfo(platform: ShortFormPlatform) {
-  const entry = PLATFORM_MAP[platform];
+export function getPlatformInfo(platform: ShortFormPlatform | string, customSpec?: PlatformSpec) {
+  if (customSpec) {
+    const safeZone = { top: customSpec.safeZoneTop, bottom: customSpec.safeZoneBottom, left: customSpec.safeZoneSides, right: customSpec.safeZoneSides };
+    return { label: customSpec.label, spec: customSpec, safeZone };
+  }
+  const entry = PLATFORM_MAP[platform as ShortFormPlatform];
+  if (!entry) {
+    const spec = getPlatformSpec('reels');
+    const safeZone = spec ? { top: spec.safeZoneTop, bottom: spec.safeZoneBottom, left: spec.safeZoneSides, right: spec.safeZoneSides } : undefined;
+    return { label: platform, spec, safeZone };
+  }
   const spec = getPlatformSpec(entry.specKey);
   const safeZone = spec ? { top: spec.safeZoneTop, bottom: spec.safeZoneBottom, left: spec.safeZoneSides, right: spec.safeZoneSides } : undefined;
   return { label: entry.label, spec, safeZone };
@@ -242,15 +251,16 @@ function buildSegmentTexts(
 }
 
 export function buildShortFormEditPlan(
-  platform: ShortFormPlatform,
+  platform: ShortFormPlatform | string,
   customPrompt: string,
   selectedHook: string | null,
   productName?: string,
   affiliatePlatforms: string[] = [],
   autoDisclosure = true,
   disclosureEnabled = false,
+  customSpec?: PlatformSpec,
 ): ShortFormEditPlan {
-  const { label, spec, safeZone } = getPlatformInfo(platform);
+  const { label, spec, safeZone } = getPlatformInfo(platform, customSpec);
   const totalDurationSec = 15;
   const hookOptions = generateHookOptions(customPrompt, productName);
   const hook = selectedHook || hookOptions[0]?.text || '';

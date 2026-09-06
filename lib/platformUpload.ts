@@ -48,8 +48,12 @@ const DEEP_LINKS: Record<UploadPlatformKey, PlatformDeepLink> = {
   },
 };
 
-export function getDeepLink(key: UploadPlatformKey): PlatformDeepLink {
-  return DEEP_LINKS[key];
+export function getDeepLink(key: UploadPlatformKey | string): PlatformDeepLink {
+  return DEEP_LINKS[key as UploadPlatformKey] ?? {
+    appUrl: '',
+    webUrl: '',
+    label: key,
+  };
 }
 
 export interface AlgorithmTip {

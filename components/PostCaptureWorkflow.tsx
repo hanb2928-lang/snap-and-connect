@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Share as RNShare,
+  Modal,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import {
@@ -31,40 +32,77 @@ import {
   Crop,
   Wand2,
   Cloud,
+  Plus,
+  Trash2,
+  Smartphone,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
-import { getDeepLink, type UploadPlatformKey } from '@/lib/platformUpload';
+import { getDeepLink } from '@/lib/platformUpload';
 import { supabase } from '@/lib/supabase';
 import {
   buildShortFormEditPlan,
   generateHookOptions,
   getPlatformInfo,
-  type ShortFormPlatform,
   type ShortFormEditPlan,
   type HookOption,
   type AutoEnhancement,
 } from '@/lib/shortFormEditEngine';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
+import {
+  fetchEnabledPlatforms,
+  addCustomPlatform,
+  deleteCustomPlatform,
+  type ManagedPlatform,
+  AVAILABLE_RATIOS,
+} from '@/lib/platformManager';
+import type { PlatformSpec } from '@/lib/platformSpecs';
 
 type PlatformOption = {
-  key: UploadPlatformKey;
-  platformKey: ShortFormPlatform;
+  key: string;
   label: string;
   icon: typeof Instagram;
   color: string;
+  isCustom?: boolean;
+  customSpec?: PlatformSpec;
+  dbId?: string;
 };
 
-const PLATFORM_OPTIONS: PlatformOption[] = [
-  { key: 'instagram', platformKey: 'instagram', label: '인스타그램', icon: Instagram, color: theme.colors.accent[500] },
-  { key: 'tiktok', platformKey: 'tiktok', label: '틱톡', icon: MusicIcon, color: theme.colors.dark.text },
-  { key: 'youtube', platformKey: 'youtube', label: '유튜브 쇼츠', icon: Youtube, color: theme.colors.error[500] },
-  { key: 'naver_clip', platformKey: 'naver_clip', label: '네이버 클립', icon: MonitorIcon, color: theme.colors.primary[400] },
+const BUILTIN_OPTIONS: PlatformOption[] = [
+  { key: 'instagram', label: '인스타그램', icon: Instagram, color: theme.colors.accent[500] },
+  { key: 'tiktok', label: '틱톡', icon: MusicIcon, color: theme.colors.dark.text },
+  { key: 'youtube', label: '유튜브 쇼츠', icon: Youtube, color: theme.colors.error[500] },
+  { key: 'naver_clip', label: '네이버 클립', icon: MonitorIcon, color: theme.colors.primary[400] },
 ];
+
+function managedToOption(mp: ManagedPlatform): PlatformOption {
+  const spec: PlatformSpec = {
+    key: mp.key as any,
+    label: mp.label,
+    ratio: mp.ratio,
+    width: mp.width,
+    height: mp.height,
+    color: mp.color,
+    safeZoneTop: mp.safeZoneTop,
+    safeZoneBottom: mp.safeZoneBottom,
+    safeZoneSides: mp.safeZoneSides,
+    desc: mp.desc,
+  };
+  return {
+    key: mp.key,
+    label: mp.label,
+    icon: Smartphone,
+    color: mp.color,
+    isCustom: !mp.isBuiltin,
+    customSpec: spec,
+    dbId: mp.id,
+  };
+}
 
 interface PostCaptureWorkflowProps {
   visible: boolean;
   videoUri: string | null;
-  onProceedToAnalysis: (customPrompt: string, platform: UploadPlatformKey, editPlan: ShortFormEditPlan) => void;
+  imageUri?: string | null;
+  onProceedToAnalysis: (customPrompt: string, platform: string, editPlan: ShortFormEditPlan) => void;
   onClose: () => void;
 }
 
@@ -73,11 +111,12 @@ type WorkflowStep = 0 | 1 | 2 | 3;
 export function PostCaptureWorkflow({
   visible,
   videoUri,
+  imageUri,
   onProceedToAnalysis,
   onClose,
 }: PostCaptureWorkflowProps) {
   const [activeStep, setActiveStep] = useState<WorkflowStep>(1);
-  const [selectedPlatformKey, setSelectedPlatformKey] = useState<UploadPlatformKey>('instagram');
+  const [selectedPlatformKey, setSelectedPlatformKey] = useState<string>('instagram');
   const [customPrompt, setCustomPrompt] = useState('');
   const [selectedHookId, setSelectedHookId] = useState<number | null>(null);
   const [disclosureEnabled, setDisclosureEnabled] = useState(false);
@@ -90,9 +129,72 @@ export function PostCaptureWorkflow({
   const [uploadRetryCount, setUploadRetryCount] = useState(0);
   const [fallbackUsed, setFallbackUsed] = useState(false);
   const [uploadErrorMsg, setUploadErrorMsg] = useState<string | null>(null);
+  const [customPlatforms, setCustomPlatforms] = useState<PlatformOption[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newPlatformName, setNewPlatformName] = useState('');
+  const [newPlatformRatio, setNewPlatformRatio] = useState<string>('9:16');
+  const [addingPlatform, setAddingPlatform] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  const selectedOption = PLATFORM_OPTIONS.find((o) => o.key === selectedPlatformKey) ?? PLATFORM_OPTIONS[0];
-  const platformInfo = useMemo(() => getPlatformInfo(selectedOption.platformKey), [selectedOption.platformKey]);
+  const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const managed = await fetchEnabledPlatforms();
+        if (cancelled) return;
+        const customOpts = managed
+          .filter((mp) => !BUILTIN_OPTIONS.some((b) => b.key === mp.key))
+          .map(managedToOption);
+        setCustomPlatforms(customOpts);
+      } catch {
+        // ignore — builtins still work
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible]);
+
+  const handleAddPlatform = useCallback(async () => {
+    const trimmed = newPlatformName.trim();
+    if (!trimmed) {
+      setAddError('플랫폼 이름을 입력해주세요.');
+      return;
+    }
+    setAddingPlatform(true);
+    setAddError(null);
+    try {
+      const mp = await addCustomPlatform({ label: trimmed, ratio: newPlatformRatio });
+      const opt = managedToOption(mp);
+      setCustomPlatforms((prev) => [...prev, opt]);
+      setSelectedPlatformKey(opt.key);
+      setNewPlatformName('');
+      setNewPlatformRatio('9:16');
+      setShowAddModal(false);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : '플랫폼 추가에 실패했습니다.');
+    }
+    setAddingPlatform(false);
+  }, [newPlatformName, newPlatformRatio]);
+
+  const handleDeletePlatform = useCallback(async (dbId: string, key: string) => {
+    try {
+      await deleteCustomPlatform(dbId);
+      setCustomPlatforms((prev) => prev.filter((o) => o.key !== key));
+      if (selectedPlatformKey === key) {
+        setSelectedPlatformKey('instagram');
+      }
+    } catch {
+      // ignore
+    }
+  }, [selectedPlatformKey]);
+
+  const selectedOption = allPlatformOptions.find((o) => o.key === selectedPlatformKey) ?? BUILTIN_OPTIONS[0];
+  const platformInfo = useMemo(
+    () => getPlatformInfo(selectedOption.key, selectedOption.customSpec),
+    [selectedOption.key, selectedOption.customSpec],
+  );
 
   const hookOptions = useMemo(() => generateHookOptions(customPrompt), [customPrompt]);
   const selectedHook = useMemo(
@@ -102,15 +204,16 @@ export function PostCaptureWorkflow({
 
   const editPlan = useMemo(
     () => buildShortFormEditPlan(
-      selectedOption.platformKey,
+      selectedOption.key,
       customPrompt,
       selectedHook?.text ?? null,
       customPrompt.trim().split(/[,.]/)[0]?.trim() || undefined,
       [],
       true,
       disclosureEnabled,
+      selectedOption.customSpec,
     ),
-    [selectedOption.platformKey, customPrompt, selectedHook, disclosureEnabled],
+    [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled],
   );
 
   const handleStepToggle = useCallback((step: WorkflowStep) => {
@@ -118,26 +221,27 @@ export function PostCaptureWorkflow({
   }, []);
 
   const handleSaveToGallery = useCallback(async () => {
-    if (!videoUri) return;
+    const uri = videoUri || (imageUri || null);
+    if (!uri) return;
     setSavingToGallery(true);
     try {
       if (Platform.OS === 'web') {
         const a = document.createElement('a');
-        a.href = videoUri;
-        a.download = `shortform-${Date.now()}.mp4`;
+        a.href = uri;
+        a.download = `shortform-${Date.now()}.${imageUri ? 'jpg' : 'mp4'}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
       } else {
         await MediaLibrary.requestPermissionsAsync();
-        await MediaLibrary.saveToLibraryAsync(videoUri);
+        await MediaLibrary.saveToLibraryAsync(uri);
       }
       setGallerySaved(true);
     } catch {
       // ignore — user can retry
     }
     setSavingToGallery(false);
-  }, [videoUri]);
+  }, [videoUri, imageUri]);
 
   const handleLaunchPlatform = useCallback(async () => {
     const deepLink = getDeepLink(selectedPlatformKey);
@@ -171,6 +275,7 @@ export function PostCaptureWorkflow({
     blob: Blob,
     fileName: string,
     maxRetries: number,
+    contentType: string = 'video/mp4',
   ): Promise<boolean> => {
     let lastError: string | null = null;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -183,7 +288,7 @@ export function PostCaptureWorkflow({
         }
         const { error } = await supabase.storage
           .from('videos')
-          .upload(fileName, blob, { contentType: 'video/mp4', upsert: false });
+          .upload(fileName, blob, { contentType, upsert: false });
         if (error) throw error;
         setUploadRetrying(false);
         return true;
@@ -204,11 +309,14 @@ export function PostCaptureWorkflow({
 
     let cloudSuccess = false;
 
-    if (videoUri) {
+    const uploadUri = videoUri || (imageUri || null);
+    if (uploadUri) {
       try {
-        const blob = await uriToBlob(videoUri);
-        const fileName = `shortform-${Date.now()}.mp4`;
-        cloudSuccess = await uploadWithRetry(blob, fileName, 3);
+        const blob = await uriToBlob(uploadUri);
+        const ext = imageUri ? 'jpg' : 'mp4';
+        const contentType = imageUri ? 'image/jpeg' : 'video/mp4';
+        const fileName = `shortform-${Date.now()}.${ext}`;
+        cloudSuccess = await uploadWithRetry(blob, fileName, 3, contentType);
       } catch {
         cloudSuccess = false;
       }
@@ -235,7 +343,7 @@ export function PostCaptureWorkflow({
 
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
     setIsUploading(false);
-  }, [isUploading, uploadDone, videoUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
+  }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry]);
 
   const handleShareText = useCallback(async () => {
     const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
@@ -275,22 +383,41 @@ export function PostCaptureWorkflow({
             onToggle={() => handleStepToggle(1)}
           >
             <View style={styles.platformGrid}>
-              {PLATFORM_OPTIONS.map((opt) => {
+              {allPlatformOptions.map((opt) => {
                 const Icon = opt.icon;
                 const isActive = selectedPlatformKey === opt.key;
                 return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    style={[styles.platformChip, isActive && { borderColor: opt.color, backgroundColor: opt.color + '15' }]}
-                    onPress={() => { setSelectedPlatformKey(opt.key); setSelectedHookId(null); }}
-                    activeOpacity={0.7}
-                  >
-                    <Icon size={20} color={isActive ? opt.color : theme.colors.dark.textDim} strokeWidth={2} />
-                    <Text style={[styles.platformChipText, isActive && { color: opt.color }]}>{opt.label}</Text>
-                    {isActive && <Check size={14} color={opt.color} strokeWidth={2.5} />}
-                  </TouchableOpacity>
+                  <View key={opt.key} style={styles.platformChipWrap}>
+                    <TouchableOpacity
+                      style={[styles.platformChip, isActive && { borderColor: opt.color, backgroundColor: opt.color + '15' }]}
+                      onPress={() => { setSelectedPlatformKey(opt.key); setSelectedHookId(null); }}
+                      activeOpacity={0.7}
+                    >
+                      <Icon size={20} color={isActive ? opt.color : theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={[styles.platformChipText, isActive && { color: opt.color }]}>{opt.label}</Text>
+                      {isActive && <Check size={14} color={opt.color} strokeWidth={2.5} />}
+                    </TouchableOpacity>
+                    {opt.isCustom && opt.dbId && (
+                      <TouchableOpacity
+                        style={styles.platformDeleteBtn}
+                        onPress={() => handleDeletePlatform(opt.dbId!, opt.key)}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={13} color={theme.colors.error[400]} strokeWidth={2} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 );
               })}
+              <TouchableOpacity
+                style={styles.platformAddChip}
+                onPress={() => setShowAddModal(true)}
+                activeOpacity={0.7}
+              >
+                <Plus size={20} color={theme.colors.primary[400]} strokeWidth={2} />
+                <Text style={styles.platformAddText}>플랫폼 추가</Text>
+              </TouchableOpacity>
             </View>
 
             {spec && (
@@ -437,7 +564,7 @@ export function PostCaptureWorkflow({
               </TouchableOpacity>
             </View>
 
-            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} />
+            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} imageUri={imageUri} />
 
             <View style={styles.timelinePreview}>
               {editPlan.segments.map((seg) => (
@@ -570,6 +697,63 @@ export function PostCaptureWorkflow({
           </StepCard>
         </ScrollView>
       </View>
+
+      <Modal visible={showAddModal} transparent animationType="fade" onRequestClose={() => setShowAddModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>플랫폼 추가</Text>
+            <Text style={styles.modalHint}>원하는 플랫폼 이름을 입력하고 비율을 선택하세요. 무제한으로 추가할 수 있습니다.</Text>
+
+            <Text style={styles.modalLabel}>플랫폼 이름</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newPlatformName}
+              onChangeText={setNewPlatformName}
+              placeholder="예: 스레드, 카카오스토리, 위챗..."
+              placeholderTextColor={theme.colors.dark.textFaint}
+              maxLength={20}
+              autoFocus
+            />
+
+            <Text style={styles.modalLabel}>화면 비율</Text>
+            <View style={styles.ratioRow}>
+              {AVAILABLE_RATIOS.map((r) => {
+                const isSelected = newPlatformRatio === r;
+                return (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.ratioChip, isSelected && styles.ratioChipSelected]}
+                    onPress={() => setNewPlatformRatio(r)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.ratioChipText, isSelected && styles.ratioChipTextSelected]}>{r}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {addError && <Text style={styles.modalError}>{addError}</Text>}
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => { setShowAddModal(false); setAddError(null); setNewPlatformName(''); }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, addingPlatform && { opacity: 0.6 }]}
+                onPress={handleAddPlatform}
+                disabled={addingPlatform}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalConfirmText}>{addingPlatform ? '추가 중...' : '추가'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -709,6 +893,146 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
+  },
+  platformChipWrap: {
+    position: 'relative',
+  },
+  platformDeleteBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  platformAddChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '50',
+    borderStyle: 'dashed',
+  },
+  platformAddText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[400],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: 20,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  modalHint: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 17,
+    marginBottom: 4,
+  },
+  modalLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginTop: 4,
+  },
+  modalInput: {
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: 12,
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  ratioRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  ratioChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  ratioChipSelected: {
+    borderColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.primary[500] + '15',
+  },
+  ratioChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  ratioChipTextSelected: {
+    color: theme.colors.primary[400],
+  },
+  modalError: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    marginTop: 4,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600],
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   specBox: {
     borderRadius: theme.radius.md,

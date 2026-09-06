@@ -38,7 +38,6 @@ import { WebCameraView, type CaptureModeType } from '@/components/WebCameraView'
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
-import type { UploadPlatformKey } from '@/lib/platformUpload';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 
 const CAPTURE_TIMEOUT_MS = 15000;
@@ -241,7 +240,7 @@ export default function CameraScreen() {
   }, [cameraReady, isRecording, stopRecording, handleVideoRecorded]);
 
 
-  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: UploadPlatformKey, _editPlan: ShortFormEditPlan) => {
+  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
     if (postCaptureBase64) {
       await runAutoAnalysis(postCaptureBase64, postCaptureMime);
@@ -305,9 +304,10 @@ export default function CameraScreen() {
         '이미지 압축',
       );
       if (!isMountedRef.current || genIdRef.current !== genId) return;
-      const compressedB64 = cleanBase64(compressedDataUrl);
-      const compressedMime = getMimeTypeFromDataUrl(compressedDataUrl);
-      await runAutoAnalysis(compressedB64, compressedMime);
+      setPostCaptureBase64(cleanBase64(compressedDataUrl));
+      setPostCaptureMime(getMimeTypeFromDataUrl(compressedDataUrl));
+      setPostCaptureVideoUri(null);
+      setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current || genIdRef.current !== genId) return;
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
@@ -326,7 +326,10 @@ export default function CameraScreen() {
           PICK_TIMEOUT_MS,
           '이미지 압축',
         );
-        await runAutoAnalysis(cleanBase64(compressed), getMimeTypeFromDataUrl(compressed));
+        setPostCaptureBase64(cleanBase64(compressed));
+        setPostCaptureMime(getMimeTypeFromDataUrl(compressed));
+        setPostCaptureVideoUri(null);
+        setPostCaptureVisible(true);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       }
@@ -353,7 +356,10 @@ export default function CameraScreen() {
         '이미지 압축',
       );
       if (!isMountedRef.current) return;
-      await runAutoAnalysis(base64, mimeType);
+      setPostCaptureBase64(base64);
+      setPostCaptureMime(mimeType);
+      setPostCaptureVideoUri(null);
+      setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -604,6 +610,7 @@ export default function CameraScreen() {
         <PostCaptureWorkflow
           visible={postCaptureVisible}
           videoUri={postCaptureVideoUri}
+          imageUri={postCaptureBase64 ? buildDataUrl(postCaptureBase64, postCaptureMime) : null}
           onProceedToAnalysis={handlePostCaptureProceed}
           onClose={handlePostCaptureClose}
         />
@@ -788,6 +795,7 @@ export default function CameraScreen() {
       <PostCaptureWorkflow
         visible={postCaptureVisible}
         videoUri={postCaptureVideoUri}
+        imageUri={postCaptureBase64 ? buildDataUrl(postCaptureBase64, postCaptureMime) : null}
         onProceedToAnalysis={handlePostCaptureProceed}
         onClose={handlePostCaptureClose}
       />

@@ -7,6 +7,7 @@ import {
   ViewStyle,
   Platform,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -31,6 +32,7 @@ import {
 interface ShortFormPreviewPlayerProps {
   editPlan: ShortFormEditPlan;
   videoUri: string | null;
+  imageUri?: string | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -43,7 +45,7 @@ function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegm
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -54,8 +56,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
 
   const { width: screenWidth } = useWindowDimensions();
 
+  const hasImage = !!imageUri;
+
   useEffect(() => {
-    if (!videoUri) {
+    if (!videoUri || hasImage) {
       setVideoSrc(null);
       return;
     }
@@ -80,7 +84,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
       }
     })();
     return () => { cancelled = true; };
-  }, [videoUri]);
+  }, [videoUri, hasImage]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
@@ -221,7 +225,36 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {videoSrc ? (
+          {hasImage && imageUri ? (
+            Platform.OS === 'web' ? (
+              // @ts-ignore web-only img element
+              <img
+                src={imageUri}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000',
+                }}
+              />
+            ) : (
+              <Image
+                source={{ uri: imageUri.startsWith('data:') ? imageUri : imageUri }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#000',
+                }}
+                resizeMode="cover"
+              />
+            )
+          ) : videoSrc ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element
               <video
