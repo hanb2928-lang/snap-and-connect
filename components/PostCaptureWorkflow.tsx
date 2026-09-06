@@ -56,7 +56,7 @@ import {
   AVAILABLE_RATIOS,
 } from '@/lib/platformManager';
 import type { PlatformSpec } from '@/lib/platformSpecs';
-import { mixBgmIntoVideo } from '@/lib/bgmEngine';
+import { mixBgmIntoVideo, fetchBgmRecommendation, type BgmRecommendation } from '@/lib/bgmEngine';
 
 type PlatformOption = {
   key: string;
@@ -136,6 +136,8 @@ export function PostCaptureWorkflow({
   const [newPlatformRatio, setNewPlatformRatio] = useState<string>('9:16');
   const [addingPlatform, setAddingPlatform] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [bgmRecommendation, setBgmRecommendation] = useState<BgmRecommendation | null>(null);
+  const [bgmLoading, setBgmLoading] = useState(false);
 
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
@@ -156,6 +158,24 @@ export function PostCaptureWorkflow({
     })();
     return () => { cancelled = true; };
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !imageUri) return;
+    let cancelled = false;
+    setBgmLoading(true);
+    (async () => {
+      try {
+        const rec = await fetchBgmRecommendation(imageUri);
+        if (cancelled) return;
+        setBgmRecommendation(rec);
+      } catch {
+        // fallback to keyword-based recommendation
+      } finally {
+        if (!cancelled) setBgmLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, imageUri]);
 
   const handleAddPlatform = useCallback(async () => {
     const trimmed = newPlatformName.trim();
@@ -213,8 +233,17 @@ export function PostCaptureWorkflow({
       true,
       disclosureEnabled,
       selectedOption.customSpec,
+      bgmRecommendation
+        ? {
+            templateId: bgmRecommendation.templateId,
+            label: bgmRecommendation.label,
+            mood: bgmRecommendation.moodDescription,
+            bpm: bgmRecommendation.bpm,
+            reason: bgmRecommendation.reason,
+          }
+        : undefined,
     ),
-    [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled],
+    [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled, bgmRecommendation],
   );
 
   const handleStepToggle = useCallback((step: WorkflowStep) => {
@@ -571,8 +600,14 @@ export function PostCaptureWorkflow({
               </View>
               <View style={styles.metaRow}>
                 <Text style={styles.metaKey}>BGM</Text>
-                <Text style={styles.metaVal}>{editPlan.bgmTemplate.label} ({editPlan.bgmTemplate.mood}, {editPlan.bgmTemplate.bpm} BPM)</Text>
+                <Text style={styles.metaVal}>{bgmLoading ? 'AI 분석 중...' : `${editPlan.bgmTemplate.label} (${editPlan.bgmTemplate.mood}, ${editPlan.bgmTemplate.bpm} BPM)`}</Text>
               </View>
+              {bgmRecommendation?.reason && (
+                <View style={styles.bgReasonRow}>
+                  <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.bgReasonText}>AI 추천: {bgmRecommendation.reason}</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.disclosureToggleRow}>
@@ -1273,6 +1308,20 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     flex: 1,
     textAlign: 'right',
+  },
+  bgReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  bgReasonText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[400],
+    flex: 1,
+    lineHeight: 15,
   },
   timelinePreview: {
     flexDirection: 'row',

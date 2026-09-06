@@ -309,3 +309,37 @@ export async function mixBgmIntoVideo(
     return videoUri;
   }
 }
+
+export interface BgmRecommendation {
+  mood: BgmMood;
+  templateId: string;
+  label: string;
+  moodDescription: string;
+  bpm: number;
+  reason: string;
+}
+
+const FALLBACK_RECOMMENDATION: BgmRecommendation = {
+  mood: 'neutral',
+  templateId: 'trendy_neutral',
+  label: '트렌디 중간 템포',
+  moodDescription: '범용·무드',
+  bpm: 100,
+  reason: '이미지 분석 없이 범용 BGM을 추천했습니다.',
+};
+
+export async function fetchBgmRecommendation(
+  imageDataUrl: string,
+  mimeType: string = 'image/jpeg',
+): Promise<BgmRecommendation> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const { data, error } = await supabase.functions.invoke('recommend-bgm', {
+      body: { imageDataUrl, mimeType },
+    });
+    if (error || !data) return FALLBACK_RECOMMENDATION;
+    return data as BgmRecommendation;
+  } catch {
+    return FALLBACK_RECOMMENDATION;
+  }
+}

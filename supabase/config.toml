@@ -79,3 +79,6 @@ verify_jwt = false
 [functions.render-video]
 verify_jwt = false
 
+[functions.recommend-bgm]
+verify_jwt = false
+

@@ -259,6 +259,7 @@ export function buildShortFormEditPlan(
   autoDisclosure = true,
   disclosureEnabled = false,
   customSpec?: PlatformSpec,
+  bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string },
 ): ShortFormEditPlan {
   const { label, spec, safeZone } = getPlatformInfo(platform, customSpec);
   const totalDurationSec = 15;
@@ -290,6 +291,9 @@ export function buildShortFormEditPlan(
   const pacingBpm = platform === 'tiktok' ? 140 : platform === 'youtube' ? 90 : platform === 'naver_clip' ? 110 : 100;
 
   const bgmTemplate: BgmTemplate = (() => {
+    if (bgmOverride) {
+      return { id: bgmOverride.templateId, label: bgmOverride.label, mood: bgmOverride.mood, bpm: bgmOverride.bpm };
+    }
     const promptLower = customPrompt.toLowerCase();
     if (promptLower.includes('할인') || promptLower.includes('재고') || promptLower.includes('매진') || promptLower.includes('품절')) {
       return { id: 'urgent_upbeat', label: '업비트 긴장감', mood: '긴박·액션', bpm: pacingBpm };
