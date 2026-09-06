@@ -385,10 +385,24 @@ export default function CameraScreen() {
   const handleMultiAngleComplete = async (shots: AngleShot[]) => {
     const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
     setMultiAngleVisible(false);
-    if (sorted[0]?.base64) {
-      const additionalB64s = sorted.slice(1).map((s) => s.base64).filter(Boolean) as string[];
-      await runAutoAnalysis(sorted[0].base64, sorted[0].mimeType || 'image/jpeg', additionalB64s);
+    if (!sorted[0]?.base64) return;
+
+    // 스틸컷 템플릿 모드: AI 분석 없이 바로 편집 화면으로 진입
+    if (captureMode === 'single') {
+      try {
+        const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
+        const scanId = await saveManualScan(imageUrl);
+        router.push({ pathname: '/editor', params: { id: scanId } });
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      }
+      return;
     }
+
+    // 다각도 모드: 기존대로 AI 분석 실행
+    const additionalB64s = sorted.slice(1).map((s) => s.base64).filter(Boolean) as string[];
+    await runAutoAnalysis(sorted[0].base64, sorted[0].mimeType || 'image/jpeg', additionalB64s);
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
