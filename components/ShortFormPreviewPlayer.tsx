@@ -261,7 +261,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri }: ShortFormPreviewP
             </View>
           )}
 
-          {activeSegment && !isDisclosureActive && (
+          {activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
             <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
               <View style={[styles.captionBadge, { backgroundColor: captionStyle.badgeBg }]}>
                 <Text style={styles.captionSegmentLabel}>{activeSegment.label}</Text>

@@ -260,7 +260,7 @@ export function buildShortFormEditPlan(
     { index: 0, startSec: 0, endSec: 3, label: '후킹', purpose: '시청자 이탈 방지', textOverlay: hook, position: 'center' },
     { index: 1, startSec: 3, endSec: 7, label: '제품 소개', purpose: '핵심 가치 전달', textOverlay: segmentTexts.intro, position: 'top' },
     { index: 2, startSec: 7, endSec: 11, label: '사용/혜택', purpose: '체감 효과 시각화', textOverlay: segmentTexts.benefit, position: 'center' },
-    { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: segmentTexts.cta, position: 'bottom' },
+    { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: disclosureEnabled ? segmentTexts.cta : '', position: 'bottom' },
   ];
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms, autoDisclosure && disclosureEnabled);
