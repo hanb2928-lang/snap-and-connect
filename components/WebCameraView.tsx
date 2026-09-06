@@ -2,9 +2,11 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check } from 'lucide-react-native';
+import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check, Square } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
+
+const ONECLICK_MAX_DURATION_S = 15;
 
 export type CaptureModeType = 'oneclick' | 'single' | 'multi' | 'video';
 
@@ -56,6 +58,9 @@ export function WebCameraView({
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mountedRef = useRef(true);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [facing, setFacing] = useState<Facing>('environment');
   const [gridVisible, setGridVisible] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -63,6 +68,8 @@ export function WebCameraView({
   const [capturing, setCapturing] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string>('image/jpeg');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordElapsed, setRecordElapsed] = useState(0);
   const pulseScale = useSharedValue(1);
 
   const stopStream = useCallback(() => {
@@ -173,17 +180,77 @@ export function WebCameraView({
     }
   }, [cameraReady, facing]);
 
+  const stopRecording = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder || recorder.state === 'inactive') {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
+        resolve();
+        return;
+      }
+      const handleStop = () => {
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
+        resolve();
+      };
+      recorder.addEventListener('stop', handleStop, { once: true });
+      recorder.stop();
+    });
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!streamRef.current || isRecording) return;
+    try {
+      recordedChunksRef.current = [];
+      const recorder = new MediaRecorder(streamRef.current, {
+        mimeType: 'video/webm;codecs=vp9',
+      });
+      recorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordElapsed(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordElapsed((s) => {
+          if (s + 1 >= ONECLICK_MAX_DURATION_S) {
+            stopRecording();
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setError('동영상 녹화를 시작할 수 없습니다.');
+    }
+  }, [isRecording, stopRecording]);
+
   const handleCapture = useCallback(async () => {
     if (!cameraReady || capturing || autoSaving) return;
     if (captureMode === 'multi') {
       onMultiAnglePress();
       return;
     }
+    if (captureMode === 'oneclick') {
+      if (isRecording) {
+        await stopRecording();
+        return;
+      }
+      await startRecording();
+      return;
+    }
     const result = await captureFrame();
     if (!result) return;
     const [mime, b64] = result.split('|');
     onCapture(b64, mime);
-  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress]);
+  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress, isRecording, startRecording, stopRecording]);
 
   const handleConfirm = useCallback(() => {
     if (previewBase64) {
@@ -201,6 +268,29 @@ export function WebCameraView({
   }, []);
 
   const hasPreview = !!previewBase64;
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isRecording && recordElapsed >= ONECLICK_MAX_DURATION_S && recordedChunksRef.current.length > 0) {
+      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const b64 = cleanBase64(dataUrl);
+        onCapture(b64, 'video/webm');
+      };
+      reader.readAsDataURL(blob);
+      setRecordElapsed(0);
+    }
+  }, [isRecording, recordElapsed, onCapture]);
 
   useEffect(() => {
     if (autoSaving) {
@@ -306,6 +396,32 @@ export function WebCameraView({
               </View>
             )}
 
+            {/* 15s recording guide + timer */}
+            {captureMode === 'oneclick' && cameraReady && (
+              <View style={styles.recordGuideWrap} pointerEvents="none">
+                <View style={styles.recordGuideBadge}>
+                  {isRecording ? (
+                    <>
+                      <View style={styles.recordDotActive} />
+                      <Text style={styles.recordTimerText}>
+                        00:{String(recordElapsed).padStart(2, '0')} / 00:{String(ONECLICK_MAX_DURATION_S).padStart(2, '0')}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={14} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.recordGuideText}>15초 숏폼 최적 촬영 준비</Text>
+                    </>
+                  )}
+                </View>
+                {isRecording && (
+                  <View style={styles.recordProgressBar}>
+                    <View style={[styles.recordProgressFill, { width: `${(recordElapsed / ONECLICK_MAX_DURATION_S) * 100}%` }]} />
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Loading / error state overlay */}
             {!cameraReady && !error && (
               <View style={styles.loadingWrap}>
@@ -395,12 +511,15 @@ export function WebCameraView({
                   !cameraReady && styles.shutterBtnDisabled,
                   (capturing || autoSaving) && styles.shutterBtnCapturing,
                   captureMode === 'oneclick' && styles.shutterBtnOneclick,
+                  isRecording && styles.shutterBtnRecording,
                 ]}
                 onPress={handleCapture}
                 disabled={!cameraReady || capturing || autoSaving}
                 activeOpacity={0.85}
               >
-                {captureMode === 'oneclick' ? (
+                {isRecording ? (
+                  <Square size={28} color="#fff" strokeWidth={2.5} />
+                ) : captureMode === 'oneclick' ? (
                   <Zap size={30} color="#fff" strokeWidth={2.5} />
                 ) : (
                   <Camera size={30} color="#fff" strokeWidth={2.5} />
@@ -423,7 +542,8 @@ export function WebCameraView({
             <Text style={styles.shutterHint}>
               {autoSaving ? 'AI 자동 분석 중...' :
                capturing ? '촬영 중...' :
-               captureMode === 'oneclick' ? '탭 한 번으로 숏폼 완성' :
+               isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_MAX_DURATION_S}s)` :
+               captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
                captureMode === 'single' ? '흔들림 없이 한 장 담아내기' :
                '전면, 측면, 디테일을 연달아 촬영'}
             </Text>
@@ -646,6 +766,56 @@ const styles = StyleSheet.create({
   },
   shutterBtnOneclick: {
     backgroundColor: theme.colors.warning[500],
+  },
+  shutterBtnRecording: {
+    backgroundColor: theme.colors.error[500],
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  recordGuideWrap: {
+    position: 'absolute',
+    top: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 15,
+    gap: 6,
+  },
+  recordGuideBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 15, 30, 0.7)',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  recordGuideText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  recordTimerText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  recordDotActive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error[400],
+  },
+  recordProgressBar: {
+    width: 200,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  recordProgressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.warning[400],
+    borderRadius: 1.5,
   },
   gridToggleBtn: {
     width: 52,

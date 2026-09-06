@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -13,7 +14,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Zap, Layers, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon } from 'lucide-react-native';
+import { Camera, Zap, Layers, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -41,6 +42,7 @@ import { TriggerBanner } from '@/components/TriggerBanner';
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
 const ANALYSIS_TIMEOUT_MS = 45000;
+const ONECLICK_RECORD_MAX_S = 15;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -77,6 +79,9 @@ export default function CameraScreen() {
   const [autoSaveStep, setAutoSaveStep] = useState(1);
   const [screenPhase, setScreenPhase] = useState<ScreenPhase>('mode_select');
   const genIdRef = useRef(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordElapsed, setRecordElapsed] = useState(0);
 
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
@@ -110,6 +115,11 @@ export default function CameraScreen() {
         setCameraReady(false);
         setProcessing(false);
         setAutoSaving(false);
+        setIsRecording(false);
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
         genIdRef.current += 1;
         stopAutoSaveAnimation();
         cancelAnimation(autoSavePulse);
@@ -167,11 +177,86 @@ export default function CameraScreen() {
     }
   }, [router, startAutoSaveAnimation, stopAutoSaveAnimation]);
 
+  const stopRecording = useCallback(async () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    if (!cameraRef.current) return;
+    try {
+      await cameraRef.current.stopRecording();
+    } catch {
+      // already stopped
+    }
+  }, []);
+
+  const handleVideoRecorded = useCallback(async (videoUri: string) => {
+    const genId = genIdRef.current;
+    try {
+      const { base64, mimeType } = await withTimeout(
+        compressImageToBase64(videoUri, 1080, 0.7),
+        PICK_TIMEOUT_MS,
+        '동영상 압축',
+      );
+      if (!isMountedRef.current || genIdRef.current !== genId) return;
+      await runAutoAnalysis(base64, mimeType);
+    } catch (err) {
+      if (!isMountedRef.current || genIdRef.current !== genId) return;
+      setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
+    }
+  }, [runAutoAnalysis]);
+
+  const startRecording = useCallback(async () => {
+    if (!cameraRef.current || !cameraReady || isRecording) return;
+    try {
+      setIsRecording(true);
+      setRecordElapsed(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordElapsed((s) => {
+          if (s + 1 >= ONECLICK_RECORD_MAX_S) {
+            stopRecording();
+          }
+          return s + 1;
+        });
+      }, 1000);
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: ONECLICK_RECORD_MAX_S,
+        ...({ mute: true } as Record<string, unknown>),
+      }) as { uri: string } | undefined;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setIsRecording(false);
+      if (video?.uri) {
+        await handleVideoRecorded(video.uri);
+      }
+    } catch (err) {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setIsRecording(false);
+      if (!isMountedRef.current) return;
+      setError(friendlyError(err, '동영상 녹화에 실패했습니다. 다시 시도해주세요.'));
+    }
+  }, [cameraReady, isRecording, stopRecording, handleVideoRecorded]);
+
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
 
     if (captureMode === 'multi') {
       setMultiAngleVisible(true);
+      return;
+    }
+
+    if (captureMode === 'oneclick') {
+      if (isRecording) {
+        await stopRecording();
+        return;
+      }
+      await startRecording();
       return;
     }
 
@@ -384,44 +469,51 @@ export default function CameraScreen() {
 
         <TriggerBanner />
 
-        <View style={styles.modeCardsWrap}>
-          <ModeCard
-            icon={<Zap size={32} color="#fff" strokeWidth={2.5} />}
-            title="원클릭 촬영"
-            desc="탭 한 번으로 매장 영상을 촬영해 바로 숏폼으로 완성"
-            color={theme.colors.warning[500]}
-            onPress={() => handleModeSelect('oneclick')}
-          />
-          <ModeCard
-            icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
-            title="스틸컷"
-            desc="상품 사진 한 장으로 깔끔한 15초 홍보 영상 제작"
-            color={theme.colors.primary[600]}
-            onPress={() => handleModeSelect('single')}
-          />
-          <ModeCard
-            icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
-            title="다각도 촬영"
-            desc="전면, 측면, 디테일을 연달아 촬영해 역동적인 숏폼 생성"
-            color={theme.colors.accent[500]}
-            onPress={() => handleModeSelect('multi')}
-          />
-        </View>
+        <ScrollView
+          style={styles.modeScroll}
+          contentContainerStyle={[styles.modeScrollContent, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.modeCardsWrap}>
+            <ModeCard
+              icon={<Zap size={32} color="#fff" strokeWidth={2.5} />}
+              title="원클릭 촬영"
+              desc="탭 한 번으로 15초 동영상을 촬영해 바로 숏폼으로 완성"
+              color={theme.colors.warning[500]}
+              onPress={() => handleModeSelect('oneclick')}
+            />
+            <ModeCard
+              icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
+              title="스틸컷"
+              desc="상품 사진 한 장으로 깔끔한 15초 홍보 영상 제작"
+              color={theme.colors.primary[600]}
+              onPress={() => handleModeSelect('single')}
+            />
+            <ModeCard
+              icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
+              title="다각도 촬영"
+              desc="전면, 측면, 디테일을 연달아 촬영해 역동적인 숏폼 생성"
+              color={theme.colors.accent[500]}
+              onPress={() => handleModeSelect('multi')}
+            />
+          </View>
 
-        <View style={[styles.modeSelectFooter, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
-          <TouchableOpacity
-            style={[styles.galleryPickBtn, { marginBottom: theme.spacing.sm }]}
-            onPress={() => router.push('/(tabs)/marketing' as never)}
-            activeOpacity={0.8}
-          >
-            <Sparkles size={22} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={[styles.galleryPickText, { color: theme.colors.primary[300] }]}>AI 템플릿으로 만들기 (텍스트 입력)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
-            <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
-            <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.modeSelectFooter}>
+            <TouchableOpacity
+              style={[styles.galleryPickBtn, { marginBottom: theme.spacing.sm }]}
+              onPress={() => router.push('/(tabs)/marketing' as never)}
+              activeOpacity={0.8}
+            >
+              <Sparkles size={22} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={[styles.galleryPickText, { color: theme.colors.primary[300] }]}>AI 템플릿으로 만들기 (텍스트 입력)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.galleryPickBtn} onPress={handlePickImage} activeOpacity={0.8}>
+              <ImageIcon size={22} color={theme.colors.dark.text} strokeWidth={2} />
+              <Text style={styles.galleryPickText}>갤러리에서 사진 선택</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
 
         <OnboardingModal
           visible={showOnboardingModal}
@@ -549,10 +641,37 @@ export default function CameraScreen() {
             style={styles.cameraPreview}
             facing={facing}
             onCameraReady={() => setCameraReady(true)}
+            mode="video"
           />
         ) : (
           <View style={[styles.cameraPreview, styles.cameraPlaceholder]}>
             <Camera size={36} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+          </View>
+        )}
+
+        {/* 15s recording guide + timer */}
+        {captureMode === 'oneclick' && cameraReady && (
+          <View style={styles.recordGuideWrap} pointerEvents="none">
+            <View style={styles.recordGuideBadge}>
+              {isRecording ? (
+                <>
+                  <View style={styles.recordDotActive} />
+                  <Text style={styles.recordTimerText}>
+                    00:{String(recordElapsed).padStart(2, '0')} / 00:{String(ONECLICK_RECORD_MAX_S).padStart(2, '0')}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Zap size={14} color="#fff" strokeWidth={2.5} />
+                  <Text style={styles.recordGuideText}>15초 숏폼 최적 촬영 준비</Text>
+                </>
+              )}
+            </View>
+            {isRecording && (
+              <View style={styles.recordProgressBar}>
+                <View style={[styles.recordProgressFill, { width: `${(recordElapsed / ONECLICK_RECORD_MAX_S) * 100}%` }]} />
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -573,12 +692,15 @@ export default function CameraScreen() {
               !cameraReady && styles.shutterBtnDisabled,
               captureMode === 'oneclick' && styles.shutterBtnOneclick,
               (autoSaving || processing) && styles.shutterBtnCapturing,
+              isRecording && styles.shutterBtnRecording,
             ]}
             onPress={handleCapture}
             disabled={processing || autoSaving || !cameraReady}
             activeOpacity={0.85}
           >
-            {captureMode === 'oneclick' ? (
+            {isRecording ? (
+              <Square size={28} color="#fff" strokeWidth={2.5} />
+            ) : captureMode === 'oneclick' ? (
               <Zap size={30} color="#fff" strokeWidth={2.5} />
             ) : (
               <Camera size={30} color="#fff" strokeWidth={2.5} />
@@ -589,7 +711,8 @@ export default function CameraScreen() {
 
         <Text style={styles.shutterHintText}>
           {autoSaving ? 'AI 자동 분석 중...' :
-           captureMode === 'oneclick' ? '탭 한 번으로 숏폼 완성' :
+           isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_RECORD_MAX_S}s)` :
+           captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
            captureMode === 'single' ? '흔들림 없이 한 장 담아내기' :
            '전면, 측면, 디테일 연달아 촬영'}
         </Text>
@@ -698,8 +821,13 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     textAlign: 'center',
   },
-  modeCardsWrap: {
+  modeScroll: {
     flex: 1,
+  },
+  modeScrollContent: {
+    flexGrow: 1,
+  },
+  modeCardsWrap: {
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
   },
@@ -738,7 +866,7 @@ const styles = StyleSheet.create({
   },
   modeSelectFooter: {
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
+    paddingTop: theme.spacing.lg,
   },
   galleryPickBtn: {
     flexDirection: 'row',
@@ -880,6 +1008,56 @@ const styles = StyleSheet.create({
   },
   shutterBtnOneclick: {
     backgroundColor: theme.colors.warning[500],
+  },
+  shutterBtnRecording: {
+    backgroundColor: theme.colors.error[500],
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  recordGuideWrap: {
+    position: 'absolute',
+    top: 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 15,
+    gap: 6,
+  },
+  recordGuideBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 15, 30, 0.7)',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  recordGuideText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  recordTimerText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  recordDotActive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error[400],
+  },
+  recordProgressBar: {
+    width: 200,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  recordProgressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.warning[400],
+    borderRadius: 1.5,
   },
   shutterHintText: {
     fontSize: 12,

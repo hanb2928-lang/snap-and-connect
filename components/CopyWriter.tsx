@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, LayoutAnimation, UIManager } from 'react-native';
-import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown, Shuffle } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, LayoutAnimation, UIManager, TextInput } from 'react-native';
+import { Sparkles, Copy, Check, Flame, Heart, BookOpen, Zap, ChevronDown, ChevronUp, RefreshCw, Crown, Shuffle, PenLine } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { COPY_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
 import { safeFetch } from '@/lib/apiClient';
@@ -70,6 +70,7 @@ export function CopyWriter({
   const [otherVersionTab, setOtherVersionTab] = useState<CopyType>('info');
   const [spinningKey, setSpinningKey] = useState<string | null>(null);
   const [spunVariations, setSpunVariations] = useState<Record<string, CaptionVariation>>({});
+  const [customPrompt, setCustomPrompt] = useState('');
 
   const handleGenerate = useCallback(async () => {
     if (!productName) return;
@@ -97,6 +98,7 @@ export function CopyWriter({
           platform,
           count,
           brandPersona: brandPersona || undefined,
+          customPrompt: customPrompt.trim() || undefined,
         }),
         timeoutMs: 115000,
       });
@@ -116,7 +118,7 @@ export function CopyWriter({
       setError(true);
     }
     setGenerating(false);
-  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count, brandPersona]);
+  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count, brandPersona, customPrompt]);
 
   const handleCopy = useCallback(async (item: CopyItem, cardKey: string) => {
     const text = `${item.hook}\n\n${item.caption}\n\n${item.hashtags.map((h) => `#${h}`).join(' ')}`;
@@ -291,6 +293,23 @@ export function CopyWriter({
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <View style={styles.customPromptWrap}>
+        <View style={styles.customPromptLabelRow}>
+          <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+          <Text style={styles.customPromptLabel}>맞춤 프롬프트 (선택)</Text>
+        </View>
+        <TextInput
+          style={styles.customPromptInput}
+          value={customPrompt}
+          onChangeText={setCustomPrompt}
+          placeholder="예: 오늘 갓 구운 소금빵 30% 할인, 절대 놓치지 마세요!"
+          placeholderTextColor={theme.colors.dark.textFaint}
+          multiline
+          maxLength={200}
+        />
+        <Text style={styles.customPromptHint}>강조할 홍보 포인트나 원하는 톤을 입력하면 AI가 문구에 반영합니다.</Text>
       </View>
 
       <TouchableOpacity
@@ -483,6 +502,40 @@ const styles = StyleSheet.create({
   },
   countPillTextActive: {
     color: '#fff',
+  },
+  customPromptWrap: {
+    marginBottom: theme.spacing.md,
+  },
+  customPromptLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  customPromptLabel: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  customPromptInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 60,
+    maxHeight: 100,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    textAlignVertical: 'top',
+  },
+  customPromptHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 4,
   },
   generateButton: {
     flexDirection: 'row',
