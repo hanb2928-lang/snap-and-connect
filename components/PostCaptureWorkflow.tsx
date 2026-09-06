@@ -758,35 +758,6 @@ export function PostCaptureWorkflow({
               <Text style={styles.actionBtnSecondaryText}>공유 문구 복사</Text>
             </TouchableOpacity>
 
-            {!gallerySaved && (
-              <Text style={styles.stepHint}>갤러리 저장 후 플랫폼 발행이 활성화됩니다.</Text>
-            )}
-
-            <TouchableOpacity
-              style={[styles.proceedBtn, uploadDone && styles.actionBtnDone, fallbackUsed && styles.proceedBtnFallback]}
-              onPress={handleProceed}
-              disabled={isUploading || uploadDone}
-              activeOpacity={0.85}
-            >
-              {uploadDone ? (
-                <Check size={18} color="#fff" strokeWidth={2.5} />
-              ) : fallbackUsed ? (
-                <Share2 size={18} color="#fff" strokeWidth={2.2} />
-              ) : (
-                <Cloud size={18} color="#fff" strokeWidth={2.2} />
-              )}
-              <Text style={styles.proceedBtnText}>
-                {isUploading && !uploadRetrying
-                  ? '클라우드 저장 중...'
-                  : uploadRetrying
-                  ? `재시도 중 (${uploadRetryCount}/3)...`
-                  : uploadDone
-                  ? '클라우드 저장 & 공유 완료'
-                  : fallbackUsed
-                  ? '로컬 공유로 전환됨'
-                  : `클라우드 저장 & ${platformLabel} 공유`}
-              </Text>
-            </TouchableOpacity>
             {fallbackUsed && !uploadDone && (
               <Text style={styles.fallbackHint}>
                 클라우드 업로드 실패 — 로컬 다운로드 및 {platformLabel} 공유로 자동 전환되었습니다. 발행을 계속 진행하세요.
