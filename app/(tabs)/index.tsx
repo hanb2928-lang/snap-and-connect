@@ -513,8 +513,8 @@ export default function CameraScreen() {
           />
           <ModeCard
             icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
-            title="스틸컷"
-            desc="상품 사진 한 장으로 깔끔한 15초 홍보 영상 제작"
+            title="스틸컷 템플릿"
+            desc="상품 사진 한 장으로 완성되는 홍보 영상 템플릿"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
           />
