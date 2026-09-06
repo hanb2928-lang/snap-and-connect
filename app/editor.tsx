@@ -22,6 +22,15 @@ import {
   Trash2,
   Undo2,
   Zap,
+  Instagram,
+  AtSign,
+  Pin,
+  Music,
+  Facebook,
+  Plus,
+  Link as LinkIcon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -41,11 +50,35 @@ import { BgRemoveEditor } from '@/components/BgRemoveEditor';
 import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
 import { cleanBase64 } from '@/lib/base64';
 import { captureRef } from 'react-native-view-shot';
-import type { Scan } from '@/types/database';
+import type { Scan, CustomAffiliateLink } from '@/types/database';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 type EditMode = 'none' | 'text' | 'sticker';
+
+type PlatformKey = 'instagram' | 'threads' | 'pinterest' | 'tiktok' | 'facebook';
+
+interface PlatformOption {
+  key: PlatformKey;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+const PLATFORM_OPTIONS: PlatformOption[] = [
+  { key: 'instagram', label: '인스타그램', icon: <Instagram size={20} color="#fff" strokeWidth={2} />, color: '#E1306C' },
+  { key: 'threads', label: '스레드', icon: <AtSign size={20} color="#fff" strokeWidth={2} />, color: '#000000' },
+  { key: 'pinterest', label: '핀터레스트', icon: <Pin size={20} color="#fff" strokeWidth={2} />, color: '#E60023' },
+  { key: 'tiktok', label: '틱톡', icon: <Music size={20} color="#fff" strokeWidth={2} />, color: '#000000' },
+  { key: 'facebook', label: '페이스북', icon: <Facebook size={20} color="#fff" strokeWidth={2} />, color: '#1877F2' },
+];
+
+interface LinkEntry {
+  id: string;
+  platform: PlatformKey;
+  label: string;
+  url: string;
+}
 
 interface TextOverlay {
   id: string;
@@ -110,6 +143,14 @@ export default function EditorScreen() {
   const [stickerModalVisible, setStickerModalVisible] = useState(false);
   const [previewArea, setPreviewArea] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
+  // Platform & link state
+  const [selectedPlatforms, setSelectedPlatforms] = useState<PlatformKey[]>([]);
+  const [linkEntries, setLinkEntries] = useState<LinkEntry[]>([]);
+  const [linkPanelVisible, setLinkPanelVisible] = useState(true);
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkPlatform, setNewLinkPlatform] = useState<PlatformKey>('instagram');
+
   const maxDisplayWidth = previewArea.w > 0 ? previewArea.w - 32 : screenWidth - 32;
   const maxDisplayHeight = previewArea.h > 0 ? previewArea.h - 32 : screenHeight * 0.5;
   const aspect = imageSize.width && imageSize.height ? imageSize.width / imageSize.height : 1;
@@ -140,6 +181,18 @@ export default function EditorScreen() {
 
         const scanData = data as Scan;
         setScan(scanData);
+
+        if (scanData.custom_affiliate_links && scanData.custom_affiliate_links.length > 0) {
+          const loaded = scanData.custom_affiliate_links.map((l, i) => ({
+            id: `link-${i}-${Date.now()}`,
+            platform: (l.platform as PlatformKey) || 'instagram',
+            label: l.label || '',
+            url: l.url || '',
+          }));
+          setLinkEntries(loaded);
+          const platforms = [...new Set(loaded.map((l) => l.platform))] as PlatformKey[];
+          setSelectedPlatforms(platforms);
+        }
         const rawUri = scanData.edited_image_url || scanData.image_url;
 
         let uri = rawUri;
@@ -520,13 +573,26 @@ export default function EditorScreen() {
       }
       const uploadedUrl = await uploadEditedImage(base64, mimeType);
       await saveEditedScan(scan.id, uploadedUrl);
+
+      // Save custom affiliate links
+      const customLinks: CustomAffiliateLink[] = linkEntries
+        .filter((l) => l.url.trim())
+        .map((l, i) => ({
+          platform: l.platform,
+          label: l.label,
+          url: l.url,
+          productIndex: i,
+        }));
+      if (customLinks.length > 0) {
+        await supabase.from('scans').update({ custom_affiliate_links: customLinks }).eq('id', scan.id);
+      }
       setProcessing(false);
       router.back();
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장 실패');
       setProcessing(false);
     }
-  }, [scan, imageUri, processing, router, textOverlays, stickers]);
+  }, [scan, imageUri, processing, router, textOverlays, stickers, linkEntries]);
 
   if (error && !scan && !loading) {
     return (
@@ -632,6 +698,168 @@ export default function EditorScreen() {
           </View>
         )}
       </View>
+
+      {/* Platform & Link Panel */}
+      {editMode === 'none' && !loading && (
+        <View style={[styles.linkPanel, { paddingBottom: theme.spacing.sm + insets.bottom }]}>
+          <TouchableOpacity
+            style={styles.linkPanelHeader}
+            onPress={() => setLinkPanelVisible((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.linkPanelHeaderLeft}>
+              <LinkIcon size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+              <Text style={styles.linkPanelTitle}>플랫폼 & 링크</Text>
+              {linkEntries.length > 0 && (
+                <View style={styles.linkCountBadge}>
+                  <Text style={styles.linkCountText}>{linkEntries.length}</Text>
+                </View>
+              )}
+            </View>
+            {linkPanelVisible ? (
+              <ChevronDown size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronUp size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          {linkPanelVisible && (
+            <View style={styles.linkPanelBody}>
+              {/* Platform selection */}
+              <Text style={styles.linkSectionLabel}>게시 플랫폼</Text>
+              <View style={styles.platformRow}>
+                {PLATFORM_OPTIONS.map((opt) => {
+                  const selected = selectedPlatforms.includes(opt.key);
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.platformChip,
+                        { borderColor: selected ? opt.color : theme.colors.dark.border },
+                        selected && { backgroundColor: opt.color + '22' },
+                      ]}
+                      onPress={() => {
+                        setSelectedPlatforms((prev) =>
+                          prev.includes(opt.key)
+                            ? prev.filter((k) => k !== opt.key)
+                            : [...prev, opt.key],
+                        );
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.platformChipIcon, { backgroundColor: selected ? opt.color : theme.colors.dark.surfaceLight }]}>
+                        {opt.icon}
+                      </View>
+                      <Text
+                        style={[
+                          styles.platformChipLabel,
+                          { color: selected ? theme.colors.dark.text : theme.colors.dark.textDim },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Link input */}
+              <Text style={styles.linkSectionLabel}>링크 추가</Text>
+              <View style={styles.linkInputRow}>
+                <View style={styles.linkPlatformSelect}>
+                  {PLATFORM_OPTIONS.map((opt) => {
+                    const selected = newLinkPlatform === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.linkPlatformDot,
+                          { backgroundColor: selected ? opt.color : theme.colors.dark.surfaceLight },
+                        ]}
+                        onPress={() => setNewLinkPlatform(opt.key)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.linkPlatformDotLabel} numberOfLines={1}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={styles.linkTextInput}
+                  value={newLinkLabel}
+                  onChangeText={setNewLinkLabel}
+                  placeholder="링크 이름"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                />
+                <TextInput
+                  style={styles.linkUrlInput}
+                  value={newLinkUrl}
+                  onChangeText={setNewLinkUrl}
+                  placeholder="https://..."
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.linkAddBtn}
+                  onPress={() => {
+                    if (!newLinkUrl.trim()) return;
+                    setLinkEntries((prev) => [
+                      ...prev,
+                      {
+                        id: `link-${Date.now()}`,
+                        platform: newLinkPlatform,
+                        label: newLinkLabel.trim() || '',
+                        url: newLinkUrl.trim(),
+                      },
+                    ]);
+                    setNewLinkLabel('');
+                    setNewLinkUrl('');
+                    setSelectedPlatforms((prev) =>
+                      prev.includes(newLinkPlatform) ? prev : [...prev, newLinkPlatform],
+                    );
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={20} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Saved links list */}
+              {linkEntries.length > 0 && (
+                <View style={styles.linkList}>
+                  {linkEntries.map((entry) => {
+                    const platformOpt = PLATFORM_OPTIONS.find((p) => p.key === entry.platform);
+                    return (
+                      <View key={entry.id} style={styles.linkItem}>
+                        <View style={[styles.linkItemIcon, { backgroundColor: platformOpt?.color || theme.colors.dark.surfaceLight }]}>
+                          {platformOpt?.icon}
+                        </View>
+                        <View style={styles.linkItemText}>
+                          <Text style={styles.linkItemLabel} numberOfLines={1}>
+                            {entry.label || platformOpt?.label || '링크'}
+                          </Text>
+                          <Text style={styles.linkItemUrl} numberOfLines={1}>{entry.url}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.linkItemDelete}
+                          onPress={() => setLinkEntries((prev) => prev.filter((l) => l.id !== entry.id))}
+                          activeOpacity={0.7}
+                        >
+                          <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
 
       {editMode === 'none' && (
         <View style={[styles.toolBar, { paddingBottom: theme.spacing.md + insets.bottom }]}>
@@ -1116,5 +1344,175 @@ const styles = StyleSheet.create({
   },
   stickerCellText: {
     fontSize: 32,
+  },
+  // Link panel
+  linkPanel: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+    backgroundColor: theme.colors.dark.surface,
+    maxHeight: '55%',
+  },
+  linkPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm + 2,
+  },
+  linkPanelHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  linkPanelTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  linkCountBadge: {
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  linkCountText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  linkPanelBody: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  linkSectionLabel: {
+    fontSize: theme.typography.micro,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: theme.spacing.xs,
+  },
+  platformRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+  },
+  platformChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    borderWidth: 1.5,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  platformChipIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  platformChipLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+  },
+  linkInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  linkPlatformSelect: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    width: '100%',
+    marginBottom: 4,
+  },
+  linkPlatformDot: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.sm,
+  },
+  linkPlatformDotLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: '#fff',
+  },
+  linkTextInput: {
+    flex: 1,
+    minWidth: 80,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  linkUrlInput: {
+    flex: 2,
+    minWidth: 120,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  linkAddBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  linkList: {
+    gap: 6,
+    marginTop: theme.spacing.xs,
+  },
+  linkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 8,
+  },
+  linkItemIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  linkItemText: {
+    flex: 1,
+    gap: 2,
+  },
+  linkItemLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  linkItemUrl: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  linkItemDelete: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
