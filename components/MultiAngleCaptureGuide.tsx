@@ -34,9 +34,11 @@ export type AngleGuide = {
 };
 
 const ANGLE_GUIDES: AngleGuide[] = [
-  { id: 'front', label: '앞면', hint: '제품 전체가 보이도록 정면에서 촬영', emoji: '📸' },
-  { id: 'back', label: '뒷면/측면', hint: '라벨이나 디테일이 보이는 뒷면 또는 측면', emoji: '🔄' },
-  { id: 'detail', label: '디테일', hint: '로고, 질감, 마감 등 핵심 디테일 클로즈업', emoji: '🔍' },
+  { id: 'front', label: '정면', hint: '제품 전체가 보이도록 정면에서 촬영', emoji: '📸' },
+  { id: 'left', label: '좌측면', hint: '제품의 왼쪽 측면을 45도 각도에서 촬영', emoji: '👈' },
+  { id: 'right', label: '우측면', hint: '제품의 오른쪽 측면을 45도 각도에서 촬영', emoji: '👉' },
+  { id: 'back', label: '후면', hint: '라벨이나 디자인이 보이는 뒷면을 촬영', emoji: '🔄' },
+  { id: 'top', label: '상부', hint: '제품의 윗면을 위에서 내려다보며 촬영', emoji: '⬆️' },
 ];
 
 interface MultiAngleCaptureGuideProps {
@@ -180,10 +182,10 @@ export function MultiAngleCaptureGuide({
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Intro */}
             <View style={styles.introBox}>
-              <Text style={styles.introTitle}>정면 1장 + 측면/디테일 1장 = AI 분석 정확도 2배</Text>
+              <Text style={styles.introTitle}>5각도 순차 촬영으로 입체적 AI 영상 완성</Text>
               <Text style={styles.introDesc}>
-                단품 사진은 배경 노이즈를 줄여 AI가 색상·질감·형태를 정확히 추출합니다.
-                다각도 사진을 함께 올리면 입체적 특성까지 파악해서 매칭 오류를 원천 차단합니다.
+                정면, 좌측, 우측, 후면, 상부를 순서대로 촬영하면 AI가 제품의 입체적 특성을 정밀하게 복원합니다.
+                5장의 사진으로 왜곡 없는 역동적인 숏폼을 생성합니다.
               </Text>
             </View>
 
@@ -279,7 +281,7 @@ export function MultiAngleCaptureGuide({
             >
               <Check size={18} color={allDone ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2} />
               <Text style={[styles.completeBtnText, !allDone && styles.completeBtnTextDisabled]}>
-                {allDone ? '3장으로 콘텐츠 만들기' : `${ANGLE_GUIDES.length - completedCount}장 더 촬영 needed`}
+                {allDone ? '5장으로 콘텐츠 만들기' : `${ANGLE_GUIDES.length - completedCount}장 더 촬영하세요`}
               </Text>
               {allDone && <ChevronRight size={18} color="#fff" strokeWidth={2} />}
             </TouchableOpacity>

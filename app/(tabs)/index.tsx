@@ -490,7 +490,7 @@ export default function CameraScreen() {
     setCaptureMode(mode);
     setError(null);
     setScreenPhase('camera');
-    if (mode === 'multi') {
+    if (mode === 'multi' || mode === 'single') {
       setMultiAngleVisible(true);
     }
   };
@@ -520,7 +520,7 @@ export default function CameraScreen() {
           <ModeCard
             icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
             title="스틸컷 템플릿"
-            desc="상품 사진 한 장으로 완성되는 홍보 영상 템플릿"
+            desc="정면·좌측·우측·후면·상부 5각도 촬영으로 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
           />
