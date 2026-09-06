@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
 import { startAsyncAnalysis } from '@/lib/asyncAnalysis';
+import { saveManualScan, uploadImage } from '@/lib/analysis';
 import { isOnline } from '@/hooks/useNetworkStatus';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
@@ -242,6 +243,34 @@ export default function CameraScreen() {
 
   const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
+
+    // 스틸컷 템플릿 모드: AI 분석 없이 바로 편집 화면으로 진입
+    if (captureMode === 'single') {
+      try {
+        const base64 = postCaptureBase64;
+        const mimeType = postCaptureMime;
+        if (!base64) {
+          if (!postCaptureVideoUri) return;
+          const compressed = await withTimeout(
+            compressImageToBase64(postCaptureVideoUri, 1080, 0.7),
+            PICK_TIMEOUT_MS,
+            '동영상 압축',
+          );
+          const imageUrl = await uploadImage(compressed.base64, compressed.mimeType);
+          const scanId = await saveManualScan(imageUrl);
+          router.push({ pathname: '/editor', params: { id: scanId } });
+          return;
+        }
+        const imageUrl = await uploadImage(base64, mimeType);
+        const scanId = await saveManualScan(imageUrl);
+        router.push({ pathname: '/editor', params: { id: scanId } });
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      }
+      return;
+    }
+
     if (postCaptureBase64) {
       await runAutoAnalysis(postCaptureBase64, postCaptureMime);
       return;
@@ -258,7 +287,7 @@ export default function CameraScreen() {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
     }
-  }, [runAutoAnalysis, postCaptureBase64, postCaptureMime, postCaptureVideoUri]);
+  }, [captureMode, runAutoAnalysis, postCaptureBase64, postCaptureMime, postCaptureVideoUri, router]);
 
   const handlePostCaptureClose = useCallback(() => {
     setPostCaptureVisible(false);
