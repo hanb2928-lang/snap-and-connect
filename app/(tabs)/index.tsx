@@ -37,6 +37,8 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { WebCameraView, type CaptureModeType } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
+import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
+import type { UploadPlatformKey } from '@/lib/platformUpload';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -81,6 +83,10 @@ export default function CameraScreen() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordElapsed, setRecordElapsed] = useState(0);
+  const [postCaptureVisible, setPostCaptureVisible] = useState(false);
+  const [postCaptureVideoUri, setPostCaptureVideoUri] = useState<string | null>(null);
+  const [postCaptureBase64, setPostCaptureBase64] = useState<string | null>(null);
+  const [postCaptureMime, setPostCaptureMime] = useState<string>('video/webm');
 
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
@@ -199,12 +205,15 @@ export default function CameraScreen() {
         '동영상 압축',
       );
       if (!isMountedRef.current || genIdRef.current !== genId) return;
-      await runAutoAnalysis(base64, mimeType);
+      setPostCaptureBase64(base64);
+      setPostCaptureMime(mimeType);
+      setPostCaptureVideoUri(videoUri);
+      setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current || genIdRef.current !== genId) return;
       setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
     }
-  }, [runAutoAnalysis]);
+  }, []);
 
   const startRecording = useCallback(async () => {
     if (!cameraRef.current || !cameraReady || isRecording) return;
@@ -241,6 +250,20 @@ export default function CameraScreen() {
       setError(friendlyError(err, '동영상 녹화에 실패했습니다. 다시 시도해주세요.'));
     }
   }, [cameraReady, isRecording, stopRecording, handleVideoRecorded]);
+
+
+  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: UploadPlatformKey) => {
+    setPostCaptureVisible(false);
+    if (postCaptureBase64) {
+      await runAutoAnalysis(postCaptureBase64, postCaptureMime);
+    }
+  }, [runAutoAnalysis, postCaptureBase64, postCaptureMime]);
+
+  const handlePostCaptureClose = useCallback(() => {
+    setPostCaptureVisible(false);
+    setPostCaptureVideoUri(null);
+    setPostCaptureBase64(null);
+  }, []);
 
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
@@ -566,6 +589,13 @@ export default function CameraScreen() {
           onCaptureImage={handleMultiAngleCapture}
         />
 
+        <PostCaptureWorkflow
+          visible={postCaptureVisible}
+          videoUri={postCaptureVideoUri}
+          onProceedToAnalysis={handlePostCaptureProceed}
+          onClose={handlePostCaptureClose}
+        />
+
         <CreditPurchaseModal
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
@@ -742,6 +772,13 @@ export default function CameraScreen() {
           </View>
         </View>
       )}
+
+      <PostCaptureWorkflow
+        visible={postCaptureVisible}
+        videoUri={postCaptureVideoUri}
+        onProceedToAnalysis={handlePostCaptureProceed}
+        onClose={handlePostCaptureClose}
+      />
 
       <CreditPurchaseModal
         visible={creditModalVisible}
