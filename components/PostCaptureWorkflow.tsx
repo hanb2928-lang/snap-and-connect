@@ -119,6 +119,8 @@ export function PostCaptureWorkflow({
   const [activeStep, setActiveStep] = useState<WorkflowStep>(1);
   const [selectedPlatformKey, setSelectedPlatformKey] = useState<string>('instagram');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [platformLink, setPlatformLink] = useState('');
+  const [showPlatformLinkInput, setShowPlatformLinkInput] = useState(false);
   const [selectedHookId, setSelectedHookId] = useState<number | null>(null);
   const [disclosureEnabled, setDisclosureEnabled] = useState(false);
   const [gallerySaved, setGallerySaved] = useState(false);
@@ -427,7 +429,9 @@ export function PostCaptureWorkflow({
   }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry, bgmRecommendation]);
 
   const handleShareText = useCallback(async () => {
-    const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
+    const baseText = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
+    const text = platformLink.trim() ? `${baseText}\n\n${platformLink.trim()}` : baseText;
+    setShowPlatformLinkInput(true);
     if (Platform.OS === 'web') {
       try {
         await navigator.clipboard.writeText(text);
@@ -437,7 +441,7 @@ export function PostCaptureWorkflow({
         await RNShare.share({ message: text });
       } catch { /* ignore */ }
     }
-  }, [customPrompt]);
+  }, [customPrompt, platformLink]);
 
   if (!visible) return null;
 
@@ -757,6 +761,24 @@ export function PostCaptureWorkflow({
               <Share2 size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
               <Text style={styles.actionBtnSecondaryText}>공유 문구 복사</Text>
             </TouchableOpacity>
+
+            {showPlatformLinkInput && (
+              <View style={styles.platformLinkBox}>
+                <Text style={styles.platformLinkLabel}>플랫폼 링크 직접 입력</Text>
+                <TextInput
+                  style={styles.platformLinkInput}
+                  value={platformLink}
+                  onChangeText={setPlatformLink}
+                  placeholder="https://..."
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  returnKeyType="done"
+                />
+                <Text style={styles.platformLinkHint}>다시 복사하면 입력한 링크가 공유 문구에 포함됩니다.</Text>
+              </View>
+            )}
 
             {fallbackUsed && !uploadDone && (
               <Text style={styles.fallbackHint}>
@@ -1526,5 +1548,36 @@ const styles = StyleSheet.create({
     color: theme.colors.warning[400],
     textAlign: 'center',
     lineHeight: 16,
+  },
+  platformLinkBox: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+    marginTop: 4,
+  },
+  platformLinkLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  platformLinkInput: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  platformLinkHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
 });
