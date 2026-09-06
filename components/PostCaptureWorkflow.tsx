@@ -30,9 +30,11 @@ import {
   Type,
   Crop,
   Wand2,
+  Cloud,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDeepLink, type UploadPlatformKey } from '@/lib/platformUpload';
+import { supabase } from '@/lib/supabase';
 import {
   buildShortFormEditPlan,
   generateHookOptions,
@@ -42,6 +44,7 @@ import {
   type HookOption,
   type AutoEnhancement,
 } from '@/lib/shortFormEditEngine';
+import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 
 type PlatformOption = {
   key: UploadPlatformKey;
@@ -81,6 +84,8 @@ export function PostCaptureWorkflow({
   const [gallerySaved, setGallerySaved] = useState(false);
   const [savingToGallery, setSavingToGallery] = useState(false);
   const [platformLaunched, setPlatformLaunched] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadDone, setUploadDone] = useState(false);
 
   const selectedOption = PLATFORM_OPTIONS.find((o) => o.key === selectedPlatformKey) ?? PLATFORM_OPTIONS[0];
   const platformInfo = useMemo(() => getPlatformInfo(selectedOption.platformKey), [selectedOption.platformKey]);
@@ -145,9 +150,42 @@ export function PostCaptureWorkflow({
     }
   }, [selectedPlatformKey]);
 
-  const handleProceed = useCallback(() => {
-    onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
-  }, [customPrompt, selectedPlatformKey, editPlan, onProceedToAnalysis]);
+  const handleProceed = useCallback(async () => {
+    if (isUploading || uploadDone) return;
+    setIsUploading(true);
+    try {
+      if (videoUri) {
+        const fileName = `shortform-${Date.now()}.mp4`;
+        if (Platform.OS === 'web') {
+          const resp = await fetch(videoUri);
+          const blob = await resp.blob();
+          await supabase.storage.from('videos').upload(fileName, blob, { contentType: 'video/mp4' });
+        } else {
+          const fileResp = await fetch(videoUri);
+          const blob = await fileResp.blob();
+          await supabase.storage.from('videos').upload(fileName, blob, { contentType: 'video/mp4' });
+        }
+      }
+      setUploadDone(true);
+      const deepLink = getDeepLink(selectedPlatformKey);
+      try {
+        const canOpen = await Linking.canOpenURL(deepLink.appUrl);
+        if (canOpen) {
+          await Linking.openURL(deepLink.appUrl);
+        } else {
+          await Linking.openURL(deepLink.webUrl);
+        }
+        setPlatformLaunched(true);
+      } catch {
+        // platform launch is best-effort
+      }
+      onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
+    } catch {
+      // upload failed — still proceed to analysis so user isn't blocked
+      onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
+    }
+    setIsUploading(false);
+  }, [isUploading, uploadDone, videoUri, selectedPlatformKey, customPrompt, editPlan, onProceedToAnalysis]);
 
   const handleShareText = useCallback(async () => {
     const text = customPrompt.trim() || '새로운 숏폼 영상이 완성되었습니다!';
@@ -349,6 +387,8 @@ export function PostCaptureWorkflow({
               </TouchableOpacity>
             </View>
 
+            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} />
+
             <View style={styles.timelinePreview}>
               {editPlan.segments.map((seg) => (
                 <View key={seg.index} style={styles.timelineSeg}>
@@ -447,9 +487,20 @@ export function PostCaptureWorkflow({
               <Text style={styles.stepHint}>갤러리 저장 후 플랫폼 발행이 활성화됩니다.</Text>
             )}
 
-            <TouchableOpacity style={styles.proceedBtn} onPress={handleProceed} activeOpacity={0.85}>
-              <Sparkles size={18} color="#fff" strokeWidth={2.2} />
-              <Text style={styles.proceedBtnText}>AI 분석으로 최종 숏폼 생성</Text>
+            <TouchableOpacity
+              style={[styles.proceedBtn, uploadDone && styles.actionBtnDone]}
+              onPress={handleProceed}
+              disabled={isUploading || uploadDone}
+              activeOpacity={0.85}
+            >
+              {uploadDone ? (
+                <Check size={18} color="#fff" strokeWidth={2.5} />
+              ) : (
+                <Cloud size={18} color="#fff" strokeWidth={2.2} />
+              )}
+              <Text style={styles.proceedBtnText}>
+                {isUploading ? '클라우드 저장 중...' : uploadDone ? '클라우드 저장 & 공유 완료' : `클라우드 저장 & ${platformLabel} 공유`}
+              </Text>
             </TouchableOpacity>
           </StepCard>
         </ScrollView>
