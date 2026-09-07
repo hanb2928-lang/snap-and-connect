@@ -366,79 +366,85 @@ export function PostCaptureWorkflow({
     setUploadErrorMsg(null);
     setUploadRetryCount(0);
 
-    let cloudSuccess = false;
+    try {
+      let cloudSuccess = false;
 
-    let uploadUri = videoUri || (imageUri || null);
-    if (uploadUri && videoUri && Platform.OS === 'web') {
-      try {
-        uploadUri = await mixBgmIntoVideo(
-          videoUri,
-          editPlan.bgmTemplate.id,
-          editPlan.pacingBpm,
-          15,
-          bgmRecommendation?.highlightStartSec,
-          bgmRecommendation?.highlightDurationSec,
-          bgmRecommendation?.energyCurve,
-        );
-      } catch {
-        uploadUri = videoUri;
+      let uploadUri = videoUri || (imageUri || null);
+      if (uploadUri && videoUri && Platform.OS === 'web') {
+        try {
+          uploadUri = await mixBgmIntoVideo(
+            videoUri,
+            editPlan.bgmTemplate.id,
+            editPlan.pacingBpm,
+            15,
+            bgmRecommendation?.highlightStartSec,
+            bgmRecommendation?.highlightDurationSec,
+            bgmRecommendation?.energyCurve,
+          );
+        } catch {
+          uploadUri = videoUri;
+        }
       }
-    }
-    if (uploadUri) {
-      try {
-        const blob = await uriToBlob(uploadUri);
-        const ext = imageUri ? 'jpg' : 'mp4';
-        const contentType = imageUri ? 'image/jpeg' : 'video/mp4';
-        const fileName = `shortform-${Date.now()}.${ext}`;
-        cloudSuccess = await uploadWithRetry(blob, fileName, 3, contentType);
-      } catch {
-        cloudSuccess = false;
+      if (uploadUri) {
+        try {
+          const blob = await uriToBlob(uploadUri);
+          const ext = imageUri ? 'jpg' : 'mp4';
+          const contentType = imageUri ? 'image/jpeg' : 'video/mp4';
+          const fileName = `shortform-${Date.now()}.${ext}`;
+          cloudSuccess = await uploadWithRetry(blob, fileName, 3, contentType);
+        } catch {
+          cloudSuccess = false;
+        }
       }
-    }
 
-    if (cloudSuccess) {
-      setUploadDone(true);
-    } else {
-      setFallbackUsed(true);
-    }
+      if (cloudSuccess) {
+        setUploadDone(true);
+      } else {
+        setFallbackUsed(true);
+      }
 
-    const deepLink = getDeepLink(selectedPlatformKey);
-    if (deepLink.uploadWebUrl || deepLink.uploadAppUrl) {
-      try {
-        if (deepLink.uploadAppUrl) {
-          const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
-          if (canOpen) {
-            await Linking.openURL(deepLink.uploadAppUrl);
+      const deepLink = getDeepLink(selectedPlatformKey);
+      if (deepLink.uploadWebUrl || deepLink.uploadAppUrl) {
+        try {
+          if (deepLink.uploadAppUrl) {
+            const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
+            if (canOpen) {
+              await Linking.openURL(deepLink.uploadAppUrl);
+            } else if (deepLink.uploadWebUrl) {
+              await Linking.openURL(deepLink.uploadWebUrl);
+            }
           } else if (deepLink.uploadWebUrl) {
             await Linking.openURL(deepLink.uploadWebUrl);
           }
-        } else if (deepLink.uploadWebUrl) {
-          await Linking.openURL(deepLink.uploadWebUrl);
-        }
-        setPlatformLaunched(true);
-      } catch {
-        try {
-          if (deepLink.appUrl) {
-            const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
-            if (canOpenFallback) {
-              await Linking.openURL(deepLink.appUrl);
+          setPlatformLaunched(true);
+        } catch {
+          try {
+            if (deepLink.appUrl) {
+              const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
+              if (canOpenFallback) {
+                await Linking.openURL(deepLink.appUrl);
+              } else if (deepLink.webUrl) {
+                await Linking.openURL(deepLink.webUrl);
+              }
+              setPlatformLaunched(true);
             } else if (deepLink.webUrl) {
               await Linking.openURL(deepLink.webUrl);
+              setPlatformLaunched(true);
             }
-            setPlatformLaunched(true);
-          } else if (deepLink.webUrl) {
-            await Linking.openURL(deepLink.webUrl);
-            setPlatformLaunched(true);
-          }
-        } catch { /* best-effort */ }
+          } catch { /* best-effort */ }
+        }
       }
-    }
 
-    onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
-    setIsUploading(false);
+      onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
+    } catch {
+      setFallbackUsed(true);
+    } finally {
+      setIsUploading(false);
+    }
   }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry, bgmRecommendation]);
 
   if (!visible) return null;
+  if (!videoUri && !imageUri) return null;
 
   const platformLabel = selectedOption.label;
   const spec = editPlan.spec;
@@ -864,13 +870,20 @@ function VerticalStepCard({ stepNum, title, subtitle, children }: VerticalStepCa
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '100%',
     backgroundColor: 'rgba(5, 8, 18, 0.92)',
     zIndex: 200,
   },
   sheet: {
     flex: 1,
+    height: '100%',
     paddingTop: 60,
+    paddingBottom: 20,
     paddingHorizontal: theme.spacing.lg,
   },
   header: {
@@ -895,8 +908,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+    minHeight: 0,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 80,
     gap: theme.spacing.md,
   },
