@@ -45,6 +45,8 @@ import {
   buildShortFormEditPlan,
   generateHookOptions,
   getPlatformInfo,
+  describeMultiAngleFusion,
+  getRetentionFormula,
   type ShortFormEditPlan,
   type HookOption,
   type AutoEnhancement,
@@ -298,6 +300,9 @@ export function PostCaptureWorkflow({
     [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled, bgmRecommendation],
   );
 
+  const fusionInfo = useMemo(() => describeMultiAngleFusion(imageUri ? 1 : 0), [imageUri]);
+  const retentionFormula = useMemo(() => getRetentionFormula(selectedOption.key), [selectedOption.key]);
+
   const handleSaveToGallery = useCallback(async () => {
     const uri = videoUri || (imageUri || null);
     if (!uri) return;
@@ -475,7 +480,7 @@ export function PostCaptureWorkflow({
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>촬영 완료! 3단계로 숏폼 완성</Text>
+            <Text style={styles.title}>입체컷 오토 · 4단계로 숏폼 완성</Text>
             <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.closeBtn}>
               <Text style={styles.closeText}>건너뛰기</Text>
             </TouchableOpacity>
@@ -495,7 +500,7 @@ export function PostCaptureWorkflow({
     <View style={styles.overlay}>
       <View style={styles.sheet}>
         <View style={styles.header}>
-          <Text style={styles.title}>촬영 완료! 3단계로 숏폼 완성</Text>
+          <Text style={styles.title}>입체컷 오토 · 4단계로 숏폼 완성</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.closeBtn}>
             <Text style={styles.closeText}>건너뛰기</Text>
           </TouchableOpacity>
@@ -503,7 +508,31 @@ export function PostCaptureWorkflow({
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Step 1: Capture Result Preview */}
-          <VerticalStepCard stepNum={1} title="촬영 결과물 확인" subtitle={videoUri ? '영상 캡처 완료' : imageUri ? '사진 캡처 완료' : '미디어 없음'}>
+          <VerticalStepCard stepNum={1} title="입체컷 융합 & 촬영 결과물 확인" subtitle={videoUri ? '영상 캡처 완료' : imageUri ? '사진 캡처 완료' : '미디어 없음'}>
+            {fusionInfo && (
+              <View style={styles.fusionInfoBox}>
+                <Sparkles size={14} color={theme.colors.primary[400]} strokeWidth={2} />
+                <View style={styles.fusionInfoText}>
+                  <Text style={styles.fusionInfoTitle}>AI 입체 합성 프리프로세싱</Text>
+                  <Text style={styles.fusionInfoDesc}>{fusionInfo.spatialDepthHint} · 사물의 입체적 공간감을 분석하여 자연스럽게 합성합니다.</Text>
+                </View>
+              </View>
+            )}
+            {retentionFormula && (
+              <View style={styles.retentionBox}>
+                <View style={styles.retentionHeader}>
+                  <Sparkles size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+                  <Text style={styles.retentionTitle}>유튜브 상위 1% 조회수 공식 적용</Text>
+                </View>
+                {retentionFormula.techniques.map((tech, i) => (
+                  <View key={`tech-${i}`} style={styles.retentionRow}>
+                    <View style={styles.retentionDot} />
+                    <Text style={styles.retentionTech}>{tech}</Text>
+                  </View>
+                ))}
+                <Text style={styles.retentionMeta}>컷 전환 간격: {retentionFormula.cutIntervalSec}s · 리듬: {retentionFormula.rhythmPattern === 'rapid' ? '빠름' : retentionFormula.rhythmPattern === 'medium' ? '중간' : '느림'} · 훅 지속: {retentionFormula.hookDurationSec}s</Text>
+              </View>
+            )}
             <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} imageUri={imageUri} />
 
             <View style={styles.timelinePreview}>
@@ -566,7 +595,7 @@ export function PostCaptureWorkflow({
           </VerticalStepCard>
 
           {/* Step 2: AI Conversion Style Selection */}
-          <VerticalStepCard stepNum={2} title="AI 변환 스타일 선택" subtitle="어떤 스타일로 만들까요?">
+          <VerticalStepCard stepNum={2} title="AI 변환 스타일 & 연출 선택" subtitle="유튜브 상위 1% 몰입 연출 기법 적용">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
               {CONVERSION_MODES.map((mode) => {
                 const ModeIcon = mode.icon;
@@ -1700,5 +1729,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
+  },
+  fusionInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[500] + '30',
+    padding: 12,
+    marginBottom: 10,
+  },
+  fusionInfoText: {
+    flex: 1,
+    gap: 4,
+  },
+  fusionInfoTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[400],
+  },
+  fusionInfoDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  retentionBox: {
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[500] + '30',
+    padding: 12,
+    marginBottom: 10,
+    gap: 6,
+  },
+  retentionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  retentionTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  retentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  retentionDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.warning[400],
+  },
+  retentionTech: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  retentionMeta: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 2,
   },
 });

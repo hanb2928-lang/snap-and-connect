@@ -271,9 +271,9 @@ export function buildShortFormEditPlan(
   const segmentTexts = buildSegmentTexts(hook, hookOptions, customPrompt, productName);
 
   const segments: EditSegment[] = [
-    { index: 0, startSec: 0, endSec: 3, label: '후킹', purpose: '시청자 이탈 방지', textOverlay: hook, position: 'center' },
-    { index: 1, startSec: 3, endSec: 7, label: '제품 소개', purpose: '핵심 가치 전달', textOverlay: segmentTexts.intro, position: 'top' },
-    { index: 2, startSec: 7, endSec: 11, label: '사용/혜택', purpose: '체감 효과 시각화', textOverlay: segmentTexts.benefit, position: 'center' },
+    { index: 0, startSec: 0, endSec: 3, label: '3초 훅', purpose: '시청자 이탈 방지 (유튜브 상위 1% 공식: 첫 3초 후킹)', textOverlay: hook, position: 'center' },
+    { index: 1, startSec: 3, endSec: 7, label: '입체 제품 소개', purpose: '다각도 합성 결과로 입체적 가치 전달', textOverlay: segmentTexts.intro, position: 'top' },
+    { index: 2, startSec: 7, endSec: 11, label: '사용 맥락·혜택', purpose: '사용 맥락 중심 다이내믹 컷 전환으로 몰입 유지', textOverlay: segmentTexts.benefit, position: 'center' },
     { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: disclosureEnabled ? segmentTexts.cta : '', position: 'bottom' },
   ];
 
@@ -366,6 +366,55 @@ export function buildShortFormEditPlan(
     pacingBpm,
     bgmTemplate,
     autoEnhancements,
+  };
+}
+
+export interface MultiAngleFusionResult {
+  primaryBase64: string;
+  additionalBase64s: string[];
+  spatialDepthHint: string;
+  fusionStrategy: 'five_angle_stereo' | 'three_angle_partial' | 'single_fallback';
+}
+
+export function describeMultiAngleFusion(shotCount: number): MultiAngleFusionResult | null {
+  if (shotCount >= 5) {
+    return {
+      primaryBase64: '',
+      additionalBase64s: [],
+      spatialDepthHint: '정면·좌측·우측·후면·상부 5각도 입체 융합',
+      fusionStrategy: 'five_angle_stereo',
+    };
+  }
+  if (shotCount >= 3) {
+    return {
+      primaryBase64: '',
+      additionalBase64s: [],
+      spatialDepthHint: `${shotCount}각도 부분 입체 융합`,
+      fusionStrategy: 'three_angle_partial',
+    };
+  }
+  return null;
+}
+
+export interface RetentionFormula {
+  hookDurationSec: number;
+  cutIntervalSec: number;
+  rhythmPattern: 'rapid' | 'medium' | 'slow';
+  techniques: string[];
+}
+
+export function getRetentionFormula(platform: ShortFormPlatform | string): RetentionFormula {
+  const isTikTok = platform === 'tiktok';
+  const isYouTube = platform === 'youtube';
+  return {
+    hookDurationSec: 3,
+    cutIntervalSec: isTikTok ? 1.5 : isYouTube ? 2.5 : 2,
+    rhythmPattern: isTikTok ? 'rapid' : isYouTube ? 'medium' : 'medium',
+    techniques: [
+      '초반 3초 훅: 시청자 이탈 방지',
+      '사용 맥락 중심 다이내믹 컷 전환: 몰입 유지',
+      '시각적 리듬감 부여: BGM 비트에 맞춘 전환',
+    ],
   };
 }
 

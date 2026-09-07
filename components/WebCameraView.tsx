@@ -31,7 +31,7 @@ type Facing = 'user' | 'environment';
 
 const ALL_MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
   { key: 'oneclick', label: '원클릭', icon: Zap, desc: '실시간 즉시 캡처' },
-  { key: 'single', label: '스틸컷', icon: Camera, desc: '단독 클로즈업 컷' },
+  { key: 'single', label: '입체컷', icon: Camera, desc: '5각도 입체 합성 컷' },
   { key: 'multi', label: '다각도', icon: Layers, desc: '멀티 앵글 시퀀스' },
 ];
 

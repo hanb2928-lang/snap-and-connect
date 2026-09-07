@@ -168,7 +168,7 @@ export function MultiAngleCaptureGuide({
             <TouchableOpacity style={styles.headerBtn} onPress={handleClose} activeOpacity={0.7}>
               <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>멀티 앵글 가이드</Text>
+            <Text style={styles.headerTitle}>입체컷 오토 · 5각도 가이드</Text>
             <View style={styles.headerSpacer} />
           </View>
 

@@ -251,7 +251,7 @@ export default function CameraScreen() {
     const videoUri = postCaptureVideoUriRef.current;
     const mode = captureModeRef.current;
 
-    // 스틸컷 템플릿 모드: AI 분석 없이 바로 편집 화면으로 진입
+    // 입체컷 오토 모드: AI 분석 없이 바로 편집 화면으로 진입
     if (mode === 'single') {
       try {
         if (!base64) {
@@ -416,7 +416,7 @@ export default function CameraScreen() {
     setMultiAngleVisible(false);
     if (!sorted[0]?.base64) return;
 
-    // 스틸컷 템플릿 모드: AI 분석 없이 바로 편집 화면으로 진입
+    // 입체컷 오토 모드: AI 분석 없이 바로 편집 화면으로 진입
     if (captureMode === 'single') {
       try {
         const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
@@ -599,7 +599,7 @@ export default function CameraScreen() {
           <ModeCard
             icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
             title="입체컷 오토"
-            desc="정면·좌측·우측·후면·상부를 순차 촬영해 입체적인 AI 숏폼 완성"
+            desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
           />
@@ -815,7 +815,7 @@ export default function CameraScreen() {
           {autoSaving ? 'AI 자동 분석 중...' :
            isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_RECORD_MAX_S}s)` :
            captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
-           captureMode === 'single' ? '흔들림 없이 한 장 담아내기' :
+           captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
            '전면, 측면, 디테일 연달아 촬영'}
         </Text>
       </View>
