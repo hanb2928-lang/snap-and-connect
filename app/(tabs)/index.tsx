@@ -571,7 +571,7 @@ export default function CameraScreen() {
     captureModeRef.current = mode;
     setError(null);
     setScreenPhase('camera');
-    if (mode === 'multi' || mode === 'single') {
+    if (mode === 'multi') {
       setMultiAngleVisible(true);
     }
   };
