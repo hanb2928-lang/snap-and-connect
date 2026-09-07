@@ -2,13 +2,13 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Layers, Sparkles, Check, Square } from 'lucide-react-native';
+import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Sparkles, Check, Square } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
 const ONECLICK_MAX_DURATION_S = 15;
 
-export type CaptureModeType = 'oneclick' | 'single' | 'multi' | 'video';
+export type CaptureModeType = 'oneclick' | 'single' | 'video';
 
 interface WebCameraViewProps {
   onCapture: (base64: string, mimeType: string) => void;
@@ -32,7 +32,6 @@ type Facing = 'user' | 'environment';
 const ALL_MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; desc: string }[] = [
   { key: 'oneclick', label: '원클릭', icon: Zap, desc: '실시간 즉시 캡처' },
   { key: 'single', label: '입체컷', icon: Camera, desc: '5각도 입체 합성 컷' },
-  { key: 'multi', label: '다각도', icon: Layers, desc: '멀티 앵글 시퀀스' },
 ];
 
 const MODE_META = (role: 'template' | 'video'): typeof ALL_MODE_META =>
@@ -234,7 +233,7 @@ export function WebCameraView({
 
   const handleCapture = useCallback(async () => {
     if (!cameraReady || capturing || autoSaving) return;
-    if (captureMode === 'multi') {
+    if (captureMode === 'single') {
       onMultiAnglePress();
       return;
     }
@@ -540,7 +539,7 @@ export function WebCameraView({
                capturing ? '촬영 중...' :
                isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_MAX_DURATION_S}s)` :
                captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
-               captureMode === 'single' ? '흔들림 없이 한 장 담아내기' :
+               captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
                '전면, 측면, 디테일을 연달아 촬영'}
             </Text>
           </View>

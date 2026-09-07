@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Zap, Layers, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square } from 'lucide-react-native';
+import { Camera, Zap, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -305,7 +305,7 @@ export default function CameraScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
 
-    if (captureMode === 'multi') {
+    if (captureMode === 'single') {
       setMultiAngleVisible(true);
       return;
     }
@@ -416,37 +416,29 @@ export default function CameraScreen() {
     setMultiAngleVisible(false);
     if (!sorted[0]?.base64) return;
 
-    // 입체컷 오토 모드: AI 분석 없이 바로 편집 화면으로 진입
-    if (captureMode === 'single') {
-      try {
-        const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-        const scanId = await saveManualScan(imageUrl);
-        // Upload remaining 4 photos and save as additional_image_urls
-        const additionalShots = sorted.slice(1);
-        if (additionalShots.length > 0) {
-          const additionalUrls: string[] = [];
-          for (const shot of additionalShots) {
-            if (!shot.base64) continue;
-            try {
-              const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
-              additionalUrls.push(url);
-            } catch { /* skip failed uploads */ }
-          }
-          if (additionalUrls.length > 0) {
-            await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
-          }
+    // 입체컷 오토: 5각도 사진을 업로드 후 편집 화면으로 진입
+    try {
+      const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
+      const scanId = await saveManualScan(imageUrl);
+      const additionalShots = sorted.slice(1);
+      if (additionalShots.length > 0) {
+        const additionalUrls: string[] = [];
+        for (const shot of additionalShots) {
+          if (!shot.base64) continue;
+          try {
+            const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
+            additionalUrls.push(url);
+          } catch { /* skip failed uploads */ }
         }
-        router.push({ pathname: '/editor', params: { id: scanId } });
-      } catch (err) {
-        if (!isMountedRef.current) return;
-        setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        if (additionalUrls.length > 0) {
+          await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+        }
       }
-      return;
+      router.push({ pathname: '/editor', params: { id: scanId } });
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
     }
-
-    // 다각도 모드: 기존대로 AI 분석 실행
-    const additionalB64s = sorted.slice(1).map((s) => s.base64).filter(Boolean) as string[];
-    await runAutoAnalysis(sorted[0].base64, sorted[0].mimeType || 'image/jpeg', additionalB64s);
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
@@ -571,7 +563,7 @@ export default function CameraScreen() {
     captureModeRef.current = mode;
     setError(null);
     setScreenPhase('camera');
-    if (mode === 'multi') {
+    if (mode === 'single') {
       setMultiAngleVisible(true);
     }
   };
@@ -602,13 +594,6 @@ export default function CameraScreen() {
             desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
-          />
-          <ModeCard
-            icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
-            title="다각도 촬영"
-            desc="전면, 측면, 디테일을 연달아 촬영해 역동적인 숏폼 생성"
-            color={theme.colors.accent[500]}
-            onPress={() => handleModeSelect('multi')}
           />
         </View>
 
@@ -815,8 +800,7 @@ export default function CameraScreen() {
           {autoSaving ? 'AI 자동 분석 중...' :
            isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_RECORD_MAX_S}s)` :
            captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
-           captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
-           '전면, 측면, 디테일 연달아 촬영'}
+           '정면·좌측·우측·후면·상부 순차 촬영'}
         </Text>
       </View>
 
