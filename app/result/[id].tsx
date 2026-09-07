@@ -655,14 +655,26 @@ export default function ResultScreen() {
     setUploadDone(false);
     setUploadProgress(0);
 
+    let fallbackObjectUrl: string | null = null;
     try {
-      const uri = await captureRef(cardRef, {
-        format: 'png',
-        quality: 1,
-        fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
-      });
+      let uri: string;
+      try {
+        uri = await captureRef(cardRef, {
+          format: 'png',
+          quality: 1,
+          fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
+        });
+      } catch (captureError) {
+        if (Platform.OS !== 'web') throw captureError;
+        const sourceUrl = captureImageUrl || scan?.edited_image_url || scan?.image_url;
+        if (!sourceUrl) throw captureError;
+        const sourceResponse = await fetch(sourceUrl);
+        if (!sourceResponse.ok) throw captureError;
+        fallbackObjectUrl = URL.createObjectURL(await sourceResponse.blob());
+        uri = fallbackObjectUrl;
+      }
 
-      const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`;
+      const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`; 
 
       // 1) Save to device gallery (primary action)
       if (Platform.OS === 'web') {
@@ -678,21 +690,20 @@ export default function ResultScreen() {
         URL.revokeObjectURL(objectUrl);
       } else {
         const permission = await MediaLibrary.requestPermissionsAsync();
-        if (permission.granted) {
-          try {
-            await MediaLibrary.createAssetAsync(uri);
-          } catch {
-            // Fallback: write base64 to temp file then save
-            const { base64 } = await readUriAsBase64(uri);
-            const dir = FileSystem.cacheDirectory;
-            if (dir) {
-              const fileUri = `${dir}${fileName}`;
-              await FileSystem.writeAsStringAsync(fileUri, base64, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              await MediaLibrary.createAssetAsync(fileUri);
-            }
-          }
+        if (!permission.granted) {
+          throw new Error('갤러리 접근 권한이 필요합니다.');
+        }
+        try {
+          await MediaLibrary.createAssetAsync(uri);
+        } catch {
+          const { base64 } = await readUriAsBase64(uri);
+          const dir = FileSystem.cacheDirectory;
+          if (!dir) throw new Error('임시 저장 공간을 사용할 수 없습니다.');
+          const fileUri = `${dir}${fileName}`;
+          await FileSystem.writeAsStringAsync(fileUri, base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          await MediaLibrary.createAssetAsync(fileUri);
         }
       }
 
@@ -750,9 +761,16 @@ export default function ResultScreen() {
           await RNShare.share({ message: shareText });
         }
       }
-    } catch {
+    } catch (saveError) {
       setUploadProgress(null);
-      setUploadError('저장 중 오류가 발생했습니다.');
+      const message = saveError instanceof Error && saveError.message
+        ? saveError.message
+        : '미리보기 캡처에 실패했습니다. 다시 시도해주세요.';
+      setUploadError(message);
+    } finally {
+      if (fallbackObjectUrl && Platform.OS === 'web') {
+        URL.revokeObjectURL(fallbackObjectUrl);
+      }
     }
   };
 
