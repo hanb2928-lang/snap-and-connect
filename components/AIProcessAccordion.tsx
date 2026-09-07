@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform as RNPlatform,
   UIManager,
+  TextInput,
 } from 'react-native';
 import {
   ChevronDown,
@@ -15,12 +16,24 @@ import {
   Radio,
   Upload,
   CheckCircle2,
+  Sliders,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
 
 if (RNPlatform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+export type HookEffectType = 'rotation_zoom' | 'dramatic_zoom_in' | 'paradox_reveal' | 'context_cut' | 'detail_punch';
+
+export interface InlineEditState {
+  volumeIntensity: number;
+  hookEffect: HookEffectType;
+  beatSyncSensitivity: number;
+  sfxStyle: string;
+  captionText: string;
+  hashtags: string[];
 }
 
 interface AIProcessAccordionProps {
@@ -43,6 +56,9 @@ interface AIProcessAccordionProps {
   hashtags: string[];
   captionPreview: string;
   analysisStatus: 'idle' | 'processing' | 'done' | 'error';
+  editState: InlineEditState;
+  onEditChange: (patch: Partial<InlineEditState>) => void;
+  onRemoveHashtag: (tag: string) => void;
 }
 
 const STEP_META = [
@@ -51,12 +67,29 @@ const STEP_META = [
   { key: 'rendering', label: '플랫폼 렌더링 & 메타데이터', icon: Upload, color: theme.colors.warning[400] },
 ] as const;
 
+const HOOK_EFFECTS: { key: HookEffectType; label: string }[] = [
+  { key: 'rotation_zoom', label: '사물 회전' },
+  { key: 'dramatic_zoom_in', label: '극적 줌인' },
+  { key: 'paradox_reveal', label: '호기심 유발' },
+  { key: 'context_cut', label: '맥락 컷 전환' },
+  { key: 'detail_punch', label: '디테일 클로즈업' },
+];
+
+const SFX_STYLES = ['감성', '하이텐션', 'ASMR', '시네마틱', '미니멀'];
+
+const HOOK_LABELS: Record<string, string> = {
+  rotation_zoom: '3D 회전 줌인',
+  dramatic_zoom_in: '극적 줌인',
+  paradox_reveal: '패러독스 반전',
+  context_cut: '맥락 컷 전환',
+  detail_punch: '디테일 클로즈업',
+};
+
 export function AIProcessAccordion({
   synthesisStrategy,
   volumeConfidence,
   contextLabel,
   processingSteps,
-  hookTransitionType,
   hookDescription,
   sfxCount,
   killPointCount,
@@ -67,9 +100,10 @@ export function AIProcessAccordion({
   renderHeight,
   renderCodec,
   renderFps,
-  hashtags,
-  captionPreview,
   analysisStatus,
+  editState,
+  onEditChange,
+  onRemoveHashtag,
 }: AIProcessAccordionProps) {
   const [expanded, setExpanded] = useState(false);
   const [openStep, setOpenStep] = useState<number | null>(0);
@@ -86,15 +120,15 @@ export function AIProcessAccordion({
 
   const confidencePct = Math.round(volumeConfidence * 100);
   const isProcessing = analysisStatus === 'processing';
+  const hookLabel = HOOK_LABELS[editState.hookEffect] ?? editState.hookEffect;
 
-  const hookTypeLabel: Record<string, string> = {
-    rotation_zoom: '3D 회전 줌인',
-    dramatic_zoom_in: '극적 줌인',
-    paradox_reveal: '패러독스 반전',
-    context_cut: '맥락 컷 전환',
-    detail_punch: '디테일 클로즈업',
-  };
-  const hookLabel = hookTypeLabel[hookTransitionType] ?? hookTransitionType;
+  const aspectLabel = renderWidth >= renderHeight
+    ? '1:1'
+    : renderHeight / renderWidth > 1.3
+      ? '9:16'
+      : '4:5';
+
+  const beatSensitivityPct = Math.round(editState.beatSyncSensitivity * 100);
 
   return (
     <View style={styles.container}>
@@ -192,6 +226,27 @@ export function AIProcessAccordion({
                   ))}
                 </View>
               )}
+              {/* Inline edit: volume intensity slider */}
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Sliders size={12} color={theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={styles.inlineEditLabel}>입체감 강도</Text>
+                  <Text style={styles.inlineEditValue}>{Math.round(editState.volumeIntensity * 100)}%</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.sliderTrack}
+                  onPress={(e) => {
+                    const { locationX } = e.nativeEvent;
+                    const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
+                    const ratio = Math.max(0, Math.min(1, locationX / w));
+                    onEditChange({ volumeIntensity: Math.round(ratio * 100) / 100 });
+                  }}
+                  activeOpacity={1}
+                >
+                  <View style={[styles.sliderFill, { width: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
+                  <View style={[styles.sliderThumb, { left: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
+                </TouchableOpacity>
+              </View>
             </View>
           </StepCard>
 
@@ -241,6 +296,81 @@ export function AIProcessAccordion({
                 </View>
               </View>
               <Text style={styles.timelineHint}>0s ─────────── 15s</Text>
+
+              {/* Inline edit: hook effect chips */}
+              <View style={styles.inlineEditBox}>
+                <Text style={styles.inlineEditLabel}>훅 효과 변경</Text>
+                <View style={styles.effectChipRow}>
+                  {HOOK_EFFECTS.map((eff) => (
+                    <TouchableOpacity
+                      key={eff.key}
+                      style={[
+                        styles.effectChip,
+                        editState.hookEffect === eff.key && styles.effectChipActive,
+                      ]}
+                      onPress={() => onEditChange({ hookEffect: eff.key })}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.effectChipText,
+                          editState.hookEffect === eff.key && styles.effectChipTextActive,
+                        ]}
+                      >
+                        {eff.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Inline edit: beat sync sensitivity */}
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Text style={styles.inlineEditLabel}>비트 싱크 감도</Text>
+                  <Text style={styles.inlineEditValue}>{beatSensitivityPct}%</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.sliderTrack}
+                  onPress={(e) => {
+                    const { locationX } = e.nativeEvent;
+                    const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
+                    const ratio = Math.max(0, Math.min(1, locationX / w));
+                    onEditChange({ beatSyncSensitivity: Math.round(ratio * 100) / 100 });
+                  }}
+                  activeOpacity={1}
+                >
+                  <View style={[styles.sliderFill, { width: `${beatSensitivityPct}%`, backgroundColor: theme.colors.accent[400] }]} />
+                  <View style={[styles.sliderThumb, { left: `${beatSensitivityPct}%` }]} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Inline edit: SFX style chips */}
+              <View style={styles.inlineEditBox}>
+                <Text style={styles.inlineEditLabel}>SFX 효과음 스타일</Text>
+                <View style={styles.effectChipRow}>
+                  {SFX_STYLES.map((style) => (
+                    <TouchableOpacity
+                      key={style}
+                      style={[
+                        styles.effectChip,
+                        editState.sfxStyle === style && styles.effectChipActive,
+                      ]}
+                      onPress={() => onEditChange({ sfxStyle: style })}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.effectChipText,
+                          editState.sfxStyle === style && styles.effectChipTextActive,
+                        ]}
+                      >
+                        {style}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
           </StepCard>
 
@@ -261,31 +391,48 @@ export function AIProcessAccordion({
                 </View>
                 <View style={styles.renderRow}>
                   <Text style={styles.renderLabel}>해상도</Text>
-                  <Text style={styles.renderValue}>{renderWidth}×{renderHeight} ({renderWidth >= renderHeight ? '1:1' : renderHeight / renderWidth > 1.3 ? '9:16' : '4:5'})</Text>
+                  <Text style={styles.renderValue}>{renderWidth}x{renderHeight} ({aspectLabel})</Text>
                 </View>
                 <View style={styles.renderRow}>
                   <Text style={styles.renderLabel}>코덱 / 프레임</Text>
-                  <Text style={styles.renderValue}>{renderCodec} · {renderFps}fps</Text>
+                  <Text style={styles.renderValue}>{renderCodec} . {renderFps}fps</Text>
                 </View>
               </View>
-              {hashtags.length > 0 && (
-                <View style={styles.metadataPreview}>
-                  <Text style={styles.metadataPreviewLabel}>AI 자동 해시태그</Text>
+
+              {/* Inline edit: caption text */}
+              <View style={styles.inlineEditBox}>
+                <Text style={styles.inlineEditLabel}>설명 문구 직접 수정</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editState.captionText}
+                  onChangeText={(text) => onEditChange({ captionText: text })}
+                  placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Inline edit: hashtag chips with remove */}
+              {editState.hashtags.length > 0 && (
+                <View style={styles.inlineEditBox}>
+                  <Text style={styles.inlineEditLabel}>해시태그 (탭하여 삭제)</Text>
                   <View style={styles.hashtagWrap}>
-                    {hashtags.slice(0, 8).map((tag, i) => (
-                      <View key={i} style={styles.hashtagChip}>
+                    {editState.hashtags.map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={styles.hashtagChip}
+                        onPress={() => onRemoveHashtag(tag)}
+                        activeOpacity={0.6}
+                      >
                         <Text style={styles.hashtagChipText}>#{tag}</Text>
-                      </View>
+                        <Text style={styles.hashtagRemoveX}> x</Text>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 </View>
               )}
-              {captionPreview ? (
-                <View style={styles.metadataPreview}>
-                  <Text style={styles.metadataPreviewLabel}>AI 생성 설명 미리보기</Text>
-                  <Text style={styles.captionPreviewText} numberOfLines={3}>{captionPreview}</Text>
-                </View>
-              ) : null}
             </View>
           </StepCard>
         </View>
@@ -593,22 +740,107 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
-  // Metadata preview
-  metadataPreview: {
-    marginTop: 4,
+  // Inline edit
+  inlineEditBox: {
+    backgroundColor: theme.colors.dark.bg + '50',
+    borderRadius: theme.radius.sm,
+    padding: 10,
+    marginTop: 2,
+    gap: 8,
   },
-  metadataPreviewLabel: {
+  inlineEditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  inlineEditLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  inlineEditValue: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  // Slider
+  sliderTrack: {
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.dark.border,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  sliderFill: {
+    position: 'absolute',
+    height: '100%',
+    borderRadius: 12,
+    backgroundColor: theme.colors.primary[400],
+    opacity: 0.5,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginLeft: -8,
+    marginTop: -8,
+    top: '50%',
+    ...({
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 2,
+    } as object),
+  },
+  // Effect chips
+  effectChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  effectChip: {
+    backgroundColor: theme.colors.dark.border + '60',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  effectChipActive: {
+    backgroundColor: theme.colors.primary[400],
+  },
+  effectChipText: {
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
-    marginBottom: 6,
   },
+  effectChipTextActive: {
+    color: '#fff',
+  },
+  // Text input
+  textInput: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 60,
+  },
+  // Hashtag chips
   hashtagWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
   },
   hashtagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: theme.colors.warning[400] + '18',
     borderRadius: 4,
     paddingHorizontal: 6,
@@ -619,10 +851,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.warning[400],
   },
-  captionPreviewText: {
-    fontSize: 11,
+  hashtagRemoveX: {
+    fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 16,
+    color: theme.colors.dark.textFaint,
   },
 });

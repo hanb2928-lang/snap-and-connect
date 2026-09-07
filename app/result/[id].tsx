@@ -116,7 +116,7 @@ import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
-import { AIProcessAccordion } from '@/components/AIProcessAccordion';
+import { AIProcessAccordion, type InlineEditState, type HookEffectType } from '@/components/AIProcessAccordion';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -161,6 +161,22 @@ export default function ResultScreen() {
   const [focusTileKey, setFocusTileKey] = useState<string | null>(null);
   const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
   const [cleanMode, setCleanMode] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState<InlineEditState>({
+    volumeIntensity: 0.75,
+    hookEffect: 'rotation_zoom' as HookEffectType,
+    beatSyncSensitivity: 0.6,
+    sfxStyle: '하이텐션',
+    captionText: '',
+    hashtags: [],
+  });
+
+  const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
+    setInlineEdit((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const handleInlineRemoveHashtag = useCallback((tag: string) => {
+    setAddedHashtags((prev) => prev.filter((t) => t !== tag));
+  }, []);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -540,9 +556,17 @@ export default function ResultScreen() {
   const td = activeTemplateData;
   const platformVariant = td?.platformVariants?.[activePlatform];
   const activeHook = hookOverride || platformVariant?.hook || td?.hook || '';
-  const activeCaption = platformVariant?.caption || td?.caption || '';
+  const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || '');
   const activeHashtags = platformVariant?.hashtags || td?.hashtags || [];
   const allDisplayHashtags = [...activeHashtags, ...addedHashtags];
+
+  useEffect(() => {
+    if (!scan) return;
+    const baseCaption = platformVariant?.caption || td?.caption || scan?.one_liner || scan?.summary || '';
+    if (!inlineEdit.captionText && baseCaption) {
+      setInlineEdit((prev) => ({ ...prev, captionText: baseCaption }));
+    }
+  }, [scan?.id, scan?.one_liner, scan?.summary, platformVariant?.caption, td?.caption]);
 
   const isLinkRestrictedPlatform = activePlatform === 'instagram' || activePlatform === 'shortform';
   const commentCta = isLinkRestrictedPlatform && shortUrl ? '\n\n댓글창 링크 확인' : '';
@@ -1741,6 +1765,16 @@ export default function ResultScreen() {
           hashtags={allDisplayHashtags}
           captionPreview={activeCaption || activeOneLiner || scan?.summary || ''}
           analysisStatus={analysisStatus}
+          editState={{
+            volumeIntensity: inlineEdit.volumeIntensity,
+            hookEffect: inlineEdit.hookEffect,
+            beatSyncSensitivity: inlineEdit.beatSyncSensitivity,
+            sfxStyle: inlineEdit.sfxStyle,
+            captionText: inlineEdit.captionText || (activeCaption || activeOneLiner || scan?.summary || ''),
+            hashtags: allDisplayHashtags,
+          }}
+          onEditChange={handleInlineEdit}
+          onRemoveHashtag={handleInlineRemoveHashtag}
         />
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
