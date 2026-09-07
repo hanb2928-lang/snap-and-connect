@@ -10,7 +10,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { Camera, Check, X, RotateCcw, ChevronRight, Image as ImageIcon, Loader } from 'lucide-react-native';
+import { Camera, Check, X, RotateCcw, ChevronRight, Image as ImageIcon, Loader, Scissors } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
 
@@ -63,21 +63,22 @@ export function MultiAngleCaptureGuide({
   const [currentAngle, setCurrentAngle] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [sourceMode, setSourceMode] = useState<'camera' | 'gallery'>('camera');
+  const [bgProcessingAngle, setBgProcessingAngle] = useState<string | null>(null);
   const pickLockRef = useRef(false);
 
   const completedCount = Object.keys(shots).length;
   const allDone = completedCount >= ANGLE_GUIDES.length;
 
   const handleAddShot = useCallback(
-    (angleId: string, base64: string, mimeType: string) => {
+    async (angleId: string, base64: string, mimeType: string) => {
       const guideIndex = ANGLE_GUIDES.findIndex((g) => g.id === angleId);
       const guide = ANGLE_GUIDES[guideIndex];
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
       setShots((prev) => {
         const next = { ...prev };
-        // Free the previous data URL if replacing an existing shot
         const prevShot = next[angleId];
         if (prevShot?.dataUrl) {
-          // Allow GC to reclaim the old string
           prevShot.dataUrl = undefined;
           prevShot.base64 = undefined;
         }
@@ -87,11 +88,39 @@ export function MultiAngleCaptureGuide({
           label: guide.label,
           hint: guide.hint,
           base64,
-          dataUrl: `data:${mimeType};base64,${base64}`,
+          dataUrl,
           mimeType,
         };
         return next;
       });
+
+      // Background: run smart cutout (nukkki) + alignment for 3D synthesis accuracy
+      if (Platform.OS === 'web') {
+        setBgProcessingAngle(angleId);
+        try {
+          const { removeBackgroundOnDevice } = await import('@/lib/removeBgOnDevice');
+          const result = await removeBackgroundOnDevice(dataUrl);
+          if (result.ok) {
+            const cleanB64 = result.dataUrl.split(',')[1] || base64;
+            setShots((prev) => {
+              const next = { ...prev };
+              const existing = next[angleId];
+              if (existing) {
+                next[angleId] = {
+                  ...existing,
+                  base64: cleanB64,
+                  dataUrl: result.dataUrl,
+                  mimeType: 'image/png',
+                };
+              }
+              return next;
+            });
+          }
+        } catch {
+          // Skip bg removal on failure - keep original
+        }
+        setBgProcessingAngle(null);
+      }
     },
     [],
   );
@@ -204,13 +233,23 @@ export function MultiAngleCaptureGuide({
                     </View>
                     {shot && (
                       <View style={styles.doneBadge}>
-                        <Check size={12} color="#fff" strokeWidth={2.5} />
+                        {bgProcessingAngle === guide.id ? (
+                          <Loader size={12} color="#fff" strokeWidth={2.5} />
+                        ) : (
+                          <Check size={12} color="#fff" strokeWidth={2.5} />
+                        )}
                       </View>
                     )}
                   </View>
 
                   {shot?.dataUrl ? (
                     <View style={styles.shotPreview}>
+                      {bgProcessingAngle === guide.id && (
+                        <View style={styles.bgProcessingOverlay}>
+                          <Scissors size={18} color="#fff" strokeWidth={2} />
+                          <Text style={styles.bgProcessingText}>스마트 누끼 처리 중...</Text>
+                        </View>
+                      )}
                       <RNImage source={{ uri: shot.dataUrl }} style={styles.shotImage} resizeMode="cover" />
                       <View style={styles.shotIndexBadge}>
                         <Text style={styles.shotIndexText}>{String(idx + 1).padStart(2, '0')}</Text>
@@ -557,5 +596,22 @@ const styles = StyleSheet.create({
   },
   completeBtnTextDisabled: {
     color: theme.colors.dark.textFaint,
+  },
+  bgProcessingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 10,
+  },
+  bgProcessingText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
 });

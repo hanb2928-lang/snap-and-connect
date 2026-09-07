@@ -61,6 +61,9 @@ import {
 } from '@/lib/platformManager';
 import type { PlatformSpec } from '@/lib/platformSpecs';
 import { mixBgmIntoVideo, fetchBgmRecommendation, type BgmRecommendation } from '@/lib/bgmEngine';
+import { runSynthesis, getSynthesisSummary, type AngleInput } from '@/lib/aiSynthesisEngine';
+import { buildDirectingPlan, getDirectingSummary } from '@/lib/directingEngine';
+import { buildMultiPlatformPublishPlans, type PublishTarget } from '@/lib/publishManager';
 
 type PlatformOption = {
   key: string;
@@ -303,6 +306,23 @@ export function PostCaptureWorkflow({
   const fusionInfo = useMemo(() => describeMultiAngleFusion(imageUri ? 1 : 0), [imageUri]);
   const retentionFormula = useMemo(() => getRetentionFormula(selectedOption.key), [selectedOption.key]);
 
+  const synthesisResult = useMemo(() => {
+    const angles: AngleInput[] = imageUri
+      ? [{ key: 'front', label: '정면', base64: '', mimeType: 'image/jpeg', orderIndex: 0 }]
+      : [];
+    return runSynthesis(angles, customPrompt);
+  }, [imageUri, customPrompt]);
+
+  const directingPlan = useMemo(
+    () => buildDirectingPlan(editPlan.segments, editPlan.bgmTemplate, synthesisResult.contextMatch.context, selectedOption.key),
+    [editPlan.segments, editPlan.bgmTemplate, synthesisResult.contextMatch.context, selectedOption.key],
+  );
+
+  const publishPlans = useMemo(
+    () => buildMultiPlatformPublishPlans(customPrompt.trim() || '이 제품', synthesisResult.contextMatch.context),
+    [customPrompt, synthesisResult.contextMatch.context],
+  );
+
   const handleSaveToGallery = useCallback(async () => {
     const uri = videoUri || (imageUri || null);
     if (!uri) return;
@@ -518,6 +538,26 @@ export function PostCaptureWorkflow({
                 </View>
               </View>
             )}
+            <View style={styles.synthesisBox}>
+              <Text style={styles.synthesisTitle}>Phase 2 · AI 입체 분석 & 3D 신세시스</Text>
+              <Text style={styles.synthesisSummary}>{getSynthesisSummary(synthesisResult)}</Text>
+              <View style={styles.synthesisStepsWrap}>
+                {synthesisResult.processingSteps.map((step, i) => (
+                  <View key={`syn-${i}`} style={styles.synthesisStepRow}>
+                    <View style={styles.synthesisStepDot} />
+                    <Text style={styles.synthesisStepText}>{step}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.synthesisMetaRow}>
+                <Text style={styles.synthesisMetaLabel}>사용 맥락</Text>
+                <Text style={styles.synthesisMetaVal}>{synthesisResult.contextMatch.label} · {synthesisResult.contextMatch.description}</Text>
+              </View>
+              <View style={styles.synthesisMetaRow}>
+                <Text style={styles.synthesisMetaLabel}>볼륨 추정</Text>
+                <Text style={styles.synthesisMetaVal}>W {Math.round(synthesisResult.volumeEstimate.widthRatio*100)}% · H {Math.round(synthesisResult.volumeEstimate.heightRatio*100)}% · D {Math.round(synthesisResult.volumeEstimate.depthRatio*100)}%</Text>
+              </View>
+            </View>
             {retentionFormula && (
               <View style={styles.retentionBox}>
                 <View style={styles.retentionHeader}>
@@ -596,6 +636,39 @@ export function PostCaptureWorkflow({
 
           {/* Step 2: AI Conversion Style Selection */}
           <VerticalStepCard stepNum={2} title="AI 변환 스타일 & 연출 선택" subtitle="유튜브 상위 1% 몰입 연출 기법 적용">
+            <View style={styles.directingBox}>
+              <Text style={styles.directingTitle}>Phase 3 · 유튜브 상위 1% 심리 리듬 연출</Text>
+              <Text style={styles.directingSummary}>{getDirectingSummary(directingPlan)}</Text>
+              <View style={styles.directingHookRow}>
+                <Text style={styles.directingHookLabel}>오프닝 훅</Text>
+                <Text style={styles.directingHookVal}>{directingPlan.hookTransition.description}</Text>
+              </View>
+              <View style={styles.directingTransitionsWrap}>
+                {directingPlan.transitions.map((t, i) => (
+                  <View key={`tr-${i}`} style={styles.directingTransitionRow}>
+                    <View style={styles.directingTransitionDot} />
+                    <Text style={styles.directingTransitionText}>{t.startSec}s · {t.description}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.directingSfxRow}>
+                {directingPlan.sfxPlans.map((s, i) => (
+                  <View key={`sfx-${i}`} style={styles.sfxChip}>
+                    <Text style={styles.sfxChipText}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.directingKillPointsWrap}>
+                <Text style={styles.directingKillPointsTitle}>킬링 포인트 자막</Text>
+                {directingPlan.killPointCaptions.map((c, i) => (
+                  <View key={`kp-${i}`} style={styles.killPointRow}>
+                    <Text style={styles.killPointTime}>{c.startSec}-{c.endSec}s</Text>
+                    <Text style={[styles.killPointText, c.emphasis && styles.killPointTextEmphasis]}>{c.text}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.directingBeatInfo}>BGM 비트 싱크: {directingPlan.beatSync.bpm}BPM · 컷 전환 {directingPlan.beatSync.cutPoints.length}회 · 하이라이트 {directingPlan.beatSync.highlightStartSec}-{directingPlan.beatSync.highlightStartSec + directingPlan.beatSync.highlightDurationSec}s</Text>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
               {CONVERSION_MODES.map((mode) => {
                 const ModeIcon = mode.icon;
@@ -784,6 +857,26 @@ export function PostCaptureWorkflow({
 
           {/* Step 4: Custom Link Management + Save & Publish */}
           <VerticalStepCard stepNum={4} title="맞춤 링크 & 발행" subtitle="링크를 추가하고 저장·발행하세요">
+            <View style={styles.publishBox}>
+              <Text style={styles.publishTitle}>Phase 4 · 원클릭 멀티플랫폼 퍼블리시</Text>
+              {publishPlans.map((plan) => (
+                <View key={plan.target} style={styles.publishPlatformCard}>
+                  <View style={styles.publishPlatformHeader}>
+                    <Text style={styles.publishPlatformLabel}>{plan.render.label}</Text>
+                    <Text style={styles.publishPlatformSpec}>{plan.render.width}x{plan.render.height} · {plan.render.codec} · {plan.render.fps}fps</Text>
+                  </View>
+                  <Text style={styles.publishMetaTitle} numberOfLines={1}>{plan.metadata.title}</Text>
+                  <Text style={styles.publishMetaDesc} numberOfLines={2}>{plan.metadata.description}</Text>
+                  <View style={styles.publishHashtagRow}>
+                    {plan.metadata.hashtags.slice(0, 5).map((tag, i) => (
+                      <View key={`ht-${i}`} style={styles.hashtagChip}>
+                        <Text style={styles.hashtagChipText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={handleSaveToGallery}
@@ -1797,5 +1890,229 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     marginTop: 2,
+  },
+  synthesisBox: {
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '0D',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[500] + '25',
+    padding: 12,
+    marginBottom: 10,
+    gap: 6,
+  },
+  synthesisTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[400],
+  },
+  synthesisSummary: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  synthesisStepsWrap: {
+    gap: 3,
+    marginTop: 2,
+  },
+  synthesisStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  synthesisStepDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: theme.colors.primary[400],
+  },
+  synthesisStepText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  synthesisMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  synthesisMetaLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textFaint,
+    minWidth: 52,
+  },
+  synthesisMetaVal: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  directingBox: {
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warning[500] + '0D',
+    borderWidth: 1.5,
+    borderColor: theme.colors.warning[500] + '25',
+    padding: 12,
+    marginBottom: 10,
+    gap: 6,
+  },
+  directingTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  directingSummary: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  directingHookRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+  },
+  directingHookLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textFaint,
+    minWidth: 52,
+  },
+  directingHookVal: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  directingTransitionsWrap: {
+    gap: 3,
+    marginTop: 2,
+  },
+  directingTransitionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  directingTransitionDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: theme.colors.warning[400],
+  },
+  directingTransitionText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  directingSfxRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  sfxChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.warning[500] + '18',
+  },
+  sfxChipText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  directingKillPointsWrap: {
+    marginTop: 4,
+    gap: 3,
+  },
+  directingKillPointsTitle: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textFaint,
+  },
+  killPointRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  killPointTime: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    minWidth: 48,
+  },
+  killPointText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  killPointTextEmphasis: {
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  directingBeatInfo: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    marginTop: 4,
+  },
+  publishBox: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  publishTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
+  publishPlatformCard: {
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    padding: 10,
+    gap: 4,
+  },
+  publishPlatformHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  publishPlatformLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  publishPlatformSpec: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  publishMetaTitle: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  publishMetaDesc: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 13,
+  },
+  publishHashtagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginTop: 2,
+  },
+  hashtagChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.success[500] + '15',
+  },
+  hashtagChipText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.success[400],
   },
 });
