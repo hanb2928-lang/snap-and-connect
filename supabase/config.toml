@@ -82,3 +82,6 @@ verify_jwt = false
 [functions.recommend-bgm]
 verify_jwt = false
 
+[functions.stereo-cut-auto]
+verify_jwt = false
+
