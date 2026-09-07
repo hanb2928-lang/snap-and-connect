@@ -168,7 +168,14 @@ export default function ResultScreen() {
     sfxStyle: '하이텐션',
     captionText: '',
     hashtags: [],
+    videoTemplate: '트렌디 쇼핑',
+    captionFont: '고딕 굵게',
+    captionPosition: '하단 고정',
+    bgmMood: '하이텐션',
+    aiPrompt: '',
+    titleText: '',
   });
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -177,6 +184,42 @@ export default function ResultScreen() {
   const handleInlineRemoveHashtag = useCallback((tag: string) => {
     setAddedHashtags((prev) => prev.filter((t) => t !== tag));
   }, []);
+
+  const handleRegenerate = useCallback(async () => {
+    if (!scan || isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      const promptParts = [
+        `템플릿: ${inlineEdit.videoTemplate}`,
+        `자막: ${inlineEdit.captionFont} / ${inlineEdit.captionPosition}`,
+        `BGM: ${inlineEdit.bgmMood}`,
+        `훅: ${inlineEdit.hookEffect}`,
+        inlineEdit.aiPrompt ? `추가: ${inlineEdit.aiPrompt}` : '',
+      ].filter(Boolean);
+      const { data, error } = await supabase.functions.invoke('generate-copy', {
+        body: {
+          scanId: scan.id,
+          platform: activePlatform,
+          productName: scan.product_name || '',
+          extraPrompt: promptParts.join(' | '),
+        },
+      });
+      if (error) throw error;
+      if (mountedRef.current && data) {
+        const result = data as { caption?: string; hook?: string; title?: string };
+        if (result.caption) {
+          setAutoMarketingCopy(result.caption);
+          setInlineEdit((prev) => ({ ...prev, captionText: result.caption! }));
+        }
+        if (result.hook) setHookOverride(result.hook);
+        if (result.title) setInlineEdit((prev) => ({ ...prev, titleText: result.title! }));
+      }
+    } catch {
+      // regeneration failed — keep current content
+    } finally {
+      if (mountedRef.current) setIsRegenerating(false);
+    }
+  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, activePlatform]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -566,7 +609,11 @@ export default function ResultScreen() {
     if (!inlineEdit.captionText && baseCaption) {
       setInlineEdit((prev) => ({ ...prev, captionText: baseCaption }));
     }
-  }, [scan?.id, scan?.one_liner, scan?.summary, platformVariant?.caption, td?.caption]);
+    if (!inlineEdit.titleText) {
+      const baseTitle = scan.title || activeProductName || td?.hook || '';
+      if (baseTitle) setInlineEdit((prev) => ({ ...prev, titleText: baseTitle }));
+    }
+  }, [scan?.id, scan?.one_liner, scan?.summary, scan?.title, platformVariant?.caption, td?.caption, td?.hook, activeProductName]);
 
   const isLinkRestrictedPlatform = activePlatform === 'instagram' || activePlatform === 'shortform';
   const commentCta = isLinkRestrictedPlatform && shortUrl ? '\n\n댓글창 링크 확인' : '';
@@ -1772,9 +1819,17 @@ export default function ResultScreen() {
             sfxStyle: inlineEdit.sfxStyle,
             captionText: inlineEdit.captionText || (activeCaption || activeOneLiner || scan?.summary || ''),
             hashtags: allDisplayHashtags,
+            videoTemplate: inlineEdit.videoTemplate,
+            captionFont: inlineEdit.captionFont,
+            captionPosition: inlineEdit.captionPosition,
+            bgmMood: inlineEdit.bgmMood,
+            aiPrompt: inlineEdit.aiPrompt,
+            titleText: inlineEdit.titleText,
           }}
           onEditChange={handleInlineEdit}
           onRemoveHashtag={handleInlineRemoveHashtag}
+          onRegenerate={handleRegenerate}
+          isRegenerating={isRegenerating}
         />
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (

@@ -17,6 +17,11 @@ import {
   Upload,
   CheckCircle2,
   Sliders,
+  Video,
+  Type,
+  Music,
+  Wand2,
+  RefreshCw,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
@@ -34,6 +39,12 @@ export interface InlineEditState {
   sfxStyle: string;
   captionText: string;
   hashtags: string[];
+  videoTemplate: string;
+  captionFont: string;
+  captionPosition: string;
+  bgmMood: string;
+  aiPrompt: string;
+  titleText: string;
 }
 
 interface AIProcessAccordionProps {
@@ -59,6 +70,8 @@ interface AIProcessAccordionProps {
   editState: InlineEditState;
   onEditChange: (patch: Partial<InlineEditState>) => void;
   onRemoveHashtag: (tag: string) => void;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
 }
 
 const STEP_META = [
@@ -76,6 +89,14 @@ const HOOK_EFFECTS: { key: HookEffectType; label: string }[] = [
 ];
 
 const SFX_STYLES = ['감성', '하이텐션', 'ASMR', '시네마틱', '미니멀'];
+
+const VIDEO_TEMPLATES = ['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'];
+
+const CAPTION_FONTS = ['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'];
+
+const CAPTION_POSITIONS = ['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'];
+
+const BGM_MOODS = ['하이텐션', '시네마틱', 'ASMR', '감성', '로파이', '트렌디'];
 
 const HOOK_LABELS: Record<string, string> = {
   rotation_zoom: '3D 회전 줌인',
@@ -104,6 +125,8 @@ export function AIProcessAccordion({
   editState,
   onEditChange,
   onRemoveHashtag,
+  onRegenerate,
+  isRegenerating,
 }: AIProcessAccordionProps) {
   const [expanded, setExpanded] = useState(false);
   const [openStep, setOpenStep] = useState<number | null>(0);
@@ -397,6 +420,126 @@ export function AIProcessAccordion({
                   <Text style={styles.renderLabel}>코덱 / 프레임</Text>
                   <Text style={styles.renderValue}>{renderCodec} . {renderFps}fps</Text>
                 </View>
+              </View>
+
+              {/* AI 가상 영상 편집 컨트롤 */}
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Video size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+                  <Text style={styles.inlineEditLabel}>영상 템플릿 스타일</Text>
+                </View>
+                <View style={styles.effectChipRow}>
+                  {VIDEO_TEMPLATES.map((tmpl) => (
+                    <TouchableOpacity
+                      key={tmpl}
+                      style={[styles.effectChip, editState.videoTemplate === tmpl && styles.effectChipActive]}
+                      onPress={() => onEditChange({ videoTemplate: tmpl })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.effectChipText, editState.videoTemplate === tmpl && styles.effectChipTextActive]}>
+                        {tmpl}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Type size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+                  <Text style={styles.inlineEditLabel}>자막 스타일</Text>
+                </View>
+                <View style={styles.effectChipRow}>
+                  {CAPTION_FONTS.map((font) => (
+                    <TouchableOpacity
+                      key={font}
+                      style={[styles.effectChip, editState.captionFont === font && styles.effectChipActive]}
+                      onPress={() => onEditChange({ captionFont: font })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.effectChipText, editState.captionFont === font && styles.effectChipTextActive]}>
+                        {font}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.effectChipRow}>
+                  {CAPTION_POSITIONS.map((pos) => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={[styles.effectChip, editState.captionPosition === pos && styles.effectChipActive]}
+                      onPress={() => onEditChange({ captionPosition: pos })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.effectChipText, editState.captionPosition === pos && styles.effectChipTextActive]}>
+                        {pos}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Music size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+                  <Text style={styles.inlineEditLabel}>BGM 분위기</Text>
+                </View>
+                <View style={styles.effectChipRow}>
+                  {BGM_MOODS.map((mood) => (
+                    <TouchableOpacity
+                      key={mood}
+                      style={[styles.effectChip, editState.bgmMood === mood && styles.effectChipActive]}
+                      onPress={() => onEditChange({ bgmMood: mood })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.effectChipText, editState.bgmMood === mood && styles.effectChipTextActive]}>
+                        {mood}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* AI 가상 영상 생성 프롬프트 */}
+              <View style={styles.inlineEditBox}>
+                <View style={styles.inlineEditHeader}>
+                  <Wand2 size={12} color={theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={styles.inlineEditLabel}>AI 가상 영상 프롬프트</Text>
+                </View>
+                <TextInput
+                  style={styles.textInput}
+                  value={editState.aiPrompt}
+                  onChangeText={(text) => onEditChange({ aiPrompt: text })}
+                  placeholder="원하는 연출 분위기나 강조 사항을 입력하세요 (예: 따뜻한 색감, 천천히 줌인)"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+                <TouchableOpacity
+                  style={[styles.regenerateBtn, isRegenerating && styles.regenerateBtnDisabled]}
+                  onPress={onRegenerate}
+                  disabled={isRegenerating}
+                  activeOpacity={0.7}
+                >
+                  <RefreshCw size={13} color={isRegenerating ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
+                  <Text style={[styles.regenerateBtnText, isRegenerating && styles.regenerateBtnTextDisabled]}>
+                    {isRegenerating ? '재생성 중...' : '재생성'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Inline edit: title text */}
+              <View style={styles.inlineEditBox}>
+                <Text style={styles.inlineEditLabel}>타이틀 (유튜브/릴스용)</Text>
+                <TextInput
+                  style={styles.textInputSingle}
+                  value={editState.titleText}
+                  onChangeText={(text) => onEditChange({ titleText: text })}
+                  placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  numberOfLines={1}
+                />
               </View>
 
               {/* Inline edit: caption text */}
@@ -855,5 +998,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  // Regenerate button
+  regenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[400],
+    borderRadius: theme.radius.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  regenerateBtnDisabled: {
+    backgroundColor: theme.colors.dark.border,
+  },
+  regenerateBtnText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  regenerateBtnTextDisabled: {
+    color: theme.colors.dark.textFaint,
+  },
+  // Single-line text input
+  textInputSingle: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
   },
 });
