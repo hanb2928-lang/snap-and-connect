@@ -707,27 +707,24 @@ export default function ResultScreen() {
         }
       }
 
+      // Gallery save succeeded — reset progress after brief success flash
       setUploadProgress(100);
       setUploadDone(true);
-      setTimeout(() => {
+      const resetTimer = setTimeout(() => {
         setUploadProgress(null);
         setUploadDone(false);
       }, 2500);
 
-      // 2) Cloud upload + asset record (secondary, non-blocking)
+      // 2) Cloud upload + asset record (secondary, non-blocking, silent)
       (async () => {
         try {
           let cloudUrl: string | null = null;
           if (Platform.OS === 'web') {
             const res = await fetch(uri);
             const blob = await res.blob();
-            cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'image/png', (pct) => {
-              setUploadProgress(pct);
-            });
+            cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'image/png', () => {});
           } else {
-            cloudUrl = await uploadAssetFromFileUriWithProgress(uri, fileName, 'image/png', (pct) => {
-              setUploadProgress(pct);
-            });
+            cloudUrl = await uploadAssetFromFileUriWithProgress(uri, fileName, 'image/png', () => {});
           }
           if (cloudUrl) {
             await saveAssetRecord({
@@ -742,6 +739,10 @@ export default function ResultScreen() {
           }
         } catch {
           // Cloud save is secondary; gallery export already succeeded
+        } finally {
+          if (fallbackObjectUrl && Platform.OS === 'web') {
+            URL.revokeObjectURL(fallbackObjectUrl);
+          }
         }
       })();
 
@@ -767,7 +768,6 @@ export default function ResultScreen() {
         ? saveError.message
         : '미리보기 캡처에 실패했습니다. 다시 시도해주세요.';
       setUploadError(message);
-    } finally {
       if (fallbackObjectUrl && Platform.OS === 'web') {
         URL.revokeObjectURL(fallbackObjectUrl);
       }
