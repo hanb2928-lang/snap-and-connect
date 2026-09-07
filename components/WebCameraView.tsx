@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
@@ -9,6 +9,11 @@ import { prepareImageForApi } from '@/lib/imageEdit';
 const ONECLICK_MAX_DURATION_S = 15;
 
 export type CaptureModeType = 'oneclick' | 'single' | 'video';
+
+export interface WebCameraHandle {
+  captureFrame: () => Promise<{ base64: string; mimeType: string } | null>;
+  isReady: () => boolean;
+}
 
 interface WebCameraViewProps {
   onCapture: (base64: string, mimeType: string) => void;
@@ -37,7 +42,7 @@ const ALL_MODE_META: { key: CaptureModeType; label: string; icon: typeof Zap; de
 const MODE_META = (role: 'template' | 'video'): typeof ALL_MODE_META =>
   role === 'video' ? [] : ALL_MODE_META;
 
-export function WebCameraView({
+export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(function WebCameraView({
   onCapture,
   onPickImage,
   isActive,
@@ -52,7 +57,7 @@ export function WebCameraView({
   onMultiAnglePress,
   cameraRole = 'template',
   simplified = false,
-}: WebCameraViewProps) {
+}, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -178,6 +183,16 @@ export function WebCameraView({
       setCapturing(false);
     }
   }, [cameraReady, facing]);
+
+  useImperativeHandle(ref, () => ({
+    captureFrame: async () => {
+      const result = await captureFrame();
+      if (!result) return null;
+      const [mimeType, base64] = result.split('|');
+      return { base64, mimeType };
+    },
+    isReady: () => cameraReady,
+  }), [captureFrame, cameraReady]);
 
   const stopRecording = useCallback((): Promise<void> => {
     return new Promise((resolve) => {
@@ -547,7 +562,7 @@ export function WebCameraView({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

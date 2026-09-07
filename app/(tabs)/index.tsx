@@ -34,7 +34,7 @@ import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { WebCameraView, type CaptureModeType } from '@/components/WebCameraView';
+import { WebCameraView, type CaptureModeType, type WebCameraHandle } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
@@ -64,6 +64,7 @@ export default function CameraScreen() {
   const bottomInset = Math.max(safeInsets.bottom, 0);
   const isMountedRef = useRef(true);
   const cameraRef = useRef<CameraView>(null);
+  const webCameraRef = useRef<WebCameraHandle>(null);
   const autoSaveStepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSavePulse = useSharedValue(1);
   const [permission, requestPermission] = useCameraPermissions();
@@ -471,12 +472,23 @@ export default function CameraScreen() {
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
-      // On web, always use the file picker with camera capture attribute.
-      // The hidden <video> behind the modal is unreliable and invisible to the user.
+      // Try live camera stream first — this is the real camera preview the user sees
+      if (webCameraRef.current?.isReady()) {
+        try {
+          const result = await withTimeout(
+            webCameraRef.current.captureFrame(),
+            CAPTURE_TIMEOUT_MS,
+            '카메라 캡처',
+          );
+          if (result?.base64) return result;
+        } catch {
+          // Fall through to file picker
+        }
+      }
+      // Fallback: file picker with camera capture attribute (mobile browsers)
       try {
         const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '카메라 캡처');
         if (images.length === 0) return null;
-        // pickImageWeb already resizes/compresses — no need for a second pass
         return { base64: images[0].base64, mimeType: images[0].mimeType };
       } catch {
         return null;
@@ -629,6 +641,7 @@ export default function CameraScreen() {
 
         <View style={styles.cameraPreviewWrap}>
           <WebCameraView
+            ref={webCameraRef}
             onCapture={handleWebCapture}
             onPickImage={handlePickImage}
             isActive={isActive}
