@@ -116,6 +116,7 @@ import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
+import { AIProcessAccordion } from '@/components/AIProcessAccordion';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1696,6 +1697,40 @@ export default function ResultScreen() {
             }
           }}
           onSaveAndShare={handleSaveAndShare}
+        />
+
+        <AIProcessAccordion
+          synthesisStrategy={td?.category || '스테레오 복원'}
+          volumeConfidence={td?.psychologyInsight ? 0.82 : 0.68}
+          contextLabel={td?.category || '제품'}
+          processingSteps={[
+            '5각도 이미지 정합 및 특점 추출',
+            '3D 볼륨 역산 및 깊이 맵 생성',
+            '각도 간 보간 프레임合成',
+          ]}
+          hookTransitionType={td?.psychologyInsight?.primaryTrigger || 'rotation_zoom'}
+          hookDescription={activeHook || '초반 3초 사물 회전与 줌인으로 시선 강타'}
+          sfxCount={3}
+          killPointCount={4}
+          beatSyncBpm={128}
+          cutPointCount={6}
+          activePlatform={activePlatform}
+          platformLabel={
+            activePlatform === 'shortform' ? '숏폼·틱톡' :
+            activePlatform === 'instagram' ? '인스타그램' :
+            activePlatform === 'naverBlog' ? '네이버 블로그' :
+            activePlatform === 'threads' ? '스레드' :
+            activePlatform === 'twitter' ? 'X(트위터)' :
+            activePlatform === 'pinterest' ? '핀터레스트' :
+            activePlatform === 'smartstore' ? '스마트스토어' : '숏폼'
+          }
+          renderWidth={1080}
+          renderHeight={1920}
+          renderCodec="H.264"
+          renderFps={30}
+          hashtags={allDisplayHashtags}
+          captionPreview={activeCaption || activeOneLiner || scan?.summary || ''}
+          analysisStatus={analysisStatus}
         />
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
