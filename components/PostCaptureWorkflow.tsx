@@ -34,6 +34,8 @@ import {
   Plus,
   Trash2,
   Smartphone,
+  Shirt,
+  Video,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDeepLink } from '@/lib/platformUpload';
@@ -108,6 +110,13 @@ interface PostCaptureWorkflowProps {
 }
 
 type WorkflowStep = 0 | 1 | 2 | 3;
+type ConversionMode = 'shortform' | 'ai_video' | 'virtual_fitting';
+
+const CONVERSION_MODES: { key: ConversionMode; label: string; desc: string; icon: typeof Video }[] = [
+  { key: 'shortform', label: '기본 숏폼', desc: '15초 숏폼 자동 편집', icon: Video },
+  { key: 'ai_video', label: 'AI 영상 변환', desc: '사진을 영상으로 AI 변환', icon: Wand2 },
+  { key: 'virtual_fitting', label: '가상 피팅', desc: '의류 착용 피팅 영상', icon: Shirt },
+];
 
 export function PostCaptureWorkflow({
   visible,
@@ -139,6 +148,7 @@ export function PostCaptureWorkflow({
   const [addError, setAddError] = useState<string | null>(null);
   const [bgmRecommendation, setBgmRecommendation] = useState<BgmRecommendation | null>(null);
   const [bgmLoading, setBgmLoading] = useState(false);
+  const [conversionMode, setConversionMode] = useState<ConversionMode>('shortform');
 
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
@@ -541,6 +551,49 @@ export function PostCaptureWorkflow({
             expanded={activeStep === 2}
             onToggle={() => handleStepToggle(2)}
           >
+            <View style={styles.conversionModeWrap}>
+              <View style={styles.conversionModeLabelRow}>
+                <Wand2 size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.conversionModeLabel}>AI 변환 스타일 선택</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
+                {CONVERSION_MODES.map((mode) => {
+                  const ModeIcon = mode.icon;
+                  const isActive = conversionMode === mode.key;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      style={[styles.conversionModeChip, isActive && styles.conversionModeChipActive]}
+                      onPress={() => setConversionMode(mode.key)}
+                      activeOpacity={0.7}
+                    >
+                      <ModeIcon size={18} color={isActive ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                      <View style={styles.conversionModeTextWrap}>
+                        <Text style={[styles.conversionModeChipText, isActive && styles.conversionModeChipTextActive]}>{mode.label}</Text>
+                        <Text style={styles.conversionModeChipDesc}>{mode.desc}</Text>
+                      </View>
+                      {isActive && <Check size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              {conversionMode === 'ai_video' && (
+                <Text style={styles.conversionModeHint}>
+                  선택한 사진을 AI가 자동으로 카메라 무빙, 줌인/아웃, 전환 효과가 포함된 15초 영상으로 변환합니다. 프롬프트로 원하는 무드를 지정할 수 있습니다.
+                </Text>
+              )}
+              {conversionMode === 'virtual_fitting' && (
+                <Text style={styles.conversionModeHint}>
+                  의류/제품 사진과 모델 사진을 업로드하면 AI가 가상 착용 피팅 영상을 생성합니다. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.
+                </Text>
+              )}
+              {conversionMode === 'shortform' && (
+                <Text style={styles.conversionModeHint}>
+                  촬영한 원본 영상/사진을 그대로 15초 숏폼으로 자동 편집합니다. 가장 빠르고 리얼한 결과가 필요할 때 선택하세요.
+                </Text>
+              )}
+            </View>
+
             <View style={styles.promptLabelRow}>
               <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
               <Text style={styles.promptLabel}>맞춤 프롬프트 (선택)</Text>
@@ -1532,5 +1585,67 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
+  },
+  conversionModeWrap: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[500] + '30',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  conversionModeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  conversionModeLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  conversionModeList: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  conversionModeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    minWidth: 120,
+  },
+  conversionModeChipActive: {
+    borderColor: theme.colors.accent[500],
+    backgroundColor: theme.colors.accent[500] + '12',
+  },
+  conversionModeTextWrap: {
+    gap: 2,
+    flex: 1,
+  },
+  conversionModeChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  conversionModeChipTextActive: {
+    color: theme.colors.accent[400],
+  },
+  conversionModeChipDesc: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  conversionModeHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
 });
