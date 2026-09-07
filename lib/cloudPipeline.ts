@@ -17,34 +17,51 @@ export interface AngleImagePayload {
   orderIndex: number;
 }
 
+export interface CloudSynthesisResult {
+  strategy: string;
+  volumeEstimate: { widthRatio: number; heightRatio: number; depthRatio: number; confidence: number };
+  contextMatch: { context: string; label: string; description: string; confidence: number };
+  interpolationGaps: { fromAngle: string; toAngle: string; steps: number }[];
+  spatialDepthHint: string;
+  primaryAngle: string;
+  processingSteps: string[];
+}
+
+export interface CloudDirectingResult {
+  hookTransition: { type: string; description: string; startSec: number; durationSec: number };
+  transitions: { type: string; description: string; startSec: number; durationSec: number }[];
+  killPointCaptions: { startSec: number; endSec: number; text: string; position: string; emphasis: boolean }[];
+  sfxPlans: { startSec: number; type: string; label: string }[];
+  beatSync: { bpm: number; beatIntervalSec: number; cutPoints: number[]; highlightStartSec: number; highlightDurationSec: number };
+  rhythmPattern: string;
+  totalDurationSec: number;
+}
+
+export interface CloudPublishPlan {
+  target: string;
+  render: { target: string; width: number; height: number; aspectRatio: string; codec: string; bitrateMbps: number; fps: number; maxDurationSec: number; label: string };
+  metadata: { title: string; description: string; hashtags: string[]; category: string };
+  scheduledAt: string | null;
+  directPublishAvailable: boolean;
+}
+
 export interface CloudPipelineResult {
+  status: 'ok';
   jobId: string;
   scanId: string | null;
-  synthesisResult: {
-    strategy: string;
-    volumeEstimate: { widthRatio: number; heightRatio: number; depthRatio: number; confidence: number };
-    contextMatch: { context: string; label: string; description: string; confidence: number };
-    spatialDepthHint: string;
-    processingSteps: string[];
-  };
-  directingPlan: {
-    hookTransition: { type: string; description: string };
-    transitions: { type: string; description: string; startSec: number }[];
-    killPointCaptions: { startSec: number; endSec: number; text: string; emphasis: boolean }[];
-    sfxPlans: { startSec: number; type: string; label: string }[];
-    beatSync: { bpm: number; cutPoints: number[] };
-  };
-  publishPlans: {
-    target: string;
-    render: { label: string; width: number; height: number; codec: string; fps: number };
-    metadata: { title: string; description: string; hashtags: string[] };
-  }[];
+  synthesis: CloudSynthesisResult;
+  directing: CloudDirectingResult;
+  publishPlans: CloudPublishPlan[];
   renderPlan: {
+    quality: string;
     resolution: { width: number; height: number };
     fps: number;
+    bitrate: number;
     durationSec: number;
+    scenes: unknown[];
   };
   estimatedProcessingSec: number;
+  cloudEndpoint: string;
   message: string;
 }
 

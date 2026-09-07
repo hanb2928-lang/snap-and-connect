@@ -136,15 +136,19 @@ export async function runStereoPipeline(
     steps[0].detail = '클라우드 GPU에서 3D 볼륨 복원 및 보간 진행 중...';
     report(0, 0.15);
     cloudResult = await invokeStereoCutAuto(anglePayloads, '', '', scanId);
+    // Defensive: verify the response has the expected shape
+    if (!cloudResult?.synthesis?.spatialDepthHint) {
+      cloudResult = null;
+    }
   } catch {
     // Offline fallback — use local synthesis result
   }
 
   const synthesisSummary = cloudResult
-    ? `${cloudResult.synthesisResult.spatialDepthHint} · 볼륨 신뢰도 ${Math.round(cloudResult.synthesisResult.volumeEstimate.confidence * 100)}% · ${cloudResult.synthesisResult.contextMatch.label} 맥락`
+    ? `${cloudResult.synthesis.spatialDepthHint} · 볼륨 신뢰도 ${Math.round(cloudResult.synthesis.volumeEstimate.confidence * 100)}% · ${cloudResult.synthesis.contextMatch.label} 맥락`
     : getSynthesisSummary(localSynthesis);
   const context = cloudResult
-    ? (cloudResult.synthesisResult.contextMatch.context as import('./aiSynthesisEngine').UsageContext)
+    ? (cloudResult.synthesis.contextMatch.context as import('./aiSynthesisEngine').UsageContext)
     : localSynthesis.contextMatch.context;
 
   steps[0].status = 'done';
@@ -182,7 +186,7 @@ export async function runStereoPipeline(
   steps[2].detail = '9:16 H.264 렌더링 코덱 적용 & 메타데이터 생성 중...';
   report(2, 0.55);
 
-  const publishPlans = buildMultiPlatformPublishPlans('', context);
+  const publishPlans = buildMultiPlatformPublishPlans('', context, ['youtube', 'instagram', 'tiktok']);
 
   // Build publish target info with deep links
   const publishTargets = PUBLISH_TARGETS.map(({ key, label }) => {
