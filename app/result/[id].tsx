@@ -116,7 +116,7 @@ import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
-import { AIProcessAccordion, type InlineEditState, type HookEffectType } from '@/components/AIProcessAccordion';
+import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -1770,67 +1770,204 @@ export default function ResultScreen() {
           onSaveAndShare={handleSaveAndShare}
         />
 
-        <AIProcessAccordion
-          synthesisStrategy={td?.category || '스테레오 복원'}
-          volumeConfidence={td?.psychologyInsight ? 0.82 : 0.68}
-          contextLabel={td?.category || '제품'}
-          processingSteps={[
-            '5각도 이미지 정합 및 특징점 추출',
-            '3D 볼륨 역산 및 깊이 맵 생성',
-            '각도 간 보간 프레임 합성',
-          ]}
-          hookTransitionType={td?.psychologyInsight?.primaryTrigger || 'rotation_zoom'}
-          hookDescription={activeHook || '초반 3초 사물 회전 및 줌인으로 시선 강타'}
-          sfxCount={3}
-          killPointCount={4}
-          beatSyncBpm={128}
-          cutPointCount={6}
-          activePlatform={activePlatform}
-          platformLabel={
-            activePlatform === 'shortform' ? '숏폼·틱톡' :
-            activePlatform === 'instagram' ? '인스타그램' :
-            activePlatform === 'naverBlog' ? '네이버 블로그' :
-            activePlatform === 'threads' ? '스레드' :
-            activePlatform === 'twitter' ? 'X(트위터)' :
-            activePlatform === 'pinterest' ? '핀터레스트' :
-            activePlatform === 'smartstore' ? '스마트스토어' : '숏폼'
-          }
-          renderWidth={
-            activePlatform === 'pinterest' ? 1000 :
-            activePlatform === 'threads' ? 1080 :
-            activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? 1200 :
-            1080
-          }
-          renderHeight={
-            activePlatform === 'pinterest' ? 1500 :
-            activePlatform === 'threads' ? 1350 :
-            activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? 1200 :
-            1920
-          }
-          renderCodec="H.264"
-          renderFps={30}
-          hashtags={allDisplayHashtags}
-          captionPreview={activeCaption || activeOneLiner || scan?.summary || ''}
-          analysisStatus={analysisStatus}
-          editState={{
-            volumeIntensity: inlineEdit.volumeIntensity,
-            hookEffect: inlineEdit.hookEffect,
-            beatSyncSensitivity: inlineEdit.beatSyncSensitivity,
-            sfxStyle: inlineEdit.sfxStyle,
-            captionText: inlineEdit.captionText || (activeCaption || activeOneLiner || scan?.summary || ''),
-            hashtags: allDisplayHashtags,
-            videoTemplate: inlineEdit.videoTemplate,
-            captionFont: inlineEdit.captionFont,
-            captionPosition: inlineEdit.captionPosition,
-            bgmMood: inlineEdit.bgmMood,
-            aiPrompt: inlineEdit.aiPrompt,
-            titleText: inlineEdit.titleText,
-          }}
-          onEditChange={handleInlineEdit}
-          onRemoveHashtag={handleInlineRemoveHashtag}
-          onRegenerate={handleRegenerate}
-          isRegenerating={isRegenerating}
-        />
+        {/* Full-screen inline edit panel (replaces accordion) */}
+        <View style={styles.editPanel}>
+          <View style={styles.editPanelHeader}>
+            <View style={styles.editPanelHeaderLeft}>
+              <View style={styles.editPanelNumber}>
+                <Text style={styles.editPanelNumberText}>3</Text>
+              </View>
+              <UploadIcon size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.editPanelTitle}>가상 영상 편집 & 프롬프트</Text>
+            </View>
+          </View>
+
+          {/* Render info */}
+          <View style={styles.editRenderBox}>
+            <View style={styles.editRenderRow}>
+              <Text style={styles.editRenderLabel}>타겟 플랫폼</Text>
+              <Text style={styles.editRenderValue}>
+                {activePlatform === 'shortform' ? '숏폼·틱톡' :
+                activePlatform === 'instagram' ? '인스타그램' :
+                activePlatform === 'naverBlog' ? '네이버 블로그' :
+                activePlatform === 'threads' ? '스레드' :
+                activePlatform === 'twitter' ? 'X(트위터)' :
+                activePlatform === 'pinterest' ? '핀터레스트' :
+                activePlatform === 'smartstore' ? '스마트스토어' : '숏폼'}
+              </Text>
+            </View>
+            <View style={styles.editRenderRow}>
+              <Text style={styles.editRenderLabel}>해상도</Text>
+              <Text style={styles.editRenderValue}>
+                {activePlatform === 'pinterest' ? '1000x1500 (2:3)' :
+                activePlatform === 'threads' ? '1080x1350 (4:5)' :
+                activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? '1200x1200 (1:1)' :
+                '1080x1920 (9:16)'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Video template chips */}
+          <View style={styles.editBox}>
+            <View style={styles.editBoxHeader}>
+              <FilmZoomIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.editBoxLabel}>영상 템플릿 스타일</Text>
+            </View>
+            <View style={styles.editChipRow}>
+              {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
+                <TouchableOpacity
+                  key={tmpl}
+                  style={[styles.editChip, inlineEdit.videoTemplate === tmpl && styles.editChipActive]}
+                  onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.editChipText, inlineEdit.videoTemplate === tmpl && styles.editChipTextActive]}>
+                    {tmpl}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Caption style */}
+          <View style={styles.editBox}>
+            <View style={styles.editBoxHeader}>
+              <PenLine size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.editBoxLabel}>자막 스타일</Text>
+            </View>
+            <View style={styles.editChipRow}>
+              {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
+                <TouchableOpacity
+                  key={font}
+                  style={[styles.editChip, inlineEdit.captionFont === font && styles.editChipActive]}
+                  onPress={() => handleInlineEdit({ captionFont: font })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.editChipText, inlineEdit.captionFont === font && styles.editChipTextActive]}>
+                    {font}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.editChipRow}>
+              {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
+                <TouchableOpacity
+                  key={pos}
+                  style={[styles.editChip, inlineEdit.captionPosition === pos && styles.editChipActive]}
+                  onPress={() => handleInlineEdit({ captionPosition: pos })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.editChipText, inlineEdit.captionPosition === pos && styles.editChipTextActive]}>
+                    {pos}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* BGM mood */}
+          <View style={styles.editBox}>
+            <View style={styles.editBoxHeader}>
+              <FilmIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.editBoxLabel}>BGM 분위기</Text>
+            </View>
+            <View style={styles.editChipRow}>
+              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이', '트렌디'].map((mood) => (
+                <TouchableOpacity
+                  key={mood}
+                  style={[styles.editChip, inlineEdit.bgmMood === mood && styles.editChipActive]}
+                  onPress={() => handleInlineEdit({ bgmMood: mood })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.editChipText, inlineEdit.bgmMood === mood && styles.editChipTextActive]}>
+                    {mood}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* AI prompt */}
+          <View style={styles.editBox}>
+            <View style={styles.editBoxHeader}>
+              <Wand2 size={12} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.editBoxLabel}>AI 가상 영상 프롬프트</Text>
+            </View>
+            <TextInput
+              style={styles.editTextInput}
+              value={inlineEdit.aiPrompt}
+              onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
+              placeholder="원하는 연출 분위기나 강조 사항을 입력하세요"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[styles.editRegenBtn, isRegenerating && styles.editRegenBtnDisabled]}
+              onPress={handleRegenerate}
+              disabled={isRegenerating}
+              activeOpacity={0.7}
+            >
+              {isRegenerating ? (
+                <ActivityIndicator size="small" color={theme.colors.dark.textFaint} />
+              ) : (
+                <Sparkles size={13} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={[styles.editRegenBtnText, isRegenerating && styles.editRegenBtnTextDisabled]}>
+                {isRegenerating ? '재생성 중...' : 'AI 재생성'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Title */}
+          <View style={styles.editBox}>
+            <Text style={styles.editBoxLabel}>타이틀 (유튜브/릴스용)</Text>
+            <TextInput
+              style={styles.editTextInputSingle}
+              value={inlineEdit.titleText}
+              onChangeText={(text) => handleInlineEdit({ titleText: text })}
+              placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              numberOfLines={1}
+            />
+          </View>
+
+          {/* Caption text */}
+          <View style={styles.editBox}>
+            <Text style={styles.editBoxLabel}>설명 문구 직접 수정</Text>
+            <TextInput
+              style={styles.editTextInput}
+              value={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
+              onChangeText={(text) => handleInlineEdit({ captionText: text })}
+              placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Hashtags */}
+          {allDisplayHashtags.length > 0 && (
+            <View style={styles.editBox}>
+              <Text style={styles.editBoxLabel}>해시태그 (탭하여 삭제)</Text>
+              <View style={styles.editHashtagWrap}>
+                {allDisplayHashtags.map((tag) => (
+                  <TouchableOpacity
+                    key={tag}
+                    style={styles.editHashtagChip}
+                    onPress={() => handleInlineRemoveHashtag(tag)}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.editHashtagChipText}>#{tag}</Text>
+                    <Text style={styles.editHashtagRemoveX}> x</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
           <AffiliatePromptBanner
@@ -3023,5 +3160,171 @@ const styles = StyleSheet.create({
   cleanModeKnobActive: {
     backgroundColor: '#fff',
     alignSelf: 'flex-end',
+  },
+  // Inline edit panel (replaces accordion)
+  editPanel: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.xs,
+    gap: 10,
+    ...theme.shadows.card,
+  },
+  editPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.dark.border,
+  },
+  editPanelHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editPanelNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: theme.colors.warning[400] + '25',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editPanelNumberText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+  },
+  editPanelTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  editRenderBox: {
+    backgroundColor: theme.colors.dark.border + '40',
+    borderRadius: theme.radius.sm,
+    padding: 10,
+    gap: 6,
+  },
+  editRenderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  editRenderLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  editRenderValue: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  editBox: {
+    backgroundColor: theme.colors.dark.bg + '50',
+    borderRadius: theme.radius.sm,
+    padding: 10,
+    gap: 8,
+  },
+  editBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  editBoxLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    flex: 1,
+  },
+  editChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  editChip: {
+    backgroundColor: theme.colors.dark.border + '60',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  editChipActive: {
+    backgroundColor: theme.colors.primary[400],
+  },
+  editChipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  editChipTextActive: {
+    color: '#fff',
+  },
+  editTextInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 72,
+  },
+  editTextInputSingle: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  editRegenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.primary[400],
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  editRegenBtnDisabled: {
+    backgroundColor: theme.colors.dark.border,
+  },
+  editRegenBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  editRegenBtnTextDisabled: {
+    color: theme.colors.dark.textFaint,
+  },
+  editHashtagWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  editHashtagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[400] + '18',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  editHashtagChipText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+  },
+  editHashtagRemoveX: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
   },
 });
