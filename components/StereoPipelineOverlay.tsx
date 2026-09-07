@@ -315,7 +315,7 @@ export function StereoPipelineOverlay({
                 activeOpacity={0.7}
               >
                 <Zap size={18} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.actionBtnText}>편집 화면으로</Text>
+                <Text style={styles.actionBtnText}>결과 편집 화면으로</Text>
                 <ArrowRight size={16} color="#fff" strokeWidth={2} />
               </TouchableOpacity>
             </View>

@@ -1622,7 +1622,7 @@ export default function ResultScreen() {
         <View style={styles.topActions}>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => router.push({ pathname: '/editor', params: { id: scan.id } })}
+            onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
             activeOpacity={0.7}
           >
             <Pencil size={18} color={theme.colors.primary[400]} strokeWidth={2} />

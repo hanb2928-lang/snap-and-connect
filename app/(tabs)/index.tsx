@@ -450,7 +450,7 @@ export default function CameraScreen() {
     setStereoOverlayVisible(false);
     setStereoResult(null);
     setStereoFirstImage(null);
-    router.push({ pathname: '/editor', params: { id: scanId } });
+    router.push({ pathname: '/result/[id]', params: { id: scanId } });
   }, [router]);
 
   const handleStereoDismiss = useCallback(() => {
