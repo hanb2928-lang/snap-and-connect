@@ -439,6 +439,9 @@ export default function CameraScreen() {
       });
       if (isMountedRef.current) {
         setStereoResult(result);
+        setStereoOverlayVisible(false);
+        setStereoFirstImage(null);
+        router.replace({ pathname: '/result/[id]', params: { id: result.scanId } });
       }
     } catch (err) {
       if (!isMountedRef.current) return;
