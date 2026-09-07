@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -149,6 +149,28 @@ export function PostCaptureWorkflow({
   const [bgmLoading, setBgmLoading] = useState(false);
   const [conversionMode, setConversionMode] = useState<ConversionMode>('shortform');
   const [linkPanelExpanded, setLinkPanelExpanded] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+
+  const prevVisibleRef = useRef(false);
+  useEffect(() => {
+    if (visible && !prevVisibleRef.current) {
+      setUploadDone(false);
+      setFallbackUsed(false);
+      setIsUploading(false);
+      setUploadErrorMsg(null);
+      setGallerySaved(false);
+      setMediaError(null);
+    }
+    prevVisibleRef.current = visible;
+  }, [visible]);
+
+  useEffect(() => {
+    if (visible && !videoUri && !imageUri) {
+      setMediaError('촬영 데이터를 불러오지 못했습니다. 뒤로 가서 다시 촬영해주세요.');
+    } else {
+      setMediaError(null);
+    }
+  }, [visible, videoUri, imageUri]);
 
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
@@ -444,10 +466,30 @@ export function PostCaptureWorkflow({
   }, [isUploading, uploadDone, videoUri, imageUri, selectedPlatformKey, customPrompt, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan, onProceedToAnalysis, uriToBlob, uploadWithRetry, bgmRecommendation]);
 
   if (!visible) return null;
-  if (!videoUri && !imageUri) return null;
 
   const platformLabel = selectedOption.label;
   const spec = editPlan.spec;
+
+  if (mediaError) {
+    return (
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          <View style={styles.header}>
+            <Text style={styles.title}>촬영 완료! 3단계로 숏폼 완성</Text>
+            <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.closeBtn}>
+              <Text style={styles.closeText}>건너뛰기</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.mediaErrorWrap}>
+            <Text style={styles.mediaErrorText}>{mediaError}</Text>
+            <TouchableOpacity style={styles.mediaErrorBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={styles.mediaErrorBtnText}>뒤로 가기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.overlay}>
@@ -914,6 +956,31 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 80,
     gap: theme.spacing.md,
+  },
+  mediaErrorWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 24,
+  },
+  mediaErrorText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  mediaErrorBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600],
+  },
+  mediaErrorBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   stepCard: {
     backgroundColor: theme.colors.dark.surface,

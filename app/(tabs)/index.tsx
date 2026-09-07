@@ -88,6 +88,11 @@ export default function CameraScreen() {
   const [postCaptureMime, setPostCaptureMime] = useState<string>('video/webm');
   const [workflowMountKey, setWorkflowMountKey] = useState(0);
 
+  const postCaptureBase64Ref = useRef<string | null>(null);
+  const postCaptureMimeRef = useRef<string>('video/webm');
+  const postCaptureVideoUriRef = useRef<string | null>(null);
+  const captureModeRef = useRef<CaptureModeType>('oneclick');
+
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
     autoSavePulse.value = withRepeat(
@@ -123,7 +128,9 @@ export default function CameraScreen() {
         setIsRecording(false);
         setPostCaptureVisible(false);
         setPostCaptureVideoUri(null);
+        postCaptureVideoUriRef.current = null;
         setPostCaptureBase64(null);
+        postCaptureBase64Ref.current = null;
         if (recordingTimerRef.current) {
           clearInterval(recordingTimerRef.current);
           recordingTimerRef.current = null;
@@ -191,8 +198,11 @@ export default function CameraScreen() {
 
   const handleVideoRecorded = useCallback(async (videoUri: string) => {
     setPostCaptureVideoUri(videoUri);
+    postCaptureVideoUriRef.current = videoUri;
     setPostCaptureBase64(null);
+    postCaptureBase64Ref.current = null;
     setPostCaptureMime('video/webm');
+    postCaptureMimeRef.current = 'video/webm';
     setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
   }, []);
 
@@ -236,15 +246,18 @@ export default function CameraScreen() {
   const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
 
+    const base64 = postCaptureBase64Ref.current;
+    const mimeType = postCaptureMimeRef.current;
+    const videoUri = postCaptureVideoUriRef.current;
+    const mode = captureModeRef.current;
+
     // 스틸컷 템플릿 모드: AI 분석 없이 바로 편집 화면으로 진입
-    if (captureMode === 'single') {
+    if (mode === 'single') {
       try {
-        const base64 = postCaptureBase64;
-        const mimeType = postCaptureMime;
         if (!base64) {
-          if (!postCaptureVideoUri) return;
+          if (!videoUri) return;
           const compressed = await withTimeout(
-            compressImageToBase64(postCaptureVideoUri, 1080, 0.7),
+            compressImageToBase64(videoUri, 1080, 0.7),
             PICK_TIMEOUT_MS,
             '동영상 압축',
           );
@@ -263,28 +276,30 @@ export default function CameraScreen() {
       return;
     }
 
-    if (postCaptureBase64) {
-      await runAutoAnalysis(postCaptureBase64, postCaptureMime);
+    if (base64) {
+      await runAutoAnalysis(base64, mimeType);
       return;
     }
-    if (!postCaptureVideoUri) return;
+    if (!videoUri) return;
     try {
-      const { base64, mimeType } = await withTimeout(
-        compressImageToBase64(postCaptureVideoUri, 1080, 0.7),
+      const { base64: compressedB64, mimeType: compressedMime } = await withTimeout(
+        compressImageToBase64(videoUri, 1080, 0.7),
         PICK_TIMEOUT_MS,
         '동영상 압축',
       );
-      await runAutoAnalysis(base64, mimeType);
+      await runAutoAnalysis(compressedB64, compressedMime);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
     }
-  }, [captureMode, runAutoAnalysis, postCaptureBase64, postCaptureMime, postCaptureVideoUri, router]);
+  }, [runAutoAnalysis, router]);
 
   const handlePostCaptureClose = useCallback(() => {
     setPostCaptureVisible(false);
     setPostCaptureVideoUri(null);
+    postCaptureVideoUriRef.current = null;
     setPostCaptureBase64(null);
+    postCaptureBase64Ref.current = null;
   }, []);
 
   const handleCapture = async () => {
@@ -326,8 +341,11 @@ export default function CameraScreen() {
       );
       if (!isMountedRef.current || genIdRef.current !== genId) return;
       setPostCaptureBase64(cleanBase64(compressedDataUrl));
+      postCaptureBase64Ref.current = cleanBase64(compressedDataUrl);
       setPostCaptureMime(getMimeTypeFromDataUrl(compressedDataUrl));
+      postCaptureMimeRef.current = getMimeTypeFromDataUrl(compressedDataUrl);
       setPostCaptureVideoUri(null);
+      postCaptureVideoUriRef.current = null;
       setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current || genIdRef.current !== genId) return;
@@ -348,8 +366,11 @@ export default function CameraScreen() {
           '이미지 압축',
         );
         setPostCaptureBase64(cleanBase64(compressed));
+        postCaptureBase64Ref.current = cleanBase64(compressed);
         setPostCaptureMime(getMimeTypeFromDataUrl(compressed));
+        postCaptureMimeRef.current = getMimeTypeFromDataUrl(compressed);
         setPostCaptureVideoUri(null);
+        postCaptureVideoUriRef.current = null;
         setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -378,8 +399,11 @@ export default function CameraScreen() {
       );
       if (!isMountedRef.current) return;
       setPostCaptureBase64(base64);
+      postCaptureBase64Ref.current = base64;
       setPostCaptureMime(mimeType);
+      postCaptureMimeRef.current = mimeType;
       setPostCaptureVideoUri(null);
+      postCaptureVideoUriRef.current = null;
       setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current) return;
@@ -526,18 +550,25 @@ export default function CameraScreen() {
     const isVideo = mimeType.startsWith('video/');
     if (isVideo) {
       setPostCaptureBase64(null);
+      postCaptureBase64Ref.current = null;
       setPostCaptureMime(mimeType);
+      postCaptureMimeRef.current = mimeType;
       setPostCaptureVideoUri(payload);
+      postCaptureVideoUriRef.current = payload;
     } else {
       setPostCaptureBase64(payload);
+      postCaptureBase64Ref.current = payload;
       setPostCaptureMime(mimeType);
+      postCaptureMimeRef.current = mimeType;
       setPostCaptureVideoUri(null);
+      postCaptureVideoUriRef.current = null;
     }
     setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
   }, []);
 
   const handleModeSelect = (mode: CaptureModeType) => {
     setCaptureMode(mode);
+    captureModeRef.current = mode;
     setError(null);
     setScreenPhase('camera');
     if (mode === 'multi' || mode === 'single') {
