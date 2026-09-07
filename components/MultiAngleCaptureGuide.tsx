@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Image as RNImage,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Camera, Check, X, RotateCcw, ChevronRight, Image as ImageIcon, Loader, Scissors } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -64,7 +65,14 @@ export function MultiAngleCaptureGuide({
   const [processing, setProcessing] = useState(false);
   const [sourceMode, setSourceMode] = useState<'camera' | 'gallery'>('camera');
   const [bgProcessingAngle, setBgProcessingAngle] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const pickLockRef = useRef(false);
+  const shotsRef = useRef<Record<string, AngleShot>>({});
+
+  // Keep ref in sync with state so async callbacks always see the latest shots
+  useEffect(() => {
+    shotsRef.current = shots;
+  }, [shots]);
 
   const completedCount = Object.keys(shots).length;
   const allDone = completedCount >= ANGLE_GUIDES.length;
@@ -73,15 +81,12 @@ export function MultiAngleCaptureGuide({
     async (angleId: string, base64: string, mimeType: string) => {
       const guideIndex = ANGLE_GUIDES.findIndex((g) => g.id === angleId);
       const guide = ANGLE_GUIDES[guideIndex];
+      if (!guide || !base64) return;
       const dataUrl = `data:${mimeType};base64,${base64}`;
 
+      setCaptureError(null);
       setShots((prev) => {
         const next = { ...prev };
-        const prevShot = next[angleId];
-        if (prevShot?.dataUrl) {
-          prevShot.dataUrl = undefined;
-          prevShot.base64 = undefined;
-        }
         next[angleId] = {
           id: angleId,
           orderIndex: guideIndex,
@@ -94,7 +99,15 @@ export function MultiAngleCaptureGuide({
         return next;
       });
 
-      // Background: run smart cutout (nukkki) + alignment for 3D synthesis accuracy
+      // Auto-advance to next incomplete angle
+      const nextIdx = ANGLE_GUIDES.findIndex((g, i) => i > guideIndex && !shotsRef.current[g.id]);
+      if (nextIdx !== -1) {
+        setCurrentAngle(nextIdx);
+      } else if (guideIndex < ANGLE_GUIDES.length - 1) {
+        setCurrentAngle(guideIndex + 1);
+      }
+
+      // Background: run smart cutout (nukkki) for 3D synthesis accuracy (web only)
       if (Platform.OS === 'web') {
         setBgProcessingAngle(angleId);
         try {
@@ -117,9 +130,10 @@ export function MultiAngleCaptureGuide({
             });
           }
         } catch {
-          // Skip bg removal on failure - keep original
+          // Skip bg removal on failure - keep original image
+        } finally {
+          setBgProcessingAngle(null);
         }
-        setBgProcessingAngle(null);
       }
     },
     [],
@@ -131,16 +145,19 @@ export function MultiAngleCaptureGuide({
       if (pickLockRef.current) return;
       pickLockRef.current = true;
       setProcessing(true);
+      setCaptureError(null);
       try {
         const result = await onPickImage(angleId);
-        if (result) {
-          handleAddShot(angleId, result.base64, result.mimeType);
+        if (result?.base64) {
+          await handleAddShot(angleId, result.base64, result.mimeType);
+        } else {
+          setCaptureError('이미지를 불러오지 못했습니다. 다시 시도해 주세요.');
         }
       } catch {
-        // ignore
+        setCaptureError('갤러리에서 이미지를 가져오는 중 오류가 발생했습니다. 다시 시도해 주세요.');
       }
       setProcessing(false);
-      setTimeout(() => { pickLockRef.current = false; }, 500);
+      setTimeout(() => { pickLockRef.current = false; }, 300);
     },
     [onPickImage, handleAddShot],
   );
@@ -151,16 +168,19 @@ export function MultiAngleCaptureGuide({
       if (pickLockRef.current) return;
       pickLockRef.current = true;
       setProcessing(true);
+      setCaptureError(null);
       try {
         const result = await onCaptureImage(angleId);
-        if (result) {
-          handleAddShot(angleId, result.base64, result.mimeType);
+        if (result?.base64) {
+          await handleAddShot(angleId, result.base64, result.mimeType);
+        } else {
+          setCaptureError('카메라 캡처에 실패했습니다. 다시 촬영해 주세요.');
         }
       } catch {
-        // ignore
+        setCaptureError('카메라 캡처 중 오류가 발생했습니다. 다시 촬영해 주세요.');
       }
       setProcessing(false);
-      setTimeout(() => { pickLockRef.current = false; }, 500);
+      setTimeout(() => { pickLockRef.current = false; }, 300);
     },
     [onCaptureImage, handleAddShot],
   );
@@ -174,17 +194,25 @@ export function MultiAngleCaptureGuide({
   }, []);
 
   const handleComplete = useCallback(() => {
+    // Use ref to avoid stale closure — always read the latest shots
+    const currentShots = shotsRef.current;
     const ordered = ANGLE_GUIDES.map((g, idx) => {
-      const shot = shots[g.id];
-      if (!shot) return null;
+      const shot = currentShots[g.id];
+      if (!shot?.base64) return null;
       return { ...shot, orderIndex: idx };
     }).filter(Boolean) as AngleShot[];
+    if (ordered.length === 0) return;
     onComplete(ordered);
     setShots({});
-  }, [shots, onComplete]);
+    shotsRef.current = {};
+    setCurrentAngle(0);
+  }, [onComplete]);
 
   const handleClose = useCallback(() => {
     setShots({});
+    shotsRef.current = {};
+    setCurrentAngle(0);
+    setCaptureError(null);
     onClose();
   }, [onClose]);
 
@@ -210,6 +238,11 @@ export function MultiAngleCaptureGuide({
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {captureError && (
+              <View style={styles.captureErrorBox}>
+                <Text style={styles.captureErrorText}>{captureError}</Text>
+              </View>
+            )}
             {/* Intro */}
             <View style={styles.introBox}>
               <Text style={styles.introTitle}>5각도 순차 촬영으로 입체적 AI 영상 완성</Text>
@@ -296,6 +329,7 @@ export function MultiAngleCaptureGuide({
                       <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => {
+                          if (pickLockRef.current || processing) return;
                           setCurrentAngle(idx);
                           if (sourceMode === 'camera' && onCaptureImage) {
                             handleCaptureFromCamera(guide.id);
@@ -304,7 +338,7 @@ export function MultiAngleCaptureGuide({
                           }
                         }}
                         disabled={processing || (sourceMode === 'camera' && !onCaptureImage) || (sourceMode === 'gallery' && !onPickImage)}
-                        activeOpacity={0.7}
+                        activeOpacity={0.6}
                       >
                         {processing ? (
                           <>
@@ -613,5 +647,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  captureErrorBox: {
+    backgroundColor: theme.colors.error[500] + '18',
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.error[500] + '30',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 4,
+  },
+  captureErrorText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.error[400],
   },
 });
