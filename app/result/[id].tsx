@@ -1704,12 +1704,12 @@ export default function ResultScreen() {
           volumeConfidence={td?.psychologyInsight ? 0.82 : 0.68}
           contextLabel={td?.category || '제품'}
           processingSteps={[
-            '5각도 이미지 정합 및 특점 추출',
+            '5각도 이미지 정합 및 특징점 추출',
             '3D 볼륨 역산 및 깊이 맵 생성',
-            '각도 간 보간 프레임合成',
+            '각도 간 보간 프레임 합성',
           ]}
           hookTransitionType={td?.psychologyInsight?.primaryTrigger || 'rotation_zoom'}
-          hookDescription={activeHook || '초반 3초 사물 회전与 줌인으로 시선 강타'}
+          hookDescription={activeHook || '초반 3초 사물 회전 및 줌인으로 시선 강타'}
           sfxCount={3}
           killPointCount={4}
           beatSyncBpm={128}
@@ -1724,8 +1724,18 @@ export default function ResultScreen() {
             activePlatform === 'pinterest' ? '핀터레스트' :
             activePlatform === 'smartstore' ? '스마트스토어' : '숏폼'
           }
-          renderWidth={1080}
-          renderHeight={1920}
+          renderWidth={
+            activePlatform === 'pinterest' ? 1000 :
+            activePlatform === 'threads' ? 1080 :
+            activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? 1200 :
+            1080
+          }
+          renderHeight={
+            activePlatform === 'pinterest' ? 1500 :
+            activePlatform === 'threads' ? 1350 :
+            activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? 1200 :
+            1920
+          }
           renderCodec="H.264"
           renderFps={30}
           hashtags={allDisplayHashtags}

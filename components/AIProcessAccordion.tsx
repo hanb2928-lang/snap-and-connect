@@ -261,7 +261,7 @@ export function AIProcessAccordion({
                 </View>
                 <View style={styles.renderRow}>
                   <Text style={styles.renderLabel}>해상도</Text>
-                  <Text style={styles.renderValue}>{renderWidth}×{renderHeight} (9:16)</Text>
+                  <Text style={styles.renderValue}>{renderWidth}×{renderHeight} ({renderWidth >= renderHeight ? '1:1' : renderHeight / renderWidth > 1.3 ? '9:16' : '4:5'})</Text>
                 </View>
                 <View style={styles.renderRow}>
                   <Text style={styles.renderLabel}>코덱 / 프레임</Text>
