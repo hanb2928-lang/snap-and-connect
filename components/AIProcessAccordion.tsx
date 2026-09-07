@@ -203,7 +203,37 @@ export function AIProcessAccordion({
 
       {expanded && (
         <View style={styles.body}>
-          {/* Step 1 & 2: Compact summary chips */}
+          {/* Step 3: Active step pinned to top, auto-expand on complete */}
+          <View style={styles.step3Card}>
+            <View style={styles.summaryChip}>
+              <CheckCircle2 size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.summaryChipText}>3D 볼륨 합성 완료 · 신뢰도 {confidencePct}%</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.summaryChip}
+              onPress={() => toggleStep(0)}
+              activeOpacity={0.7}
+            >
+              <Box size={13} color={theme.colors.primary[400]} strokeWidth={2} />
+              <Text style={styles.summaryChipLink}>상세</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryChip}>
+              <CheckCircle2 size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.summaryChipText} numberOfLines={1}>훅 연출 완료 · {hookLabel} · BPM {beatSyncBpm}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.summaryChip}
+              onPress={() => toggleStep(1)}
+              activeOpacity={0.7}
+            >
+              <Radio size={13} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.summaryChipLink}>상세</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Completed steps: compact summary chips below */}
           <View style={styles.summaryRow}>
             <View style={styles.summaryChip}>
               <CheckCircle2 size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
@@ -436,201 +466,6 @@ export function AIProcessAccordion({
               </View>
             </StepCard>
           )}
-
-          {/* Step 3: Auto-expand on complete, manually toggleable */}
-          <View style={styles.step3Card}>
-            <TouchableOpacity
-              style={styles.step3Header}
-              onPress={toggleStep3}
-              activeOpacity={0.7}
-            >
-              <View style={styles.step3HeaderLeft}>
-                <View style={[styles.step3Number, { backgroundColor: theme.colors.warning[400] + '25' }]}>
-                  <Text style={[styles.step3NumberText, { color: theme.colors.warning[400] }]}>3</Text>
-                </View>
-                <Upload size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.step3Label}>가상 영상 편집 & 프롬프트</Text>
-              </View>
-              {step3Open ? (
-                <ChevronUp size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
-              ) : (
-                <ChevronDown size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
-              )}
-            </TouchableOpacity>
-            {step3Open && <View style={styles.step3Body}>
-            <View style={styles.stepContent}>
-              <View style={styles.renderBox}>
-                <View style={styles.renderRow}>
-                  <Text style={styles.renderLabel}>타겟 플랫폼</Text>
-                  <Text style={styles.renderValue}>{platformLabel}</Text>
-                </View>
-                <View style={styles.renderRow}>
-                  <Text style={styles.renderLabel}>해상도</Text>
-                  <Text style={styles.renderValue}>{renderWidth}x{renderHeight} ({aspectLabel})</Text>
-                </View>
-                <View style={styles.renderRow}>
-                  <Text style={styles.renderLabel}>코덱 / 프레임</Text>
-                  <Text style={styles.renderValue}>{renderCodec} . {renderFps}fps</Text>
-                </View>
-              </View>
-
-              {/* AI 가상 영상 편집 컨트롤 */}
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Video size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.inlineEditLabel}>영상 템플릿 스타일</Text>
-                </View>
-                <View style={styles.effectChipRow}>
-                  {VIDEO_TEMPLATES.map((tmpl) => (
-                    <TouchableOpacity
-                      key={tmpl}
-                      style={[styles.effectChip, editState.videoTemplate === tmpl && styles.effectChipActive]}
-                      onPress={() => onEditChange({ videoTemplate: tmpl })}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.effectChipText, editState.videoTemplate === tmpl && styles.effectChipTextActive]}>
-                        {tmpl}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Type size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.inlineEditLabel}>자막 스타일</Text>
-                </View>
-                <View style={styles.effectChipRow}>
-                  {CAPTION_FONTS.map((font) => (
-                    <TouchableOpacity
-                      key={font}
-                      style={[styles.effectChip, editState.captionFont === font && styles.effectChipActive]}
-                      onPress={() => onEditChange({ captionFont: font })}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.effectChipText, editState.captionFont === font && styles.effectChipTextActive]}>
-                        {font}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.effectChipRow}>
-                  {CAPTION_POSITIONS.map((pos) => (
-                    <TouchableOpacity
-                      key={pos}
-                      style={[styles.effectChip, editState.captionPosition === pos && styles.effectChipActive]}
-                      onPress={() => onEditChange({ captionPosition: pos })}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.effectChipText, editState.captionPosition === pos && styles.effectChipTextActive]}>
-                        {pos}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Music size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.inlineEditLabel}>BGM 분위기</Text>
-                </View>
-                <View style={styles.effectChipRow}>
-                  {BGM_MOODS.map((mood) => (
-                    <TouchableOpacity
-                      key={mood}
-                      style={[styles.effectChip, editState.bgmMood === mood && styles.effectChipActive]}
-                      onPress={() => onEditChange({ bgmMood: mood })}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.effectChipText, editState.bgmMood === mood && styles.effectChipTextActive]}>
-                        {mood}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* AI 가상 영상 생성 프롬프트 */}
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Wand2 size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={styles.inlineEditLabel}>AI 가상 영상 프롬프트</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={editState.aiPrompt}
-                  onChangeText={(text) => onEditChange({ aiPrompt: text })}
-                  placeholder="원하는 연출 분위기나 강조 사항을 입력하세요 (예: 따뜻한 색감, 천천히 줌인)"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-                <TouchableOpacity
-                  style={[styles.regenerateBtn, isRegenerating && styles.regenerateBtnDisabled]}
-                  onPress={onRegenerate}
-                  disabled={isRegenerating}
-                  activeOpacity={0.7}
-                >
-                  <RefreshCw size={13} color={isRegenerating ? theme.colors.dark.textFaint : '#fff'} strokeWidth={2} />
-                  <Text style={[styles.regenerateBtnText, isRegenerating && styles.regenerateBtnTextDisabled]}>
-                    {isRegenerating ? '재생성 중...' : '재생성'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Inline edit: title text */}
-              <View style={styles.inlineEditBox}>
-                <Text style={styles.inlineEditLabel}>타이틀 (유튜브/릴스용)</Text>
-                <TextInput
-                  style={styles.textInputSingle}
-                  value={editState.titleText}
-                  onChangeText={(text) => onEditChange({ titleText: text })}
-                  placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  numberOfLines={1}
-                />
-              </View>
-
-              {/* Inline edit: caption text */}
-              <View style={styles.inlineEditBox}>
-                <Text style={styles.inlineEditLabel}>설명 문구 직접 수정</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editState.captionText}
-                  onChangeText={(text) => onEditChange({ captionText: text })}
-                  placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              {/* Inline edit: hashtag chips with remove */}
-              {editState.hashtags.length > 0 && (
-                <View style={styles.inlineEditBox}>
-                  <Text style={styles.inlineEditLabel}>해시태그 (탭하여 삭제)</Text>
-                  <View style={styles.hashtagWrap}>
-                    {editState.hashtags.map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        style={styles.hashtagChip}
-                        onPress={() => onRemoveHashtag(tag)}
-                        activeOpacity={0.6}
-                      >
-                        <Text style={styles.hashtagChipText}>#{tag}</Text>
-                        <Text style={styles.hashtagRemoveX}> x</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-            </View>}
-          </View>
         </View>
       )}
     </View>
