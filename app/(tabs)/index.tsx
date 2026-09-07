@@ -121,6 +121,9 @@ export default function CameraScreen() {
         setProcessing(false);
         setAutoSaving(false);
         setIsRecording(false);
+        setPostCaptureVisible(false);
+        setPostCaptureVideoUri(null);
+        setPostCaptureBase64(null);
         if (recordingTimerRef.current) {
           clearInterval(recordingTimerRef.current);
           recordingTimerRef.current = null;

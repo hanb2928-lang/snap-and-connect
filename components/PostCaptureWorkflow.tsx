@@ -403,24 +403,35 @@ export function PostCaptureWorkflow({
     }
 
     const deepLink = getDeepLink(selectedPlatformKey);
-    try {
-      const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
-      if (canOpen) {
-        await Linking.openURL(deepLink.uploadAppUrl);
-      } else {
-        await Linking.openURL(deepLink.uploadWebUrl);
-      }
-      setPlatformLaunched(true);
-    } catch {
+    if (deepLink.uploadWebUrl || deepLink.uploadAppUrl) {
       try {
-        const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
-        if (canOpenFallback) {
-          await Linking.openURL(deepLink.appUrl);
-        } else {
-          await Linking.openURL(deepLink.webUrl);
+        if (deepLink.uploadAppUrl) {
+          const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
+          if (canOpen) {
+            await Linking.openURL(deepLink.uploadAppUrl);
+          } else if (deepLink.uploadWebUrl) {
+            await Linking.openURL(deepLink.uploadWebUrl);
+          }
+        } else if (deepLink.uploadWebUrl) {
+          await Linking.openURL(deepLink.uploadWebUrl);
         }
         setPlatformLaunched(true);
-      } catch { /* best-effort */ }
+      } catch {
+        try {
+          if (deepLink.appUrl) {
+            const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
+            if (canOpenFallback) {
+              await Linking.openURL(deepLink.appUrl);
+            } else if (deepLink.webUrl) {
+              await Linking.openURL(deepLink.webUrl);
+            }
+            setPlatformLaunched(true);
+          } else if (deepLink.webUrl) {
+            await Linking.openURL(deepLink.webUrl);
+            setPlatformLaunched(true);
+          }
+        } catch { /* best-effort */ }
+      }
     }
 
     onProceedToAnalysis(customPrompt.trim(), selectedPlatformKey, editPlan);
