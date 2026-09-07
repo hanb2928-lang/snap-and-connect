@@ -36,6 +36,7 @@ import {
   Smartphone,
   Shirt,
   Video,
+  Link2 as LinkIcon,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { getDeepLink } from '@/lib/platformUpload';
@@ -149,6 +150,7 @@ export function PostCaptureWorkflow({
   const [bgmRecommendation, setBgmRecommendation] = useState<BgmRecommendation | null>(null);
   const [bgmLoading, setBgmLoading] = useState(false);
   const [conversionMode, setConversionMode] = useState<ConversionMode>('shortform');
+  const [linkPanelExpanded, setLinkPanelExpanded] = useState(false);
 
   const allPlatformOptions = useMemo(() => [...BUILTIN_OPTIONS, ...customPlatforms], [customPlatforms]);
 
@@ -469,6 +471,42 @@ export function PostCaptureWorkflow({
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* AI Conversion Style Selector — top priority card */}
+          <View style={styles.conversionModeWrap}>
+            <View style={styles.conversionModeLabelRow}>
+              <Wand2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.conversionModeTitle}>AI 변환 스타일 선택</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
+              {CONVERSION_MODES.map((mode) => {
+                const ModeIcon = mode.icon;
+                const isActive = conversionMode === mode.key;
+                return (
+                  <TouchableOpacity
+                    key={mode.key}
+                    style={[styles.conversionModeChip, isActive && styles.conversionModeChipActive]}
+                    onPress={() => setConversionMode(mode.key)}
+                    activeOpacity={0.7}
+                  >
+                    <ModeIcon size={20} color={isActive ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
+                    <View style={styles.conversionModeTextWrap}>
+                      <Text style={[styles.conversionModeChipText, isActive && styles.conversionModeChipTextActive]}>{mode.label}</Text>
+                      <Text style={styles.conversionModeChipDesc}>{mode.desc}</Text>
+                    </View>
+                    {isActive && <Check size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <Text style={styles.conversionModeHint}>
+              {conversionMode === 'ai_video'
+                ? '선택한 사진을 AI가 자동으로 카메라 무빙, 줌인/아웃, 전환 효과가 포함된 15초 영상으로 변환합니다. 프롬프트로 원하는 무드를 지정할 수 있습니다.'
+                : conversionMode === 'virtual_fitting'
+                ? '의류/제품 사진과 모델 사진을 업로드하면 AI가 가상 착용 피팅 영상을 생성합니다. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.'
+                : '촬영한 원본 영상/사진을 그대로 15초 숏폼으로 자동 편집합니다. 가장 빠르고 리얼한 결과가 필요할 때 선택하세요.'}
+            </Text>
+          </View>
+
           {/* Step 1: Platform Selection + Safe Zone */}
           <StepCard
             stepNum={1}
@@ -551,49 +589,6 @@ export function PostCaptureWorkflow({
             expanded={activeStep === 2}
             onToggle={() => handleStepToggle(2)}
           >
-            <View style={styles.conversionModeWrap}>
-              <View style={styles.conversionModeLabelRow}>
-                <Wand2 size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                <Text style={styles.conversionModeLabel}>AI 변환 스타일 선택</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
-                {CONVERSION_MODES.map((mode) => {
-                  const ModeIcon = mode.icon;
-                  const isActive = conversionMode === mode.key;
-                  return (
-                    <TouchableOpacity
-                      key={mode.key}
-                      style={[styles.conversionModeChip, isActive && styles.conversionModeChipActive]}
-                      onPress={() => setConversionMode(mode.key)}
-                      activeOpacity={0.7}
-                    >
-                      <ModeIcon size={18} color={isActive ? theme.colors.accent[400] : theme.colors.dark.textDim} strokeWidth={2} />
-                      <View style={styles.conversionModeTextWrap}>
-                        <Text style={[styles.conversionModeChipText, isActive && styles.conversionModeChipTextActive]}>{mode.label}</Text>
-                        <Text style={styles.conversionModeChipDesc}>{mode.desc}</Text>
-                      </View>
-                      {isActive && <Check size={14} color={theme.colors.accent[400]} strokeWidth={2.5} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              {conversionMode === 'ai_video' && (
-                <Text style={styles.conversionModeHint}>
-                  선택한 사진을 AI가 자동으로 카메라 무빙, 줌인/아웃, 전환 효과가 포함된 15초 영상으로 변환합니다. 프롬프트로 원하는 무드를 지정할 수 있습니다.
-                </Text>
-              )}
-              {conversionMode === 'virtual_fitting' && (
-                <Text style={styles.conversionModeHint}>
-                  의류/제품 사진과 모델 사진을 업로드하면 AI가 가상 착용 피팅 영상을 생성합니다. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.
-                </Text>
-              )}
-              {conversionMode === 'shortform' && (
-                <Text style={styles.conversionModeHint}>
-                  촬영한 원본 영상/사진을 그대로 15초 숏폼으로 자동 편집합니다. 가장 빠르고 리얼한 결과가 필요할 때 선택하세요.
-                </Text>
-              )}
-            </View>
-
             <View style={styles.promptLabelRow}>
               <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
               <Text style={styles.promptLabel}>맞춤 프롬프트 (선택)</Text>
@@ -810,7 +805,23 @@ export function PostCaptureWorkflow({
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.platformLinkBox}>
+            <TouchableOpacity
+              style={styles.linkPanelHeader}
+              onPress={() => setLinkPanelExpanded((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.linkPanelHeaderLeft}>
+                <LinkIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.linkPanelHeaderText}>맞춤 링크 관리</Text>
+              </View>
+              {linkPanelExpanded ? (
+                <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+            {linkPanelExpanded && (
+              <View style={styles.platformLinkBox}>
                 <Text style={styles.platformLinkLabel}>플랫폼 링크 직접 입력</Text>
                 <TextInput
                   style={styles.platformLinkInput}
@@ -824,7 +835,8 @@ export function PostCaptureWorkflow({
                   returnKeyType="done"
                 />
                 <Text style={styles.platformLinkHint}>선택한 플랫폼의 공식 업로드 페이지가 기본값으로 설정됩니다. 필요하면 쇼핑커넥터나 제휴 랜딩 링크로 자유롭게 수정하세요.</Text>
-            </View>
+              </View>
+            )}
 
             {fallbackUsed && !uploadDone && (
               <Text style={styles.fallbackHint}>
@@ -833,6 +845,30 @@ export function PostCaptureWorkflow({
             )}
           </StepCard>
         </ScrollView>
+
+        {/* Sticky bottom CTA */}
+        <View style={styles.stickyCtaWrap}>
+          <TouchableOpacity
+            style={[styles.stickyCtaBtn, isUploading && styles.stickyCtaBtnLoading]}
+            onPress={handleProceed}
+            disabled={isUploading || uploadDone}
+            activeOpacity={0.85}
+          >
+            {isUploading ? (
+              <Text style={styles.stickyCtaText}>생성 중...</Text>
+            ) : uploadDone ? (
+              <>
+                <Check size={20} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
+              </>
+            ) : (
+              <>
+                <Check size={20} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal visible={showAddModal} transparent animationType="fade" onRequestClose={() => setShowAddModal(false)}>
@@ -961,7 +997,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 80,
     gap: theme.spacing.md,
   },
   stepCard: {
@@ -1600,6 +1636,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  conversionModeTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[400],
+  },
   conversionModeLabel: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
@@ -1647,5 +1688,51 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     lineHeight: 16,
+  },
+  linkPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  linkPanelHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  linkPanelHeaderText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  stickyCtaWrap: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(5, 8, 18, 0.98)',
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+  },
+  stickyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[600],
+  },
+  stickyCtaBtnLoading: {
+    opacity: 0.6,
+  },
+  stickyCtaText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });
