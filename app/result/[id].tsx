@@ -52,6 +52,9 @@ import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { uploadAssetBlobWithProgress, uploadAssetFromFileUriWithProgress, saveAssetRecord } from '@/lib/savedAssets';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
+import { readUriAsBase64 } from '@/lib/imageEdit';
+import { cleanBase64 } from '@/lib/base64';
 import { Share as RNShare } from 'react-native';
 import type { Scan, UserSettings, AffiliateLink, CustomAffiliateLink, DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 import { TemplateCard, STICKER_POSITIONS, TEXT_POSITIONS } from '@/components/TemplateCard';
@@ -589,34 +592,37 @@ export default function ResultScreen() {
 
       const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`;
 
-      let cloudUrl: string | null = null;
+      // 1) Save to device gallery (primary action)
       if (Platform.OS === 'web') {
         const res = await fetch(uri);
         const blob = await res.blob();
-        cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'image/png', (pct) => {
-          setUploadProgress(pct);
-        });
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
       } else {
-        cloudUrl = await uploadAssetFromFileUriWithProgress(uri, fileName, 'image/png', (pct) => {
-          setUploadProgress(pct);
-        });
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        if (permission.granted) {
+          try {
+            await MediaLibrary.createAssetAsync(uri);
+          } catch {
+            // Fallback: write base64 to temp file then save
+            const { base64 } = await readUriAsBase64(uri);
+            const dir = FileSystem.cacheDirectory;
+            if (dir) {
+              const fileUri = `${dir}${fileName}`;
+              await FileSystem.writeAsStringAsync(fileUri, base64, {
+                encoding: FileSystem.EncodingType.Base64,
+              });
+              await MediaLibrary.createAssetAsync(fileUri);
+            }
+          }
+        }
       }
-
-      if (!cloudUrl) {
-        setUploadProgress(null);
-        setUploadError('클라우드 업로드 실패. 네트워크를 확인 후 다시 시도해주세요.');
-        return;
-      }
-
-      await saveAssetRecord({
-        scan_id: scan?.id ?? null,
-        asset_type: 'image',
-        title: activeProductName || scan?.title || '숏폼 카드',
-        file_url: cloudUrl,
-        file_name: fileName,
-        mime_type: 'image/png',
-        platform: activePlatform,
-      });
 
       setUploadProgress(100);
       setUploadDone(true);
@@ -624,6 +630,37 @@ export default function ResultScreen() {
         setUploadProgress(null);
         setUploadDone(false);
       }, 2500);
+
+      // 2) Cloud upload + asset record (secondary, non-blocking)
+      (async () => {
+        try {
+          let cloudUrl: string | null = null;
+          if (Platform.OS === 'web') {
+            const res = await fetch(uri);
+            const blob = await res.blob();
+            cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'image/png', (pct) => {
+              setUploadProgress(pct);
+            });
+          } else {
+            cloudUrl = await uploadAssetFromFileUriWithProgress(uri, fileName, 'image/png', (pct) => {
+              setUploadProgress(pct);
+            });
+          }
+          if (cloudUrl) {
+            await saveAssetRecord({
+              scan_id: scan?.id ?? null,
+              asset_type: 'image',
+              title: activeProductName || scan?.title || '숏폼 카드',
+              file_url: cloudUrl,
+              file_name: fileName,
+              mime_type: 'image/png',
+              platform: activePlatform,
+            });
+          }
+        } catch {
+          // Cloud save is secondary; gallery export already succeeded
+        }
+      })();
 
       if (Platform.OS === 'web') {
         if (navigator.clipboard) {
@@ -1977,7 +2014,7 @@ export default function ResultScreen() {
             <Download size={18} color={theme.colors.dark.text} strokeWidth={2} />
           )}
           <Text style={styles.floatingBarBtnText}>
-            {uploadDone ? '저장됨' : uploadProgress !== null ? '업로드 중...' : '보관함 저장 / 내보내기'}
+            {uploadDone ? '저장됨' : uploadProgress !== null ? '저장 중...' : '갤러리에 저장'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

@@ -47,6 +47,8 @@ import { BgRemoveEditor } from '@/components/BgRemoveEditor';
 import { removeBackgroundOnDevice } from '@/lib/removeBgOnDevice';
 import { cleanBase64 } from '@/lib/base64';
 import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
 import type { Scan, CustomAffiliateLink } from '@/types/database';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -103,6 +105,35 @@ function emojiToDataUrl(emoji: string, size: number): string {
   ctx.textBaseline = 'middle';
   ctx.fillText(emoji, size / 2, size / 2);
   return canvas.toDataURL('image/png');
+}
+
+async function saveImageToGallery(base64: string, mimeType: string, fileName: string): Promise<void> {
+  const extension = mimeType === 'image/png' ? 'png' : 'jpg';
+
+  if (Platform.OS === 'web') {
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `${fileName}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+    return;
+  }
+
+  const permission = await MediaLibrary.requestPermissionsAsync();
+  if (!permission.granted) throw new Error('사진 보관함 접근 권한이 필요합니다');
+  const directory = FileSystem.cacheDirectory;
+  if (!directory) throw new Error('임시 저장 공간을 사용할 수 없습니다');
+  const fileUri = `${directory}${fileName}.${extension}`;
+  await FileSystem.writeAsStringAsync(fileUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  await MediaLibrary.createAssetAsync(fileUri);
 }
 
 
@@ -562,20 +593,25 @@ export default function EditorScreen() {
         base64 = result.base64;
         mimeType = result.mimeType;
       }
-      const uploadedUrl = await uploadEditedImage(base64, mimeType);
-      await saveEditedScan(scan.id, uploadedUrl);
+      await saveImageToGallery(base64, mimeType, `${scan.id}-edited`);
 
-      // Save custom affiliate links
-      const customLinks: CustomAffiliateLink[] = linkEntries
-        .filter((l) => l.url.trim())
-        .map((l, i) => ({
-          platform: l.platform,
-          label: l.label,
-          url: l.url,
-          productIndex: i,
-        }));
-      if (customLinks.length > 0) {
-        await supabase.from('scans').update({ custom_affiliate_links: customLinks }).eq('id', scan.id);
+      try {
+        const uploadedUrl = await uploadEditedImage(base64, mimeType);
+        await saveEditedScan(scan.id, uploadedUrl);
+
+        const customLinks: CustomAffiliateLink[] = linkEntries
+          .filter((l) => l.url.trim())
+          .map((l, i) => ({
+            platform: l.platform,
+            label: l.label,
+            url: l.url,
+            productIndex: i,
+          }));
+        if (customLinks.length > 0) {
+          await supabase.from('scans').update({ custom_affiliate_links: customLinks }).eq('id', scan.id);
+        }
+      } catch {
+        // Gallery export is the primary save action.
       }
       setProcessing(false);
       router.replace({ pathname: '/result/[id]', params: { id: scan.id } });
@@ -886,7 +922,7 @@ export default function EditorScreen() {
           activeOpacity={0.8}
         >
           <Check size={22} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
+          <Text style={styles.stickyCtaText}>갤러리에 저장</Text>
         </TouchableOpacity>
       </View>
 
