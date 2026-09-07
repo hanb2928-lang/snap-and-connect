@@ -28,7 +28,7 @@ import { saveManualScan, uploadImage } from '@/lib/analysis';
 import { supabase } from '@/lib/supabase';
 import { isOnline } from '@/hooks/useNetworkStatus';
 import { buildDataUrl, cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
-import { prepareImageForApi, compressImageToBase64 } from '@/lib/imageEdit';
+import { prepareImageForApi, compressImageToBase64, extractVideoFrameBase64 } from '@/lib/imageEdit';
 import type { MoodFilterType } from '@/lib/imageEdit';
 import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
@@ -256,12 +256,12 @@ export default function CameraScreen() {
       try {
         if (!base64) {
           if (!videoUri) return;
-          const compressed = await withTimeout(
-            compressImageToBase64(videoUri, 1080, 0.7),
+          const frame = await withTimeout(
+            extractVideoFrameBase64(videoUri, 1080, 0.7),
             PICK_TIMEOUT_MS,
-            '동영상 압축',
+            '동영상 프레임 추출',
           );
-          const imageUrl = await uploadImage(compressed.base64, compressed.mimeType);
+          const imageUrl = await uploadImage(frame.base64, frame.mimeType);
           const scanId = await saveManualScan(imageUrl);
           router.push({ pathname: '/editor', params: { id: scanId } });
           return;
@@ -282,12 +282,12 @@ export default function CameraScreen() {
     }
     if (!videoUri) return;
     try {
-      const { base64: compressedB64, mimeType: compressedMime } = await withTimeout(
-        compressImageToBase64(videoUri, 1080, 0.7),
+      const { base64: frameB64, mimeType: frameMime } = await withTimeout(
+        extractVideoFrameBase64(videoUri, 1080, 0.7),
         PICK_TIMEOUT_MS,
-        '동영상 압축',
+        '동영상 프레임 추출',
       );
-      await runAutoAnalysis(compressedB64, compressedMime);
+      await runAutoAnalysis(frameB64, frameMime);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));

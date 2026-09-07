@@ -368,6 +368,50 @@ export function normalizeImageDataUrl(dataUrl: string): string {
   return detectedMime ? `data:${detectedMime};base64,${base64}` : dataUrl;
 }
 
+export async function extractVideoFrameBase64(
+  videoUri: string,
+  maxDimension = 1080,
+  quality = 0.7,
+): Promise<{ base64: string; mimeType: string }> {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const video = document.createElement('video');
+    video.src = videoUri;
+    video.muted = true;
+    video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('동영상 로딩 시간 초과')), 15000);
+      video.onloadeddata = () => { clearTimeout(timer); resolve(); };
+      video.onerror = () => { clearTimeout(timer); reject(new Error('동영상을 불러올 수 없습니다')); };
+    });
+
+    video.currentTime = Math.min(video.duration / 2, 1);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('동영상 프레임 탐색 시간 초과')), 10000);
+      video.onseeked = () => { clearTimeout(timer); resolve(); };
+      video.onerror = () => { clearTimeout(timer); reject(new Error('동영상 프레임 탐색 실패')); };
+    });
+
+    const rawW = video.videoWidth || 1080;
+    const rawH = video.videoHeight || 1080;
+    const scale = Math.min(1, maxDimension / Math.max(rawW, rawH));
+    const w = Math.round(rawW * scale);
+    const h = Math.round(rawH * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
+    ctx.drawImage(video, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    return { base64: cleanBase64(dataUrl), mimeType: 'image/jpeg' };
+  }
+
+  throw new Error('이 플랫폼에서는 동영상 프레임 추출을 지원하지 않습니다');
+}
+
 export async function readUriAsBase64(uri: string): Promise<{ base64: string; mimeType: string }> {
   if (Platform.OS === 'web') {
     const controller = new AbortController();
