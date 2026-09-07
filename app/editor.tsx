@@ -640,7 +640,7 @@ export default function EditorScreen() {
         <TouchableOpacity style={styles.iconButton} onPress={() => router.back()} activeOpacity={0.7}>
           <ArrowLeft size={22} color={theme.colors.dark.text} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.topTitle}>스틸컷 편집</Text>
+        <Text style={styles.topTitle}>입체컷 오토</Text>
         <View style={styles.topActions}>
           {canUndo && (
             <TouchableOpacity style={styles.iconButton} onPress={handleUndo} activeOpacity={0.7}>
