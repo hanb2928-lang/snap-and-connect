@@ -471,40 +471,13 @@ export default function CameraScreen() {
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
+      // On web, always use the file picker with camera capture attribute.
+      // The hidden <video> behind the modal is unreliable and invisible to the user.
       try {
-        const video = document.querySelector('video') as HTMLVideoElement | null;
-        if (video && video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
-          try {
-            const maxDim = 1080;
-            const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
-            const w = Math.round(video.videoWidth * scale);
-            const h = Math.round(video.videoHeight * scale);
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('canvas unsupported');
-            ctx.drawImage(video, 0, 0, w, h);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            const compressed = await withTimeout(
-              prepareImageForApi(dataUrl, 1080, 0.7, 'none' as MoodFilterType),
-              PICK_TIMEOUT_MS,
-              '이미지 압축',
-            );
-            return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
-          } catch {
-            // Canvas capture failed (CORS or stream issue) — fall through to file picker
-          }
-        }
-        // Fallback: file picker with camera capture
-        const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '웹 캡처');
+        const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '카메라 캡처');
         if (images.length === 0) return null;
-        const compressed = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7, 'none' as MoodFilterType),
-          PICK_TIMEOUT_MS,
-          '이미지 압축',
-        );
-        return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
+        // pickImageWeb already resizes/compresses — no need for a second pass
+        return { base64: images[0].base64, mimeType: images[0].mimeType };
       } catch {
         return null;
       }
@@ -539,12 +512,7 @@ export default function CameraScreen() {
       try {
         const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
         if (images.length === 0) return null;
-        const compressed = await withTimeout(
-          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1080, 0.7, 'none' as MoodFilterType),
-          PICK_TIMEOUT_MS,
-          '이미지 압축',
-        );
-        return { base64: cleanBase64(compressed), mimeType: getMimeTypeFromDataUrl(compressed) };
+        return { base64: images[0].base64, mimeType: images[0].mimeType };
       } catch {
         return null;
       }

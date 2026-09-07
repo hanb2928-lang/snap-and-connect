@@ -9,7 +9,6 @@ import {
   Image as RNImage,
   Platform,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { Camera, Check, X, RotateCcw, ChevronRight, Image as ImageIcon, Loader, Scissors } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -107,33 +106,35 @@ export function MultiAngleCaptureGuide({
         setCurrentAngle(guideIndex + 1);
       }
 
-      // Background: run smart cutout (nukkki) for 3D synthesis accuracy (web only)
+      // Fire-and-forget bg removal — don't block the next capture
       if (Platform.OS === 'web') {
         setBgProcessingAngle(angleId);
-        try {
-          const { removeBackgroundOnDevice } = await import('@/lib/removeBgOnDevice');
-          const result = await removeBackgroundOnDevice(dataUrl);
-          if (result.ok) {
-            const cleanB64 = result.dataUrl.split(',')[1] || base64;
-            setShots((prev) => {
-              const next = { ...prev };
-              const existing = next[angleId];
-              if (existing) {
-                next[angleId] = {
-                  ...existing,
-                  base64: cleanB64,
-                  dataUrl: result.dataUrl,
-                  mimeType: 'image/png',
-                };
-              }
-              return next;
-            });
+        (async () => {
+          try {
+            const { removeBackgroundOnDevice } = await import('@/lib/removeBgOnDevice');
+            const result = await removeBackgroundOnDevice(dataUrl);
+            if (result.ok) {
+              const cleanB64 = result.dataUrl.split(',')[1] || base64;
+              setShots((prev) => {
+                const next = { ...prev };
+                const existing = next[angleId];
+                if (existing) {
+                  next[angleId] = {
+                    ...existing,
+                    base64: cleanB64,
+                    dataUrl: result.dataUrl,
+                    mimeType: 'image/png',
+                  };
+                }
+                return next;
+              });
+            }
+          } catch {
+            // keep original on failure
+          } finally {
+            setBgProcessingAngle(null);
           }
-        } catch {
-          // Skip bg removal on failure - keep original image
-        } finally {
-          setBgProcessingAngle(null);
-        }
+        })();
       }
     },
     [],
