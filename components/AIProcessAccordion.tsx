@@ -128,8 +128,8 @@ export function AIProcessAccordion({
   onRegenerate,
   isRegenerating,
 }: AIProcessAccordionProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [openStep, setOpenStep] = useState<number | null>(0);
+  const [expanded, setExpanded] = useState(true);
+  const [openStep, setOpenStep] = useState<number | null>(2);
 
   const toggleExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
