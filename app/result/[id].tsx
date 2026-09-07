@@ -1082,23 +1082,9 @@ export default function ResultScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.templateWrap}>
-                <TemplateCard
-                  ref={cardRef}
-                  imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-                  templateData={activeTemplateData}
-                  title={activeProductName || scan.title || 'Product'}
-                  affiliatePlatforms={affiliatePlatforms}
-                  platform={activePlatform}
-                  customReview={scan.custom_review?.text ? scan.custom_review : null}
-                  shortUrl={shortUrl || ''}
-                  stickerPosition={stickerPosition}
-                  stickerStyle={stickerStyle}
-                  stickerSize={stickerSize}
-                  overlayOpacity={overlayOpacity ?? undefined}
-                  textPosition={textPosition}
-                  cleanMode={cleanMode}
-                />
+              <View style={styles.templateMovedNote}>
+                <LayoutTemplate size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={styles.templateMovedNoteText}>9:16 미리보기는 화면 상단에서 직접 확인할 수 있어요. 아래 스티커·투명도·문구 위치를 조작하면 상단 미리보기에 실시간 반영됩니다.</Text>
               </View>
             </View>
           ),
@@ -1679,13 +1665,32 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.heroWrap}>
-          <Image
-            source={{ uri: scan.edited_image_url || scan.image_url }}
-            style={[styles.heroImage, { aspectRatio: heroAspect }]}
-            resizeMode="contain"
-            onError={() => setHeroAspect(1)}
-          />
+        {/* === 9:16 Preview === */}
+        <View style={styles.previewFrame}>
+          <View style={styles.previewInner}>
+            <TemplateCard
+              ref={cardRef}
+              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
+              templateData={activeTemplateData}
+              title={activeProductName || scan.title || 'Product'}
+              affiliatePlatforms={affiliatePlatforms}
+              platform={activePlatform}
+              customReview={scan.custom_review?.text ? scan.custom_review : null}
+              shortUrl={shortUrl || ''}
+              stickerPosition={stickerPosition}
+              stickerStyle={stickerStyle}
+              stickerSize={stickerSize}
+              overlayOpacity={overlayOpacity ?? undefined}
+              textPosition={textPosition}
+              cleanMode={cleanMode}
+            />
+            {isRegenerating && (
+              <View style={styles.previewLoadingOverlay}>
+                <ActivityIndicator size="large" color={theme.colors.primary[400]} />
+                <Text style={styles.previewLoadingText}>AI 재생성 중...</Text>
+              </View>
+            )}
+          </View>
           {editingProduct ? (
             <View style={styles.productEditOverlay}>
               <View style={styles.productEditCard}>
@@ -1734,15 +1739,128 @@ export default function ResultScreen() {
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.heroBadge}
+              style={styles.previewBadge}
               onPress={handleStartEditProduct}
               activeOpacity={0.7}
             >
               <ShoppingBag size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.heroBadgeText}>{activeProductName || '제품명 수정'}</Text>
+              <Text style={styles.previewBadgeText}>{activeProductName || '제품명 수정'}</Text>
               <Pencil size={12} color={theme.colors.primary[300]} strokeWidth={2} />
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* === Template + Caption + BGM chips === */}
+        <View style={styles.chipSection}>
+          <View style={styles.chipGroup}>
+            <View style={styles.chipGroupHeader}>
+              <FilmZoomIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.chipGroupLabel}>영상 템플릿</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
+                <TouchableOpacity
+                  key={tmpl}
+                  style={[styles.chipPill, inlineEdit.videoTemplate === tmpl && styles.chipPillActive]}
+                  onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipPillText, inlineEdit.videoTemplate === tmpl && styles.chipPillTextActive]}>
+                    {tmpl}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.chipGroup}>
+            <View style={styles.chipGroupHeader}>
+              <PenLine size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.chipGroupLabel}>자막 스타일</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
+                <TouchableOpacity
+                  key={font}
+                  style={[styles.chipPill, inlineEdit.captionFont === font && styles.chipPillActive]}
+                  onPress={() => handleInlineEdit({ captionFont: font })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipPillText, inlineEdit.captionFont === font && styles.chipPillTextActive]}>
+                    {font}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
+                <TouchableOpacity
+                  key={pos}
+                  style={[styles.chipPill, inlineEdit.captionPosition === pos && styles.chipPillActive]}
+                  onPress={() => handleInlineEdit({ captionPosition: pos })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipPillText, inlineEdit.captionPosition === pos && styles.chipPillTextActive]}>
+                    {pos}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.chipGroup}>
+            <View style={styles.chipGroupHeader}>
+              <FilmIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.chipGroupLabel}>BGM 분위기</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이', '트렌디'].map((mood) => (
+                <TouchableOpacity
+                  key={mood}
+                  style={[styles.chipPill, inlineEdit.bgmMood === mood && styles.chipPillActive]}
+                  onPress={() => handleInlineEdit({ bgmMood: mood })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipPillText, inlineEdit.bgmMood === mood && styles.chipPillTextActive]}>
+                    {mood}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* === AI Prompt + Regenerate === */}
+        <View style={styles.promptSection}>
+          <View style={styles.promptHeader}>
+            <Wand2 size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.promptTitle}>AI 가상 영상 프롬프트</Text>
+          </View>
+          <TextInput
+            style={styles.promptInput}
+            value={inlineEdit.aiPrompt}
+            onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
+            placeholder="원하는 연출 분위기나 강조 사항을 입력하세요"
+            placeholderTextColor={theme.colors.dark.textFaint}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+          <TouchableOpacity
+            style={[styles.regenBtnLarge, isRegenerating && styles.regenBtnDisabled]}
+            onPress={handleRegenerate}
+            disabled={isRegenerating}
+            activeOpacity={0.7}
+          >
+            {isRegenerating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Sparkles size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.regenBtnText}>
+              {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <QuickTweakPanel
@@ -1770,161 +1888,12 @@ export default function ResultScreen() {
           onSaveAndShare={handleSaveAndShare}
         />
 
-        {/* Full-screen inline edit panel (replaces accordion) */}
-        <View style={styles.editPanel}>
-          <View style={styles.editPanelHeader}>
-            <View style={styles.editPanelHeaderLeft}>
-              <View style={styles.editPanelNumber}>
-                <Text style={styles.editPanelNumberText}>3</Text>
-              </View>
-              <UploadIcon size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.editPanelTitle}>가상 영상 편집 & 프롬프트</Text>
-            </View>
-          </View>
-
-          {/* Render info */}
-          <View style={styles.editRenderBox}>
-            <View style={styles.editRenderRow}>
-              <Text style={styles.editRenderLabel}>타겟 플랫폼</Text>
-              <Text style={styles.editRenderValue}>
-                {activePlatform === 'shortform' ? '숏폼·틱톡' :
-                activePlatform === 'instagram' ? '인스타그램' :
-                activePlatform === 'naverBlog' ? '네이버 블로그' :
-                activePlatform === 'threads' ? '스레드' :
-                activePlatform === 'twitter' ? 'X(트위터)' :
-                activePlatform === 'pinterest' ? '핀터레스트' :
-                activePlatform === 'smartstore' ? '스마트스토어' : '숏폼'}
-              </Text>
-            </View>
-            <View style={styles.editRenderRow}>
-              <Text style={styles.editRenderLabel}>해상도</Text>
-              <Text style={styles.editRenderValue}>
-                {activePlatform === 'pinterest' ? '1000x1500 (2:3)' :
-                activePlatform === 'threads' ? '1080x1350 (4:5)' :
-                activePlatform === 'naverBlog' || activePlatform === 'smartstore' ? '1200x1200 (1:1)' :
-                '1080x1920 (9:16)'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Video template chips */}
-          <View style={styles.editBox}>
-            <View style={styles.editBoxHeader}>
-              <FilmZoomIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.editBoxLabel}>영상 템플릿 스타일</Text>
-            </View>
-            <View style={styles.editChipRow}>
-              {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
-                <TouchableOpacity
-                  key={tmpl}
-                  style={[styles.editChip, inlineEdit.videoTemplate === tmpl && styles.editChipActive]}
-                  onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editChipText, inlineEdit.videoTemplate === tmpl && styles.editChipTextActive]}>
-                    {tmpl}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Caption style */}
-          <View style={styles.editBox}>
-            <View style={styles.editBoxHeader}>
-              <PenLine size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.editBoxLabel}>자막 스타일</Text>
-            </View>
-            <View style={styles.editChipRow}>
-              {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
-                <TouchableOpacity
-                  key={font}
-                  style={[styles.editChip, inlineEdit.captionFont === font && styles.editChipActive]}
-                  onPress={() => handleInlineEdit({ captionFont: font })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editChipText, inlineEdit.captionFont === font && styles.editChipTextActive]}>
-                    {font}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.editChipRow}>
-              {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
-                <TouchableOpacity
-                  key={pos}
-                  style={[styles.editChip, inlineEdit.captionPosition === pos && styles.editChipActive]}
-                  onPress={() => handleInlineEdit({ captionPosition: pos })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editChipText, inlineEdit.captionPosition === pos && styles.editChipTextActive]}>
-                    {pos}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* BGM mood */}
-          <View style={styles.editBox}>
-            <View style={styles.editBoxHeader}>
-              <FilmIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.editBoxLabel}>BGM 분위기</Text>
-            </View>
-            <View style={styles.editChipRow}>
-              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이', '트렌디'].map((mood) => (
-                <TouchableOpacity
-                  key={mood}
-                  style={[styles.editChip, inlineEdit.bgmMood === mood && styles.editChipActive]}
-                  onPress={() => handleInlineEdit({ bgmMood: mood })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.editChipText, inlineEdit.bgmMood === mood && styles.editChipTextActive]}>
-                    {mood}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* AI prompt */}
-          <View style={styles.editBox}>
-            <View style={styles.editBoxHeader}>
-              <Wand2 size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.editBoxLabel}>AI 가상 영상 프롬프트</Text>
-            </View>
+        {/* === Title + Caption + Hashtags === */}
+        <View style={styles.detailSection}>
+          <View style={styles.detailBox}>
+            <Text style={styles.detailLabel}>타이틀 (유튜브/릴스용)</Text>
             <TextInput
-              style={styles.editTextInput}
-              value={inlineEdit.aiPrompt}
-              onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
-              placeholder="원하는 연출 분위기나 강조 사항을 입력하세요"
-              placeholderTextColor={theme.colors.dark.textFaint}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-            <TouchableOpacity
-              style={[styles.editRegenBtn, isRegenerating && styles.editRegenBtnDisabled]}
-              onPress={handleRegenerate}
-              disabled={isRegenerating}
-              activeOpacity={0.7}
-            >
-              {isRegenerating ? (
-                <ActivityIndicator size="small" color={theme.colors.dark.textFaint} />
-              ) : (
-                <Sparkles size={13} color="#fff" strokeWidth={2} />
-              )}
-              <Text style={[styles.editRegenBtnText, isRegenerating && styles.editRegenBtnTextDisabled]}>
-                {isRegenerating ? '재생성 중...' : 'AI 재생성'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Title */}
-          <View style={styles.editBox}>
-            <Text style={styles.editBoxLabel}>타이틀 (유튜브/릴스용)</Text>
-            <TextInput
-              style={styles.editTextInputSingle}
+              style={styles.detailInputSingle}
               value={inlineEdit.titleText}
               onChangeText={(text) => handleInlineEdit({ titleText: text })}
               placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
@@ -1932,12 +1901,10 @@ export default function ResultScreen() {
               numberOfLines={1}
             />
           </View>
-
-          {/* Caption text */}
-          <View style={styles.editBox}>
-            <Text style={styles.editBoxLabel}>설명 문구 직접 수정</Text>
+          <View style={styles.detailBox}>
+            <Text style={styles.detailLabel}>설명 문구 직접 수정</Text>
             <TextInput
-              style={styles.editTextInput}
+              style={styles.detailInput}
               value={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
               onChangeText={(text) => handleInlineEdit({ captionText: text })}
               placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
@@ -1947,21 +1914,19 @@ export default function ResultScreen() {
               textAlignVertical="top"
             />
           </View>
-
-          {/* Hashtags */}
           {allDisplayHashtags.length > 0 && (
-            <View style={styles.editBox}>
-              <Text style={styles.editBoxLabel}>해시태그 (탭하여 삭제)</Text>
-              <View style={styles.editHashtagWrap}>
+            <View style={styles.detailBox}>
+              <Text style={styles.detailLabel}>해시태그 (탭하여 삭제)</Text>
+              <View style={styles.detailHashtagWrap}>
                 {allDisplayHashtags.map((tag) => (
                   <TouchableOpacity
                     key={tag}
-                    style={styles.editHashtagChip}
+                    style={styles.detailHashtagChip}
                     onPress={() => handleInlineRemoveHashtag(tag)}
                     activeOpacity={0.6}
                   >
-                    <Text style={styles.editHashtagChipText}>#{tag}</Text>
-                    <Text style={styles.editHashtagRemoveX}> x</Text>
+                    <Text style={styles.detailHashtagChipText}>#{tag}</Text>
+                    <Text style={styles.detailHashtagRemoveX}> x</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -3326,5 +3291,227 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  // === One-stop preview & edit layout ===
+  previewFrame: {
+    position: 'relative',
+    alignItems: 'center',
+    marginVertical: theme.spacing.sm,
+  },
+  previewInner: {
+    width: '100%',
+    maxWidth: 340,
+    aspectRatio: 9 / 16,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.dark.surface,
+    ...theme.shadows.card,
+  },
+  previewLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(3, 5, 15, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  previewLoadingText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  previewBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: '50%',
+    marginLeft: -80,
+    width: 160,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(10, 15, 30, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+  },
+  previewBadgeText: {
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    flex: 1,
+  },
+  chipSection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: 10,
+  },
+  chipGroup: {
+    gap: 6,
+  },
+  chipGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipGroupLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  chipScroll: {
+    flexGrow: 0,
+  },
+  chipPill: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  chipPillActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[400],
+  },
+  chipPillText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  chipPillTextActive: {
+    color: '#fff',
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  promptSection: {
+    marginHorizontal: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    ...theme.shadows.card,
+  },
+  promptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  promptTitle: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  promptInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 80,
+  },
+  regenBtnLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 16,
+    ...theme.shadows.card,
+  },
+  regenBtnDisabled: {
+    backgroundColor: theme.colors.dark.border,
+  },
+  regenBtnText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  detailSection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: 10,
+  },
+  detailBox: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    gap: 8,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  detailInputSingle: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+  },
+  detailInput: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 72,
+  },
+  detailHashtagWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  detailHashtagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.warning[400] + '18',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  detailHashtagChipText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.warning[400],
+  },
+  detailHashtagRemoveX: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  templateMovedNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.primary[500] + '12',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[400] + '20',
+  },
+  templateMovedNoteText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 18,
   },
 });
