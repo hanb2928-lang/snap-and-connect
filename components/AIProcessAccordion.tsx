@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -130,6 +130,14 @@ export function AIProcessAccordion({
 }: AIProcessAccordionProps) {
   const [expanded, setExpanded] = useState(true);
   const [openStep, setOpenStep] = useState<number | null>(null);
+  const [step3Open, setStep3Open] = useState(false);
+
+  useEffect(() => {
+    if (analysisStatus === 'done') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setStep3Open(true);
+    }
+  }, [analysisStatus]);
 
   const toggleExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -139,6 +147,11 @@ export function AIProcessAccordion({
   const toggleStep = (idx: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpenStep((prev) => (prev === idx ? null : idx));
+  };
+
+  const toggleStep3 = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setStep3Open((prev) => !prev);
   };
 
   const confidencePct = Math.round(volumeConfidence * 100);
@@ -424,9 +437,13 @@ export function AIProcessAccordion({
             </StepCard>
           )}
 
-          {/* Step 3: Always-open prominent section */}
+          {/* Step 3: Auto-expand on complete, manually toggleable */}
           <View style={styles.step3Card}>
-            <View style={styles.step3Header}>
+            <TouchableOpacity
+              style={styles.step3Header}
+              onPress={toggleStep3}
+              activeOpacity={0.7}
+            >
               <View style={styles.step3HeaderLeft}>
                 <View style={[styles.step3Number, { backgroundColor: theme.colors.warning[400] + '25' }]}>
                   <Text style={[styles.step3NumberText, { color: theme.colors.warning[400] }]}>3</Text>
@@ -434,8 +451,13 @@ export function AIProcessAccordion({
                 <Upload size={18} color={theme.colors.warning[400]} strokeWidth={2} />
                 <Text style={styles.step3Label}>가상 영상 편집 & 프롬프트</Text>
               </View>
-            </View>
-            <View style={styles.step3Body}>
+              {step3Open ? (
+                <ChevronUp size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+            {step3Open && <View style={styles.step3Body}>
             <View style={styles.stepContent}>
               <View style={styles.renderBox}>
                 <View style={styles.renderRow}>
@@ -607,7 +629,7 @@ export function AIProcessAccordion({
                 </View>
               )}
             </View>
-            </View>
+            </View>}
           </View>
         </View>
       )}
