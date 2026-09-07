@@ -86,6 +86,7 @@ export default function CameraScreen() {
   const [postCaptureVideoUri, setPostCaptureVideoUri] = useState<string | null>(null);
   const [postCaptureBase64, setPostCaptureBase64] = useState<string | null>(null);
   const [postCaptureMime, setPostCaptureMime] = useState<string>('video/webm');
+  const [workflowMountKey, setWorkflowMountKey] = useState(0);
 
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
@@ -189,7 +190,7 @@ export default function CameraScreen() {
     setPostCaptureVideoUri(videoUri);
     setPostCaptureBase64(null);
     setPostCaptureMime('video/webm');
-    setPostCaptureVisible(true);
+    setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
   }, []);
 
   const startRecording = useCallback(async () => {
@@ -324,7 +325,7 @@ export default function CameraScreen() {
       setPostCaptureBase64(cleanBase64(compressedDataUrl));
       setPostCaptureMime(getMimeTypeFromDataUrl(compressedDataUrl));
       setPostCaptureVideoUri(null);
-      setPostCaptureVisible(true);
+      setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current || genIdRef.current !== genId) return;
       setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
@@ -346,7 +347,7 @@ export default function CameraScreen() {
         setPostCaptureBase64(cleanBase64(compressed));
         setPostCaptureMime(getMimeTypeFromDataUrl(compressed));
         setPostCaptureVideoUri(null);
-        setPostCaptureVisible(true);
+        setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
       } catch (err) {
         setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
       }
@@ -376,7 +377,7 @@ export default function CameraScreen() {
       setPostCaptureBase64(base64);
       setPostCaptureMime(mimeType);
       setPostCaptureVideoUri(null);
-      setPostCaptureVisible(true);
+      setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
@@ -529,7 +530,7 @@ export default function CameraScreen() {
       setPostCaptureMime(mimeType);
       setPostCaptureVideoUri(null);
     }
-    setPostCaptureVisible(true);
+    setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
   }, []);
 
   const handleModeSelect = (mode: CaptureModeType) => {
@@ -641,6 +642,7 @@ export default function CameraScreen() {
         />
 
         <PostCaptureWorkflow
+          key={`pcw-web-${workflowMountKey}`}
           visible={postCaptureVisible}
           videoUri={postCaptureVideoUri}
           imageUri={postCaptureBase64 ? buildDataUrl(postCaptureBase64, postCaptureMime) : null}
@@ -826,6 +828,7 @@ export default function CameraScreen() {
       )}
 
       <PostCaptureWorkflow
+        key={`pcw-native-${workflowMountKey}`}
         visible={postCaptureVisible}
         videoUri={postCaptureVideoUri}
         imageUri={postCaptureBase64 ? buildDataUrl(postCaptureBase64, postCaptureMime) : null}
