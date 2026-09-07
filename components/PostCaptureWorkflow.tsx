@@ -317,28 +317,6 @@ export function PostCaptureWorkflow({
     setSavingToGallery(false);
   }, [videoUri, imageUri, editPlan.bgmTemplate.id, editPlan.pacingBpm, bgmRecommendation]);
 
-  const handleLaunchPlatform = useCallback(async () => {
-    const deepLink = getDeepLink(selectedPlatformKey);
-    setPlatformLaunched(true);
-    try {
-      const canOpen = await Linking.canOpenURL(deepLink.uploadAppUrl);
-      if (canOpen) {
-        await Linking.openURL(deepLink.uploadAppUrl);
-      } else {
-        await Linking.openURL(deepLink.uploadWebUrl);
-      }
-    } catch {
-      try {
-        const canOpenFallback = await Linking.canOpenURL(deepLink.appUrl);
-        if (canOpenFallback) {
-          await Linking.openURL(deepLink.appUrl);
-        } else {
-          await Linking.openURL(deepLink.webUrl);
-        }
-      } catch { /* ignore */ }
-    }
-  }, [selectedPlatformKey]);
-
   const uriToBlob = useCallback(async (uri: string): Promise<Blob> => {
     if (uri.startsWith('data:')) {
       const resp = await fetch(uri);
@@ -735,14 +713,14 @@ export function PostCaptureWorkflow({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnShare, platformLaunched && styles.actionBtnDone]}
-              onPress={handleLaunchPlatform}
-              disabled={!gallerySaved}
+              style={[styles.actionBtn, styles.actionBtnShare, (isUploading || uploadDone) && styles.actionBtnDone]}
+              onPress={handleProceed}
+              disabled={isUploading || uploadDone}
               activeOpacity={0.8}
             >
               <Share2 size={18} color="#fff" strokeWidth={2.5} />
               <Text style={styles.actionBtnText}>
-                {platformLaunched ? `${platformLabel} 업로드 열림` : `${platformLabel} 동영상 업로드`}
+                {isUploading ? '생성 중...' : uploadDone ? '숏폼 생성 완료' : `${platformLabel} 동영상 업로드`}
               </Text>
             </TouchableOpacity>
 
@@ -787,29 +765,6 @@ export function PostCaptureWorkflow({
           </VerticalStepCard>
         </ScrollView>
 
-        {/* Sticky bottom CTA */}
-        <View style={styles.stickyCtaWrap}>
-          <TouchableOpacity
-            style={[styles.stickyCtaBtn, isUploading && styles.stickyCtaBtnLoading]}
-            onPress={handleProceed}
-            disabled={isUploading || uploadDone}
-            activeOpacity={0.85}
-          >
-            {isUploading ? (
-              <Text style={styles.stickyCtaText}>생성 중...</Text>
-            ) : uploadDone ? (
-              <>
-                <Check size={20} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
-              </>
-            ) : (
-              <>
-                <Check size={20} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.stickyCtaText}>숏폼 생성 완료</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
       </View>
 
       <Modal visible={showAddModal} transparent animationType="fade" onRequestClose={() => setShowAddModal(false)}>
@@ -1652,29 +1607,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
-  },
-  stickyCtaWrap: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(5, 8, 18, 0.98)',
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
-  },
-  stickyCtaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[600],
-  },
-  stickyCtaBtnLoading: {
-    opacity: 0.6,
-  },
-  stickyCtaText: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
 });
