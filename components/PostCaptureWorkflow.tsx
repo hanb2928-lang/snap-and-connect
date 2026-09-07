@@ -110,7 +110,6 @@ interface PostCaptureWorkflowProps {
   onClose: () => void;
 }
 
-type WorkflowStep = 0 | 1 | 2 | 3;
 type ConversionMode = 'shortform' | 'ai_video' | 'virtual_fitting';
 
 const CONVERSION_MODES: { key: ConversionMode; label: string; desc: string; icon: typeof Video }[] = [
@@ -126,7 +125,6 @@ export function PostCaptureWorkflow({
   onProceedToAnalysis,
   onClose,
 }: PostCaptureWorkflowProps) {
-  const [activeStep, setActiveStep] = useState<WorkflowStep>(1);
   const [selectedPlatformKey, setSelectedPlatformKey] = useState<string>('instagram');
   const [customPrompt, setCustomPrompt] = useState('');
   const [platformLink, setPlatformLink] = useState('');
@@ -277,10 +275,6 @@ export function PostCaptureWorkflow({
     ),
     [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled, bgmRecommendation],
   );
-
-  const handleStepToggle = useCallback((step: WorkflowStep) => {
-    setActiveStep((prev) => (prev === step ? 0 : step));
-  }, []);
 
   const handleSaveToGallery = useCallback(async () => {
     const uri = videoUri || (imageUri || null);
@@ -471,12 +465,71 @@ export function PostCaptureWorkflow({
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* AI Conversion Style Selector — top priority card */}
-          <View style={styles.conversionModeWrap}>
-            <View style={styles.conversionModeLabelRow}>
-              <Wand2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.conversionModeTitle}>AI 변환 스타일 선택</Text>
+          {/* Step 1: Capture Result Preview */}
+          <VerticalStepCard stepNum={1} title="촬영 결과물 확인" subtitle={videoUri ? '영상 캡처 완료' : imageUri ? '사진 캡처 완료' : '미디어 없음'}>
+            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} imageUri={imageUri} />
+
+            <View style={styles.timelinePreview}>
+              {editPlan.segments.map((seg) => (
+                <View key={seg.index} style={styles.timelineSeg}>
+                  <View style={[styles.timelineBar, { flex: seg.endSec - seg.startSec }]}>
+                    <Text style={styles.timelineLabel}>{seg.label}</Text>
+                    <Text style={styles.timelineTime}>{seg.startSec}-{seg.endSec}s</Text>
+                  </View>
+                </View>
+              ))}
+              {disclosureEnabled && (
+                <View style={[styles.timelineSeg]}>
+                  <View style={[styles.timelineBar, styles.timelineDisclosure, { flex: 2 }]}>
+                    <Text style={styles.timelineLabel}>공정위 문구</Text>
+                    <Text style={styles.timelineTime}>13-15s</Text>
+                  </View>
+                </View>
+              )}
+              {!disclosureEnabled && (
+                <View style={[styles.timelineSeg]}>
+                  <View style={[styles.timelineBar, styles.timelineExtraSeg, { flex: 2 }]}>
+                    <Text style={styles.timelineLabel}>여유</Text>
+                    <Text style={styles.timelineTime}>13-15s</Text>
+                  </View>
+                </View>
+              )}
             </View>
+
+            <View style={styles.metaInfoBox}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaKey}>비율</Text>
+                <Text style={styles.metaVal}>{spec ? spec.ratio : '9:16'} 세로형</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaKey}>자막 스타일</Text>
+                <Text style={styles.metaVal}>{editPlan.captionStyle}</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaKey}>템포</Text>
+                <Text style={styles.metaVal}>{editPlan.pacingBpm} BPM</Text>
+              </View>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaKey}>BGM</Text>
+                <Text style={styles.metaVal}>{bgmLoading ? 'AI 음악 분석 중...' : `${editPlan.bgmTemplate.label} · ${editPlan.bgmTemplate.bpm} BPM`}</Text>
+              </View>
+              {bgmRecommendation?.description && !bgmLoading && (
+                <View style={styles.bgReasonRow}>
+                  <MusicIcon size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.bgReasonText}>{bgmRecommendation.description}</Text>
+                </View>
+              )}
+              {bgmRecommendation?.reason && !bgmLoading && (
+                <View style={styles.bgReasonRow}>
+                  <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.bgReasonText}>AI 추천: {bgmRecommendation.reason}</Text>
+                </View>
+              )}
+            </View>
+          </VerticalStepCard>
+
+          {/* Step 2: AI Conversion Style Selection */}
+          <VerticalStepCard stepNum={2} title="AI 변환 스타일 선택" subtitle="어떤 스타일로 만들까요?">
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversionModeList}>
               {CONVERSION_MODES.map((mode) => {
                 const ModeIcon = mode.icon;
@@ -505,16 +558,102 @@ export function PostCaptureWorkflow({
                 ? '의류/제품 사진과 모델 사진을 업로드하면 AI가 가상 착용 피팅 영상을 생성합니다. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.'
                 : '촬영한 원본 영상/사진을 그대로 15초 숏폼으로 자동 편집합니다. 가장 빠르고 리얼한 결과가 필요할 때 선택하세요.'}
             </Text>
-          </View>
 
-          {/* Step 1: Platform Selection + Safe Zone */}
-          <StepCard
-            stepNum={1}
-            title="플랫폼 선택"
-            subtitle={`${platformLabel} · ${spec ? spec.ratio : '9:16'} · 안전지대 자동 적용`}
-            expanded={activeStep === 1}
-            onToggle={() => handleStepToggle(1)}
-          >
+            <View style={styles.promptLabelRow}>
+              <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.promptLabel}>맞춤 프롬프트 (선택)</Text>
+            </View>
+            <TextInput
+              style={styles.promptInput}
+              value={customPrompt}
+              onChangeText={(t) => { setCustomPrompt(t); setSelectedHookId(null); }}
+              placeholder="예: 오늘 갓 구운 소금빵 30% 할인, 절대 놓치지 마세요!"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              multiline
+              maxLength={200}
+            />
+
+            <View style={styles.hookLabelWrap}>
+              <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.hookLabel}>심리학 기반 후킹 문구 (1개 선택)</Text>
+            </View>
+            {hookOptions.map((hook: HookOption) => {
+              const isSelected = (selectedHookId ?? hookOptions[0]?.id) === hook.id;
+              return (
+                <TouchableOpacity
+                  key={hook.id}
+                  style={[styles.hookCard, isSelected && styles.hookCardSelected]}
+                  onPress={() => setSelectedHookId(hook.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.hookCardLeft}>
+                    <View style={[styles.hookBadge, isSelected && styles.hookBadgeSelected]}>
+                      <Text style={[styles.hookBadgeText, isSelected && styles.hookBadgeTextSelected]}>{hook.id}</Text>
+                    </View>
+                    <View style={styles.hookTextWrap}>
+                      <Text style={[styles.hookText, isSelected && styles.hookTextSelected]}>{hook.text}</Text>
+                      <Text style={styles.hookPsych}>{hook.psychology}</Text>
+                    </View>
+                  </View>
+                  {isSelected && <Check size={18} color={theme.colors.warning[400]} strokeWidth={2.5} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            <View style={styles.enhanceLabelWrap}>
+              <Wand2 size={14} color={theme.colors.success[500]} strokeWidth={2} />
+              <Text style={styles.enhanceLabel}>AI 자동 보정 (배경 편집 불필요)</Text>
+            </View>
+            {editPlan.autoEnhancements.map((enh: AutoEnhancement, idx: number) => {
+              const EnhIcon = enh.id === 'safe_zone_crop' ? Crop : enh.id === 'hook_overlay' ? Type : MusicIcon;
+              return (
+                <View key={enh.id} style={styles.enhanceCard}>
+                  <View style={styles.enhanceIconWrap}>
+                    <EnhIcon size={16} color={theme.colors.success[500]} strokeWidth={2} />
+                  </View>
+                  <View style={styles.enhanceTextWrap}>
+                    <Text style={styles.enhanceTitle}>{idx + 1}. {enh.label}</Text>
+                    <Text style={styles.enhanceDesc}>{enh.description}</Text>
+                  </View>
+                  <Check size={16} color={theme.colors.success[500]} strokeWidth={2.5} />
+                </View>
+              );
+            })}
+
+            <View style={styles.disclosureToggleRow}>
+              <View style={styles.disclosureToggleLeft}>
+                <Shield size={15} color={disclosureEnabled ? theme.colors.warning[500] : theme.colors.dark.textDim} strokeWidth={2} />
+                <View style={styles.disclosureToggleText}>
+                  <Text style={styles.disclosureToggleTitle}>유료 광고/협찬 표기</Text>
+                  <Text style={styles.disclosureToggleSub}>후반부 2초(13~15초) 공정위 문구 자동 삽입</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.toggleSwitch, disclosureEnabled && styles.toggleSwitchOn]}
+                onPress={() => setDisclosureEnabled((v) => !v)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.toggleThumb, disclosureEnabled && styles.toggleThumbOn]} />
+              </TouchableOpacity>
+            </View>
+
+            {disclosureEnabled && (
+              <View style={styles.disclosurePreviewBox}>
+                <View style={styles.disclosurePreviewHeader}>
+                  <Shield size={14} color={theme.colors.warning[400]} strokeWidth={2.2} />
+                  <Text style={styles.disclosurePreviewTitle}>공정위 의무 표기 (13~15초, 2초간 자동 삽입)</Text>
+                </View>
+                <Text style={styles.disclosurePreviewText}>{editPlan.disclosureOverlay.text}</Text>
+                <Text style={styles.disclosurePreviewMeta}>
+                  위치: {editPlan.disclosureOverlay.position === 'bottom-center' ? '하단 중앙' : '상단 중앙'} ·
+                  배경 투명도: {Math.round(editPlan.disclosureOverlay.bgOpacity * 100)}%
+                </Text>
+              </View>
+            )}
+          </VerticalStepCard>
+
+          {/* Step 3: Platform Selection */}
+          <VerticalStepCard stepNum={3} title="플랫폼 선택" subtitle={`${platformLabel} · ${spec ? spec.ratio : '9:16'} · 안전지대 자동 적용`}>
             <View style={styles.platformGrid}>
               {allPlatformOptions.map((opt) => {
                 const Icon = opt.icon;
@@ -522,13 +661,13 @@ export function PostCaptureWorkflow({
                 return (
                   <View key={opt.key} style={styles.platformChipWrap}>
                     <TouchableOpacity
-                      style={[styles.platformChip, isActive && { borderColor: opt.color, backgroundColor: opt.color + '15' }]}
+                      style={[styles.platformChip, isActive && styles.platformChipActiveRed]}
                       onPress={() => { setSelectedPlatformKey(opt.key); setSelectedHookId(null); }}
                       activeOpacity={0.7}
                     >
-                      <Icon size={20} color={isActive ? opt.color : theme.colors.dark.textDim} strokeWidth={2} />
-                      <Text style={[styles.platformChipText, isActive && { color: opt.color }]}>{opt.label}</Text>
-                      {isActive && <Check size={14} color={opt.color} strokeWidth={2.5} />}
+                      <Icon size={20} color={isActive ? theme.colors.error[500] : theme.colors.dark.textDim} strokeWidth={2} />
+                      <Text style={[styles.platformChipText, isActive && styles.platformChipTextActiveRed]}>{opt.label}</Text>
+                      {isActive && <Check size={14} color={theme.colors.error[500]} strokeWidth={2.5} />}
                     </TouchableOpacity>
                     {opt.isCustom && opt.dbId && (
                       <TouchableOpacity
@@ -575,210 +714,12 @@ export function PostCaptureWorkflow({
             <Text style={styles.safeZoneHint}>
               선택한 플랫폼의 안전지대(Safe Zone)가 AI 편집에 자동 적용되어 자막이 UI 영역과 겹치지 않습니다.
             </Text>
-            <TouchableOpacity style={styles.stepNextBtn} onPress={() => setActiveStep(2)} activeOpacity={0.8}>
-              <Text style={styles.stepNextBtnText}>다음 단계: AI 편집</Text>
-              <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </StepCard>
+          </VerticalStepCard>
 
-          {/* Step 2: AI Semi-Auto Editing + Hook Selection */}
-          <StepCard
-            stepNum={2}
-            title="AI 반자동 편집"
-            subtitle={`후킹 ${hookOptions.length}개 자동 도출 · ${editPlan.captionStyle.slice(0, 12)}...`}
-            expanded={activeStep === 2}
-            onToggle={() => handleStepToggle(2)}
-          >
-            <View style={styles.promptLabelRow}>
-              <PenLine size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.promptLabel}>맞춤 프롬프트 (선택)</Text>
-            </View>
-            <TextInput
-              style={styles.promptInput}
-              value={customPrompt}
-              onChangeText={(t) => { setCustomPrompt(t); setSelectedHookId(null); }}
-              placeholder="예: 오늘 갓 구운 소금빵 30% 할인, 절대 놓치지 마세요!"
-              placeholderTextColor={theme.colors.dark.textFaint}
-              multiline
-              maxLength={200}
-            />
-
-            <View style={styles.hookLabelWrap}>
-              <Sparkles size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.hookLabel}>심리학 기반 후킹 문구 (1개 선택)</Text>
-            </View>
-            {hookOptions.map((hook: HookOption) => {
-              const isSelected = (selectedHookId ?? hookOptions[0]?.id) === hook.id;
-              return (
-                <TouchableOpacity
-                  key={hook.id}
-                  style={[styles.hookCard, isSelected && styles.hookCardSelected]}
-                  onPress={() => setSelectedHookId(hook.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.hookCardLeft}>
-                    <View style={[styles.hookBadge, isSelected && styles.hookBadgeSelected]}>
-                      <Text style={[styles.hookBadgeText, isSelected && styles.hookBadgeTextSelected]}>{hook.id}</Text>
-                    </View>
-                    <View style={styles.hookTextWrap}>
-                      <Text style={[styles.hookText, isSelected && styles.hookTextSelected]}>{hook.text}</Text>
-                      <Text style={styles.hookPsych}>{hook.psychology}</Text>
-                    </View>
-                  </View>
-                  {isSelected && <Check size={18} color={theme.colors.warning[400]} strokeWidth={2.5} />}
-                </TouchableOpacity>
-              );
-            })}
-
-            <View style={styles.enhanceLabelWrap}>
-              <Wand2 size={14} color={theme.colors.success[500]} strokeWidth={2} />
-              <Text style={styles.enhanceLabel}>AI 자동 보정 (배경 편집 불필요)</Text>
-            </View>
-            <Text style={styles.enhanceHint}>
-              스마트폰으로 촬영한 날것의 영상이 가장 리얼합니다. 복잡한 배경 제거/가상 스튜디오 합성 없이, 아래 3가지만 AI가 자동으로 잡아줍니다.
-            </Text>
-            {editPlan.autoEnhancements.map((enh: AutoEnhancement, idx: number) => {
-              const EnhIcon = enh.id === 'safe_zone_crop' ? Crop : enh.id === 'hook_overlay' ? Type : MusicIcon;
-              return (
-                <View key={enh.id} style={styles.enhanceCard}>
-                  <View style={styles.enhanceIconWrap}>
-                    <EnhIcon size={16} color={theme.colors.success[500]} strokeWidth={2} />
-                  </View>
-                  <View style={styles.enhanceTextWrap}>
-                    <Text style={styles.enhanceTitle}>{idx + 1}. {enh.label}</Text>
-                    <Text style={styles.enhanceDesc}>{enh.description}</Text>
-                  </View>
-                  <Check size={16} color={theme.colors.success[500]} strokeWidth={2.5} />
-                </View>
-              );
-            })}
-
-            <View style={styles.metaInfoBox}>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>비율</Text>
-                <Text style={styles.metaVal}>{spec ? spec.ratio : '9:16'} 세로형</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>플랫폼</Text>
-                <Text style={styles.metaVal}>{platformLabel}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>자막 스타일</Text>
-                <Text style={styles.metaVal}>{editPlan.captionStyle}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>템포</Text>
-                <Text style={styles.metaVal}>{editPlan.pacingBpm} BPM</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>안전지대</Text>
-                <Text style={styles.metaVal}>상하단 자막 영역 확보</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaKey}>BGM</Text>
-                <Text style={styles.metaVal}>{bgmLoading ? 'AI 음악 분석 중...' : `${editPlan.bgmTemplate.label} · ${editPlan.bgmTemplate.bpm} BPM`}</Text>
-              </View>
-              {bgmRecommendation?.description && !bgmLoading && (
-                <View style={styles.bgReasonRow}>
-                  <MusicIcon size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-                  <Text style={styles.bgReasonText}>{bgmRecommendation.description}</Text>
-                </View>
-              )}
-              {bgmRecommendation?.reason && !bgmLoading && (
-                <View style={styles.bgReasonRow}>
-                  <Sparkles size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-                  <Text style={styles.bgReasonText}>AI 추천: {bgmRecommendation.reason}</Text>
-                </View>
-              )}
-              {bgmRecommendation && !bgmLoading && (
-                <View style={styles.bgReasonRow}>
-                  <Wand2 size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.bgReasonText}>핵심 구간: {bgmRecommendation.highlightStartSec}초~{bgmRecommendation.highlightStartSec + bgmRecommendation.highlightDurationSec}초 (에너지 피크 싱크)</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.disclosureToggleRow}>
-              <View style={styles.disclosureToggleLeft}>
-                <Shield size={15} color={disclosureEnabled ? theme.colors.warning[500] : theme.colors.dark.textDim} strokeWidth={2} />
-                <View style={styles.disclosureToggleText}>
-                  <Text style={styles.disclosureToggleTitle}>유료 광고/협찬 표기</Text>
-                  <Text style={styles.disclosureToggleSub}>후반부 2초(13~15초) 공정위 문구 자동 삽입</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.toggleSwitch, disclosureEnabled && styles.toggleSwitchOn]}
-                onPress={() => setDisclosureEnabled((v) => !v)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.toggleThumb, disclosureEnabled && styles.toggleThumbOn]} />
-              </TouchableOpacity>
-            </View>
-
-            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} imageUri={imageUri} />
-
-            <View style={styles.timelinePreview}>
-              {editPlan.segments.map((seg) => (
-                <View key={seg.index} style={styles.timelineSeg}>
-                  <View style={[styles.timelineBar, { flex: seg.endSec - seg.startSec }]}>
-                    <Text style={styles.timelineLabel}>{seg.label}</Text>
-                    <Text style={styles.timelineTime}>{seg.startSec}-{seg.endSec}s</Text>
-                  </View>
-                </View>
-              ))}
-              {disclosureEnabled && (
-                <View style={[styles.timelineSeg]}>
-                  <View style={[styles.timelineBar, styles.timelineDisclosure, { flex: 2 }]}>
-                    <Text style={styles.timelineLabel}>공정위 문구</Text>
-                    <Text style={styles.timelineTime}>13-15s</Text>
-                  </View>
-                </View>
-              )}
-              {!disclosureEnabled && (
-                <View style={[styles.timelineSeg]}>
-                  <View style={[styles.timelineBar, styles.timelineExtraSeg, { flex: 2 }]}>
-                    <Text style={styles.timelineLabel}>여유</Text>
-                    <Text style={styles.timelineTime}>13-15s</Text>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.stepNextBtn} onPress={() => setActiveStep(3)} activeOpacity={0.8}>
-              <Text style={styles.stepNextBtnText}>다음 단계: 저장 & 발행</Text>
-              <ArrowRight size={16} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </StepCard>
-
-          {/* Step 3: Gallery Save + Platform Share + Disclosure */}
-          <StepCard
-            stepNum={3}
-            title="갤러리 저장 & 플랫폼 발행"
-            subtitle="기기에 저장하고 SNS로 바로 발행하세요"
-            expanded={activeStep === 3}
-            onToggle={() => handleStepToggle(3)}
-          >
-            {disclosureEnabled ? (
-              <View style={styles.disclosurePreviewBox}>
-                <View style={styles.disclosurePreviewHeader}>
-                  <Shield size={14} color={theme.colors.warning[400]} strokeWidth={2.2} />
-                  <Text style={styles.disclosurePreviewTitle}>공정위 의무 표기 (13~15초, 2초간 자동 삽입)</Text>
-                </View>
-                <Text style={styles.disclosurePreviewText}>{editPlan.disclosureOverlay.text}</Text>
-                <Text style={styles.disclosurePreviewMeta}>
-                  위치: {editPlan.disclosureOverlay.position === 'bottom-center' ? '하단 중앙' : '상단 중앙'} ·
-                  배경 투명도: {Math.round(editPlan.disclosureOverlay.bgOpacity * 100)}%
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.disclosureOffBox}>
-                <Shield size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                <Text style={styles.disclosureOffText}>공정위 문구 삽입 없이 순수 15초 홍보 영상으로 완성됩니다.</Text>
-              </View>
-            )}
-
+          {/* Step 4: Custom Link Management + Save & Publish */}
+          <VerticalStepCard stepNum={4} title="맞춤 링크 & 발행" subtitle="링크를 추가하고 저장·발행하세요">
             <TouchableOpacity
-              style={[styles.actionBtn, gallerySaved && styles.actionBtnDone]}
+              style={styles.actionBtn}
               onPress={handleSaveToGallery}
               disabled={savingToGallery || gallerySaved}
               activeOpacity={0.8}
@@ -812,7 +753,7 @@ export function PostCaptureWorkflow({
             >
               <View style={styles.linkPanelHeaderLeft}>
                 <LinkIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                <Text style={styles.linkPanelHeaderText}>맞춤 링크 관리</Text>
+                <Text style={styles.linkPanelHeaderText}>맞춤 링크 관리 (무한 추가)</Text>
               </View>
               {linkPanelExpanded ? (
                 <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
@@ -843,7 +784,7 @@ export function PostCaptureWorkflow({
                 클라우드 업로드 실패 — 로컬 다운로드 및 {platformLabel} 공유로 자동 전환되었습니다. 발행을 계속 진행하세요.
               </Text>
             )}
-          </StepCard>
+          </VerticalStepCard>
         </ScrollView>
 
         {/* Sticky bottom CTA */}
@@ -931,33 +872,26 @@ export function PostCaptureWorkflow({
   );
 }
 
-interface StepCardProps {
+interface VerticalStepCardProps {
   stepNum: number;
   title: string;
   subtitle: string;
-  expanded: boolean;
-  onToggle: () => void;
   children: React.ReactNode;
 }
 
-function StepCard({ stepNum, title, subtitle, expanded, onToggle, children }: StepCardProps) {
+function VerticalStepCard({ stepNum, title, subtitle, children }: VerticalStepCardProps) {
   return (
     <View style={styles.stepCard}>
-      <TouchableOpacity style={styles.stepHeader} onPress={onToggle} activeOpacity={0.7}>
+      <View style={styles.stepHeader}>
         <View style={styles.stepNumWrap}>
           <Text style={styles.stepNumText}>{stepNum}</Text>
         </View>
         <View style={styles.stepHeaderText}>
           <Text style={styles.stepTitle}>{title}</Text>
-          <Text style={styles.stepSubtitle} numberOfLines={expanded ? 0 : 1}>{subtitle}</Text>
+          <Text style={styles.stepSubtitle} numberOfLines={0}>{subtitle}</Text>
         </View>
-        {expanded ? (
-          <ChevronUp size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-        ) : (
-          <ChevronDown size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-        )}
-      </TouchableOpacity>
-      {expanded && <View style={styles.stepBody}>{children}</View>}
+      </View>
+      <View style={styles.stepBody}>{children}</View>
     </View>
   );
 }
@@ -1061,6 +995,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
     borderColor: theme.colors.dark.border,
+  },
+  platformChipActiveRed: {
+    borderColor: theme.colors.error[500],
+    backgroundColor: theme.colors.error[500] + '18',
+    borderWidth: 2.5,
+  },
+  platformChipTextActiveRed: {
+    color: theme.colors.error[500],
   },
   platformChipText: {
     fontSize: 13,
