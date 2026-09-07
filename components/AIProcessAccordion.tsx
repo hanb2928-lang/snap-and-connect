@@ -129,7 +129,7 @@ export function AIProcessAccordion({
   isRegenerating,
 }: AIProcessAccordionProps) {
   const [expanded, setExpanded] = useState(true);
-  const [openStep, setOpenStep] = useState<number | null>(2);
+  const [openStep, setOpenStep] = useState<number | null>(null);
 
   const toggleExpanded = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -190,222 +190,252 @@ export function AIProcessAccordion({
 
       {expanded && (
         <View style={styles.body}>
-          {/* Step 1: Synthesis */}
-          <StepCard
-            index={0}
-            label={STEP_META[0].label}
-            icon={STEP_META[0].icon}
-            color={STEP_META[0].color}
-            isOpen={openStep === 0}
-            onToggle={() => toggleStep(0)}
-          >
-            <View style={styles.stepContent}>
-              <View style={styles.chipRow}>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>전략: {synthesisStrategy}</Text>
-                </View>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>맥락: {contextLabel}</Text>
-                </View>
-              </View>
-              <View style={styles.confidenceBar}>
-                <View style={styles.confidenceBarHeader}>
-                  <Text style={styles.confidenceLabel}>볼륨 신뢰도</Text>
-                  <Text style={styles.confidenceValue}>{confidencePct}%</Text>
-                </View>
-                <View style={styles.confidenceTrack}>
-                  <View
-                    style={[
-                      styles.confidenceFill,
-                      {
-                        width: `${confidencePct}%`,
-                        backgroundColor: confidencePct >= 70
-                          ? theme.colors.success[400]
-                          : confidencePct >= 40
-                            ? theme.colors.warning[400]
-                            : theme.colors.error[400],
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-              <View style={styles.angleRow}>
-                {['정면', '좌측', '우측', '후면', '상부'].map((angle, i) => (
-                  <View key={angle} style={styles.angleChip}>
-                    <View style={[styles.angleDot, { backgroundColor: i < 3 ? theme.colors.primary[400] : theme.colors.dark.border }]} />
-                    <Text style={[styles.angleText, { color: i < 3 ? theme.colors.dark.text : theme.colors.dark.textFaint }]}>
-                      {angle}
-                    </Text>
+          {/* Step 1 & 2: Compact summary chips */}
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryChip}>
+              <CheckCircle2 size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.summaryChipText}>3D 볼륨 합성 완료 · 신뢰도 {confidencePct}%</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.summaryChip}
+              onPress={() => toggleStep(0)}
+              activeOpacity={0.7}
+            >
+              <Box size={13} color={theme.colors.primary[400]} strokeWidth={2} />
+              <Text style={styles.summaryChipLink}>상세</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryChip}>
+              <CheckCircle2 size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
+              <Text style={styles.summaryChipText} numberOfLines={1}>훅 연출 완료 · {hookLabel} · BPM {beatSyncBpm}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.summaryChip}
+              onPress={() => toggleStep(1)}
+              activeOpacity={0.7}
+            >
+              <Radio size={13} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.summaryChipLink}>상세</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Expandable Step 1 (hidden by default, toggleable from summary) */}
+          {openStep === 0 && (
+            <StepCard
+              index={0}
+              label={STEP_META[0].label}
+              icon={STEP_META[0].icon}
+              color={STEP_META[0].color}
+              isOpen={true}
+              onToggle={() => toggleStep(0)}
+            >
+              <View style={styles.stepContent}>
+                <View style={styles.chipRow}>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>전략: {synthesisStrategy}</Text>
                   </View>
-                ))}
-              </View>
-              {processingSteps.length > 0 && (
-                <View style={styles.stepList}>
-                  {processingSteps.map((step, i) => (
-                    <View key={i} style={styles.stepListItem}>
-                      <View style={styles.stepListDot} />
-                      <Text style={styles.stepListText}>{step}</Text>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>맥락: {contextLabel}</Text>
+                  </View>
+                </View>
+                <View style={styles.confidenceBar}>
+                  <View style={styles.confidenceBarHeader}>
+                    <Text style={styles.confidenceLabel}>볼륨 신뢰도</Text>
+                    <Text style={styles.confidenceValue}>{confidencePct}%</Text>
+                  </View>
+                  <View style={styles.confidenceTrack}>
+                    <View
+                      style={[
+                        styles.confidenceFill,
+                        {
+                          width: `${confidencePct}%`,
+                          backgroundColor: confidencePct >= 70
+                            ? theme.colors.success[400]
+                            : confidencePct >= 40
+                              ? theme.colors.warning[400]
+                              : theme.colors.error[400],
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+                <View style={styles.angleRow}>
+                  {['정면', '좌측', '우측', '후면', '상부'].map((angle, i) => (
+                    <View key={angle} style={styles.angleChip}>
+                      <View style={[styles.angleDot, { backgroundColor: i < 3 ? theme.colors.primary[400] : theme.colors.dark.border }]} />
+                      <Text style={[styles.angleText, { color: i < 3 ? theme.colors.dark.text : theme.colors.dark.textFaint }]}>
+                        {angle}
+                      </Text>
                     </View>
                   ))}
                 </View>
-              )}
-              {/* Inline edit: volume intensity slider */}
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Sliders size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={styles.inlineEditLabel}>입체감 강도</Text>
-                  <Text style={styles.inlineEditValue}>{Math.round(editState.volumeIntensity * 100)}%</Text>
+                {processingSteps.length > 0 && (
+                  <View style={styles.stepList}>
+                    {processingSteps.map((step, i) => (
+                      <View key={i} style={styles.stepListItem}>
+                        <View style={styles.stepListDot} />
+                        <Text style={styles.stepListText}>{step}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <View style={styles.inlineEditBox}>
+                  <View style={styles.inlineEditHeader}>
+                    <Sliders size={12} color={theme.colors.primary[300]} strokeWidth={2} />
+                    <Text style={styles.inlineEditLabel}>입체감 강도</Text>
+                    <Text style={styles.inlineEditValue}>{Math.round(editState.volumeIntensity * 100)}%</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.sliderTrack}
+                    onPress={(e) => {
+                      const { locationX } = e.nativeEvent;
+                      const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
+                      const ratio = Math.max(0, Math.min(1, locationX / w));
+                      onEditChange({ volumeIntensity: Math.round(ratio * 100) / 100 });
+                    }}
+                    activeOpacity={1}
+                  >
+                    <View style={[styles.sliderFill, { width: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
+                    <View style={[styles.sliderThumb, { left: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.sliderTrack}
-                  onPress={(e) => {
-                    const { locationX } = e.nativeEvent;
-                    const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
-                    const ratio = Math.max(0, Math.min(1, locationX / w));
-                    onEditChange({ volumeIntensity: Math.round(ratio * 100) / 100 });
-                  }}
-                  activeOpacity={1}
-                >
-                  <View style={[styles.sliderFill, { width: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
-                  <View style={[styles.sliderThumb, { left: `${Math.round(editState.volumeIntensity * 100)}%` }]} />
-                </TouchableOpacity>
+              </View>
+            </StepCard>
+          )}
+
+          {/* Expandable Step 2 (hidden by default, toggleable from summary) */}
+          {openStep === 1 && (
+            <StepCard
+              index={1}
+              label={STEP_META[1].label}
+              icon={STEP_META[1].icon}
+              color={STEP_META[1].color}
+              isOpen={true}
+              onToggle={() => toggleStep(1)}
+            >
+              <View style={styles.stepContent}>
+                <View style={styles.directingRow}>
+                  <View style={styles.directingCard}>
+                    <Text style={styles.directingCardLabel}>오프닝 훅</Text>
+                    <Text style={styles.directingCardValue}>{hookLabel}</Text>
+                    <Text style={styles.directingCardDesc} numberOfLines={2}>{hookDescription}</Text>
+                  </View>
+                </View>
+                <View style={styles.chipRow}>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>BPM {beatSyncBpm}</Text>
+                  </View>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>컷 전환 {cutPointCount}회</Text>
+                  </View>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>SFX {sfxCount}종</Text>
+                  </View>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>킬링 자막 {killPointCount}개</Text>
+                  </View>
+                </View>
+                <View style={styles.timelineBar}>
+                  <View style={[styles.timelineSegment, { flex: 3, backgroundColor: theme.colors.primary[500] }]}>
+                    <Text style={styles.timelineSegmentText}>3s 훅</Text>
+                  </View>
+                  <View style={[styles.timelineSegment, { flex: 4, backgroundColor: theme.colors.accent[500] }]}>
+                    <Text style={styles.timelineSegmentText}>소개</Text>
+                  </View>
+                  <View style={[styles.timelineSegment, { flex: 4, backgroundColor: theme.colors.warning[500] }]}>
+                    <Text style={styles.timelineSegmentText}>혜택</Text>
+                  </View>
+                  <View style={[styles.timelineSegment, { flex: 2, backgroundColor: theme.colors.success[500] }]}>
+                    <Text style={styles.timelineSegmentText}>CTA</Text>
+                  </View>
+                </View>
+                <Text style={styles.timelineHint}>0s ─────────── 15s</Text>
+                <View style={styles.inlineEditBox}>
+                  <Text style={styles.inlineEditLabel}>훅 효과 변경</Text>
+                  <View style={styles.effectChipRow}>
+                    {HOOK_EFFECTS.map((eff) => (
+                      <TouchableOpacity
+                        key={eff.key}
+                        style={[
+                          styles.effectChip,
+                          editState.hookEffect === eff.key && styles.effectChipActive,
+                        ]}
+                        onPress={() => onEditChange({ hookEffect: eff.key })}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.effectChipText,
+                            editState.hookEffect === eff.key && styles.effectChipTextActive,
+                          ]}
+                        >
+                          {eff.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.inlineEditBox}>
+                  <View style={styles.inlineEditHeader}>
+                    <Text style={styles.inlineEditLabel}>비트 싱크 감도</Text>
+                    <Text style={styles.inlineEditValue}>{beatSensitivityPct}%</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.sliderTrack}
+                    onPress={(e) => {
+                      const { locationX } = e.nativeEvent;
+                      const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
+                      const ratio = Math.max(0, Math.min(1, locationX / w));
+                      onEditChange({ beatSyncSensitivity: Math.round(ratio * 100) / 100 });
+                    }}
+                    activeOpacity={1}
+                  >
+                    <View style={[styles.sliderFill, { width: `${beatSensitivityPct}%`, backgroundColor: theme.colors.accent[400] }]} />
+                    <View style={[styles.sliderThumb, { left: `${beatSensitivityPct}%` }]} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.inlineEditBox}>
+                  <Text style={styles.inlineEditLabel}>SFX 효과음 스타일</Text>
+                  <View style={styles.effectChipRow}>
+                    {SFX_STYLES.map((style) => (
+                      <TouchableOpacity
+                        key={style}
+                        style={[
+                          styles.effectChip,
+                          editState.sfxStyle === style && styles.effectChipActive,
+                        ]}
+                        onPress={() => onEditChange({ sfxStyle: style })}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.effectChipText,
+                            editState.sfxStyle === style && styles.effectChipTextActive,
+                          ]}
+                        >
+                          {style}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </StepCard>
+          )}
+
+          {/* Step 3: Always-open prominent section */}
+          <View style={styles.step3Card}>
+            <View style={styles.step3Header}>
+              <View style={styles.step3HeaderLeft}>
+                <View style={[styles.step3Number, { backgroundColor: theme.colors.warning[400] + '25' }]}>
+                  <Text style={[styles.step3NumberText, { color: theme.colors.warning[400] }]}>3</Text>
+                </View>
+                <Upload size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.step3Label}>가상 영상 편집 & 프롬프트</Text>
               </View>
             </View>
-          </StepCard>
-
-          {/* Step 2: Directing */}
-          <StepCard
-            index={1}
-            label={STEP_META[1].label}
-            icon={STEP_META[1].icon}
-            color={STEP_META[1].color}
-            isOpen={openStep === 1}
-            onToggle={() => toggleStep(1)}
-          >
-            <View style={styles.stepContent}>
-              <View style={styles.directingRow}>
-                <View style={styles.directingCard}>
-                  <Text style={styles.directingCardLabel}>오프닝 훅</Text>
-                  <Text style={styles.directingCardValue}>{hookLabel}</Text>
-                  <Text style={styles.directingCardDesc} numberOfLines={2}>{hookDescription}</Text>
-                </View>
-              </View>
-              <View style={styles.chipRow}>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>BPM {beatSyncBpm}</Text>
-                </View>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>컷 전환 {cutPointCount}회</Text>
-                </View>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>SFX {sfxCount}종</Text>
-                </View>
-                <View style={styles.chip}>
-                  <Text style={styles.chipText}>킬링 자막 {killPointCount}개</Text>
-                </View>
-              </View>
-              <View style={styles.timelineBar}>
-                <View style={[styles.timelineSegment, { flex: 3, backgroundColor: theme.colors.primary[500] }]}>
-                  <Text style={styles.timelineSegmentText}>3s 훅</Text>
-                </View>
-                <View style={[styles.timelineSegment, { flex: 4, backgroundColor: theme.colors.accent[500] }]}>
-                  <Text style={styles.timelineSegmentText}>소개</Text>
-                </View>
-                <View style={[styles.timelineSegment, { flex: 4, backgroundColor: theme.colors.warning[500] }]}>
-                  <Text style={styles.timelineSegmentText}>혜택</Text>
-                </View>
-                <View style={[styles.timelineSegment, { flex: 2, backgroundColor: theme.colors.success[500] }]}>
-                  <Text style={styles.timelineSegmentText}>CTA</Text>
-                </View>
-              </View>
-              <Text style={styles.timelineHint}>0s ─────────── 15s</Text>
-
-              {/* Inline edit: hook effect chips */}
-              <View style={styles.inlineEditBox}>
-                <Text style={styles.inlineEditLabel}>훅 효과 변경</Text>
-                <View style={styles.effectChipRow}>
-                  {HOOK_EFFECTS.map((eff) => (
-                    <TouchableOpacity
-                      key={eff.key}
-                      style={[
-                        styles.effectChip,
-                        editState.hookEffect === eff.key && styles.effectChipActive,
-                      ]}
-                      onPress={() => onEditChange({ hookEffect: eff.key })}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.effectChipText,
-                          editState.hookEffect === eff.key && styles.effectChipTextActive,
-                        ]}
-                      >
-                        {eff.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Inline edit: beat sync sensitivity */}
-              <View style={styles.inlineEditBox}>
-                <View style={styles.inlineEditHeader}>
-                  <Text style={styles.inlineEditLabel}>비트 싱크 감도</Text>
-                  <Text style={styles.inlineEditValue}>{beatSensitivityPct}%</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.sliderTrack}
-                  onPress={(e) => {
-                    const { locationX } = e.nativeEvent;
-                    const w = (e.currentTarget as any).clientWidth || (e.nativeEvent as any).layout?.width || 200;
-                    const ratio = Math.max(0, Math.min(1, locationX / w));
-                    onEditChange({ beatSyncSensitivity: Math.round(ratio * 100) / 100 });
-                  }}
-                  activeOpacity={1}
-                >
-                  <View style={[styles.sliderFill, { width: `${beatSensitivityPct}%`, backgroundColor: theme.colors.accent[400] }]} />
-                  <View style={[styles.sliderThumb, { left: `${beatSensitivityPct}%` }]} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Inline edit: SFX style chips */}
-              <View style={styles.inlineEditBox}>
-                <Text style={styles.inlineEditLabel}>SFX 효과음 스타일</Text>
-                <View style={styles.effectChipRow}>
-                  {SFX_STYLES.map((style) => (
-                    <TouchableOpacity
-                      key={style}
-                      style={[
-                        styles.effectChip,
-                        editState.sfxStyle === style && styles.effectChipActive,
-                      ]}
-                      onPress={() => onEditChange({ sfxStyle: style })}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.effectChipText,
-                          editState.sfxStyle === style && styles.effectChipTextActive,
-                        ]}
-                      >
-                        {style}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </StepCard>
-
-          {/* Step 3: Rendering & Metadata */}
-          <StepCard
-            index={2}
-            label={STEP_META[2].label}
-            icon={STEP_META[2].icon}
-            color={STEP_META[2].color}
-            isOpen={openStep === 2}
-            onToggle={() => toggleStep(2)}
-          >
+            <View style={styles.step3Body}>
             <View style={styles.stepContent}>
               <View style={styles.renderBox}>
                 <View style={styles.renderRow}>
@@ -577,7 +607,8 @@ export function AIProcessAccordion({
                 </View>
               )}
             </View>
-          </StepCard>
+            </View>
+          </View>
         </View>
       )}
     </View>
@@ -947,15 +978,15 @@ const styles = StyleSheet.create({
   },
   effectChip: {
     backgroundColor: theme.colors.dark.border + '60',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   effectChipActive: {
     backgroundColor: theme.colors.primary[400],
   },
   effectChipText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
@@ -968,12 +999,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
-    minHeight: 60,
+    minHeight: 72,
   },
   // Hashtag chips
   hashtagWrap: {
@@ -1004,17 +1035,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: theme.colors.primary[400],
-    borderRadius: theme.radius.sm,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   regenerateBtnDisabled: {
     backgroundColor: theme.colors.dark.border,
   },
   regenerateBtnText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },
@@ -1027,10 +1058,78 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
+  },
+  // Summary chips for collapsed Step 1 & 2
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  summaryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  summaryChipText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+    flex: 1,
+  },
+  summaryChipLink: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  // Step 3 prominent card
+  step3Card: {
+    backgroundColor: theme.colors.warning[400] + '08',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+    overflow: 'hidden',
+  },
+  step3Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  step3HeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  step3Number: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  step3NumberText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+  },
+  step3Label: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  step3Body: {
+    paddingHorizontal: 12,
+    paddingBottom: 14,
   },
 });
