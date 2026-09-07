@@ -39,7 +39,8 @@ import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleC
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
-import { invokeStereoCutAuto, type CloudPipelineProgress, type AngleImagePayload } from '@/lib/cloudPipeline';
+import { runStereoPipeline, makeInitialProgress, type StereoPipelineProgress, type StereoPipelineResult } from '@/lib/stereoPipeline';
+import { StereoPipelineOverlay } from '@/components/StereoPipelineOverlay';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -89,7 +90,10 @@ export default function CameraScreen() {
   const [postCaptureBase64, setPostCaptureBase64] = useState<string | null>(null);
   const [postCaptureMime, setPostCaptureMime] = useState<string>('video/webm');
   const [workflowMountKey, setWorkflowMountKey] = useState(0);
-  const [cloudProgress, setCloudProgress] = useState<CloudPipelineProgress | null>(null);
+  const [stereoProgress, setStereoProgress] = useState<StereoPipelineProgress>(makeInitialProgress());
+  const [stereoOverlayVisible, setStereoOverlayVisible] = useState(false);
+  const [stereoResult, setStereoResult] = useState<StereoPipelineResult | null>(null);
+  const [stereoFirstImage, setStereoFirstImage] = useState<string | null>(null);
 
   const postCaptureBase64Ref = useRef<string | null>(null);
   const postCaptureMimeRef = useRef<string>('video/webm');
@@ -419,56 +423,41 @@ export default function CameraScreen() {
     setMultiAngleVisible(false);
     if (!sorted[0]?.base64) return;
 
+    // Store first image data URL for gallery save
+    const firstDataUrl = `data:${sorted[0].mimeType};base64,${sorted[0].base64}`;
+    setStereoFirstImage(firstDataUrl);
+    setStereoProgress(makeInitialProgress());
+    setStereoResult(null);
+    setStereoOverlayVisible(true);
+
     try {
-      // Phase 1 (온디바이스): 촬영된 5각도 이미지를 스토리지에 업로드
-      setCloudProgress({ phase: 'uploading', phaseLabel: '이미지 업로드 중', progress: 0.1, message: '5각도 이미지를 클라우드로 전송 중...' });
-      const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-      const scanId = await saveManualScan(imageUrl);
-      const additionalShots = sorted.slice(1);
-      if (additionalShots.length > 0) {
-        const additionalUrls: string[] = [];
-        for (const shot of additionalShots) {
-          if (!shot.base64) continue;
-          try {
-            const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
-            additionalUrls.push(url);
-          } catch { /* skip failed uploads */ }
+      const result = await runStereoPipeline(sorted, (prog) => {
+        if (isMountedRef.current) {
+          setStereoProgress(prog);
+          if (prog.result) setStereoResult(prog.result);
         }
-        if (additionalUrls.length > 0) {
-          await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
-        }
+      });
+      if (isMountedRef.current) {
+        setStereoResult(result);
       }
-
-      // Phase 2-3 (클라우드): AI 입체 분석 + 심리 리듬 연출을 클라우드로 위임
-      const anglePayloads: AngleImagePayload[] = sorted
-        .filter((s) => s.base64)
-        .map((s) => ({
-          key: ['front', 'left', 'right', 'back', 'top'][s.orderIndex] || 'front',
-          label: s.label,
-          base64: s.base64!,
-          mimeType: s.mimeType,
-          orderIndex: s.orderIndex,
-        }));
-
-      try {
-        await invokeStereoCutAuto(
-          anglePayloads,
-          '',
-          '',
-          scanId,
-          (prog) => setCloudProgress(prog),
-        );
-      } catch {
-        // 클라우드 실패 시에도 편집 화면으로 진입 (오프라인 폴백)
-      }
-      setCloudProgress(null);
-      router.push({ pathname: '/editor', params: { id: scanId } });
     } catch (err) {
       if (!isMountedRef.current) return;
-      setCloudProgress(null);
-      setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      setStereoProgress((prev) => ({ ...prev, error: friendlyError(err, '파이프라인 처리 중 오류가 발생했습니다.') }));
     }
   };
+
+  const handleStereoGoToEditor = useCallback((scanId: string) => {
+    setStereoOverlayVisible(false);
+    setStereoResult(null);
+    setStereoFirstImage(null);
+    router.push({ pathname: '/editor', params: { id: scanId } });
+  }, [router]);
+
+  const handleStereoDismiss = useCallback(() => {
+    setStereoOverlayVisible(false);
+    setStereoResult(null);
+    setStereoFirstImage(null);
+  }, []);
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
@@ -688,19 +677,14 @@ export default function CameraScreen() {
           onClose={() => setCreditModalVisible(false)}
         />
 
-        {cloudProgress && (
-          <View style={styles.cloudProgressOverlay}>
-            <View style={styles.cloudProgressCard}>
-              <Sparkles size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-              <Text style={styles.cloudProgressTitle}>{cloudProgress.phaseLabel}</Text>
-              <Text style={styles.cloudProgressMsg}>{cloudProgress.message}</Text>
-              <View style={styles.cloudProgressTrack}>
-                <View style={[styles.cloudProgressFill, { width: `${Math.round(cloudProgress.progress * 100)}%` }]} />
-              </View>
-              <Text style={styles.cloudProgressPct}>{Math.round(cloudProgress.progress * 100)}%</Text>
-            </View>
-          </View>
-        )}
+        <StereoPipelineOverlay
+          visible={stereoOverlayVisible}
+          progress={stereoProgress}
+          result={stereoResult}
+          onDismiss={handleStereoDismiss}
+          onGoToEditor={handleStereoGoToEditor}
+          firstImageDataUrl={stereoFirstImage}
+        />
       </View>
     );
   }
@@ -887,19 +871,14 @@ export default function CameraScreen() {
         onClose={() => setCreditModalVisible(false)}
       />
 
-      {cloudProgress && (
-        <View style={styles.cloudProgressOverlay}>
-          <View style={styles.cloudProgressCard}>
-            <Sparkles size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-            <Text style={styles.cloudProgressTitle}>{cloudProgress.phaseLabel}</Text>
-            <Text style={styles.cloudProgressMsg}>{cloudProgress.message}</Text>
-            <View style={styles.cloudProgressTrack}>
-              <View style={[styles.cloudProgressFill, { width: `${Math.round(cloudProgress.progress * 100)}%` }]} />
-            </View>
-            <Text style={styles.cloudProgressPct}>{Math.round(cloudProgress.progress * 100)}%</Text>
-          </View>
-        </View>
-      )}
+      <StereoPipelineOverlay
+        visible={stereoOverlayVisible}
+        progress={stereoProgress}
+        result={stereoResult}
+        onDismiss={handleStereoDismiss}
+        onGoToEditor={handleStereoGoToEditor}
+        firstImageDataUrl={stereoFirstImage}
+      />
     </View>
   );
 }
@@ -1243,52 +1222,5 @@ const styles = StyleSheet.create({
   autoSavingStepDotActive: {
     backgroundColor: theme.colors.primary[400],
   },
-  cloudProgressOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(5,8,18,0.88)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 300,
-  },
-  cloudProgressCard: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.xl,
-    padding: 28,
-    alignItems: 'center',
-    gap: 10,
-    width: '82%',
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary[500] + '30',
-  },
-  cloudProgressTitle: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  cloudProgressMsg: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  cloudProgressTrack: {
-    width: '100%',
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    overflow: 'hidden',
-    marginTop: 6,
-  },
-  cloudProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: theme.colors.primary[500],
-  },
-  cloudProgressPct: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[400],
-  },
+
 });
