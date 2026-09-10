@@ -22,7 +22,6 @@ import {
   Download,
   Trash2,
   Sparkles,
-  ShoppingBag,
   Pencil,
   Hash,
   Copy,
@@ -148,10 +147,7 @@ export default function ResultScreen() {
   const [hookOverride, setHookOverride] = useState<string | null>(null);
   const [priceOverride, setPriceOverride] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
-  const [editingProduct, setEditingProduct] = useState(false);
-  const [productNameInput, setProductNameInput] = useState('');
-  const [productCategoryInput, setProductCategoryInput] = useState('');
-  const [savingProduct, setSavingProduct] = useState(false);
+
   const [localStoreInfo, setLocalStoreInfo] = useState<LocalStoreInfo | null>(null);
   const [recommendedStyle, setRecommendedStyle] = useState<StyleRecommendation | null>(null);
   const [styleAppliedKey, setStyleAppliedKey] = useState<string | null>(null);
@@ -177,7 +173,7 @@ export default function ResultScreen() {
     titleText: '',
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
 
@@ -481,48 +477,6 @@ export default function ResultScreen() {
       router.back();
     } catch {
       setError('삭제 중 오류가 발생했어요');
-    }
-  };
-
-  const handleStartEditProduct = () => {
-    setProductNameInput(activeProductName);
-    setProductCategoryInput(selectedProduct?.productCategory || scan?.product_category || '');
-    setEditingProduct(true);
-  };
-
-  const handleSaveProduct = async () => {
-    if (!scan) return;
-    setSavingProduct(true);
-    try {
-      const trimmedName = productNameInput.trim();
-      const trimmedCategory = productCategoryInput.trim();
-
-      if (selectedProduct) {
-        const updatedProducts = [...detectedProducts];
-        updatedProducts[selectedProductIndex] = {
-          ...selectedProduct,
-          productName: trimmedName,
-          productCategory: trimmedCategory,
-        };
-        const { error: updateError } = await supabase
-          .from('scans')
-          .update({ detected_products: updatedProducts })
-          .eq('id', scan.id);
-        if (updateError) throw updateError;
-        setScan({ ...scan, detected_products: updatedProducts });
-      } else {
-        const { error: updateError } = await supabase
-          .from('scans')
-          .update({ product_name: trimmedName, product_category: trimmedCategory })
-          .eq('id', scan.id);
-        if (updateError) throw updateError;
-        setScan({ ...scan, product_name: trimmedName, product_category: trimmedCategory });
-      }
-      setEditingProduct(false);
-    } catch (err) {
-      if (mountedRef.current) setError(friendlyError(err, '제품 정보 저장에 실패했습니다. 다시 시도해주세요.'));
-    } finally {
-      setSavingProduct(false);
     }
   };
 
@@ -1738,63 +1692,7 @@ export default function ResultScreen() {
               </View>
             )}
           </View>
-          {editingProduct ? (
-            <View style={styles.productEditOverlay}>
-              <View style={styles.productEditCard}>
-                <Text style={styles.productEditTitle}>제품 정보 수정</Text>
-                <TextInput
-                  style={styles.productEditInput}
-                  value={productNameInput}
-                  onChangeText={setProductNameInput}
-                  placeholder="제품명"
-                  placeholderTextColor={theme.colors.dark.textDim}
-                />
-                <TextInput
-                  style={styles.productEditInput}
-                  value={productCategoryInput}
-                  onChangeText={setProductCategoryInput}
-                  placeholder="카테고리 (예: sneakers, lamp, jacket)"
-                  placeholderTextColor={theme.colors.dark.textDim}
-                />
-                <View style={styles.productEditActions}>
-                  <TouchableOpacity
-                    style={styles.productEditCancelBtn}
-                    onPress={() => setEditingProduct(false)}
-                    disabled={savingProduct}
-                    activeOpacity={0.7}
-                  >
-                    <X size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-                    <Text style={styles.productEditCancelText}>취소</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.productEditSaveBtn}
-                    onPress={handleSaveProduct}
-                    disabled={savingProduct}
-                    activeOpacity={0.7}
-                  >
-                    {savingProduct ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Check size={16} color="#fff" strokeWidth={2} />
-                        <Text style={styles.productEditSaveText}>저장</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.previewBadge}
-              onPress={handleStartEditProduct}
-              activeOpacity={0.7}
-            >
-              <ShoppingBag size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.previewBadgeText}>{activeProductName || '제품명 수정'}</Text>
-              <Pencil size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-            </TouchableOpacity>
-          )}
+
         </View>
 
         {/* === 5-Cut Original Thumbnail Strip === */}
@@ -2517,66 +2415,6 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.caption,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
-  },
-  productEditOverlay: {
-    position: 'absolute',
-    bottom: theme.spacing.md,
-    left: theme.spacing.md,
-    right: theme.spacing.md,
-  },
-  productEditCard: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    gap: theme.spacing.sm,
-    ...theme.shadows.card,
-  },
-  productEditTitle: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  productEditInput: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 10,
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-  },
-  productEditActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  productEditCancelBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  productEditCancelText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  productEditSaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[400],
-  },
-  productEditSaveText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
   },
   body: {
     padding: theme.spacing.lg,
@@ -3568,27 +3406,6 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     borderWidth: 1,
     borderColor: theme.colors.primary[500] + '20',
-  },
-  previewBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: '50%',
-    marginLeft: -80,
-    width: 160,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(10, 15, 30, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: theme.radius.full,
-  },
-  previewBadgeText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
-    flex: 1,
   },
   chipSection: {
     paddingHorizontal: theme.spacing.md,
