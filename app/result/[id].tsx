@@ -121,6 +121,7 @@ import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
+import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -313,6 +314,8 @@ export default function ResultScreen() {
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [narrativeVariation, setNarrativeVariation] = useState(0);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -359,6 +362,30 @@ export default function ResultScreen() {
     if (!scan || isRegenerating) return;
     setIsRegenerating(true);
     setNarrativeVariation((v) => v + 1);
+    setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 비디오 생성 요청 전송 중...', elapsedSec: 0 });
+
+    // Kick off AI video generation in parallel with copy regeneration
+    const gazeImageUrl = scan.edited_image_url || scan.image_url || undefined;
+    const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
+    const videoGenPromise = generateAiVideo(
+      videoPromptText,
+      {
+        imageUrl: gazeImageUrl,
+        durationSec: Math.round(selectedDurationMs / 1000),
+        aspectRatio: '9:16',
+        productName: scan.product_name || undefined,
+        scanId: scan.id,
+        variationSeed: narrativeVariation + 1,
+      },
+      (progress) => {
+        if (mountedRef.current) setVideoGenProgress(progress);
+      },
+    ).then((result) => {
+      if (mountedRef.current) setGeneratedVideoUrl(result.videoUrl);
+    }).catch(() => {
+      // Video gen failure is non-fatal — slideshow fallback remains active
+    });
+
     try {
       const preset = TARGET_PLATFORM_PRESETS[targetPlatform];
       const purposePreset = CONTENT_PURPOSE_PRESETS[contentPurpose];
@@ -405,11 +432,16 @@ export default function ResultScreen() {
         if (result.title) setInlineEdit((prev) => ({ ...prev, titleText: result.title! }));
       }
     } catch {
-      // regeneration failed — keep current content
-    } finally {
-      if (mountedRef.current) setIsRegenerating(false);
+      // copy regeneration failed — keep current content
     }
-  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs]);
+
+    // Wait for video generation to finish before clearing loading state
+    await videoGenPromise;
+    if (mountedRef.current) {
+      setIsRegenerating(false);
+      setVideoGenProgress(null);
+    }
+  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs, narrativeVariation]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2133,10 +2165,11 @@ export default function ResultScreen() {
         <View style={styles.promptSection}>
           <ShortFormPreviewPlayer
             editPlan={previewEditPlan}
-            videoUri={null}
+            videoUri={generatedVideoUrl}
             imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
             slideshowImages={narrativeReorderedImages.length > 1 ? narrativeReorderedImages : null}
             narrativePlan={narrativePlan}
+            videoGenProgress={videoGenProgress}
           />
           <MiniPreview
             platform={targetPlatform}

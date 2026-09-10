@@ -21,6 +21,7 @@ import { BgmPlayer } from '@/lib/bgmEngine';
 import type { ShortFormEditPlan, EditSegment, StoryPhase } from '@/lib/shortFormEditEngine';
 import { getCameraMovementForTime, type CameraMovement } from '@/lib/directingEngine';
 import { trajectoryToCameraMovement, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
+import type { VideoGenProgress } from '@/lib/aiVideoPipeline';
 import {
   sampleVideoLuminance,
   classifyLuminance,
@@ -36,6 +37,7 @@ interface ShortFormPreviewPlayerProps {
   imageUri?: string | null;
   slideshowImages?: string[] | null;
   narrativePlan?: NarrativePlan | null;
+  videoGenProgress?: VideoGenProgress | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -122,7 +124,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -138,9 +140,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   const hasImage = !!imageUri;
   const hasSlideshow = !!slideshowImages && slideshowImages.length > 1;
+  const hasGeneratedVideo = !!videoUri;
+  const isGeneratingVideo = !!videoGenProgress && videoGenProgress.phase !== 'completed' && videoGenProgress.phase !== 'error';
 
   useEffect(() => {
-    if (!videoUri || hasImage || hasSlideshow) {
+    if (!videoUri) {
       setVideoSrc(null);
       return;
     }
@@ -165,7 +169,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       }
     })();
     return () => { cancelled = true; };
-  }, [videoUri, hasImage, hasSlideshow]);
+  }, [videoUri]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
@@ -363,7 +367,39 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {hasSlideshow && slideImgSrc ? (
+          {hasGeneratedVideo && videoSrc ? (
+            Platform.OS === 'web' ? (
+              // @ts-ignore web-only video element
+              <video
+                ref={webVideoRef}
+                src={videoSrc}
+                loop
+                playsInline
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover' as const,
+                  backgroundColor: '#000',
+                }}
+              />
+            ) : (
+              <WebView
+                key={videoSrc}
+                source={webviewSource}
+                style={styles.webViewFill}
+                javaScriptEnabled
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                scrollEnabled={false}
+                mixedContentMode="always"
+                originWhitelist={['*']}
+                allowFileAccess
+              />
+            )
+          ) : hasSlideshow && slideImgSrc ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only img element
               <img
@@ -434,38 +470,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 resizeMode="cover"
               />
             )
-          ) : videoSrc ? (
-            Platform.OS === 'web' ? (
-              // @ts-ignore web-only video element
-              <video
-                ref={webVideoRef}
-                src={videoSrc}
-                loop
-                playsInline
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover' as const,
-                  backgroundColor: '#000',
-                }}
-              />
-            ) : (
-              <WebView
-                key={videoSrc}
-                source={webviewSource}
-                style={styles.webViewFill}
-                javaScriptEnabled
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                scrollEnabled={false}
-                mixedContentMode="always"
-                originWhitelist={['*']}
-                allowFileAccess
-              />
-            )
           ) : (
             <View style={styles.videoPlaceholder}>
               <Text style={styles.videoPlaceholderText}>영상 없음</Text>
@@ -519,6 +523,21 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
           <View style={styles.timeBadge}>
             <Text style={styles.timeText}>{currentSec.toFixed(1)}s / {TOTAL_DURATION}s</Text>
           </View>
+
+          {isGeneratingVideo && videoGenProgress && (
+            <View style={styles.videoGenOverlay}>
+              <View style={styles.videoGenPulseRing} />
+              <Text style={styles.videoGenPhaseText}>
+                {videoGenProgress.phase === 'submitting' ? 'AI 비디오 생성 요청 중...' : 'AI가 영상을 생성하고 있어요'}
+              </Text>
+              <View style={styles.videoGenProgressBar}>
+                <View style={[styles.videoGenProgressFill, { width: `${Math.round(videoGenProgress.progress * 100)}%` }]} />
+              </View>
+              <Text style={styles.videoGenDetailText} numberOfLines={1}>
+                {videoGenProgress.message} · {videoGenProgress.elapsedSec}s
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -784,5 +803,49 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: theme.typography.fontFamily.bold,
     color: theme.colors.dark.textDim,
+  },
+  videoGenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  videoGenPulseRing: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: theme.colors.primary[400],
+    marginBottom: 4,
+  },
+  videoGenPhaseText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    textAlign: 'center',
+  },
+  videoGenProgressBar: {
+    width: '80%',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  videoGenProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: theme.colors.primary[400],
+  },
+  videoGenDetailText: {
+    fontSize: 8,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
   },
 });
