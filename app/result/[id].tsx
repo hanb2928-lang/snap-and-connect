@@ -179,6 +179,7 @@ export default function ResultScreen() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [showMoodHints, setShowMoodHints] = useState(true);
+  const [activeCutIndex, setActiveCutIndex] = useState(0);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -933,6 +934,17 @@ export default function ResultScreen() {
     })();
     return () => { cancelled = true; };
   }, [scan?.id, scan?.product_category, scan?.product_name, scan?.tags, selectedProductIndex, activeProductName, selectedProduct?.productCategory]);
+
+  const allCutImages = useMemo(() => {
+    const images: string[] = [];
+    if (scan?.image_url) images.push(scan.image_url);
+    if (scan?.additional_image_urls && Array.isArray(scan.additional_image_urls)) {
+      for (const url of scan.additional_image_urls) {
+        if (url && !images.includes(url)) images.push(url);
+      }
+    }
+    return images;
+  }, [scan?.image_url, scan?.additional_image_urls]);
 
   const trendingSuggestions = getTrendingSuggestions(trendingHashtags, [...activeHashtags, ...addedHashtags]);
 
@@ -1784,6 +1796,40 @@ export default function ResultScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* === 5-Cut Original Thumbnail Strip === */}
+        {allCutImages.length > 1 && (
+          <View style={styles.thumbnailStripSection}>
+            <View style={styles.thumbnailStripHeader}>
+              <CameraIcon size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.thumbnailStripLabel}>원본 입체컷 {allCutImages.length}장</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.thumbnailStripScroll}
+              contentContainerStyle={styles.thumbnailStripContent}
+            >
+              {allCutImages.map((imgUrl, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    styles.thumbnailItem,
+                    activeCutIndex === idx && styles.thumbnailItemActive,
+                  ]}
+                  onPress={() => {
+                    setActiveCutIndex(idx);
+                    setCaptureImageUrl(imgUrl);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Image source={{ uri: imgUrl }} style={styles.thumbnailImage} resizeMode="cover" />
+                  {activeCutIndex === idx && <View style={styles.thumbnailActiveDot} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* === Template + Caption + BGM chips === */}
         <View style={styles.chipSection}>
@@ -3418,6 +3464,54 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textFaint,
   },
   // === One-stop preview & edit layout ===
+  thumbnailStripSection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: 6,
+  },
+  thumbnailStripHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  thumbnailStripLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  thumbnailStripScroll: {
+    flexGrow: 0,
+  },
+  thumbnailStripContent: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  thumbnailItem: {
+    width: 52,
+    height: 70,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  thumbnailItemActive: {
+    borderColor: theme.colors.primary[400],
+    borderWidth: 2.5,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailActiveDot: {
+    position: 'absolute',
+    bottom: 4,
+    alignSelf: 'center',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary[400],
+  },
   previewFrame: {
     position: 'relative',
     alignItems: 'center',
