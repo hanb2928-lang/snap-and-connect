@@ -116,12 +116,12 @@ import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
-import { MiniPreview } from '@/components/MiniPreview';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { InteractivePreviewSimulator } from '@/components/InteractivePreviewSimulator';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -257,6 +257,7 @@ const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = 
   reels: 'monetization',
   naverclip: 'adConversion',
 };
+
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -2171,18 +2172,6 @@ export default function ResultScreen() {
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
           />
-          <MiniPreview
-            platform={targetPlatform}
-            videoTemplate={inlineEdit.videoTemplate}
-            captionFont={inlineEdit.captionFont}
-            captionPosition={inlineEdit.captionPosition}
-            bgmMood={inlineEdit.bgmMood}
-            hookText={activeHook}
-            isRegenerating={isRegenerating}
-            bgmEnabled={CONTENT_PURPOSE_PRESETS[contentPurpose].bgmEnabled}
-            narrationEnabled={CONTENT_PURPOSE_PRESETS[contentPurpose].narrationEnabled}
-            purposeLabel={CONTENT_PURPOSE_PRESETS[contentPurpose].label}
-          />
         </View>
 
         {/* === AI Prompt + Regenerate === */}
@@ -2241,6 +2230,15 @@ export default function ResultScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <InteractivePreviewSimulator
+          promptText={inlineEdit.aiPrompt}
+          cutImages={narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages}
+          captionText={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
+          moodLabel={inlineEdit.bgmMood}
+          productName={activeProductName || scan?.product_name || undefined}
+          durationSec={Math.round(selectedDurationMs / 1000)}
+        />
 
         <QuickTweakPanel
           hook={activeHook}
