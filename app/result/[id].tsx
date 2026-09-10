@@ -120,6 +120,7 @@ import { MiniPreview } from '@/components/MiniPreview';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
+import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -311,6 +312,7 @@ export default function ResultScreen() {
     titleText: '',
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -356,6 +358,7 @@ export default function ResultScreen() {
   const handleRegenerate = useCallback(async () => {
     if (!scan || isRegenerating) return;
     setIsRegenerating(true);
+    setNarrativeVariation((v) => v + 1);
     try {
       const preset = TARGET_PLATFORM_PRESETS[targetPlatform];
       const purposePreset = CONTENT_PURPOSE_PRESETS[contentPurpose];
@@ -1101,6 +1104,17 @@ export default function ResultScreen() {
     }
     return images;
   }, [scan?.image_url, scan?.additional_image_urls]);
+
+  const narrativePlan: NarrativePlan | null = useMemo(() => {
+    if (allCutImages.length === 0) return null;
+    const context = (scan?.product_category as NarrativePlan['scenario']['context']) || 'general';
+    return buildNarrativePlan(allCutImages, context, narrativeVariation);
+  }, [allCutImages, scan?.product_category, narrativeVariation]);
+
+  const narrativeReorderedImages = useMemo(() => {
+    if (!narrativePlan) return allCutImages;
+    return narrativePlan.reorderedCuts.orderedImageUrls;
+  }, [narrativePlan, allCutImages]);
 
   const trendingSuggestions = getTrendingSuggestions(trendingHashtags, [...activeHashtags, ...addedHashtags]);
 
@@ -2121,7 +2135,8 @@ export default function ResultScreen() {
             editPlan={previewEditPlan}
             videoUri={null}
             imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={allCutImages.length > 1 ? allCutImages : null}
+            slideshowImages={narrativeReorderedImages.length > 1 ? narrativeReorderedImages : null}
+            narrativePlan={narrativePlan}
           />
           <MiniPreview
             platform={targetPlatform}

@@ -6,7 +6,7 @@ export type TransitionType = 'gaze_lock' | 'need_reveal' | 'transformation_zoom'
 export interface CameraMovement {
   segmentIndex: number;
   storyPhase: StoryPhase;
-  moveType: 'gaze_hold' | 'slow_pan' | 'tilt_reveal' | 'push_in' | 'pull_back' | 'orbit';
+  moveType: 'gaze_hold' | 'slow_pan' | 'tilt_reveal' | 'push_in' | 'pull_back' | 'orbit' | 'gaze_to_dolly' | 'macro_zoom';
   startScale: number;
   endScale: number;
   startTx: number;

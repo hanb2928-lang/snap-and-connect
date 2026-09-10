@@ -20,6 +20,7 @@ import { theme } from '@/lib/theme';
 import { BgmPlayer } from '@/lib/bgmEngine';
 import type { ShortFormEditPlan, EditSegment, StoryPhase } from '@/lib/shortFormEditEngine';
 import { getCameraMovementForTime, type CameraMovement } from '@/lib/directingEngine';
+import { trajectoryToCameraMovement, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import {
   sampleVideoLuminance,
   classifyLuminance,
@@ -34,6 +35,7 @@ interface ShortFormPreviewPlayerProps {
   videoUri: string | null;
   imageUri?: string | null;
   slideshowImages?: string[] | null;
+  narrativePlan?: NarrativePlan | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -66,13 +68,27 @@ function applyEasing(easing: CameraMovement['easing'], t: number): number {
   return easeInOutCubic(t);
 }
 
+function getNarrativeCamera(
+  segments: EditSegment[],
+  currentSec: number,
+  narrativePlan: NarrativePlan | null,
+): CameraMovement | null {
+  if (!narrativePlan) return getCameraMovementForTime(segments, currentSec);
+  const seg = getActiveSegment(segments, currentSec);
+  if (!seg) return null;
+  const traj = narrativePlan.trajectories.find((t) => t.phase === seg.storyPhase);
+  if (!traj) return getCameraMovementForTime(segments, currentSec);
+  return trajectoryToCameraMovement(traj, seg.index);
+}
+
 function computeStoryTransform(
   segments: EditSegment[],
   currentSec: number,
+  narrativePlan: NarrativePlan | null = null,
 ): string {
   const seg = getActiveSegment(segments, currentSec);
   if (!seg) return 'scale(1) translate(0%, 0%)';
-  const cam = getCameraMovementForTime(segments, currentSec);
+  const cam = getNarrativeCamera(segments, currentSec, narrativePlan);
   if (!cam) return 'scale(1) translate(0%, 0%)';
   const rawProgress = getSegmentProgress(seg, currentSec);
   const p = applyEasing(cam.easing, rawProgress);
@@ -106,7 +122,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -323,8 +339,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   }, [activeSegment, safeZonePadding]);
 
   const liveTransform = useMemo(
-    () => computeStoryTransform(editPlan.segments, currentSec),
-    [editPlan.segments, currentSec],
+    () => computeStoryTransform(editPlan.segments, currentSec, narrativePlan ?? null),
+    [editPlan.segments, currentSec, narrativePlan],
   );
 
   const videoHtml = useMemo(() => {
