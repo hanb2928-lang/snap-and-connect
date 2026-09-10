@@ -14,12 +14,23 @@ interface AngleImageInput {
   orderIndex: number;
 }
 
+interface FrameBufferInput {
+  angleKey: string;
+  width: number;
+  height: number;
+  channels: number;
+  aspectRatio: string;
+  orderIndex: number;
+}
+
 interface StereoCutRequest {
   angles: AngleImageInput[];
   productName?: string;
   customPrompt?: string;
   targetPlatforms?: string[];
   scanId?: string;
+  frameBuffers?: FrameBufferInput[];
+  aspectRatio?: string;
 }
 
 type UsageContext =
@@ -76,10 +87,12 @@ interface StereoCutResponse {
   renderPlan: {
     quality: "high";
     resolution: { width: number; height: number };
+    aspectRatio: string;
     fps: number;
     bitrate: number;
     durationSec: number;
     scenes: unknown[];
+    frameBuffers: Array<{ angleKey: string; width: number; height: number; channels: number; aspectRatio: string; orderIndex: number }>;
   };
   estimatedProcessingSec: number;
   cloudEndpoint: string;
@@ -314,6 +327,8 @@ Deno.serve(async (req: Request) => {
     const customPrompt = payload.customPrompt ?? "";
     const targetPlatforms = payload.targetPlatforms ?? ["youtube", "instagram", "tiktok"];
     const scanId = payload.scanId ?? null;
+    const inputFrameBuffers = payload.frameBuffers ?? [];
+    const inputAspectRatio = payload.aspectRatio ?? "9:16";
 
     if (angles.length === 0) {
       return new Response(JSON.stringify({ error: "각도 이미지가 필요합니다." }), {
@@ -342,6 +357,17 @@ Deno.serve(async (req: Request) => {
     const jobId = `stereo-cut-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const estimatedProcessingSec = angles.length >= 5 ? 8 : 5;
 
+    const frameBuffers = inputFrameBuffers.length > 0
+      ? inputFrameBuffers
+      : angles.map((a, i) => ({
+          angleKey: a.key,
+          width: 1080,
+          height: 1920,
+          channels: 4,
+          aspectRatio: inputAspectRatio,
+          orderIndex: a.orderIndex ?? i,
+        }));
+
     const result: StereoCutResponse = {
       status: "ok",
       jobId,
@@ -352,10 +378,12 @@ Deno.serve(async (req: Request) => {
       renderPlan: {
         quality: "high",
         resolution: { width: 1080, height: 1920 },
+        aspectRatio: inputAspectRatio,
         fps: 30,
         bitrate: 8_000_000,
         durationSec: 15,
         scenes,
+        frameBuffers,
       },
       estimatedProcessingSec,
       cloudEndpoint: "stereo-cut-auto",

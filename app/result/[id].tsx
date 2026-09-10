@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -117,6 +117,14 @@ import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 import { MiniPreview } from '@/components/MiniPreview';
+import {
+  buildViralAudioSyncProfile,
+  buildRegenerationPayload,
+  getSyncAccuracyLabel,
+  formatTimeBoxSummary,
+} from '@/lib/viralAudioSyncEngine';
+import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
+import { DEFAULT_DURATION, DURATION_PRESETS } from '@/lib/durationPresets';
 
 type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
 
@@ -191,6 +199,60 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
 
 const TARGET_PLATFORM_LIST = Object.values(TARGET_PLATFORM_PRESETS);
 
+type ContentPurpose = 'monetization' | 'adConversion';
+
+interface ContentPurposePreset {
+  key: ContentPurpose;
+  label: string;
+  icon: typeof Rocket;
+  color: string;
+  bgmEnabled: boolean;
+  narrationEnabled: boolean;
+  bgmMoodOverride?: string;
+  captionFontOverride?: string;
+  videoTemplateOverride?: string;
+  defaultPrompt: string;
+  audioGuideline: string;
+  strategyLabel: string;
+}
+
+const CONTENT_PURPOSE_PRESETS: Record<ContentPurpose, ContentPurposePreset> = {
+  monetization: {
+    key: 'monetization',
+    label: '수익화 / 노출 극대화',
+    icon: Rocket,
+    color: '#FF6B35',
+    bgmEnabled: true,
+    narrationEnabled: true,
+    defaultPrompt: '',
+    audioGuideline: '오디오 전략: 자막 + 트렌디 BGM + AI 나레이션 풀 패키지. 도파민 유도형 BGM으로 시청 지속률 극대화, 핵심 자막으로 정보 처리 속도 향상, 신뢰감 있는 나레이션 스크립트 동시 생성',
+    strategyLabel: '자막 + BGM + 나레이션 풀패키지',
+  },
+  adConversion: {
+    key: 'adConversion',
+    label: '광고 / 구매 전환',
+    icon: ShoppingBagIcon,
+    color: '#2563EB',
+    bgmEnabled: false,
+    narrationEnabled: true,
+    bgmMoodOverride: 'ASMR',
+    captionFontOverride: '스포츠 강조',
+    videoTemplateOverride: '제품 집중',
+    defaultPrompt: '',
+    audioGuideline: '오디오 전략: BGM 배제/최소화, 차분하고 설득력 있는 전문 VO + 시선을 사로잡는 핵심 키워드 자막. 구매 전환을 위한 CTA 중심 구성',
+    strategyLabel: '전문 VO + 키워드 자막 (BGM 최소화)',
+  },
+};
+
+const CONTENT_PURPOSE_LIST = Object.values(CONTENT_PURPOSE_PRESETS);
+
+const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = {
+  shorts: 'monetization',
+  tiktok: 'monetization',
+  reels: 'monetization',
+  naverclip: 'adConversion',
+};
+
 export default function ResultScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -250,21 +312,35 @@ export default function ResultScreen() {
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
   const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
+  const [contentPurpose, setContentPurpose] = useState<ContentPurpose>('monetization');
+  const [selectedDurationMs, setSelectedDurationMs] = useState<number>(DEFAULT_DURATION);
+
+  const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
+    const pp = TARGET_PLATFORM_PRESETS[platform];
+    const cp = CONTENT_PURPOSE_PRESETS[purpose];
+    setInlineEdit((prev) => ({
+      ...prev,
+      aiPrompt: cp.defaultPrompt || pp.defaultPrompt,
+      captionFont: cp.captionFontOverride || pp.captionFont,
+      captionPosition: pp.captionPosition,
+      bgmMood: cp.bgmMoodOverride || pp.bgmMood,
+      videoTemplate: cp.videoTemplateOverride || pp.videoTemplate,
+      hashtags: pp.hashtags,
+    }));
+    setAddedHashtags(pp.hashtags);
+  }, []);
 
   const handleTargetPlatformChange = useCallback((key: TargetPlatformKey) => {
     setTargetPlatform(key);
-    const preset = TARGET_PLATFORM_PRESETS[key];
-    setInlineEdit((prev) => ({
-      ...prev,
-      aiPrompt: preset.defaultPrompt,
-      captionFont: preset.captionFont,
-      captionPosition: preset.captionPosition,
-      bgmMood: preset.bgmMood,
-      videoTemplate: preset.videoTemplate,
-      hashtags: preset.hashtags,
-    }));
-    setAddedHashtags(preset.hashtags);
-  }, []);
+    const defaultPurpose = DEFAULT_PURPOSE_FOR_PLATFORM[key];
+    setContentPurpose(defaultPurpose);
+    applyCombinedPreset(key, defaultPurpose);
+  }, [applyCombinedPreset]);
+
+  const handleContentPurposeChange = useCallback((key: ContentPurpose) => {
+    setContentPurpose(key);
+    applyCombinedPreset(targetPlatform, key);
+  }, [targetPlatform, applyCombinedPreset]);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -279,13 +355,30 @@ export default function ResultScreen() {
     setIsRegenerating(true);
     try {
       const preset = TARGET_PLATFORM_PRESETS[targetPlatform];
+      const purposePreset = CONTENT_PURPOSE_PRESETS[contentPurpose];
+      const prosodyProfile = mapVoiceKeyToProsody('viral_female_1');
+      const scriptText = inlineEdit.captionText || activeHookRef.current || scan.summary || '';
+      const syncProfile = buildViralAudioSyncProfile(
+        targetPlatform,
+        contentPurpose,
+        selectedDurationMs,
+        prosodyProfile,
+        scriptText,
+      );
+      const viralPayload = buildRegenerationPayload(syncProfile, inlineEdit.aiPrompt);
       const promptParts = [
         `플랫폼: ${preset.label} (${preset.algorithmHint})`,
+        `목적: ${purposePreset.label}`,
+        purposePreset.audioGuideline,
+        `영상 길이: ${syncProfile.totalDurationSec}초 (${syncProfile.tier})`,
+        `동기화 정밀도: ${getSyncAccuracyLabel(syncProfile)}`,
+        `타임박스: ${formatTimeBoxSummary(syncProfile.timeBoxingPlan)}`,
         `템플릿: ${inlineEdit.videoTemplate}`,
         `자막: ${inlineEdit.captionFont} / ${inlineEdit.captionPosition}`,
-        `BGM: ${inlineEdit.bgmMood}`,
+        `BGM: ${inlineEdit.bgmMood}${purposePreset.bgmEnabled ? '' : ' (배경음 최소화)'}`,
+        `나레이션: ${purposePreset.narrationEnabled ? '포함' : '미포함'}`,
         `훅: ${inlineEdit.hookEffect}`,
-        inlineEdit.aiPrompt ? `추가: ${inlineEdit.aiPrompt}` : '',
+        viralPayload,
       ].filter(Boolean);
       const { data, error } = await supabase.functions.invoke('generate-copy', {
         body: {
@@ -310,13 +403,14 @@ export default function ResultScreen() {
     } finally {
       if (mountedRef.current) setIsRegenerating(false);
     }
-  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, activePlatform, targetPlatform]);
+  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const safeTop = useSafeTop();
   const cardRef = useRef<View>(null);
   const mountedRef = useRef(true);
+  const activeHookRef = useRef('');
   const styleApplyCounter = useRef(0);
   const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
 
@@ -648,6 +742,7 @@ export default function ResultScreen() {
   const td = activeTemplateData;
   const platformVariant = td?.platformVariants?.[activePlatform];
   const activeHook = hookOverride || platformVariant?.hook || td?.hook || '';
+  useEffect(() => { activeHookRef.current = activeHook; }, [activeHook]);
   const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || '');
   const activeHashtags = platformVariant?.hashtags || td?.hashtags || [];
   const allDisplayHashtags = [...activeHashtags, ...addedHashtags];
@@ -1848,6 +1943,31 @@ export default function ResultScreen() {
           <Text style={styles.targetPlatformHint}>
             {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
           </Text>
+
+          {/* Content Purpose Selector */}
+          <View style={styles.purposeRow}>
+            <Text style={styles.purposeLabel}>목적</Text>
+            {CONTENT_PURPOSE_LIST.map((p) => {
+              const isActive = contentPurpose === p.key;
+              const Icon = p.icon;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                  onPress={() => handleContentPurposeChange(p.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.strategyHint}>
+            {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
+          </Text>
         </View>
 
         {/* === Template + Caption + BGM chips === */}
@@ -1930,6 +2050,48 @@ export default function ResultScreen() {
           </View>
         </View>
 
+        {/* === Viral Audio Sync Status === */}
+        <View style={styles.syncStatusSection}>
+          <View style={styles.syncStatusHeader}>
+            <AudioLines size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+            <Text style={styles.syncStatusTitle}>인간 감성 지능형 오디오 동기화</Text>
+          </View>
+          <View style={styles.syncMetricRow}>
+            <View style={styles.syncMetricChip}>
+              <Clock size={11} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.syncMetricText}>{Math.round(selectedDurationMs / 1000)}초</Text>
+            </View>
+            <View style={styles.syncMetricChip}>
+              <Sparkles size={11} color={theme.colors.accent[400]} strokeWidth={2} />
+              <Text style={styles.syncMetricText}>{getSyncAccuracyLabel(buildViralAudioSyncProfile(targetPlatform, contentPurpose, selectedDurationMs, mapVoiceKeyToProsody('viral_female_1'), inlineEdit.captionText || activeHook || scan?.summary || ''))}</Text>
+            </View>
+            <View style={styles.syncMetricChip}>
+              <ZapIcon size={11} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.syncMetricText}>상위 1% 벤치마크</Text>
+            </View>
+          </View>
+          <View style={styles.durationSelectorRow}>
+            <Text style={styles.durationSelectorLabel}>영상 길이</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
+              {DURATION_PRESETS.map((p) => {
+                const isActive = selectedDurationMs === p.value;
+                return (
+                  <TouchableOpacity
+                    key={p.value}
+                    style={[styles.durationChip, isActive && styles.durationChipActive]}
+                    onPress={() => setSelectedDurationMs(p.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+
         {/* === Mini Live Preview === */}
         <View style={styles.promptSection}>
           <MiniPreview
@@ -1940,6 +2102,9 @@ export default function ResultScreen() {
             bgmMood={inlineEdit.bgmMood}
             hookText={activeHook}
             isRegenerating={isRegenerating}
+            bgmEnabled={CONTENT_PURPOSE_PRESETS[contentPurpose].bgmEnabled}
+            narrationEnabled={CONTENT_PURPOSE_PRESETS[contentPurpose].narrationEnabled}
+            purposeLabel={CONTENT_PURPOSE_PRESETS[contentPurpose].label}
           />
         </View>
 
@@ -3557,6 +3722,116 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.primary[300],
     paddingLeft: 2,
+  },
+  syncStatusSection: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  syncStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  syncStatusTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  syncMetricRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  syncMetricChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  syncMetricText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  durationSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  durationSelectorLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    flexShrink: 0,
+  },
+  durationScroll: {
+    flexShrink: 1,
+  },
+  durationChip: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  durationChipActive: {
+    backgroundColor: theme.colors.primary[300] + '20',
+    borderColor: theme.colors.primary[300],
+  },
+  durationChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  durationChipTextActive: {
+    color: theme.colors.primary[300],
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  purposeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  purposeLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  purposeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  purposeChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  strategyHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.accent[400],
+    paddingLeft: 2,
+    marginTop: 4,
   },
   chipSection: {
     paddingHorizontal: theme.spacing.md,

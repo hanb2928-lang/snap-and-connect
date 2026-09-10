@@ -23,6 +23,9 @@ interface MiniPreviewProps {
   bgmMood: string;
   hookText: string;
   isRegenerating: boolean;
+  bgmEnabled?: boolean;
+  narrationEnabled?: boolean;
+  purposeLabel?: string;
 }
 
 const PLATFORM_META: Record<
@@ -68,6 +71,9 @@ export function MiniPreview({
   bgmMood,
   hookText,
   isRegenerating,
+  bgmEnabled = true,
+  narrationEnabled = true,
+  purposeLabel,
 }: MiniPreviewProps) {
   const meta = PLATFORM_META[platform];
   const Icon = meta.icon;
@@ -184,7 +190,22 @@ export function MiniPreview({
         <View style={styles.summaryColumn}>
           <StyleRow icon={<Film size={10} color={theme.colors.accent[300]} strokeWidth={2} />} label="템플릿" value={videoTemplate} />
           <StyleRow icon={<Type size={10} color={theme.colors.accent[300]} strokeWidth={2} />} label="자막" value={`${captionFont} · ${captionPosition}`} />
-          <StyleRow icon={<AudioLines size={10} color={theme.colors.accent[300]} strokeWidth={2} />} label="BGM" value={bgmMood} />
+          <StyleRow
+            icon={<AudioLines size={10} color={bgmEnabled ? theme.colors.accent[300] : theme.colors.dark.textFaint} strokeWidth={2} />}
+            label="BGM"
+            value={bgmEnabled ? bgmMood : '최소화'}
+          />
+          <View style={styles.audioStatusRow}>
+            <View style={[styles.audioBadge, bgmEnabled ? styles.audioBadgeOn : styles.audioBadgeOff]}>
+              <Text style={[styles.audioBadgeText, bgmEnabled ? styles.audioBadgeTextOn : styles.audioBadgeTextOff]}>BGM {bgmEnabled ? 'ON' : 'OFF'}</Text>
+            </View>
+            <View style={[styles.audioBadge, narrationEnabled ? styles.audioBadgeOn : styles.audioBadgeOff]}>
+              <Text style={[styles.audioBadgeText, narrationEnabled ? styles.audioBadgeTextOn : styles.audioBadgeTextOff]}>VO {narrationEnabled ? 'ON' : 'OFF'}</Text>
+            </View>
+          </View>
+          {purposeLabel && (
+            <Text style={styles.purposeLabelText} numberOfLines={1}>{purposeLabel}</Text>
+          )}
           {isRegenerating && (
             <View style={styles.regeneratingRow}>
               <Animated.View style={spinStyle}>
@@ -337,6 +358,38 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
     flexShrink: 1,
+  },
+  audioStatusRow: {
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 2,
+  },
+  audioBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  audioBadgeOn: {
+    backgroundColor: theme.colors.success[400] + '20',
+  },
+  audioBadgeOff: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  audioBadgeText: {
+    fontSize: 8,
+    fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  audioBadgeTextOn: {
+    color: theme.colors.success[400],
+  },
+  audioBadgeTextOff: {
+    color: theme.colors.dark.textFaint,
+  },
+  purposeLabelText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[400],
+    marginTop: 2,
   },
   regeneratingRow: {
     flexDirection: 'row',

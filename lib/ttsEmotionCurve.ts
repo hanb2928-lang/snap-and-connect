@@ -72,7 +72,7 @@ const PHASE_GUIDES: Record<EmotionPhase, string> = {
   action: 'End with a strong, clear call-to-action. Speak with urgency and conviction. Make the listener feel compelled to act now.',
 };
 
-const PHASE_RATIOS: Record<EmotionPhase, number> = {
+export const PHASE_RATIOS: Record<EmotionPhase, number> = {
   attention: 0.15,
   interest: 0.25,
   desire: 0.3,

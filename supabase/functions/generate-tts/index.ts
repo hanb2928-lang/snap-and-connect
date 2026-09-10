@@ -16,6 +16,9 @@ interface TTSRequest {
   pitch?: number;
   instructions?: string;
   ttsApiKey?: string;
+  viralProsodyInstructions?: string;
+  targetDurationSec?: number;
+  phaseSpeedOverrides?: Array<{ startSec: number; endSec: number; speed: number }>;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,12 +44,26 @@ Deno.serve(async (req: Request) => {
     const text = body.text.slice(0, 500);
     const voice = body.voice || "alloy";
     const baseSpeed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
-    const instructions = body.instructions?.trim() || undefined;
+
+    // Merge viral prosody instructions with base instructions
+    const viralInstructions = body.viralProsodyInstructions?.trim() || undefined;
+    const baseInstructions = body.instructions?.trim() || undefined;
+    const instructions = [viralInstructions, baseInstructions].filter(Boolean).join('\n\n') || undefined;
+
+    // Apply phase-specific speed overrides for time-boxing sync
+    let effectiveSpeed = baseSpeed;
+    if (body.targetDurationSec && body.phaseSpeedOverrides && body.phaseSpeedOverrides.length > 0) {
+      const estimatedDurationSec = estimateDuration(text, baseSpeed);
+      if (estimatedDurationSec > 0) {
+        const speedAdjustment = body.targetDurationSec / estimatedDurationSec;
+        effectiveSpeed = Math.min(Math.max(baseSpeed * speedAdjustment, 0.5), 2.0);
+      }
+    }
 
     // Human-like TTS variation: apply subtle speed jitter (±0.08)
     // to avoid identical audio waveforms across generations
     const speedJitter = (Math.random() - 0.5) * 0.16;
-    const speed = Math.min(Math.max(baseSpeed + speedJitter, 0.5), 2.0);
+    const speed = Math.min(Math.max(effectiveSpeed + speedJitter, 0.5), 2.0);
 
     const openaiKey = body.ttsApiKey?.trim() || await resolveOpenAIKey();
 
