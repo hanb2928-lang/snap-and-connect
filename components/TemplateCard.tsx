@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  Dimensions,
   TextInput,
   TouchableOpacity,
   Platform,
@@ -14,8 +13,7 @@ import { theme } from '@/lib/theme';
 import type { StickerStyle } from '@/components/StickerLink';
 import type { TemplateData, PlatformKey, PlatformVariant, CustomReview } from '@/types/database';
 
-const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = screenWidth - 32;
+
 
 export type TextPosition = 'top' | 'center' | 'bottom';
 
@@ -139,10 +137,6 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
       }
     }, [imageUrl]);
 
-    const fallbackAspect = 1 / 1.55;
-    const aspect = imgAspect ?? fallbackAspect;
-    const cardHeight = Math.round(CARD_WIDTH / aspect);
-
     const overlayBase = cleanMode ? 0 : 0.35;
     const effectiveOpacity = overlayOpacity != null ? overlayOpacity : overlayBase;
     const overlayColor = `rgba(10, 15, 30, ${effectiveOpacity})`;
@@ -152,7 +146,7 @@ export const TemplateCard = forwardRef<View, TemplateCardProps>(
     return (
       <View
         ref={ref}
-        style={[styles.cardBase, { height: cardHeight }]}
+        style={styles.cardBase}
         collapsable={false}
       >
         <Image source={{ uri: imageUrl }} style={styles.image} resizeMode={imgAspect ? 'cover' : 'contain'} />
@@ -184,7 +178,8 @@ TemplateCard.displayName = 'TemplateCard';
 
 const styles = StyleSheet.create({
   cardBase: {
-    width: CARD_WIDTH,
+    width: '100%',
+    height: '100%',
     borderRadius: theme.radius.xl,
     overflow: 'hidden',
     backgroundColor: theme.colors.dark.surface,
