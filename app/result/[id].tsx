@@ -176,6 +176,8 @@ export default function ResultScreen() {
     titleText: '',
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [showMoodHints, setShowMoodHints] = useState(true);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -1100,10 +1102,6 @@ export default function ResultScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.templateMovedNote}>
-                <LayoutTemplate size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={styles.templateMovedNoteText}>9:16 미리보기는 화면 상단에서 직접 확인할 수 있어요. 아래 스티커·투명도·문구 위치를 조작하면 상단 미리보기에 실시간 반영됩니다.</Text>
-              </View>
             </View>
           ),
         },
@@ -1683,7 +1681,7 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
-        {/* === 9:16 Preview === */}
+        {/* === 9:16 Immersive Preview === */}
         <View style={styles.previewFrame}>
           <View style={styles.previewInner}>
             <TemplateCard
@@ -1704,8 +1702,13 @@ export default function ResultScreen() {
             />
             {isRegenerating && (
               <View style={styles.previewLoadingOverlay}>
-                <ActivityIndicator size="large" color={theme.colors.primary[400]} />
-                <Text style={styles.previewLoadingText}>AI 재생성 중...</Text>
+                <View style={styles.regenPulseRing} />
+                <View style={styles.regenPulseRing2} />
+                <View style={styles.regenIconWrap}>
+                  <Sparkles size={28} color={theme.colors.primary[300]} strokeWidth={2} />
+                </View>
+                <Text style={styles.previewLoadingText}>AI가 새로운 비주얼 생성 중</Text>
+                <Text style={styles.previewLoadingSub}>방금 선택한 스타일이 실시간으로 입혀지고 있어요</Text>
               </View>
             )}
           </View>
@@ -1864,6 +1867,30 @@ export default function ResultScreen() {
             numberOfLines={3}
             textAlignVertical="top"
           />
+          {showMoodHints && (
+            <View style={styles.moodHintRow}>
+              <Text style={styles.moodHintLabel}>이런 무드가 연출됩니다</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodHintScroll}>
+                {[
+                  { label: ' neon 글로우', color: '#ff6b9d', desc: '사이버팝' },
+                  { label: ' 필름 그레인', color: '#e8a87c', desc: '레트로 무드' },
+                  { label: ' 청량 템플릿', color: '#5b9bd5', desc: '썸머 바이브' },
+                  { label: ' 미니멀 화이트', color: '#cccccc', desc: '클린 감성' },
+                  { label: ' 시네마틱 다크', color: '#8e44ad', desc: '급이 다른 무드' },
+                ].map((hint) => (
+                  <TouchableOpacity
+                    key={hint.desc}
+                    style={styles.moodHintChip}
+                    onPress={() => handleInlineEdit({ aiPrompt: (inlineEdit.aiPrompt + ' ' + hint.desc).trim() })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.moodHintDot, { backgroundColor: hint.color }]} />
+                    <Text style={styles.moodHintChipText}>{hint.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           <TouchableOpacity
             style={[styles.regenBtnLarge, isRegenerating && styles.regenBtnDisabled]}
             onPress={handleRegenerate}
@@ -1906,48 +1933,114 @@ export default function ResultScreen() {
           onSaveAndShare={handleSaveAndShare}
         />
 
-        {/* === Title + Caption + Hashtags === */}
+        {/* === Collapsible Detail Cards === */}
         <View style={styles.detailSection}>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailLabel}>타이틀 (유튜브/릴스용)</Text>
-            <TextInput
-              style={styles.detailInputSingle}
-              value={inlineEdit.titleText}
-              onChangeText={(text) => handleInlineEdit({ titleText: text })}
-              placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
-              placeholderTextColor={theme.colors.dark.textFaint}
-              numberOfLines={1}
-            />
-          </View>
-          <View style={styles.detailBox}>
-            <Text style={styles.detailLabel}>설명 문구 직접 수정</Text>
-            <TextInput
-              style={styles.detailInput}
-              value={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
-              onChangeText={(text) => handleInlineEdit({ captionText: text })}
-              placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
-              placeholderTextColor={theme.colors.dark.textFaint}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-          </View>
-          {allDisplayHashtags.length > 0 && (
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>해시태그 (탭하여 삭제)</Text>
-              <View style={styles.detailHashtagWrap}>
-                {allDisplayHashtags.map((tag) => (
+          <TouchableOpacity
+            style={styles.detailToggle}
+            onPress={() => setDetailsExpanded((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.detailToggleLeft}>
+              <Pencil size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.detailToggleText}>제목 · 설명 · 해시태그 상세 편집</Text>
+            </View>
+            {detailsExpanded ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          {detailsExpanded && (
+            <>
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>타이틀 (유튜브/릴스용)</Text>
+                <TextInput
+                  style={styles.detailInputSingle}
+                  value={inlineEdit.titleText}
+                  onChangeText={(text) => handleInlineEdit({ titleText: text })}
+                  placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  numberOfLines={1}
+                />
+              </View>
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>설명 문구 직접 수정</Text>
+                <TextInput
+                  style={styles.detailInput}
+                  value={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
+                  onChangeText={(text) => handleInlineEdit({ captionText: text })}
+                  placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
+                  placeholderTextColor={theme.colors.dark.textFaint}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+              {allDisplayHashtags.length > 0 && (
+                <View style={styles.detailBox}>
+                  <Text style={styles.detailLabel}>해시태그 (탭하여 삭제)</Text>
+                  <View style={styles.detailHashtagWrap}>
+                    {allDisplayHashtags.map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={styles.detailHashtagChip}
+                        onPress={() => handleInlineRemoveHashtag(tag)}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={styles.detailHashtagChipText}>#{tag}</Text>
+                        <Text style={styles.detailHashtagRemoveX}> x</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {trendingSuggestions.length > 0 && (
+            <View style={styles.trendNudgeCard}>
+              <View style={styles.trendNudgeHeader}>
+                <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />
+                <Text style={styles.trendNudgeTitle}>지금 터지는 해시태그 콤보</Text>
+              </View>
+              <View style={styles.trendNudgeChips}>
+                {trendingSuggestions.slice(0, 6).map((tag) => (
                   <TouchableOpacity
                     key={tag}
-                    style={styles.detailHashtagChip}
-                    onPress={() => handleInlineRemoveHashtag(tag)}
-                    activeOpacity={0.6}
+                    style={styles.trendNudgeChip}
+                    onPress={() => handleAddTrendingHashtag(tag)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.detailHashtagChipText}>#{tag}</Text>
-                    <Text style={styles.detailHashtagRemoveX}> x</Text>
+                    <Plus size={9} color={theme.colors.warning[400]} strokeWidth={2.5} />
+                    <Text style={styles.trendNudgeChipText}>{tag}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
+          )}
+
+          {activeHook && (
+            <View style={styles.hookNudgeCard}>
+              <View style={styles.hookNudgeHeader}>
+                <ZapIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                <Text style={styles.hookNudgeTitle}>주목도 200% 후킹 멘트 추천</Text>
+              </View>
+              <Text style={styles.hookNudgeText} numberOfLines={2}>{activeHook}</Text>
+              <TouchableOpacity
+                style={styles.hookNudgeCopyBtn}
+                onPress={handleCopyHook}
+                activeOpacity={0.7}
+              >
+                {hookCopied ? (
+                  <Check size={12} color={theme.colors.success[400]} strokeWidth={2} />
+                ) : (
+                  <Copy size={12} color={theme.colors.accent[300]} strokeWidth={2} />
+                )}
+                <Text style={[styles.hookNudgeCopyText, hookCopied && { color: theme.colors.success[400] }]}>
+                  {hookCopied ? '복사됨' : '이 멘트 복사'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -3318,24 +3411,54 @@ const styles = StyleSheet.create({
   },
   previewInner: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     aspectRatio: 9 / 16,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     overflow: 'hidden',
     backgroundColor: theme.colors.dark.surface,
-    ...theme.shadows.card,
+    ...theme.shadows.elevated,
   },
   previewLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 5, 15, 0.7)',
+    backgroundColor: 'rgba(3, 5, 15, 0.78)',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   previewLoadingText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  previewLoadingSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  regenIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary[500] + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  regenPulseRing: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  regenPulseRing2: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1,
+    borderColor: theme.colors.primary[500] + '20',
   },
   previewBadge: {
     position: 'absolute',
@@ -3434,6 +3557,39 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.text,
     minHeight: 80,
   },
+  moodHintRow: {
+    gap: 6,
+  },
+  moodHintLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  moodHintScroll: {
+    flexGrow: 0,
+  },
+  moodHintChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  moodHintDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  moodHintChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
   regenBtnLarge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3456,6 +3612,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     gap: 10,
+  },
+  detailToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  detailToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailToggleText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
   },
   detailBox: {
     backgroundColor: theme.colors.dark.surface,
@@ -3513,6 +3690,84 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
+  },
+  trendNudgeCard: {
+    backgroundColor: theme.colors.warning[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '25',
+  },
+  trendNudgeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trendNudgeTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
+  },
+  trendNudgeChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  trendNudgeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  trendNudgeChipText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  hookNudgeCard: {
+    backgroundColor: theme.colors.accent[500] + '10',
+    borderRadius: theme.radius.md,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '25',
+  },
+  hookNudgeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hookNudgeTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  hookNudgeText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    lineHeight: 19,
+  },
+  hookNudgeCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surface,
+    alignSelf: 'flex-start',
+  },
+  hookNudgeCopyText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[300],
   },
   templateMovedNote: {
     flexDirection: 'row',
