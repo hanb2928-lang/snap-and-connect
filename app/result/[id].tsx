@@ -117,7 +117,9 @@ import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 import { MiniPreview } from '@/components/MiniPreview';
+import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
+import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -1028,6 +1030,19 @@ export default function ResultScreen() {
   const affiliatePlatforms = useMemo(
     () => availablePlatforms.length > 0 ? availablePlatforms : [selectedAffiliate],
     [availablePlatforms, selectedAffiliate],
+  );
+
+  const previewEditPlan = useMemo(
+    () => buildShortFormEditPlan(
+      targetPlatform,
+      inlineEdit.aiPrompt || activeOneLiner || scan?.summary || '',
+      activeHook || null,
+      activeProductName || undefined,
+      affiliatePlatforms,
+      true,
+      false,
+    ),
+    [targetPlatform, inlineEdit.aiPrompt, activeOneLiner, scan?.summary, activeHook, activeProductName, affiliatePlatforms],
   );
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms);
@@ -2100,8 +2115,13 @@ export default function ResultScreen() {
           </View>
         </View>
 
-        {/* === Mini Live Preview === */}
+        {/* === Live Short-Form Preview === */}
         <View style={styles.promptSection}>
+          <ShortFormPreviewPlayer
+            editPlan={previewEditPlan}
+            videoUri={null}
+            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
+          />
           <MiniPreview
             platform={targetPlatform}
             videoTemplate={inlineEdit.videoTemplate}
