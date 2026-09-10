@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   TextInput,
   AppState,
-  Dimensions,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -2393,29 +2392,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
   },
-  heroWrap: {
-    position: 'relative',
-  },
-  heroImage: {
-    width: '100%',
-  },
-  heroBadge: {
-    position: 'absolute',
-    bottom: theme.spacing.md,
-    left: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(10, 15, 30, 0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.radius.full,
-  },
-  heroBadgeText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
-  },
   body: {
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
@@ -3358,7 +3334,6 @@ const styles = StyleSheet.create({
   previewInner: {
     width: '100%',
     maxWidth: 360,
-    maxHeight: Dimensions.get('window').height * 0.72,
     aspectRatio: 9 / 16,
     borderRadius: theme.radius.xl,
     overflow: 'hidden',
