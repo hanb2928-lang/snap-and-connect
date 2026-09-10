@@ -2121,6 +2121,7 @@ export default function ResultScreen() {
             editPlan={previewEditPlan}
             videoUri={null}
             imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
+            slideshowImages={allCutImages.length > 1 ? allCutImages : null}
           />
           <MiniPreview
             platform={targetPlatform}

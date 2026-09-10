@@ -32,6 +32,7 @@ interface ShortFormPreviewPlayerProps {
   editPlan: ShortFormEditPlan;
   videoUri: string | null;
   imageUri?: string | null;
+  slideshowImages?: string[] | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -44,11 +45,12 @@ function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegm
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [luminanceLevel, setLuminanceLevel] = useState<LuminanceLevel>('dark');
+  const [slideshowIndex, setSlideshowIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -57,6 +59,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
   const { width: screenWidth } = useWindowDimensions();
 
   const hasImage = !!imageUri;
+  const hasSlideshow = !!slideshowImages && slideshowImages.length > 1;
+  const slideshowInterval = TOTAL_DURATION / (slideshowImages?.length ?? 1);
 
   useEffect(() => {
     if (!videoUri || hasImage) {
@@ -188,6 +192,15 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
   }, [isPlaying, stop]);
 
   useEffect(() => {
+    if (!hasSlideshow || !isPlaying) return;
+    const idx = Math.min(
+      Math.floor(currentSec / slideshowInterval),
+      (slideshowImages?.length ?? 1) - 1,
+    );
+    setSlideshowIndex(idx);
+  }, [currentSec, hasSlideshow, slideshowInterval, slideshowImages?.length, isPlaying]);
+
+  useEffect(() => {
     return () => {
       stop();
       if (bgmPlayerRef.current) {
@@ -196,6 +209,16 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
       }
     };
   }, [stop]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const existing = document.getElementById('kenburns-keyframes');
+    if (existing) return;
+    const style = document.createElement('style');
+    style.id = 'kenburns-keyframes';
+    style.textContent = `@keyframes kenburns{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.12) translate(-2%,-2%)}}`;
+    document.head.appendChild(style);
+  }, []);
 
   const activeSegment = getActiveSegment(editPlan.segments, currentSec);
   const isDisclosureActive =
@@ -246,7 +269,39 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri }: ShortFo
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {hasImage && imageUri ? (
+          {hasSlideshow && slideshowImages ? (
+            Platform.OS === 'web' ? (
+              // @ts-ignore web-only img element
+              <img
+                key={slideshowIndex}
+                src={slideshowImages[slideshowIndex]}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000',
+                  transition: 'opacity 0.4s ease-in-out',
+                  animation: isPlaying ? 'kenburns 3s ease-out forwards' : 'none',
+                }}
+              />
+            ) : (
+              <Image
+                source={{ uri: slideshowImages[slideshowIndex].startsWith('data:') ? slideshowImages[slideshowIndex] : slideshowImages[slideshowIndex] }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#000',
+                }}
+                resizeMode="cover"
+              />
+            )
+          ) : hasImage && imageUri ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only img element
               <img
