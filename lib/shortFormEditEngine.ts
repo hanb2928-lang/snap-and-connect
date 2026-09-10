@@ -164,6 +164,8 @@ export interface ShortFormEditPlan {
   autoEnhancements: AutoEnhancement[];
 }
 
+export type StoryPhase = 'gaze_hook' | 'need_discovery' | 'transformation' | 'cta_call';
+
 export interface EditSegment {
   index: number;
   startSec: number;
@@ -172,6 +174,8 @@ export interface EditSegment {
   purpose: string;
   textOverlay: string;
   position: 'top' | 'center' | 'bottom';
+  storyPhase: StoryPhase;
+  narrationCue: string;
 }
 
 export function getPlatformInfo(platform: ShortFormPlatform | string, customSpec?: PlatformSpec) {
@@ -213,6 +217,76 @@ const CTA_TEMPLATES: Record<EmotionPhase, string[]> = {
   desire: ['지금 바로 시작하세요', '이 순간이 시작입니다', '경험해보면 차이를 느껴요'],
   action: ['함께 확인해볼까요', '지금이 최적 타이밍', '누구나 만족하는 선택'],
 };
+
+export interface StoryNarrative {
+  gazeHook: string;
+  needDiscovery: string;
+  transformation: string;
+  ctaCall: string;
+  narrationCues: {
+    gazeHook: string;
+    needDiscovery: string;
+    transformation: string;
+    ctaCall: string;
+  };
+}
+
+const STORY_GAZE_HOOKS: string[] = [
+  '이 사람이 지금 무언가 발견한 순간',
+  '잠깐, 이거 보고 계신가요?',
+  '바쁜 일상 속 결정적 순간',
+  '이 표정, 무슨 일이 있었을까?',
+];
+
+const STORY_NEED_DISCOVERY: string[] = [
+  '왜 이 제품이 필요했을까요?',
+  '일상의 불편함을 해결하는 순간',
+  '이 사물을 만졌을 때 변화가 시작됩니다',
+  '고민하던 문제, 여기서 풀렸어요',
+];
+
+const STORY_TRANSFORMATION: string[] = [
+  '사용 후, 확 달라진 일상',
+  '디테일이 만든 작은 혁명',
+  '이거 하나로 스타일링 완성',
+  '경험하고 나면 돌아갈 수 없어요',
+];
+
+const STORY_CTA: string[] = [
+  '지금이 바로 그 순간입니다',
+  '여러분의 일상도 바뀔 수 있어요',
+  '이 경험, 직접 확인하세요',
+  '다음은 당신의 차례입니다',
+];
+
+const NARRATION_CUES = {
+  gazeHook: 'VO: 인물의 시선이 카메라를 향한다 — 호기심 자극, 2초 후킹',
+  needDiscovery: 'VO: 왜 이 제품인가 — 상황 설정과 문제 정의',
+  transformation: 'VO: 사용 후 변화 — 감성 충전과 몰입',
+  ctaCall: 'VO: 행동 유도 — 시청자를 향한 직접적 메시지',
+};
+
+function pickStoryText(pool: string[], productHint: string): string {
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx].replace('이 제품', productHint).replace('이거', productHint);
+}
+
+function buildStoryNarrative(
+  hook: string,
+  emotion: EmotionPhase,
+  productName?: string,
+): StoryNarrative {
+  const pName = productName?.trim() || '';
+  const productHint = pName.length > 8 ? pName.slice(0, 8) + '...' : pName || '이 제품';
+
+  return {
+    gazeHook: hook || pickStoryText(STORY_GAZE_HOOKS, productHint),
+    needDiscovery: pickStoryText(STORY_NEED_DISCOVERY, productHint),
+    transformation: pickStoryText(STORY_TRANSFORMATION, productHint),
+    ctaCall: pickStoryText(STORY_CTA, productHint),
+    narrationCues: NARRATION_CUES,
+  };
+}
 
 function pickTemplate(
   pool: Record<EmotionPhase, string[]>,
@@ -268,13 +342,56 @@ export function buildShortFormEditPlan(
   const totalDurationSec = 15;
   const hookOptions = generateHookOptions(customPrompt, productName);
   const hook = selectedHook || hookOptions[0]?.text || '';
+  const matchedHook = hookOptions.find((h) => h.text === hook);
+  const emotion: EmotionPhase = matchedHook?.emotion ?? 'curiosity';
+  const story = buildStoryNarrative(hook, emotion, productName);
   const segmentTexts = buildSegmentTexts(hook, hookOptions, customPrompt, productName);
 
   const segments: EditSegment[] = [
-    { index: 0, startSec: 0, endSec: 3, label: '3초 훅', purpose: '시청자 이탈 방지 (유튜브 상위 1% 공식: 첫 3초 후킹)', textOverlay: hook, position: 'center' },
-    { index: 1, startSec: 3, endSec: 7, label: '입체 제품 소개', purpose: '다각도 합성 결과로 입체적 가치 전달', textOverlay: segmentTexts.intro, position: 'top' },
-    { index: 2, startSec: 7, endSec: 11, label: '사용 맥락·혜택', purpose: '사용 맥락 중심 다이내믹 컷 전환으로 몰입 유지', textOverlay: segmentTexts.benefit, position: 'center' },
-    { index: 3, startSec: 11, endSec: 13, label: 'CTA', purpose: '행동 유도', textOverlay: disclosureEnabled ? segmentTexts.cta : '', position: 'bottom' },
+    {
+      index: 0,
+      startSec: 0,
+      endSec: 3,
+      label: '시선 포착',
+      purpose: '인물이 카메라를 응시하는 순간으로 시선 강탈, 상황 정의',
+      textOverlay: story.gazeHook,
+      position: 'center',
+      storyPhase: 'gaze_hook',
+      narrationCue: story.narrationCues.gazeHook,
+    },
+    {
+      index: 1,
+      startSec: 3,
+      endSec: 7,
+      label: '서사 전개',
+      purpose: '왜 이 제품이 필요한지 리얼리티 서사로 연결, 다각도 입체 컷 전환',
+      textOverlay: story.needDiscovery,
+      position: 'top',
+      storyPhase: 'need_discovery',
+      narrationCue: story.narrationCues.needDiscovery,
+    },
+    {
+      index: 2,
+      startSec: 7,
+      endSec: 11,
+      label: '변화·몰입',
+      purpose: '사용 후 일상적 변화를 감성적으로 전달, 디테일 클로즈업 전환',
+      textOverlay: story.transformation,
+      position: 'center',
+      storyPhase: 'transformation',
+      narrationCue: story.narrationCues.transformation,
+    },
+    {
+      index: 3,
+      startSec: 11,
+      endSec: 13,
+      label: 'CTA',
+      purpose: '시청자를 향한 직접적 행동 유도, 감정 최고점에서 클로징',
+      textOverlay: disclosureEnabled ? story.ctaCall : segmentTexts.cta,
+      position: 'bottom',
+      storyPhase: 'cta_call',
+      narrationCue: story.narrationCues.ctaCall,
+    },
   ];
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms, autoDisclosure && disclosureEnabled);

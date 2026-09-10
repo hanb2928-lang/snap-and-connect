@@ -18,7 +18,8 @@ import {
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { BgmPlayer } from '@/lib/bgmEngine';
-import type { ShortFormEditPlan, EditSegment } from '@/lib/shortFormEditEngine';
+import type { ShortFormEditPlan, EditSegment, StoryPhase } from '@/lib/shortFormEditEngine';
+import { getCameraMovementForTime, type CameraMovement } from '@/lib/directingEngine';
 import {
   sampleVideoLuminance,
   classifyLuminance,
@@ -41,31 +42,6 @@ const LUMINANCE_SAMPLE_MS = 500;
 const PREVIEW_FRAME_WIDTH = 135;
 const PREVIEW_FRAME_HEIGHT = 240;
 
-type CameraMove =
-  | 'zoom_in_fast'
-  | 'pan_right'
-  | 'tilt_up'
-  | 'zoom_out'
-  | 'orbit_left'
-  | 'push_in';
-
-interface SegmentCamera {
-  move: CameraMove;
-  startScale: number;
-  endScale: number;
-  startTx: number;
-  endTx: number;
-  startTy: number;
-  endTy: number;
-}
-
-const SEGMENT_CAMERAS: Record<number, SegmentCamera> = {
-  0: { move: 'zoom_in_fast', startScale: 1.0, endScale: 1.25, startTx: 0, endTx: 0, startTy: 0, endTy: 0 },
-  1: { move: 'pan_right',    startScale: 1.15, endScale: 1.15, startTx: 3, endTx: -3, startTy: 0, endTy: 0 },
-  2: { move: 'tilt_up',      startScale: 1.2, endScale: 1.2, startTx: 0, endTx: 0, startTy: 3, endTy: -3 },
-  3: { move: 'zoom_out',     startScale: 1.25, endScale: 1.0, startTx: 0, endTx: 0, startTy: 0, endTy: 0 },
-};
-
 function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegment | null {
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
 }
@@ -81,16 +57,44 @@ function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-function computeTransform(seg: EditSegment | null, currentSec: number): string {
+function easeOutQuart(t: number): number {
+  return 1 - Math.pow(1 - t, 4);
+}
+
+function applyEasing(easing: CameraMovement['easing'], t: number): number {
+  if (easing === 'ease_out_quart') return easeOutQuart(t);
+  return easeInOutCubic(t);
+}
+
+function computeStoryTransform(
+  segments: EditSegment[],
+  currentSec: number,
+): string {
+  const seg = getActiveSegment(segments, currentSec);
   if (!seg) return 'scale(1) translate(0%, 0%)';
-  const cam = SEGMENT_CAMERAS[seg.index] ?? SEGMENT_CAMERAS[0];
+  const cam = getCameraMovementForTime(segments, currentSec);
+  if (!cam) return 'scale(1) translate(0%, 0%)';
   const rawProgress = getSegmentProgress(seg, currentSec);
-  const p = easeInOutCubic(rawProgress);
+  const p = applyEasing(cam.easing, rawProgress);
   const scale = cam.startScale + (cam.endScale - cam.startScale) * p;
   const tx = cam.startTx + (cam.endTx - cam.startTx) * p;
   const ty = cam.startTy + (cam.endTy - cam.startTy) * p;
   return `scale(${scale.toFixed(3)}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`;
 }
+
+const STORY_PHASE_LABELS: Record<StoryPhase, string> = {
+  gaze_hook: '시선 포착',
+  need_discovery: '서사 전개',
+  transformation: '변화·몰입',
+  cta_call: 'CTA',
+};
+
+const STORY_PHASE_COLORS: Record<StoryPhase, string> = {
+  gaze_hook: theme.colors.accent[300],
+  need_discovery: theme.colors.primary[300],
+  transformation: theme.colors.primary[400],
+  cta_call: theme.colors.warning[400],
+};
 
 function getImageForSegment(
   segments: EditSegment[],
@@ -319,8 +323,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   }, [activeSegment, safeZonePadding]);
 
   const liveTransform = useMemo(
-    () => computeTransform(activeSegment, currentSec),
-    [activeSegment, currentSec],
+    () => computeStoryTransform(editPlan.segments, currentSec),
+    [editPlan.segments, currentSec],
   );
 
   const videoHtml = useMemo(() => {
@@ -489,7 +493,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
           {activeSegment && isPlaying && (
             <View style={styles.sceneBadge}>
-              <Text style={styles.sceneBadgeText} numberOfLines={1}>{activeSegment.label}</Text>
+              <View style={[styles.sceneDot, { backgroundColor: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} />
+              <Text style={[styles.sceneBadgeText, { color: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} numberOfLines={1}>
+                {STORY_PHASE_LABELS[activeSegment.storyPhase]}
+              </Text>
             </View>
           )}
 
@@ -651,15 +658,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 6,
     left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },
+  sceneDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   sceneBadgeText: {
     fontSize: 7,
     fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.accent[300],
   },
   timeBadge: {
     position: 'absolute',
