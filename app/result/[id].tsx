@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   TextInput,
   AppState,
+  Dimensions,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -660,37 +661,43 @@ export default function ResultScreen() {
     let fallbackObjectUrl: string | null = null;
     try {
       let uri: string;
-      try {
-        uri = await captureRef(cardRef, {
-          format: 'png',
-          quality: 1,
-          fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
-        });
-      } catch (captureError) {
-        if (Platform.OS !== 'web') throw captureError;
-        const sourceUrl = captureImageUrl || scan?.edited_image_url || scan?.image_url;
-        if (!sourceUrl) throw captureError;
-        const sourceResponse = await fetch(sourceUrl);
-        if (!sourceResponse.ok) throw captureError;
-        fallbackObjectUrl = URL.createObjectURL(await sourceResponse.blob());
-        uri = fallbackObjectUrl;
-      }
+      const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`;
 
-      const fileName = `snap-connect-${scan?.id ?? 'card'}-${Date.now()}.png`; 
-
-      // 1) Save to device gallery (primary action)
       if (Platform.OS === 'web') {
-        const res = await fetch(uri);
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
+        // Web: skip DOM canvas capture (CORS/tainted-canvas issues) — fetch source image directly
+        const sourceUrl = captureImageUrl || scan?.edited_image_url || scan?.image_url;
+        if (!sourceUrl) throw new Error('저장할 이미지를 찾을 수 없습니다.');
+        let fetchRes: Response;
+        try {
+          fetchRes = await fetch(sourceUrl);
+        } catch {
+          throw new Error('이미지를 불러올 수 없습니다. 네트워크 연결을 확인해주세요.');
+        }
+        if (!fetchRes.ok) throw new Error(`이미지 서버 응답 오류 (${fetchRes.status})`);
+        const blob = await fetchRes.blob();
+        fallbackObjectUrl = URL.createObjectURL(blob);
+        uri = fallbackObjectUrl;
+
+        // Trigger browser download via <a> tag
         const link = document.createElement('a');
-        link.href = objectUrl;
+        link.href = uri;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
         link.remove();
-        URL.revokeObjectURL(objectUrl);
       } else {
+        // Native: use view-shot capture
+        try {
+          uri = await captureRef(cardRef, {
+            format: 'png',
+            quality: 1,
+            fileName: `snap-connect-${scan?.id ?? 'card'}.png`,
+          });
+        } catch (captureError) {
+          throw new Error('화면 캡처에 실패했습니다. 이미지를 불러온 후 다시 시도해주세요.');
+        }
+
+        // 1) Save to device gallery (primary action)
         const permission = await MediaLibrary.requestPermissionsAsync();
         if (!permission.granted) {
           throw new Error('갤러리 접근 권한이 필요합니다.');
@@ -766,9 +773,16 @@ export default function ResultScreen() {
       }
     } catch (saveError) {
       setUploadProgress(null);
-      const message = saveError instanceof Error && saveError.message
-        ? saveError.message
-        : '미리보기 캡처에 실패했습니다. 다시 시도해주세요.';
+      let message: string;
+      if (saveError instanceof Error && saveError.message) {
+        message = saveError.message;
+      } else if (typeof saveError === 'string') {
+        message = saveError;
+      } else {
+        message = Platform.OS === 'web'
+          ? '이미지 저장에 실패했습니다. 브라우저 설정에서 다운로드 권한을 확인해주세요.'
+          : '저장 중 오류가 발생했습니다. 다시 시도해주세요.';
+      }
       setUploadError(message);
       if (fallbackObjectUrl && Platform.OS === 'web') {
         URL.revokeObjectURL(fallbackObjectUrl);
@@ -3412,6 +3426,7 @@ const styles = StyleSheet.create({
   previewInner: {
     width: '100%',
     maxWidth: 360,
+    maxHeight: Dimensions.get('window').height * 0.72,
     aspectRatio: 9 / 16,
     borderRadius: theme.radius.xl,
     overflow: 'hidden',

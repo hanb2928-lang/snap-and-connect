@@ -60,8 +60,22 @@ export function StereoPipelineOverlay({
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      setGallerySaved(false);
+      setSavingGallery(false);
+      setPublishClicked(null);
+    };
   }, []);
+
+  // Reset internal state when modal is dismissed
+  useEffect(() => {
+    if (!visible) {
+      setGallerySaved(false);
+      setSavingGallery(false);
+      setPublishClicked(null);
+    }
+  }, [visible]);
 
   const handleSaveToGallery = useCallback(async () => {
     if (!firstImageDataUrl || savingGallery) return;
