@@ -116,6 +116,7 @@ import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
+import { MiniPreview } from '@/components/MiniPreview';
 
 type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
 
@@ -1927,6 +1928,19 @@ export default function ResultScreen() {
               ))}
             </ScrollView>
           </View>
+        </View>
+
+        {/* === Mini Live Preview === */}
+        <View style={styles.promptSection}>
+          <MiniPreview
+            platform={targetPlatform}
+            videoTemplate={inlineEdit.videoTemplate}
+            captionFont={inlineEdit.captionFont}
+            captionPosition={inlineEdit.captionPosition}
+            bgmMood={inlineEdit.bgmMood}
+            hookText={activeHook}
+            isRegenerating={isRegenerating}
+          />
         </View>
 
         {/* === AI Prompt + Regenerate === */}
