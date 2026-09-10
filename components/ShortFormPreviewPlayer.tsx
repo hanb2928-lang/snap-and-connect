@@ -36,13 +36,70 @@ interface ShortFormPreviewPlayerProps {
 }
 
 const TOTAL_DURATION = 15;
-const TICK_MS = 100;
+const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
 const PREVIEW_FRAME_WIDTH = 135;
 const PREVIEW_FRAME_HEIGHT = 240;
 
+type CameraMove =
+  | 'zoom_in_fast'
+  | 'pan_right'
+  | 'tilt_up'
+  | 'zoom_out'
+  | 'orbit_left'
+  | 'push_in';
+
+interface SegmentCamera {
+  move: CameraMove;
+  startScale: number;
+  endScale: number;
+  startTx: number;
+  endTx: number;
+  startTy: number;
+  endTy: number;
+}
+
+const SEGMENT_CAMERAS: Record<number, SegmentCamera> = {
+  0: { move: 'zoom_in_fast', startScale: 1.0, endScale: 1.25, startTx: 0, endTx: 0, startTy: 0, endTy: 0 },
+  1: { move: 'pan_right',    startScale: 1.15, endScale: 1.15, startTx: 3, endTx: -3, startTy: 0, endTy: 0 },
+  2: { move: 'tilt_up',      startScale: 1.2, endScale: 1.2, startTx: 0, endTx: 0, startTy: 3, endTy: -3 },
+  3: { move: 'zoom_out',     startScale: 1.25, endScale: 1.0, startTx: 0, endTx: 0, startTy: 0, endTy: 0 },
+};
+
 function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegment | null {
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
+}
+
+function getSegmentProgress(seg: EditSegment | null, currentSec: number): number {
+  if (!seg) return 0;
+  const elapsed = currentSec - seg.startSec;
+  const duration = seg.endSec - seg.startSec;
+  return duration > 0 ? Math.min(1, elapsed / duration) : 0;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function computeTransform(seg: EditSegment | null, currentSec: number): string {
+  if (!seg) return 'scale(1) translate(0%, 0%)';
+  const cam = SEGMENT_CAMERAS[seg.index] ?? SEGMENT_CAMERAS[0];
+  const rawProgress = getSegmentProgress(seg, currentSec);
+  const p = easeInOutCubic(rawProgress);
+  const scale = cam.startScale + (cam.endScale - cam.startScale) * p;
+  const tx = cam.startTx + (cam.endTx - cam.startTx) * p;
+  const ty = cam.startTy + (cam.endTy - cam.startTy) * p;
+  return `scale(${scale.toFixed(3)}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`;
+}
+
+function getImageForSegment(
+  segments: EditSegment[],
+  seg: EditSegment | null,
+  images: string[] | null,
+): { src: string | null; index: number } {
+  if (!images || images.length === 0) return { src: null, index: 0 };
+  if (!seg) return { src: images[0], index: 0 };
+  return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
 export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages }: ShortFormPreviewPlayerProps) {
@@ -50,7 +107,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [luminanceLevel, setLuminanceLevel] = useState<LuminanceLevel>('dark');
-  const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const [displayedImage, setDisplayedImage] = useState<string | null>(null);
+  const [displayedSegIndex, setDisplayedSegIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -60,10 +118,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   const hasImage = !!imageUri;
   const hasSlideshow = !!slideshowImages && slideshowImages.length > 1;
-  const slideshowInterval = TOTAL_DURATION / (slideshowImages?.length ?? 1);
 
   useEffect(() => {
-    if (!videoUri || hasImage) {
+    if (!videoUri || hasImage || hasSlideshow) {
       setVideoSrc(null);
       return;
     }
@@ -88,7 +145,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       }
     })();
     return () => { cancelled = true; };
-  }, [videoUri, hasImage]);
+  }, [videoUri, hasImage, hasSlideshow]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
@@ -107,7 +164,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     }
   }, [currentSec, videoSrc]);
 
-  // Rule 1: Real-time luminance sampling for dynamic caption color
   useEffect(() => {
     if (Platform.OS !== 'web' || !videoSrc) {
       setLuminanceLevel('dark');
@@ -193,12 +249,21 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   useEffect(() => {
     if (!hasSlideshow || !isPlaying) return;
-    const idx = Math.min(
-      Math.floor(currentSec / slideshowInterval),
-      (slideshowImages?.length ?? 1) - 1,
-    );
-    setSlideshowIndex(idx);
-  }, [currentSec, hasSlideshow, slideshowInterval, slideshowImages?.length, isPlaying]);
+    const seg = getActiveSegment(editPlan.segments, currentSec);
+    if (seg) {
+      const { src, index } = getImageForSegment(editPlan.segments, seg, slideshowImages ?? null);
+      if (src && src !== displayedImage) {
+        setDisplayedImage(src);
+        setDisplayedSegIndex(index);
+      }
+    }
+  }, [currentSec, hasSlideshow, isPlaying, editPlan.segments, slideshowImages, displayedImage]);
+
+  useEffect(() => {
+    if (!hasSlideshow && slideshowImages && slideshowImages.length > 0) {
+      setDisplayedImage(slideshowImages[0]);
+    }
+  }, [slideshowImages, hasSlideshow]);
 
   useEffect(() => {
     return () => {
@@ -212,11 +277,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-    const existing = document.getElementById('kenburns-keyframes');
+    const existing = document.getElementById('snap-connect-cam-keyframes');
     if (existing) return;
     const style = document.createElement('style');
-    style.id = 'kenburns-keyframes';
-    style.textContent = `@keyframes kenburns{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.12) translate(-2%,-2%)}}`;
+    style.id = 'snap-connect-cam-keyframes';
+    style.textContent = [
+      '@keyframes cam_fade_in{from{opacity:0;transform:scale(1.08)}to{opacity:1;transform:scale(1.08)}}',
+      '@keyframes cam_flash{0%{opacity:0}15%{opacity:1}100%{opacity:1}}',
+    ].join('\n');
     document.head.appendChild(style);
   }, []);
 
@@ -228,14 +296,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const progressPercent = (currentSec / TOTAL_DURATION) * 100;
   const isBgmActive = currentSec > 0 && currentSec < TOTAL_DURATION;
 
-  // Rule 2: Responsive font scaling based on screen width
   const responsiveWidth = Math.min(PREVIEW_FRAME_WIDTH, screenWidth * 0.4);
   const captionStyle: CaptionStyle = useMemo(
     () => getCaptionStyle(luminanceLevel, activeSegment?.position ?? 'center', responsiveWidth),
     [luminanceLevel, activeSegment, responsiveWidth],
   );
 
-  // Rule 3: Safe-zone-aware positioning
   const safeZonePadding = useMemo(
     () => getSafeZonePadding(editPlan.safeZone, editPlan.spec, PREVIEW_FRAME_HEIGHT),
     [editPlan.safeZone, editPlan.spec],
@@ -252,6 +318,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     return { justifyContent: 'center' };
   }, [activeSegment, safeZonePadding]);
 
+  const liveTransform = useMemo(
+    () => computeTransform(activeSegment, currentSec),
+    [activeSegment, currentSec],
+  );
+
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
     const playCmd = isPlaying ? 'play()' : 'pause()';
@@ -259,6 +330,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   }, [videoSrc, isPlaying]);
 
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
+
+  const slideImgSrc = hasSlideshow ? displayedImage : null;
+  const slideImgKey = `${displayedSegIndex}-${displayedImage?.slice(-20) ?? ''}`;
 
   return (
     <View style={styles.container}>
@@ -269,12 +343,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {hasSlideshow && slideshowImages ? (
+          {hasSlideshow && slideImgSrc ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only img element
               <img
-                key={slideshowIndex}
-                src={slideshowImages[slideshowIndex]}
+                key={slideImgKey}
+                src={slideImgSrc}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -283,13 +357,17 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                   height: '100%',
                   objectFit: 'cover',
                   backgroundColor: '#000',
-                  transition: 'opacity 0.4s ease-in-out',
-                  animation: isPlaying ? 'kenburns 3s ease-out forwards' : 'none',
+                  transformOrigin: 'center center',
+                  transform: isPlaying ? liveTransform : 'scale(1.05)',
+                  transition: isPlaying
+                    ? 'transform 0.05s linear'
+                    : 'transform 0.4s ease-out',
+                  opacity: 1,
                 }}
               />
             ) : (
               <Image
-                source={{ uri: slideshowImages[slideshowIndex].startsWith('data:') ? slideshowImages[slideshowIndex] : slideshowImages[slideshowIndex] }}
+                source={{ uri: slideImgSrc.startsWith('data:') ? slideImgSrc : slideImgSrc }}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -297,6 +375,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                   width: '100%',
                   height: '100%',
                   backgroundColor: '#000',
+                  transform: [{ scale: isPlaying ? 1.15 : 1.05 }],
                 }}
                 resizeMode="cover"
               />
@@ -314,6 +393,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                   height: '100%',
                   objectFit: 'cover',
                   backgroundColor: '#000',
+                  transformOrigin: 'center center',
+                  transform: isPlaying ? liveTransform : 'scale(1.0)',
+                  transition: isPlaying
+                    ? 'transform 0.05s linear'
+                    : 'transform 0.3s ease-out',
                 }}
               />
             ) : (
@@ -400,6 +484,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
           {isBgmActive && (
             <View style={styles.bgmIndicator}>
               <Text style={styles.bgmText} numberOfLines={1}>{editPlan.bgmTemplate.label}</Text>
+            </View>
+          )}
+
+          {activeSegment && isPlaying && (
+            <View style={styles.sceneBadge}>
+              <Text style={styles.sceneBadgeText} numberOfLines={1}>{activeSegment.label}</Text>
             </View>
           )}
 
@@ -520,17 +610,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
   },
-  captionBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginBottom: 4,
-  },
-  captionSegmentLabel: {
-    fontSize: 8,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
   disclosureOverlay: {
     position: 'absolute',
     left: 6,
@@ -542,16 +621,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     gap: 3,
     alignItems: 'center',
-  },
-  disclosureBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  disclosureBadgeText: {
-    fontSize: 7,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.warning[400],
   },
   disclosureText: {
     fontSize: 8,
@@ -577,6 +646,20 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
     maxWidth: 50,
+  },
+  sceneBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  sceneBadgeText: {
+    fontSize: 7,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
   },
   timeBadge: {
     position: 'absolute',
