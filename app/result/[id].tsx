@@ -117,6 +117,7 @@ import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 import { MiniPreview } from '@/components/MiniPreview';
+import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -2049,6 +2050,13 @@ export default function ResultScreen() {
             </ScrollView>
           </View>
         </View>
+
+        <AiSoloDirectorCard
+          productName={scan?.product_name || ''}
+          platform={targetPlatform}
+          scanId={scan?.id ?? null}
+          customPrompt={inlineEdit.aiPrompt}
+        />
 
         {/* === Viral Audio Sync Status === */}
         <View style={styles.syncStatusSection}>
