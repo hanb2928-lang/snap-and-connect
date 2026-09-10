@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -13,7 +14,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Zap, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square } from 'lucide-react-native';
+import { Camera, Zap, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square, AlertCircle } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -39,8 +40,7 @@ import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleC
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
-import { runStereoPipeline, makeInitialProgress, type StereoPipelineProgress, type StereoPipelineResult } from '@/lib/stereoPipeline';
-import { StereoPipelineOverlay } from '@/components/StereoPipelineOverlay';
+import { runStereoPipeline, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -92,8 +92,6 @@ export default function CameraScreen() {
   const [workflowMountKey, setWorkflowMountKey] = useState(0);
   const [stereoProgress, setStereoProgress] = useState<StereoPipelineProgress>(makeInitialProgress());
   const [stereoOverlayVisible, setStereoOverlayVisible] = useState(false);
-  const [stereoResult, setStereoResult] = useState<StereoPipelineResult | null>(null);
-  const [stereoFirstImage, setStereoFirstImage] = useState<string | null>(null);
 
   const postCaptureBase64Ref = useRef<string | null>(null);
   const postCaptureMimeRef = useRef<string>('video/webm');
@@ -423,24 +421,15 @@ export default function CameraScreen() {
     setMultiAngleVisible(false);
     if (!sorted[0]?.base64) return;
 
-    // Store first image data URL for gallery save
-    const firstDataUrl = `data:${sorted[0].mimeType};base64,${sorted[0].base64}`;
-    setStereoFirstImage(firstDataUrl);
     setStereoProgress(makeInitialProgress());
-    setStereoResult(null);
     setStereoOverlayVisible(true);
 
     try {
       const result = await runStereoPipeline(sorted, (prog) => {
-        if (isMountedRef.current) {
-          setStereoProgress(prog);
-          if (prog.result) setStereoResult(prog.result);
-        }
+        if (isMountedRef.current) setStereoProgress(prog);
       });
       if (isMountedRef.current) {
-        setStereoResult(result);
         setStereoOverlayVisible(false);
-        setStereoFirstImage(null);
         router.replace({ pathname: '/result/[id]', params: { id: result.scanId } });
       }
     } catch (err) {
@@ -448,19 +437,6 @@ export default function CameraScreen() {
       setStereoProgress((prev) => ({ ...prev, error: friendlyError(err, '파이프라인 처리 중 오류가 발생했습니다.') }));
     }
   };
-
-  const handleStereoGoToEditor = useCallback((scanId: string) => {
-    setStereoOverlayVisible(false);
-    setStereoResult(null);
-    setStereoFirstImage(null);
-    router.push({ pathname: '/result/[id]', params: { id: scanId } });
-  }, [router]);
-
-  const handleStereoDismiss = useCallback(() => {
-    setStereoOverlayVisible(false);
-    setStereoResult(null);
-    setStereoFirstImage(null);
-  }, []);
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
@@ -680,13 +656,10 @@ export default function CameraScreen() {
           onClose={() => setCreditModalVisible(false)}
         />
 
-        <StereoPipelineOverlay
+        <StereoProgressLightweight
           visible={stereoOverlayVisible}
           progress={stereoProgress}
-          result={stereoResult}
-          onDismiss={handleStereoDismiss}
-          onGoToEditor={handleStereoGoToEditor}
-          firstImageDataUrl={stereoFirstImage}
+          onDismiss={() => setStereoOverlayVisible(false)}
         />
       </View>
     );
@@ -874,15 +847,60 @@ export default function CameraScreen() {
         onClose={() => setCreditModalVisible(false)}
       />
 
-      <StereoPipelineOverlay
+      <StereoProgressLightweight
         visible={stereoOverlayVisible}
         progress={stereoProgress}
-        result={stereoResult}
-        onDismiss={handleStereoDismiss}
-        onGoToEditor={handleStereoGoToEditor}
-        firstImageDataUrl={stereoFirstImage}
+        onDismiss={() => setStereoOverlayVisible(false)}
       />
     </View>
+  );
+}
+
+// ─── Lightweight Stereo Pipeline Progress ───
+
+function StereoProgressLightweight({
+  visible,
+  progress,
+  onDismiss,
+}: {
+  visible: boolean;
+  progress: StereoPipelineProgress;
+  onDismiss: () => void;
+}) {
+  const hasError = progress.error !== null;
+  const pct = Math.round(progress.overallProgress * 100);
+  const currentStep = progress.currentStep >= 0 ? progress.steps[progress.currentStep] : null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+      <View style={styles.stereoLightOverlay}>
+        <View style={styles.stereoLightCard}>
+          {hasError ? (
+            <>\n              <AlertCircle size={28} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.stereoLightTitle}>처리 중 오류</Text>
+              <Text style={styles.stereoLightError}>{progress.error}</Text>
+              <TouchableOpacity style={styles.stereoLightBtn} onPress={onDismiss} activeOpacity={0.7}>
+                <Text style={styles.stereoLightBtnText}>확인</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Animated.View style={{ transform: [{ scale: 1 }] }}>
+                <Sparkles size={28} color={theme.colors.primary[400]} strokeWidth={2} />
+              </Animated.View>
+              <Text style={styles.stereoLightTitle}>AI 입체컷 생성 중</Text>
+              {currentStep && <Text style={styles.stereoLightStep}>{currentStep.label}</Text>}
+              <View style={styles.stereoLightBarWrap}>
+                <View style={styles.stereoLightBarTrack}>
+                  <View style={[styles.stereoLightBarFill, { width: `${pct}%` }]} />
+                </View>
+                <Text style={styles.stereoLightPct}>{pct}%</Text>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1224,6 +1242,76 @@ const styles = StyleSheet.create({
   },
   autoSavingStepDotActive: {
     backgroundColor: theme.colors.primary[400],
+  },
+  stereoLightOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 5, 15, 0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stereoLightCard: {
+    width: 280,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    ...theme.shadows.elevated,
+  },
+  stereoLightTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  stereoLightStep: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[300],
+  },
+  stereoLightError: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  stereoLightBarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 8,
+  },
+  stereoLightBarTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    overflow: 'hidden',
+  },
+  stereoLightBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary[500],
+  },
+  stereoLightPct: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    minWidth: 36,
+    textAlign: 'right',
+  },
+  stereoLightBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+  },
+  stereoLightBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
   },
 
 });
