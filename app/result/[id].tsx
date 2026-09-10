@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -116,6 +116,79 @@ import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
+
+type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
+
+interface TargetPlatformPreset {
+  key: TargetPlatformKey;
+  label: string;
+  icon: typeof Youtube;
+  color: string;
+  algorithmHint: string;
+  defaultPrompt: string;
+  captionFont: string;
+  captionPosition: string;
+  bgmMood: string;
+  videoTemplate: string;
+  hashtags: string[];
+}
+
+const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> = {
+  shorts: {
+    key: 'shorts',
+    label: 'YouTube Shorts',
+    icon: Youtube,
+    color: '#FF0000',
+    algorithmHint: '첫 3초 후킹 + 검색 키워드 노출',
+    defaultPrompt: '유튜브 쇼츠 알고리즘 최적화: 첫 3초 강렬한 후킹, 검색 키워드 포함, 시청 지속률 극대화',
+    captionFont: '고딕 굵게',
+    captionPosition: '하단 고정',
+    bgmMood: '트렌디',
+    videoTemplate: '스토리텔링',
+    hashtags: ['쇼츠', '숏폼', '리뷰', '제품추천', '유튜브쇼츠'],
+  },
+  tiktok: {
+    key: 'tiktok',
+    label: 'TikTok',
+    icon: Music2,
+    color: '#FF0050',
+    algorithmHint: '트렌드 사운드 + 빠른 전환 + FYP 진입',
+    defaultPrompt: '틱톡 알고리즘 최적화: 트렌드 사운드 활용, 1.5초 단위 컷 전환, FYP 진입率为 높이는 후킹',
+    captionFont: '손글씨 캐주얼',
+    captionPosition: '하단 + 상단 번갈',
+    bgmMood: '하이텐션',
+    videoTemplate: '트렌디 쇼핑',
+    hashtags: ['틱톡', '탁해볶', 'tiktok', '제품리뷰', '템'],
+  },
+  reels: {
+    key: 'reels',
+    label: 'Instagram Reels',
+    icon: Instagram,
+    color: '#E1306C',
+    algorithmHint: '감성 스토리 + 미적 연출 + 댓글 유도',
+    defaultPrompt: '인스타 릴스 알고리즘 최적화: 감성 스토리 구조, 미적 비주얼 연출, 댓글 참여 유도',
+    captionFont: '명조 우아',
+    captionPosition: '중앙',
+    bgmMood: '감성',
+    videoTemplate: '라이프스타일',
+    hashtags: ['릴스', 'reels', '인스타릴스', '제품추천', '일상'],
+  },
+  naverclip: {
+    key: 'naverclip',
+    label: '네이버 클립',
+    icon: MonitorPlay,
+    color: '#03C75A',
+    algorithmHint: '정보 전달 + 신뢰성 + 쇼핑 연결',
+    defaultPrompt: '네이버 클립 알고리즘 최적화: 정보 밀도 높은 설명, 신뢰감 있는 톤, 쇼핑 검색 연동',
+    captionFont: '스포츠 강조',
+    captionPosition: '하단 고정',
+    bgmMood: '시네마틱',
+    videoTemplate: '제품 집중',
+    hashtags: ['네이버클립', '클립', '쇼핑', '제품리뷰', 'naver'],
+  },
+};
+
+const TARGET_PLATFORM_LIST = Object.values(TARGET_PLATFORM_PRESETS);
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -175,6 +248,22 @@ export default function ResultScreen() {
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
+  const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
+
+  const handleTargetPlatformChange = useCallback((key: TargetPlatformKey) => {
+    setTargetPlatform(key);
+    const preset = TARGET_PLATFORM_PRESETS[key];
+    setInlineEdit((prev) => ({
+      ...prev,
+      aiPrompt: preset.defaultPrompt,
+      captionFont: preset.captionFont,
+      captionPosition: preset.captionPosition,
+      bgmMood: preset.bgmMood,
+      videoTemplate: preset.videoTemplate,
+      hashtags: preset.hashtags,
+    }));
+    setAddedHashtags(preset.hashtags);
+  }, []);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -188,7 +277,9 @@ export default function ResultScreen() {
     if (!scan || isRegenerating) return;
     setIsRegenerating(true);
     try {
+      const preset = TARGET_PLATFORM_PRESETS[targetPlatform];
       const promptParts = [
+        `플랫폼: ${preset.label} (${preset.algorithmHint})`,
         `템플릿: ${inlineEdit.videoTemplate}`,
         `자막: ${inlineEdit.captionFont} / ${inlineEdit.captionPosition}`,
         `BGM: ${inlineEdit.bgmMood}`,
@@ -218,7 +309,7 @@ export default function ResultScreen() {
     } finally {
       if (mountedRef.current) setIsRegenerating(false);
     }
-  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, activePlatform]);
+  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, activePlatform, targetPlatform]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -1727,6 +1818,36 @@ export default function ResultScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* === Target Platform Selector === */}
+        <View style={styles.targetPlatformSection}>
+          <View style={styles.targetPlatformHeader}>
+            <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
+            {TARGET_PLATFORM_LIST.map((p) => {
+              const isActive = targetPlatform === p.key;
+              const Icon = p.icon;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                  onPress={() => handleTargetPlatformChange(p.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.targetPlatformHint}>
+            {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
+          </Text>
+        </View>
 
         {/* === Template + Caption + BGM chips === */}
         <View style={styles.chipSection}>
@@ -3381,6 +3502,47 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     borderWidth: 1,
     borderColor: theme.colors.primary[500] + '20',
+  },
+  targetPlatformSection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    gap: 8,
+  },
+  targetPlatformHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  targetPlatformLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  targetPlatformScroll: {
+    flexGrow: 0,
+  },
+  targetPlatformChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 8,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  targetPlatformChipText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  targetPlatformHint: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.primary[300],
+    paddingLeft: 2,
   },
   chipSection: {
     paddingHorizontal: theme.spacing.md,
