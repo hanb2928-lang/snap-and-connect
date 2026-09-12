@@ -212,17 +212,20 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
-    const clampedSeconds = Math.min(Math.max(durationSec, 4), 10);
+    const validDurations = [5, 10];
+    const clampedSeconds = validDurations.reduce((closest, valid) =>
+      Math.abs(valid - durationSec) < Math.abs(closest - durationSec) ? valid : closest, 5);
     const ratioValue = aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768";
 
     const payload: Record<string, unknown> = {
       promptText: prompt,
-      model: "gen3_alpha_turbo",
+      model: "gen4.5",
       seconds: clampedSeconds,
-      ratio: ratioValue,
     };
     if (imageUrl) {
       payload.promptImage = { uri: imageUrl };
+    } else {
+      payload.ratio = ratioValue;
     }
 
     const resp = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
@@ -342,7 +345,7 @@ function buildAutoPrompt(
     parts.push(`caption context: "${captionText.slice(0, 100)}"`);
   }
 
-  parts.push("15-second vertical short-form commercial with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA");
+  parts.push("10-second vertical short-form commercial with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA");
 
   return parts.join(". ");
 }
@@ -471,7 +474,7 @@ function buildMotionPrompt(
   const promptParts = [
     `### PURCHASE-CONVERSION PSYCHOLOGY COMMERCIAL — TOP-1% AI-GENERATED VIDEO (no source photos)`,
     ``,
-    `Create a completely new 15-second AI-generated commercial video featuring ${productName ?? "the product"}.`,
+    `Create a completely new 10-second AI-generated commercial video featuring ${productName ?? "the product"}.`,
     `Do NOT use any input photographs as video frames. The 5 captured product photos were used ONLY for Vision AI metadata extraction.`,
     `All visual content must be freshly generated as dynamic AI artwork and cinematic 3D commercial scenes.`,
     ``,
