@@ -408,7 +408,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     setVideoError(true);
   }, []);
 
-  const showCinematicFallback = videoError && !videoLoaded && (hasSlideshow || hasImage);
+  const showCinematicFallback = (videoError || isGeneratingVideo || !hasGeneratedVideo) && !videoLoaded && (hasSlideshow || hasImage);
   const cinematicFallbackSrc = showCinematicFallback ? (slideImgSrc || imageUri || null) : null;
 
   return (
