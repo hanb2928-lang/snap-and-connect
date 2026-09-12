@@ -212,18 +212,31 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
-    const payload: Record<string, unknown> = {
-      promptText: prompt,
-      model: "gen3-alpha_turbo",
-      seconds: Math.min(Math.max(durationSec, 4), 10),
-      ratio: aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768",
-    };
+    const clampedSeconds = Math.min(Math.max(durationSec, 4), 10);
+    const ratioValue = aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768";
+
+    let endpoint: string;
+    let payload: Record<string, unknown>;
 
     if (imageUrl) {
-      payload.promptImage = imageUrl;
+      endpoint = "https://api.dev.runwayml.com/v1/image_to_video";
+      payload = {
+        promptText: prompt,
+        model: "gen3-alpha_turbo",
+        seconds: clampedSeconds,
+        promptImage: { uri: imageUrl },
+      };
+    } else {
+      endpoint = "https://api.dev.runwayml.com/v1/text_to_video";
+      payload = {
+        promptText: prompt,
+        model: "gen3-alpha_turbo",
+        seconds: clampedSeconds,
+        ratio: ratioValue,
+      };
     }
 
-    const resp = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -245,6 +258,9 @@ async function submitRunwayTask(
       } catch { /* keep raw text */ }
       if (resp.status === 401) {
         throw new Error(`Runway API 키가 유효하지 않거나 비활성화되었습니다. 설정에서 활성화된 Runway API 키를 다시 등록해주세요. (HTTP 401): ${errDetail}`);
+      }
+      if (resp.status === 400) {
+        throw new Error(`Runway 요청 형식 오류 (HTTP 400): ${errDetail}`);
       }
       throw new Error(`Runway 생성 요청 실패 (HTTP ${resp.status}): ${errDetail}`);
     }
