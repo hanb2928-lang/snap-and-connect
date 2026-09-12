@@ -46,7 +46,7 @@ export const DURATION_PRESETS: DurationPreset[] = [
   },
 ];
 
-export const DEFAULT_DURATION = 20000;
+export const DEFAULT_DURATION = 15000;
 
 export function tierLabel(tier: DurationTier): string {
   switch (tier) {
@@ -117,8 +117,8 @@ const CATEGORY_DURATION_MAP: Record<string, CategoryDurationRecommendation> = {
     reason: '럭셔리는 22초 표준으로 고급스러운 스토리를 전달하는 것이 적합합니다.',
   },
   default: {
-    duration: 20000,
-    reason: '대부분의 제품은 18~22초 표준 길이가 구매 전환에 가장 효과적입니다.',
+    duration: 15000,
+    reason: '대부분의 제품은 15초 바이럴 길이가 구매 전환에 가장 효과적입니다.',
   },
 };
 

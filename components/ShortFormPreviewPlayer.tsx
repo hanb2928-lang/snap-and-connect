@@ -46,7 +46,8 @@ const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
 const PREVIEW_FRAME_WIDTH = 135;
 const PREVIEW_FRAME_HEIGHT = 240;
-const VIDEO_LOAD_TIMEOUT_MS = 8000;
+const VIDEO_LOAD_TIMEOUT_MS = 5000;
+const BUFFERING_TIMEOUT_MS = 5000;
 
 function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegment | null {
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
@@ -136,9 +137,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const [videoError, setVideoError] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoBuffering, setVideoBuffering] = useState(false);
+  const [videoFallbackMode, setVideoFallbackMode] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bufferingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgmPlayerRef = useRef<BgmPlayer | null>(null);
 
@@ -191,6 +194,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     videoTimeoutRef.current = setTimeout(() => {
       if (!videoLoaded) {
         setVideoError(true);
+        setVideoFallbackMode(true);
       }
     }, VIDEO_LOAD_TIMEOUT_MS);
     return () => {
@@ -206,12 +210,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     const v = webVideoRef.current;
     const handleCanPlay = () => {
       setVideoLoaded(true);
+      setVideoFallbackMode(false);
       if (videoTimeoutRef.current) {
         clearTimeout(videoTimeoutRef.current);
         videoTimeoutRef.current = null;
       }
     };
     const handlePlaying = () => {
+      setVideoBuffering(false);
       if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
         bgmPlayerRef.current.start(
           editPlan.bgmTemplate.id,
@@ -227,15 +233,41 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         bgmPlayerRef.current.stop();
       }
     };
+    const handleEnded = () => {
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.stop();
+      }
+    };
     const handleWaiting = () => {
       setVideoBuffering(true);
       if (bgmPlayerRef.current) {
         bgmPlayerRef.current.stop();
       }
+      if (bufferingTimeoutRef.current) clearTimeout(bufferingTimeoutRef.current);
+      bufferingTimeoutRef.current = setTimeout(() => {
+        setVideoError(true);
+        setVideoFallbackMode(true);
+      }, BUFFERING_TIMEOUT_MS);
     };
     const handleCanPlayAfterBuffer = () => {
       setVideoBuffering(false);
+      if (bufferingTimeoutRef.current) {
+        clearTimeout(bufferingTimeoutRef.current);
+        bufferingTimeoutRef.current = null;
+      }
       if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
+      }
+    };
+    const handleSeeked = () => {
+      if (bgmPlayerRef.current && isPlaying) {
+        bgmPlayerRef.current.stop();
         bgmPlayerRef.current.start(
           editPlan.bgmTemplate.id,
           editPlan.pacingBpm,
@@ -249,11 +281,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     v.addEventListener('loadeddata', handleCanPlay);
     v.addEventListener('playing', handlePlaying);
     v.addEventListener('pause', handlePause);
+    v.addEventListener('ended', handleEnded);
     v.addEventListener('waiting', handleWaiting);
     v.addEventListener('canplaythrough', handleCanPlayAfterBuffer);
+    v.addEventListener('seeked', handleSeeked);
     if (isPlaying) {
       v.play().catch(() => {
         setVideoError(true);
+        setVideoFallbackMode(true);
       });
     } else {
       v.pause();
@@ -263,8 +298,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       v.removeEventListener('loadeddata', handleCanPlay);
       v.removeEventListener('playing', handlePlaying);
       v.removeEventListener('pause', handlePause);
+      v.removeEventListener('ended', handleEnded);
       v.removeEventListener('waiting', handleWaiting);
       v.removeEventListener('canplaythrough', handleCanPlayAfterBuffer);
+      v.removeEventListener('seeked', handleSeeked);
+      if (bufferingTimeoutRef.current) {
+        clearTimeout(bufferingTimeoutRef.current);
+        bufferingTimeoutRef.current = null;
+      }
     };
   }, [isPlaying, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
@@ -326,20 +367,36 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       if (Platform.OS === 'web' && !bgmPlayerRef.current) {
         bgmPlayerRef.current = new BgmPlayer();
       }
-      // For slideshow-only mode (no generated video), start BGM immediately
-      // For video mode, BGM starts on 'playing' event from the video element
-      if (bgmPlayerRef.current && (!hasGeneratedVideo || videoError || !videoSrc)) {
-        bgmPlayerRef.current.start(
-          editPlan.bgmTemplate.id,
-          editPlan.pacingBpm,
-          editPlan.bgmTemplate.highlightStartSec,
-          editPlan.bgmTemplate.highlightDurationSec,
-          editPlan.bgmTemplate.energyCurve,
-        );
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.unlockAudio();
       }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop, hasGeneratedVideo, videoError, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
+  }, [isPlaying, currentSec, stop]);
+
+  const videoReady = hasGeneratedVideo && videoSrc && !videoError && !videoFallbackMode;
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.stop();
+      }
+      return;
+    }
+    if (Platform.OS !== 'web') return;
+    if (!bgmPlayerRef.current) {
+      bgmPlayerRef.current = new BgmPlayer();
+    }
+    if (!videoReady) {
+      bgmPlayerRef.current.start(
+        editPlan.bgmTemplate.id,
+        editPlan.pacingBpm,
+        editPlan.bgmTemplate.highlightStartSec,
+        editPlan.bgmTemplate.highlightDurationSec,
+        editPlan.bgmTemplate.energyCurve,
+      );
+    }
+  }, [isPlaying, videoReady, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -386,6 +443,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       if (bgmPlayerRef.current) {
         bgmPlayerRef.current.dispose();
         bgmPlayerRef.current = null;
+      }
+      if (bufferingTimeoutRef.current) {
+        clearTimeout(bufferingTimeoutRef.current);
+        bufferingTimeoutRef.current = null;
       }
     };
   }, [stop]);
@@ -453,11 +514,13 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   const handleVideoError = useCallback(() => {
     setVideoError(true);
+    setVideoFallbackMode(true);
   }, []);
 
-  const showCinematicFallback = (videoError || isGeneratingVideo || !hasGeneratedVideo || (hasGeneratedVideo && !videoLoaded)) && (hasSlideshow || hasImage);
+  const showCinematicFallback = (videoError || videoFallbackMode || isGeneratingVideo || !hasGeneratedVideo || (hasGeneratedVideo && !videoLoaded) || !videoSrc) && (hasSlideshow || hasImage);
   const cinematicFallbackSrc = showCinematicFallback ? (slideImgSrc || imageUri || null) : null;
-  const showVideoLoadingSpinner = hasGeneratedVideo && !videoLoaded && !videoError;
+  const showVideoLoadingSpinner = hasGeneratedVideo && !videoLoaded && !videoError && !videoFallbackMode;
+  const showPlaceholder = (!hasGeneratedVideo || videoError) && !showCinematicFallback && !hasImage;
 
   return (
     <View style={styles.container}>
@@ -511,7 +574,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
           ) : null}
 
           {/* Generated video layer — sits on top of fallback, transparent until loaded */}
-          {hasGeneratedVideo && videoSrc && !videoError ? (
+          {videoReady ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element
               <video
@@ -580,8 +643,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
             </View>
           ) : null}
 
-          {/* Placeholder when no video and no fallback image */}
-          {!hasGeneratedVideo && !showCinematicFallback && !hasImage ? (
+          {/* Placeholder when no video, no fallback image, and no generated video */}
+          {showPlaceholder ? (
             <View style={styles.videoPlaceholder}>
               <Text style={styles.videoPlaceholderText}>영상 없음</Text>
               <Text style={styles.videoPlaceholderHint}>촬영 후 미리보기 가능</Text>

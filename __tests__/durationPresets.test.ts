@@ -31,7 +31,7 @@ describe('DURATION_PRESETS', () => {
 
 describe('DEFAULT_DURATION', () => {
   it('20000ms (20초)이다', () => {
-    expect(DEFAULT_DURATION).toBe(20000);
+    expect(DEFAULT_DURATION).toBe(15000);
   });
 });
 
@@ -102,11 +102,11 @@ describe('getRecommendedDuration', () => {
 
   it('알 수 없는 카테고리는 기본값 20초를 추천한다', () => {
     const result = getRecommendedDuration('unknown');
-    expect(result.duration).toBe(20000);
+    expect(result.duration).toBe(15000);
   });
 
   it('null 카테고리는 기본값을 추천한다', () => {
     const result = getRecommendedDuration(null);
-    expect(result.duration).toBe(20000);
+    expect(result.duration).toBe(15000);
   });
 });

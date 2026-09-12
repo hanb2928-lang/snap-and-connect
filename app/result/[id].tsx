@@ -452,7 +452,7 @@ export default function ResultScreen() {
         {
           imageUrl: gazeImageUrl,
           cutImages: videoCutImages,
-          durationSec: 5,
+          durationSec: 15,
           aspectRatio: '9:16',
           productName: scan.product_name || undefined,
           scanId: scan.id,

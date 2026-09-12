@@ -185,6 +185,7 @@ export class BgmPlayer {
   private volume = 0.6;
   private currentCategory: BgmCategory = 'hightension';
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
+  private audioUnlocked = false;
 
   private ensureAudio(): HTMLAudioElement | null {
     if (typeof window === 'undefined' || typeof document === 'undefined') return null;
@@ -202,6 +203,41 @@ export class BgmPlayer {
     return this.audio;
   }
 
+  unlockAudio(): void {
+    if (this.audioUnlocked) return;
+    const audio = this.ensureAudio();
+    if (!audio) return;
+
+    try {
+      const AudioCtx = (typeof window !== 'undefined')
+        ? (window.AudioContext || (window as any).webkitAudioContext)
+        : null;
+      if (AudioCtx) {
+        let ctx = (window as any).__snapConnectAudioCtx;
+        if (!ctx) {
+          ctx = new AudioCtx();
+          (window as any).__snapConnectAudioCtx = ctx;
+        }
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      }
+
+      audio.muted = true;
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+        this.audioUnlocked = true;
+      }).catch(() => {
+        audio.muted = false;
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   start(
     bgmTemplateId: string,
     _bpm?: number,
@@ -213,20 +249,7 @@ export class BgmPlayer {
     if (!audio) return;
     if (this.isPlaying) this.stop();
 
-    // Resume AudioContext if suspended (autoplay policy workaround)
-    try {
-      const AudioCtx = (typeof window !== 'undefined')
-        ? (window.AudioContext || (window as any).webkitAudioContext)
-        : null;
-      if (AudioCtx) {
-        const ctx = (window as any).__snapConnectAudioCtx;
-        if (ctx && ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
-        }
-      }
-    } catch {
-      // ignore
-    }
+    this.unlockAudio();
 
     const category = MOOD_LABEL_MAP[bgmTemplateId] ?? 'hightension';
     this.currentCategory = category;
