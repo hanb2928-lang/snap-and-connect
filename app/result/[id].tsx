@@ -346,7 +346,6 @@ export default function ResultScreen() {
   const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
-  const [showMoodHints, setShowMoodHints] = useState(true);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
@@ -2481,30 +2480,6 @@ export default function ResultScreen() {
             numberOfLines={3}
             textAlignVertical="top"
           />
-          {showMoodHints && (
-            <View style={styles.moodHintRow}>
-              <Text style={styles.moodHintLabel}>이런 무드가 연출됩니다</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodHintScroll}>
-                {[
-                  { label: ' neon 글로우', color: '#ff6b9d', desc: '사이버팝' },
-                  { label: ' 필름 그레인', color: '#e8a87c', desc: '레트로 무드' },
-                  { label: ' 청량 템플릿', color: '#5b9bd5', desc: '썸머 바이브' },
-                  { label: ' 미니멀 화이트', color: '#cccccc', desc: '클린 감성' },
-                  { label: ' 시네마틱 다크', color: '#8e44ad', desc: '급이 다른 무드' },
-                ].map((hint) => (
-                  <TouchableOpacity
-                    key={hint.desc}
-                    style={styles.moodHintChip}
-                    onPress={() => handleInlineEdit({ aiPrompt: (inlineEdit.aiPrompt + ' ' + hint.desc).trim() })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.moodHintDot, { backgroundColor: hint.color }]} />
-                    <Text style={styles.moodHintChipText}>{hint.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
         </View>
 
         {/* === 5각도 원본 컷 풀스크린 뷰어 === */}
@@ -4204,39 +4179,6 @@ iconButton: {
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     minHeight: 80,
-  },
-  moodHintRow: {
-    gap: 6,
-  },
-  moodHintLabel: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  moodHintScroll: {
-    flexGrow: 0,
-  },
-  moodHintChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    marginRight: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
-  moodHintDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  moodHintChipText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
   },
   regenBtnLarge: {
     flexDirection: 'row',
