@@ -2780,35 +2780,35 @@ export default function ResultScreen() {
               minute: '2-digit',
             })}
           </Text>
+
+          <View style={styles.bottomShareSection}>
+            <View style={styles.bottomShareRow}>
+              <TouchableOpacity
+                style={[styles.bottomShareBtn, styles.bottomShareBtnPrimary, { flex: 1 }]}
+                onPress={async () => {
+                  try {
+                    if (Platform.OS === 'web' && navigator.clipboard) {
+                      await navigator.clipboard.writeText(shareText);
+                    } else {
+                      await Clipboard.setStringAsync(shareText);
+                    }
+                    if (Platform.OS !== 'web') {
+                      await RNShare.share({ message: shareText });
+                    }
+                  } catch {
+                    // clipboard/share failed silently
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Share2 size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.bottomShareBtnText}>SNS 바로 공유</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
-
-      <View style={[styles.floatingBar, { paddingBottom: insets.bottom }]}>
-        <View style={styles.floatingBarRow}>
-        <TouchableOpacity
-          style={[styles.floatingBarBtn, styles.floatingBarBtnPrimary, { flex: 1 }]}
-          onPress={async () => {
-            try {
-              if (Platform.OS === 'web' && navigator.clipboard) {
-                await navigator.clipboard.writeText(shareText);
-              } else {
-                await Clipboard.setStringAsync(shareText);
-              }
-              if (Platform.OS !== 'web') {
-                await RNShare.share({ message: shareText });
-              }
-            } catch {
-              // clipboard/share failed silently
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <Share2 size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.floatingBarBtnTextPrimary}>SNS 바로 공유</Text>
-        </TouchableOpacity>
-        </View>
-      </View>
 
       <AccountSafetyChecker
         platform={activePlatform}
@@ -3310,19 +3310,32 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     textAlign: 'center',
   },
-  floatingBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'column',
+  bottomShareSection: {
+    marginTop: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.sm,
+    paddingBottom: theme.spacing.xl,
+  },
+  bottomShareRow: {
+    flexDirection: 'row',
     gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.sm,
-    backgroundColor: theme.colors.dark.surface,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
-    ...theme.shadows.elevated,
+  },
+  bottomShareBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  bottomShareBtnPrimary: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  bottomShareBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   cloudSaveSection: {
     marginTop: theme.spacing.lg,
@@ -3380,33 +3393,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],
-  },
-  floatingBarRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  floatingBarBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-  },
-  floatingBarBtnPrimary: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  floatingBarBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  floatingBarBtnTextPrimary: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
   },
   errorTitle: {
     fontSize: theme.typography.heading,
