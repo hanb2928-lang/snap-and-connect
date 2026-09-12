@@ -122,7 +122,6 @@ import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
-import { InteractivePreviewSimulator } from '@/components/InteractivePreviewSimulator';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -2470,17 +2469,6 @@ export default function ResultScreen() {
             </View>
           </View>
         )}
-
-        <InteractivePreviewSimulator
-          promptText={inlineEdit.aiPrompt}
-          cutImages={narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages}
-          captionText={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
-          moodLabel={inlineEdit.bgmMood}
-          productName={activeProductName || scan?.product_name || undefined}
-          durationSec={Math.round(selectedDurationMs / 1000)}
-          generatedVideoUrl={generatedVideoUrl}
-          videoGenProgress={videoGenProgress}
-        />
 
         <QuickTweakPanel
           hook={activeHook}
