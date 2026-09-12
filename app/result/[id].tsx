@@ -2104,7 +2104,29 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* === 1순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
+        {/* === 2순위: 실시간 15초 미리보기 (단일 플레이어) === */}
+        <View style={styles.previewSection}>
+          {isRegenerating && (
+            <View style={styles.regenBanner}>
+              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
+            </View>
+          )}
+          <ShortFormPreviewPlayer
+            editPlan={previewEditPlan}
+            videoUri={generatedVideoUrl}
+            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
+            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
+            narrativePlan={narrativePlan}
+            videoGenProgress={videoGenProgress}
+            bgmVolume={bgmVolume}
+            copyOverlays={copyOverlaysForPreview}
+            narrationActive={narrationPlaying}
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          />
+        </View>
+
+        {/* === 3순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
         <QuickTweakPanel
           hook={activeHook}
           productName={activeProductName}
@@ -2120,7 +2142,7 @@ export default function ResultScreen() {
           onPriceChange={(price) => setPriceOverride(price)}
         />
 
-        {/* === 4순위: BGM / AI 나레이션 스타일 설정 (영상 길이, BGM 분위기, 나레이션 통합) === */}
+        {/* === 3순위: Quick-Tweak 편집 세팅 (영상 길이, BGM, 나레이션, 자막, 카메라 모션, 음량, AI 프롬프트, AI 재생성) === */}
         <View style={styles.chipSection}>
           {/* 영상 길이 선택 */}
           <View style={styles.durationSelectorRow}>
@@ -2384,29 +2406,7 @@ export default function ResultScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        {/* === 실시간 15초 미리보기 (단일 플레이어) === */}
-        <View style={styles.previewSection}>
-          {isRegenerating && (
-            <View style={styles.regenBanner}>
-              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
-            </View>
-          )}
-          <ShortFormPreviewPlayer
-            editPlan={previewEditPlan}
-            videoUri={generatedVideoUrl}
-            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
-            narrativePlan={narrativePlan}
-            videoGenProgress={videoGenProgress}
-            bgmVolume={bgmVolume}
-            copyOverlays={copyOverlaysForPreview}
-            narrationActive={narrationPlaying}
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          />
-        </View>
-
-        {/* === 2순위: 촬영된 5각도 입체 원본 컷 갤러리 === */}
+        {/* === 4순위: 촬영된 5각도 입체 원본 컷 갤러리 (하단 배치) === */}
         {allCutImages.length > 0 && (
           <View style={styles.angleGallerySection}>
             <View style={styles.angleGalleryHeader}>
