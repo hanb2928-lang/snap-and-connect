@@ -37,6 +37,7 @@ interface GenerateVideoRequest {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionData | null;
+  imageUrls?: string[] | null;
 }
 
 interface VideoJobResponse {
@@ -86,6 +87,8 @@ Deno.serve(async (req: Request) => {
     const durationSec = 15;
     const aspectRatio = body.aspectRatio ?? "9:16";
     const variationSeed = body.variationSeed ?? 0;
+    const imageUrls = body.imageUrls ?? null;
+    const primaryImageUrl = imageUrls && imageUrls.length > 0 ? imageUrls[0] : undefined;
 
     const motionPrompt = buildMotionPrompt(
       effectivePrompt,
@@ -105,10 +108,10 @@ Deno.serve(async (req: Request) => {
     let jobId = "";
     let provider = "";
 
-    // Try Runway first, fall back to OpenAI — text-to-video only, no input image
+    // Try Runway first, fall back to OpenAI
     if (runwayKey) {
       try {
-        const result = await generateWithRunway(motionPrompt, undefined, runwayKey, aspectRatio, durationSec);
+        const result = await generateWithRunway(motionPrompt, primaryImageUrl, runwayKey, aspectRatio, durationSec);
         videoUrl = result.videoUrl;
         jobId = result.taskId;
         provider = "runway";
@@ -124,7 +127,7 @@ Deno.serve(async (req: Request) => {
 
     if (!videoUrl && openaiKey) {
       try {
-        const result = await generateWithOpenAI(motionPrompt, undefined, openaiKey, aspectRatio, durationSec);
+        const result = await generateWithOpenAI(motionPrompt, primaryImageUrl, openaiKey, aspectRatio, durationSec);
         videoUrl = result.videoUrl;
         jobId = result.jobId;
         provider = "openai";
@@ -229,6 +232,11 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
+    const useImageToVideo = !!imageUrl;
+    const endpoint = useImageToVideo
+      ? "https://api.runwayml.com/v1/image_to_video"
+      : "https://api.runwayml.com/v1/text_to_video";
+
     const payload: Record<string, unknown> = {
       promptText: prompt,
       model: "gen3-alpha",
@@ -240,7 +248,7 @@ async function submitRunwayTask(
       payload.image = imageUrl;
     }
 
-    const resp = await fetch("https://api.runwayml.com/v1/image_to_video", {
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

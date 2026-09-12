@@ -33,6 +33,7 @@ interface GenerateAiVideoOptions {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionResult | null;
+  imageUrls?: string[];
 }
 
 const MAX_RETRIES = 2;
@@ -74,6 +75,7 @@ export async function generateAiVideo(
           hookCategory: options.hookCategory ?? 'curiosity',
           cutCount: options.cutCount,
           productVision: options.productVision ?? null,
+          imageUrls: options.imageUrls ?? null,
         },
       });
 
