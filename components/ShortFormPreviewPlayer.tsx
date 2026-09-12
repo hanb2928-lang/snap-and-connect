@@ -210,8 +210,26 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         videoTimeoutRef.current = null;
       }
     };
+    const handlePlaying = () => {
+      if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
+      }
+    };
+    const handlePause = () => {
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.stop();
+      }
+    };
     v.addEventListener('canplay', handleCanPlay);
     v.addEventListener('loadeddata', handleCanPlay);
+    v.addEventListener('playing', handlePlaying);
+    v.addEventListener('pause', handlePause);
     if (isPlaying) {
       v.play().catch(() => {
         setVideoError(true);
@@ -222,8 +240,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     return () => {
       v.removeEventListener('canplay', handleCanPlay);
       v.removeEventListener('loadeddata', handleCanPlay);
+      v.removeEventListener('playing', handlePlaying);
+      v.removeEventListener('pause', handlePause);
     };
-  }, [isPlaying, videoSrc]);
+  }, [isPlaying, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
@@ -282,7 +302,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       if (Platform.OS === 'web' && !bgmPlayerRef.current) {
         bgmPlayerRef.current = new BgmPlayer();
       }
-      if (bgmPlayerRef.current) {
+      // For slideshow-only mode (no generated video), start BGM immediately
+      // For video mode, BGM starts on 'playing' event from the video element
+      if (bgmPlayerRef.current && (!hasGeneratedVideo || videoError || !videoSrc)) {
         bgmPlayerRef.current.start(
           editPlan.bgmTemplate.id,
           editPlan.pacingBpm,
@@ -293,7 +315,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
+  }, [isPlaying, currentSec, stop, hasGeneratedVideo, videoError, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   useEffect(() => {
     if (isPlaying) {
