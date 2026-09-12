@@ -15,6 +15,7 @@ import {
   Play,
   Pause,
   RotateCcw,
+  Loader2,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { BgmPlayer } from '@/lib/bgmEngine';
@@ -408,8 +409,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     setVideoError(true);
   }, []);
 
-  const showCinematicFallback = (videoError || isGeneratingVideo || !hasGeneratedVideo) && !videoLoaded && (hasSlideshow || hasImage);
+  const showCinematicFallback = (videoError || isGeneratingVideo || !hasGeneratedVideo || (hasGeneratedVideo && !videoLoaded)) && (hasSlideshow || hasImage);
   const cinematicFallbackSrc = showCinematicFallback ? (slideImgSrc || imageUri || null) : null;
+  const showVideoLoadingSpinner = hasGeneratedVideo && !videoLoaded && !videoError;
 
   return (
     <View style={styles.container}>
@@ -420,6 +422,49 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
+          {/* Cinematic fallback layer — visible BEHIND video while loading */}
+          {showCinematicFallback && cinematicFallbackSrc ? (
+            Platform.OS === 'web' ? (
+              // @ts-ignore web-only img element
+              <img
+                key={`fallback-${slideImgKey}`}
+                src={cinematicFallbackSrc ?? ''}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  backgroundColor: '#000',
+                  transformOrigin: 'center center',
+                  transform: isPlaying ? liveTransform : 'scale(1.05)',
+                  transition: isPlaying
+                    ? 'transform 0.05s linear'
+                    : 'transform 0.4s ease-out',
+                  opacity: 1,
+                  zIndex: 0,
+                }}
+              />
+            ) : (
+              <Image
+                source={{ uri: (cinematicFallbackSrc ?? '').startsWith('data:') ? (cinematicFallbackSrc ?? '') : (cinematicFallbackSrc ?? '') }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#000',
+                  transform: [{ scale: isPlaying ? 1.15 : 1.05 }],
+                  zIndex: 0,
+                }}
+                resizeMode="cover"
+              />
+            )
+          ) : null}
+
+          {/* Generated video layer — sits on top of fallback, transparent until loaded */}
           {hasGeneratedVideo && videoSrc && !videoError ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element
@@ -430,6 +475,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 loop
                 muted
                 playsInline
+                preload="auto"
                 onError={handleVideoError}
                 style={{
                   position: 'absolute',
@@ -438,14 +484,17 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover' as const,
-                  backgroundColor: '#000',
+                  backgroundColor: 'transparent',
+                  opacity: videoLoaded ? 1 : 0,
+                  transition: 'opacity 0.3s ease-out',
+                  zIndex: 1,
                 }}
               />
             ) : (
               <WebView
                 key={videoSrc}
                 source={webviewSource}
-                style={styles.webViewFill}
+                style={[styles.webViewFill, { opacity: videoLoaded ? 1 : 0, backgroundColor: 'transparent' }]}
                 javaScriptEnabled
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
@@ -467,83 +516,23 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 onError={handleVideoError}
               />
             )
-          ) : showCinematicFallback && cinematicFallbackSrc ? (
-            Platform.OS === 'web' ? (
-              // @ts-ignore web-only img element
-              <img
-                key={slideImgKey}
-                src={cinematicFallbackSrc ?? ''}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  backgroundColor: '#000',
-                  transformOrigin: 'center center',
-                  transform: isPlaying ? liveTransform : 'scale(1.05)',
-                  transition: isPlaying
-                    ? 'transform 0.05s linear'
-                    : 'transform 0.4s ease-out',
-                  opacity: 1,
-                }}
-              />
-            ) : (
-              <Image
-                source={{ uri: (cinematicFallbackSrc ?? '').startsWith('data:') ? (cinematicFallbackSrc ?? '') : (cinematicFallbackSrc ?? '') }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: '#000',
-                  transform: [{ scale: isPlaying ? 1.15 : 1.05 }],
-                }}
-                resizeMode="cover"
-              />
-            )
-          ) : hasImage && imageUri ? (
-            Platform.OS === 'web' ? (
-              // @ts-ignore web-only img element
-              <img
-                src={imageUri}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  backgroundColor: '#000',
-                  transformOrigin: 'center center',
-                  transform: isPlaying ? liveTransform : 'scale(1.0)',
-                  transition: isPlaying
-                    ? 'transform 0.05s linear'
-                    : 'transform 0.3s ease-out',
-                }}
-              />
-            ) : (
-              <Image
-                source={{ uri: imageUri.startsWith('data:') ? imageUri : imageUri }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: '#000',
-                }}
-                resizeMode="cover"
-              />
-            )
-          ) : (
+          ) : null}
+
+          {/* Loading spinner overlay while video URL is being fetched/loaded */}
+          {showVideoLoadingSpinner ? (
+            <View style={styles.videoLoadingOverlay} pointerEvents="none">
+              <Loader2 size={24} color={theme.colors.primary[400]} strokeWidth={2.5} />
+              <Text style={styles.videoLoadingText}>영상 로딩 중...</Text>
+            </View>
+          ) : null}
+
+          {/* Placeholder when no video and no fallback image */}
+          {!hasGeneratedVideo && !showCinematicFallback && !hasImage ? (
             <View style={styles.videoPlaceholder}>
               <Text style={styles.videoPlaceholderText}>영상 없음</Text>
               <Text style={styles.videoPlaceholderHint}>촬영 후 미리보기 가능</Text>
             </View>
-          )}
+          ) : null}
 
           {activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
             <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
@@ -915,5 +904,21 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
     textAlign: 'center',
+  },
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 2,
+  },
+  videoLoadingText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
 });
