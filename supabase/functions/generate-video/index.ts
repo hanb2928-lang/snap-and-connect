@@ -26,8 +26,6 @@ interface ProductVisionData {
 
 interface GenerateVideoRequest {
   prompt: string;
-  imageUrl?: string;
-  cutImages?: string[];
   durationSec?: number;
   aspectRatio?: "9:16" | "16:9" | "1:1";
   productName?: string;
@@ -89,9 +87,6 @@ Deno.serve(async (req: Request) => {
     const durationSec = 15;
     const aspectRatio = body.aspectRatio ?? "9:16";
     const variationSeed = body.variationSeed ?? 0;
-    const cutImages = body.cutImages ?? [];
-
-    const primaryImage = body.imageUrl || (cutImages.length > 0 ? cutImages[0] : undefined);
 
     const motionPrompt = buildMotionPrompt(
       body.prompt,
@@ -100,7 +95,7 @@ Deno.serve(async (req: Request) => {
       variationSeed,
       body.bgmMood,
       body.captionText,
-      cutImages.length,
+      body.cutCount,
       body.platform ?? "shorts",
       body.hookCategory ?? "curiosity",
       body.cutCount,
@@ -111,15 +106,14 @@ Deno.serve(async (req: Request) => {
     let jobId = "";
     let provider = "";
 
-    // Try Runway first, fall back to OpenAI
+    // Try Runway first, fall back to OpenAI — text-to-video only, no input image
     if (runwayKey) {
       try {
-        const result = await generateWithRunway(motionPrompt, primaryImage, runwayKey, aspectRatio, durationSec);
+        const result = await generateWithRunway(motionPrompt, undefined, runwayKey, aspectRatio, durationSec);
         videoUrl = result.videoUrl;
         jobId = result.taskId;
         provider = "runway";
       } catch (runwayErr) {
-        // Runway failed — try OpenAI if available
         if (!openaiKey) {
           return new Response(
             JSON.stringify({ error: runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패", step: "runway", provider: "runway" }),
@@ -131,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
     if (!videoUrl && openaiKey) {
       try {
-        const result = await generateWithOpenAI(motionPrompt, primaryImage, openaiKey, aspectRatio, durationSec);
+        const result = await generateWithOpenAI(motionPrompt, undefined, openaiKey, aspectRatio, durationSec);
         videoUrl = result.videoUrl;
         jobId = result.jobId;
         provider = "openai";
@@ -478,50 +472,50 @@ function buildMotionPrompt(
   variationSeed: number,
   bgmMood: string | undefined,
   captionText: string | undefined,
-  cutCount: number,
+  _cutCount: number,
   platform: string = "shorts",
   hookCategory: string = "curiosity",
   explicitCutCount?: number,
   productVision?: ProductVisionData | null,
 ): string {
   const orientation = aspectRatio === "9:16" ? "vertical portrait 9:16" : aspectRatio === "16:9" ? "horizontal landscape 16:9" : "square 1:1";
-  const effectiveCutCount = explicitCutCount ?? Math.max(cutCount, 5);
+  const effectiveCutCount = explicitCutCount ?? 4;
 
   const platformBenchmarks: Record<string, {
     composition: string; gaze: string; lighting: string; transition: string; colorGrade: string; cutInterval: number; hookSec: number;
   }> = {
     shorts: {
       composition: "Rule of thirds, subject upper-third, negative space lower third for captions",
-      gaze: "Direct eye contact with lens, subject fills 60-70% frame width",
-      lighting: "Soft key light 45° camera-left, rim light for depth, no harsh shadows",
-      transition: "Match-cut on motion, whip-pan at beat peaks, zero cross-dissolves",
+      gaze: "Dynamic 3D product rotation with particle effects, no human subject needed",
+      lighting: "Studio 3-point lighting with animated color shifts, rim light for depth",
+      transition: "Seamless 3D morph transitions, camera whoosh between scenes, zero cross-dissolves",
       colorGrade: "Warm highlights +200K, crushed blacks, saturation +15%",
       cutInterval: 1.8,
       hookSec: 2.0,
     },
     tiktok: {
-      composition: "Center-weighted, subject fills 70-80% frame, high contrast against background",
-      gaze: "Immediate direct-to-camera gaze, fast subject movement within 0.5s",
-      lighting: "High-key bright, ring light primary, ambient fill, no moody low-key",
-      transition: "Jump cuts every 1.5s, zoom-punch on beat drops, screen-shake on impact",
+      composition: "Center-weighted, product fills 70-80% frame, high contrast against dynamic background",
+      gaze: "Fast 3D zoom-punch on product, kinetic energy, trending visual effects",
+      lighting: "High-key bright, neon accent lighting, ambient fill, energetic atmosphere",
+      transition: "Jump cuts with 3D zoom-punch on beat drops, particle burst transitions",
       colorGrade: "Vibrant pop, saturation +25%, warm skin tones, teal shadows",
       cutInterval: 1.5,
       hookSec: 0.5,
     },
     reels: {
-      composition: "Cinematic asymmetry, subject in left/right third, shallow depth of field",
-      gaze: "Soft gaze, storytelling expression, emotional micro-expressions in first 2s",
-      lighting: "Golden hour warmth, natural window light, soft diffusion, backlight halo",
-      transition: "Smooth speed-ramp transitions, seamless match-action, minimal hard cuts",
+      composition: "Cinematic asymmetry, product in left/right third, shallow depth of field with bokeh",
+      gaze: "Smooth orbital camera around product, emotional atmospheric build",
+      lighting: "Golden hour warmth, volumetric light rays, soft diffusion, backlight halo",
+      transition: "Smooth speed-ramp transitions, seamless 3D match-action, minimal hard cuts",
       colorGrade: "Filmic teal-orange, muted mid-tones, warm highlights, deep blacks",
       cutInterval: 2.0,
       hookSec: 2.5,
     },
     naverclip: {
       composition: "Product-centric center, clean uncluttered background, info-dense framing",
-      gaze: "Product hero shot first, presenter gaze to product, trust-building angle",
+      gaze: "Product hero shot with clean 3D rotation, info-graphic overlay style",
       lighting: "Clean bright studio, even key+fill ratio, minimal shadows for clarity",
-      transition: "Information cuts, text-overlay transitions, clean wipe synced to VO",
+      transition: "Information cuts, 3D text overlay transitions, clean wipe synced to VO",
       colorGrade: "Neutral natural colors, accurate product representation, slight warmth",
       cutInterval: 2.5,
       hookSec: 3.0,
@@ -529,47 +523,39 @@ function buildMotionPrompt(
   };
   const benchmark = platformBenchmarks[platform] ?? platformBenchmarks.shorts;
 
-  const cameraSpecs = [
+  const scenePhases = [
     {
       phase: "HOOK",
-      shot: "Extreme close-up, subject eyes fill upper third",
-      lens: "85mm equiv, f/1.8, shallow depth of field, bokeh background isolation",
-      light: "Rembrandt key 45° camera-left at eye level, fill 1:4 ratio, rim light",
-      motion: `Slow dolly-in 1.05x→1.22x over ${benchmark.hookSec}s, handheld micro-tremor`,
-      micro: "0.5° rotation drift, natural breathing sway, 2px vertical drift",
+      scene: `Cinematic 3D product reveal — ${productName ?? "product"} emerges from darkness with particle dispersion, volumetric light shafts, and dramatic slow-motion materialization`,
+      camera: `Dolly-in from black 1.05x→1.3x over ${benchmark.hookSec}s, shallow DOF, bokeh particles drifting through foreground`,
+      lighting: `Single motivated key light 45° camera-left, rim light revealing product silhouette, ambient glow buildup`,
     },
     {
       phase: "DISCOVERY",
-      shot: "Medium close-up, product visible with environmental context",
-      lens: "50mm equiv, f/2.8, context visible but subject prioritized",
-      light: "Practical lighting integrated, soft bounce fill, ambient atmosphere",
-      motion: "Lateral pan +4 to -4 on X axis, ease-in-out cubic, 1.5s",
-      micro: "Parallax shift on background, focus pull foreground→product at midpoint",
+      scene: `Dynamic AI art showcase — ${productName ?? "product"} floating in 3D space with animated graphic elements, feature callout text-materializing in air, color-graded environment shift`,
+      camera: `Orbital arc 90° clockwise around product, radius 1.5x product width, ease-in-out cubic, parallax background drift`,
+      lighting: `Color-shifting key light cycling through brand palette, studio practicals pulsing to beat, particle accents`,
     },
     {
       phase: "TRANSFORMATION",
-      shot: "Medium shot, full product-in-use context visible",
-      lens: "35mm equiv, f/4.0, full scene sharp for transformation reveal",
-      light: "Motivated lighting shift: warm key → cool key, simulating time passage",
-      motion: "Tilt reveal +4 to -4 on Y axis, ease-out quart, ascending",
-      micro: "Rack focus from hands→product→face, 0.3s each beat",
+      scene: `Cinematic commercial sequence — ${productName ?? "product"} in aspirational lifestyle context, 3D environment morph, before/after energy shift with lighting transformation`,
+      camera: `Tilt reveal +8° on Y-axis, ascending crane move, depth layers separating foreground product from environment`,
+      lighting: `Motivated lighting shift: warm key → cool key, simulating time-of-day passage, lens flare accents at transition peaks`,
     },
     {
       phase: "CTA",
-      shot: "Medium-wide, subject + product + CTA text space in lower third",
-      lens: "35mm equiv, f/3.5, subject and product both in focus",
-      light: "Even key+fill, bright approachable, no dramatic shadows for CTA clarity",
-      motion: "Slow pull-back 1.3x→1.0x, stabilizing to fixed frame for text overlay",
-      micro: "Settling motion, zero drift after 0.5s, locked frame for CTA burn-in",
+      scene: `Hero product frame with kinetic CTA text overlay — ${productName ?? "product"} centered, clean background, animated text burn-in, subtle particle fade`,
+      camera: `Slow pull-back 1.3x→1.0x, stabilizing to locked hero frame for text overlay, zero drift after 0.5s`,
+      lighting: `Even key+fill, bright approachable, no dramatic shadows for CTA clarity, soft bloom on product edges`,
     },
   ];
 
   const moodGrades: Record<string, string> = {
-    "하이텐션": "High-energy: saturation +25%, contrast +20%, punchy highlights, motion blur on fast cuts",
-    "시네마틱": "Cinematic: teal-orange split tone, film grain 15%, anamorphic lens flare, letterbox safe",
-    "ASMR": "Soft intimate: warm muted tones, f/1.4 shallow DOF, gentle glow on highlights",
-    "감성": "Emotional: warm golden tones, soft contrast, bloom on highlights, gentle vignette",
-    "로파이": "Lofi: desaturated -10%, warm tint, slight grain, vintage film emulation",
+    "하이텐션": "High-energy: saturation +25%, contrast +20%, punchy highlights, motion blur on fast cuts, neon accent glow",
+    "시네마틱": "Cinematic: teal-orange split tone, film grain 15%, anamorphic lens flare, letterbox safe, volumetric atmosphere",
+    "ASMR": "Soft intimate: warm muted tones, f/1.4 shallow DOF, gentle glow on highlights, slow ethereal motion",
+    "감성": "Emotional: warm golden tones, soft contrast, bloom on highlights, gentle vignette, dreamy particle drift",
+    "로파이": "Lofi: desaturated -10%, warm tint, slight grain, vintage film emulation, retro color palette",
   };
   const moodGrade = bgmMood ? (moodGrades[bgmMood] ?? moodGrades["하이텐션"]) : moodGrades["하이텐션"];
 
@@ -583,34 +569,21 @@ function buildMotionPrompt(
   const hookTexts = hookPatterns[hookCategory] ?? hookPatterns.curiosity;
   const hookText = hookTexts[variationSeed % hookTexts.length];
 
-  const gazeAnchors: Record<string, string> = {
-    shorts: "Direct eye contact with lens, subject upper-third, expression: subtle surprise→confidence",
-    tiktok: "Fast head turn to camera at 0.3s, eyes wide, micro-expression of discovery, leaning in",
-    reels: "Soft gaze off-camera then slow turn to lens at 1.5s, vulnerability→empowerment",
-    naverclip: "Product hero shot centered, presenter hand enters at 0.5s pointing to key feature",
-  };
-  const motionTriggers: Record<string, string> = {
-    shorts: `Slow dolly-in 1.05x→1.22x over ${benchmark.hookSec}s with handheld micro-tremor`,
-    tiktok: "Snap zoom to 1.3x at 0.2s then settle to 1.15x by 1s, screen-shake on beat 1",
-    reels: "Gentle push-in 1.0x→1.1x over 2.5s, parallax drift on background bokeh, dreamy motion",
-    naverclip: "Static locked frame 1s, then 5° tilt-down reveal of product detail at 1.5s",
-  };
-
-  const segmentDirectives = cameraSpecs.slice(0, Math.min(effectiveCutCount, cameraSpecs.length)).map((spec, i) => {
+  const segmentDirectives = scenePhases.slice(0, Math.min(effectiveCutCount, scenePhases.length)).map((spec, i) => {
     const startSec = i === 0 ? 0 : Math.round(i * (15 / effectiveCutCount) * 10) / 10;
-    const endSec = i === Math.min(effectiveCutCount, cameraSpecs.length) - 1 ? 15 : Math.round((i + 1) * (15 / effectiveCutCount) * 10) / 10;
-    return `[${startSec}-${endSec}s] ${spec.phase}: ${spec.shot}. Camera: ${spec.motion}. Lens: ${spec.lens}. Light: ${spec.light}. Micro: ${spec.micro}.`;
+    const endSec = i === Math.min(effectiveCutCount, scenePhases.length) - 1 ? 15 : Math.round((i + 1) * (15 / effectiveCutCount) * 10) / 10;
+    return `[${startSec}-${endSec}s] ${spec.phase}: ${spec.scene}. Camera: ${spec.camera}. Lighting: ${spec.lighting}.`;
   }).join("\n");
 
   const hookDirective =
-    `HOOK (first ${benchmark.hookSec}s): ${gazeAnchors[platform] ?? gazeAnchors.shorts}. ` +
-    `Motion: ${motionTriggers[platform] ?? motionTriggers.shorts}. ` +
-    `Text: "${hookText}" at 0.3s, kinetic typography 120% pop-in. ` +
-    `ZERO scene changes in first ${benchmark.hookSec}s — locked frame, escalating audio only.`;
+    `HOOK (first ${benchmark.hookSec}s): Cinematic 3D product materialization from darkness. ` +
+    `Motion: Slow dolly-in with particle dispersion and volumetric light reveal. ` +
+    `Text: "${hookText}" materializes at 0.3s with kinetic 3D typography, 120% pop-in, depth shadow. ` +
+    `ZERO scene changes in first ${benchmark.hookSec}s — escalating visual intensity only.`;
 
   const retentionDirective =
-    `Cut interval ${benchmark.cutInterval}s accelerating. Pattern interrupts every 3-4s. ` +
-    `Kill-point captions 0.3s before audio peaks. Last 3s: locked frame for CTA. ` +
+    `Cut interval ${benchmark.cutInterval}s accelerating. 3D scene morphs every 3-4s. ` +
+    `Kinetic captions 0.3s before audio peaks. Last 3s: locked hero frame for CTA. ` +
     `Audio-visual sync: 0.1s max desync.`;
 
   const captionHint = captionText ? `\nCaption context: "${captionText.slice(0, 80)}".` : "";
@@ -618,7 +591,11 @@ function buildMotionPrompt(
   const visionSection = productVision ? buildVisionPromptSection(productVision) : "";
 
   const promptParts = [
-    `### CINEMATIC VIDEO PROMPT — TOP-1% VIRAL QUALITY`,
+    `### DYNAMIC AI ART & CINEMATIC COMMERCIAL — FULLY GENERATED VIDEO (no source photos)`,
+    ``,
+    `Create a completely new 15-second AI-generated commercial video featuring ${productName ?? "the product"}.`,
+    `Do NOT use any input photographs as video frames. The 5 captured product photos were used ONLY for Vision AI metadata extraction.`,
+    `All visual content must be freshly generated as dynamic AI artwork and cinematic 3D commercial scenes.`,
     ``,
     `Subject: ${userPrompt}${productName ? ` featuring ${productName}` : ""}.`,
     `Format: ${orientation}.`,
@@ -626,13 +603,13 @@ function buildMotionPrompt(
     `### HOOK STRUCTURE (first ${benchmark.hookSec}s)`,
     hookDirective,
     ``,
-    `### CINEMATOGRAPHY — PER-SEGMENT CAMERA SPECS`,
+    `### CINEMATIC SCENE SEQUENCE — AI-GENERATED 3D COMMERCIAL SCENES`,
     segmentDirectives,
     ``,
     `### PLATFORM OPTIMIZATION — ${platform.toUpperCase()}`,
-    `Composition: ${benchmark.composition}. Gaze: ${benchmark.gaze}. Transition: ${benchmark.transition}.`,
+    `Composition: ${benchmark.composition}. Visual style: ${benchmark.gaze}. Transition: ${benchmark.transition}.`,
     ``,
-    `### COLOR GRADING`,
+    `### COLOR GRADING & MOOD`,
     `${moodGrade}. Base: ${benchmark.colorGrade}.`,
     ``,
     `### RETENTION ENGINE`,
@@ -646,7 +623,7 @@ function buildMotionPrompt(
   promptParts.push(
     ``,
     `### QUALITY LOCK`,
-    `Photorealistic, 4K, natural skin tones, no text artifacts, no warped faces, seamless motion, clean composition, professional color science.${captionHint}`,
+    `Fully AI-generated 3D cinematic visuals, 4K quality, professional commercial-grade rendering, no source photo frames, no slideshow, no image-to-image transitions. All scenes must be newly created digital artwork with product-accurate appearance derived from Vision AI metadata.${captionHint}`,
   );
 
   return promptParts.join("\n");
@@ -659,12 +636,12 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     ? vision.parallaxDepthLayers.join(" → ")
     : "foreground product → midground context → background bokeh";
   const copyLayers = vision.suggestedCopyLayers;
-  const angleDescs = vision.keyAngles.length > 0
-    ? vision.keyAngles.map((a) => `  • ${a.angle}: ${a.description}`).join("\n")
-    : "  • Front: product face detail\n  • 45° side: depth and form\n  • Top: texture overview\n  • Close-up: material detail\n  • Context: lifestyle placement";
 
   return [
-    `### VISION AI PRODUCT ANALYSIS — 3D ORBITAL AD FORMAT (15s)`,
+    `### VISION AI PRODUCT METADATA — AI ART CREATION REFERENCE (no source photos in output)`,
+    ``,
+    `The following product metadata was extracted from 5 reference photos via Vision AI analysis.`,
+    `These photos are NOT used as video frames. Use this metadata to generate entirely new AI artwork depicting the product accurately.`,
     ``,
     `Product: ${vision.productName}`,
     `Category: ${vision.productCategory}`,
@@ -675,31 +652,22 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     `Color Palette: ${vision.colorPalette.join(", ")}`,
     `Shape: ${vision.shapeDescription}`,
     ``,
-    `### MULTI-ANGLE REFERENCE (from 5 captured cuts)`,
-    angleDescs,
+    `### AI ART SCENE GENERATION — PRODUCT-ACCURATE CINEMATIC COMMERCIAL`,
+    `Generate all visual scenes as original 3D-rendered AI artwork that accurately depicts the product using the metadata above.`,
+    `Product appearance must match: shape (${vision.shapeDescription}), material (${vision.materialGuess}), color palette, and texture.`,
+    `Do NOT reproduce the reference photographs. Create new cinematic commercial scenes from imagination guided by product metadata.`,
     ``,
-    `### 3D ORBITAL ARC SHOT — 360° CAMERA TRAJECTORY`,
-    `Orbital Focus Point: ${vision.orbitalFocusPoint || "product center mass"}`,
-    `Parallax Depth Layers: ${depthLayers}`,
+    `### 3D ORBITAL CAMERA TRAJECTORY (15s timeline)`,
+    `  [0-4s] Product materializes from darkness — particle dispersion reveals product shape, volumetric light build-up`,
+    `  [4-7s] Orbital arc clockwise 90° around product — parallax depth layers: ${depthLayers}`,
+    `  [7-10s] Cinematic environment morph — product transitions into lifestyle/usage context, lighting atmosphere shift`,
+    `  [10-13s] Reverse arc returning to hero frontal — zoom-out reveal showing full product in environment`,
+    `  [13-15s] Locked hero frame, product centered, CTA text burn-in zone with kinetic typography`,
     ``,
-    `Camera path (15s locked timeline):`,
-    `  [0-4s] Frontal close-up → orbital arc clockwise 90° (radius 1.5x product width, smooth ease-in-out)`,
-    `  [4-7s] Parallax drift through depth layers — foreground separates from midground/background`,
-    `  [7-10s] Cinematic depth tilt: camera tilts 15° on Y-axis while orbiting counter-clockwise 45°`,
-    `  [10-13s] Reverse arc clockwise 45° returning to frontal, zoom-out reveal showing full product`,
-    `  [13-15s] Locked hero frame, product centered, CTA text burn-in zone`,
-    ``,
-    `Maintain product as orbital anchor at all times. Background parallax shifts with camera angle.`,
+    `Maintain product as visual anchor at all times. Environment and background are fully AI-generated, not from source photos.`,
     `Depth separation: foreground product razor-sharp, midground 50% blur, background 85% bokeh blur.`,
-    `Steroscopic depth must be preserved from the 5-cut input images — frontal and side cuts provide real parallax data.`,
     ``,
-    `### CINEMATIC PARALLAX ZOOM & DEPTH TILT`,
-    `  • Multi-layer parallax: product (z=0) moves at 1.0x speed, midground (z=0.5) at 0.6x, background (z=1.0) at 0.3x`,
-    `  • Depth tilt: subtle 5-15° Y-axis rotation during arc transitions to enhance stereoscopic separation`,
-    `  • Parallax zoom: 1.05x → 1.3x during orbital arc, 1.3x → 0.9x during zoom-out reveal`,
-    `  • Focus pull: rack focus between depth layers at 5s and 9s for dramatic depth emphasis`,
-    ``,
-    `### DYNAMIC COMMERCIAL LIGHTING & STUDIO PARTICLE EFFECTS`,
+    `### DYNAMIC COMMERCIAL LIGHTING & PARTICLE EFFECTS`,
     `  • Studio key light: 3-point setup — soft key 45° camera-left, rim light 135° camera-right, fill 1:3 ratio`,
     `  • Product-matched color temperature: warm key (3200K) for lifestyle products, cool key (5600K) for tech products`,
     `  • Motivated lighting shift: key light rotates with orbital camera, simulating real studio arc`,
@@ -707,7 +675,7 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     `  • Lens flare: anamorphic horizontal flare on rim light peaks at 4s and 10s, 15% opacity, 2px height`,
     `  • Specular highlights: controlled highlights on product surfaces following material properties (${vision.materialGuess})`,
     ``,
-    `### STEREOSCOPIC COPYWRITING LAYERS (3D Z-AXIS TEXT)`,
+    `### KINETIC COPYWRITING LAYERS (3D Z-AXIS TEXT)`,
     `Primary (z=0, foreground): "${copyLayers.primary}" — kinetic typography, 120% pop, drop shadow depth 4px`,
     `Secondary (z=0.5, midground): "${copyLayers.secondary}" — fades in at 4s, 80% opacity, parallax drift -8px`,
     `Tertiary (z=1.0, background): "${copyLayers.tertiary}" — subtle ambient text, 40% opacity, static placement`,

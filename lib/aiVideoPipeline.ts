@@ -22,8 +22,6 @@ export interface VideoGenResult {
 }
 
 interface GenerateAiVideoOptions {
-  imageUrl?: string;
-  cutImages?: string[];
   durationSec?: number;
   aspectRatio?: '9:16' | '16:9' | '1:1';
   productName?: string;
@@ -65,8 +63,6 @@ export async function generateAiVideo(
       const { data, error } = await supabase.functions.invoke('generate-video', {
         body: {
           prompt,
-          imageUrl: options.imageUrl,
-          cutImages: options.cutImages,
           durationSec: options.durationSec ?? 15,
           aspectRatio: options.aspectRatio ?? '9:16',
           productName: options.productName,

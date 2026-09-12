@@ -449,7 +449,6 @@ export default function ResultScreen() {
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
 
-    const gazeImageUrl = scan.edited_image_url || scan.image_url || undefined;
     const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
     const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
 
@@ -470,8 +469,6 @@ export default function ResultScreen() {
       const result = await generateAiVideo(
         videoPromptText,
         {
-          imageUrl: gazeImageUrl,
-          cutImages: videoCutImages,
           durationSec: 15,
           aspectRatio: '9:16',
           productName: scan.product_name || undefined,
@@ -479,6 +476,8 @@ export default function ResultScreen() {
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
           captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
+          platform: targetPlatform,
+          hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
         },
         (progress) => {
@@ -499,7 +498,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, narrativeVariation, productVision]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2116,8 +2115,6 @@ export default function ResultScreen() {
           <ShortFormPreviewPlayer
             editPlan={previewEditPlan}
             videoUri={generatedVideoUrl}
-            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
             bgmVolume={bgmVolume}

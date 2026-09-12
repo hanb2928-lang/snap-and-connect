@@ -7,7 +7,6 @@ import {
   ViewStyle,
   Platform,
   useWindowDimensions,
-  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -20,8 +19,7 @@ import {
 import { theme } from '@/lib/theme';
 import { BgmPlayer } from '@/lib/bgmEngine';
 import type { ShortFormEditPlan, EditSegment, StoryPhase } from '@/lib/shortFormEditEngine';
-import { getCameraMovementForTime, type CameraMovement } from '@/lib/directingEngine';
-import { trajectoryToCameraMovement, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
+import type { NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import type { VideoGenProgress } from '@/lib/aiVideoPipeline';
 import {
   sampleVideoLuminance,
@@ -37,8 +35,6 @@ import { getActiveCopyOverlay } from '@/lib/promptBuilder';
 interface ShortFormPreviewPlayerProps {
   editPlan: ShortFormEditPlan;
   videoUri: string | null;
-  imageUri?: string | null;
-  slideshowImages?: string[] | null;
   narrativePlan?: NarrativePlan | null;
   videoGenProgress?: VideoGenProgress | null;
   bgmVolume?: number;
@@ -57,56 +53,6 @@ function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegm
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
 }
 
-function getSegmentProgress(seg: EditSegment | null, currentSec: number): number {
-  if (!seg) return 0;
-  const elapsed = currentSec - seg.startSec;
-  const duration = seg.endSec - seg.startSec;
-  return duration > 0 ? Math.min(1, elapsed / duration) : 0;
-}
-
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-function easeOutQuart(t: number): number {
-  return 1 - Math.pow(1 - t, 4);
-}
-
-function applyEasing(easing: CameraMovement['easing'], t: number): number {
-  if (easing === 'ease_out_quart') return easeOutQuart(t);
-  return easeInOutCubic(t);
-}
-
-function getNarrativeCamera(
-  segments: EditSegment[],
-  currentSec: number,
-  narrativePlan: NarrativePlan | null,
-): CameraMovement | null {
-  if (!narrativePlan) return getCameraMovementForTime(segments, currentSec);
-  const seg = getActiveSegment(segments, currentSec);
-  if (!seg) return null;
-  const traj = narrativePlan.trajectories.find((t) => t.phase === seg.storyPhase);
-  if (!traj) return getCameraMovementForTime(segments, currentSec);
-  return trajectoryToCameraMovement(traj, seg.index);
-}
-
-function computeStoryTransform(
-  segments: EditSegment[],
-  currentSec: number,
-  narrativePlan: NarrativePlan | null = null,
-): string {
-  const seg = getActiveSegment(segments, currentSec);
-  if (!seg) return 'scale(1) translate(0%, 0%)';
-  const cam = getNarrativeCamera(segments, currentSec, narrativePlan);
-  if (!cam) return 'scale(1) translate(0%, 0%)';
-  const rawProgress = getSegmentProgress(seg, currentSec);
-  const p = applyEasing(cam.easing, rawProgress);
-  const scale = cam.startScale + (cam.endScale - cam.startScale) * p;
-  const tx = cam.startTx + (cam.endTx - cam.startTx) * p;
-  const ty = cam.startTy + (cam.endTy - cam.startTy) * p;
-  return `scale(${scale.toFixed(3)}) translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%)`;
-}
-
 const STORY_PHASE_LABELS: Record<StoryPhase, string> = {
   gaze_hook: '시선 포착',
   need_discovery: '서사 전개',
@@ -121,23 +67,12 @@ const STORY_PHASE_COLORS: Record<StoryPhase, string> = {
   cta_call: theme.colors.warning[400],
 };
 
-function getImageForSegment(
-  segments: EditSegment[],
-  seg: EditSegment | null,
-  images: string[] | null,
-): { src: string | null; index: number } {
-  if (!images || images.length === 0) return { src: null, index: 0 };
-  if (!seg) return { src: images[0], index: 0 };
-  return { src: images[seg.index % images.length], index: seg.index % images.length };
-}
-
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null, narrationActive = false, ttsUrl = null }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null, narrationActive = false, ttsUrl = null }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [luminanceLevel, setLuminanceLevel] = useState<LuminanceLevel>('dark');
-  const [displayedImage, setDisplayedImage] = useState<string | null>(null);
-  const [displayedSegIndex, setDisplayedSegIndex] = useState(0);
+
   const [videoError, setVideoError] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoBuffering, setVideoBuffering] = useState(false);
@@ -153,8 +88,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
-  const hasImage = !!imageUri;
-  const hasSlideshow = !!slideshowImages && slideshowImages.length > 1;
   const hasGeneratedVideo = !!videoUri;
   const isGeneratingVideo = !!videoGenProgress && videoGenProgress.phase !== 'completed' && videoGenProgress.phase !== 'error';
 
@@ -519,25 +452,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     };
   }, [isPlaying, stop]);
 
-  useEffect(() => {
-    if (!hasSlideshow || !isPlaying) return;
-    const seg = getActiveSegment(editPlan.segments, currentSec);
-    if (seg) {
-      const { src, index } = getImageForSegment(editPlan.segments, seg, slideshowImages ?? null);
-      if (src && src !== displayedImage) {
-        setDisplayedImage(src);
-        setDisplayedSegIndex(index);
-      }
-    }
-  }, [currentSec, hasSlideshow, isPlaying, editPlan.segments, slideshowImages, displayedImage]);
-
-  useEffect(() => {
-    if (!hasSlideshow && slideshowImages && slideshowImages.length > 0) {
-      setDisplayedImage(slideshowImages[0]);
-    }
-  }, [slideshowImages, hasSlideshow]);
-
-  useEffect(() => {
+useEffect(() => {
     return () => {
       stop();
       if (bgmPlayerRef.current) {
@@ -600,11 +515,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     return { justifyContent: 'center' };
   }, [activeSegment, safeZonePadding]);
 
-  const liveTransform = useMemo(
-    () => computeStoryTransform(editPlan.segments, currentSec, narrativePlan ?? null),
-    [editPlan.segments, currentSec, narrativePlan],
-  );
-
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
     const playCmd = isPlaying ? 'play()' : 'pause()';
@@ -613,20 +523,13 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
 
-  const slideImgSrc = hasSlideshow ? displayedImage : null;
-  const slideImgKey = `${displayedSegIndex}-${displayedImage?.slice(-20) ?? ''}`;
-
-
-
   const handleVideoError = useCallback(() => {
     setVideoError(true);
     setVideoFallbackMode(true);
   }, []);
 
-  const showCinematicFallback = (videoError || videoFallbackMode || isGeneratingVideo || !hasGeneratedVideo || (hasGeneratedVideo && !videoLoaded) || !videoSrc) && (hasSlideshow || hasImage);
-  const cinematicFallbackSrc = showCinematicFallback ? (slideImgSrc || imageUri || null) : null;
   const showVideoLoadingSpinner = hasGeneratedVideo && !videoLoaded && !videoError && !videoFallbackMode;
-  const showPlaceholder = (!hasGeneratedVideo || videoError) && !showCinematicFallback && !hasImage;
+  const showPlaceholder = !hasGeneratedVideo || videoError;
 
   return (
     <View style={styles.container}>
@@ -637,49 +540,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
       <View style={[styles.previewFrame, { width: responsiveWidth, height: responsiveHeight }]}>
         <View style={styles.videoArea}>
-          {/* Cinematic fallback layer — visible BEHIND video while loading */}
-          {showCinematicFallback && cinematicFallbackSrc ? (
-            Platform.OS === 'web' ? (
-              // @ts-ignore web-only img element
-              <img
-                key={`fallback-${slideImgKey}`}
-                src={cinematicFallbackSrc ?? ''}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  backgroundColor: '#000',
-                  transformOrigin: 'center center',
-                  transform: isPlaying ? liveTransform : 'scale(1.05)',
-                  transition: isPlaying
-                    ? 'transform 0.05s linear'
-                    : 'transform 0.4s ease-out',
-                  opacity: 1,
-                  zIndex: 0,
-                }}
-              />
-            ) : (
-              <Image
-                source={{ uri: (cinematicFallbackSrc ?? '').startsWith('data:') ? (cinematicFallbackSrc ?? '') : (cinematicFallbackSrc ?? '') }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: '#000',
-                  transform: [{ scale: isPlaying ? 1.15 : 1.05 }],
-                  zIndex: 0,
-                }}
-                resizeMode="cover"
-              />
-            )
-          ) : null}
-
-          {/* Generated video layer — sits on top of fallback, transparent until loaded */}
+          {/* Generated video layer — transparent until loaded */}
           {videoReady ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element

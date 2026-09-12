@@ -573,7 +573,7 @@ export function PostCaptureWorkflow({
                 <Text style={styles.retentionMeta}>컷 전환 간격: {retentionFormula.cutIntervalSec}s · 리듬: {retentionFormula.rhythmPattern === 'rapid' ? '빠름' : retentionFormula.rhythmPattern === 'medium' ? '중간' : '느림'} · 훅 지속: {retentionFormula.hookDurationSec}s</Text>
               </View>
             )}
-            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} imageUri={imageUri} />
+            <ShortFormPreviewPlayer editPlan={editPlan} videoUri={videoUri} />
 
             <View style={styles.timelinePreview}>
               {editPlan.segments.map((seg) => (
