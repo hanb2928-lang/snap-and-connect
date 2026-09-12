@@ -45,6 +45,7 @@ const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
 const PREVIEW_FRAME_WIDTH = 135;
 const PREVIEW_FRAME_HEIGHT = 240;
+const VIDEO_LOAD_TIMEOUT_MS = 8000;
 
 function getActiveSegment(segments: EditSegment[], currentSec: number): EditSegment | null {
   return segments.find((s) => currentSec >= s.startSec && currentSec < s.endSec) ?? null;
@@ -132,8 +133,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const [displayedImage, setDisplayedImage] = useState<string | null>(null);
   const [displayedSegIndex, setDisplayedSegIndex] = useState(0);
   const [videoError, setVideoError] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgmPlayerRef = useRef<BgmPlayer | null>(null);
 
@@ -150,6 +153,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       return;
     }
     setVideoError(false);
+    setVideoLoaded(false);
     if (Platform.OS === 'web') {
       setVideoSrc(videoUri);
       return;
@@ -174,12 +178,50 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   }, [videoUri]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
-    if (isPlaying) {
-      webVideoRef.current.play().catch(() => {});
-    } else {
-      webVideoRef.current.pause();
+    if (!videoSrc) {
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+      return;
     }
+    if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current);
+    videoTimeoutRef.current = setTimeout(() => {
+      if (!videoLoaded) {
+        setVideoError(true);
+      }
+    }, VIDEO_LOAD_TIMEOUT_MS);
+    return () => {
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+    };
+  }, [videoSrc, videoLoaded]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
+    const v = webVideoRef.current;
+    const handleCanPlay = () => {
+      setVideoLoaded(true);
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+    };
+    v.addEventListener('canplay', handleCanPlay);
+    v.addEventListener('loadeddata', handleCanPlay);
+    if (isPlaying) {
+      v.play().catch(() => {
+        setVideoError(true);
+      });
+    } else {
+      v.pause();
+    }
+    return () => {
+      v.removeEventListener('canplay', handleCanPlay);
+      v.removeEventListener('loadeddata', handleCanPlay);
+    };
   }, [isPlaying, videoSrc]);
 
   useEffect(() => {
@@ -352,7 +394,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
     const playCmd = isPlaying ? 'play()' : 'pause()';
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" muted loop playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.getElementById('v');v.${playCmd};v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" autoplay muted loop playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.getElementById('v');v.${playCmd};v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});v.addEventListener('canplay',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});v.addEventListener('loadeddata',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});setTimeout(function(){if(v.readyState===0){window.ReactNativeWebView.postMessage('video_error');}},8000);</script></body></html>`;
   }, [videoSrc, isPlaying]);
 
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
@@ -360,12 +402,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const slideImgSrc = hasSlideshow ? displayedImage : null;
   const slideImgKey = `${displayedSegIndex}-${displayedImage?.slice(-20) ?? ''}`;
 
-  const showFallbackSlideshow = videoError && (hasSlideshow || hasImage);
-  const fallbackImgSrc = showFallbackSlideshow ? (slideImgSrc || imageUri || null) : null;
+
 
   const handleVideoError = useCallback(() => {
     setVideoError(true);
   }, []);
+
+  const showCinematicFallback = videoError && !videoLoaded && (hasSlideshow || hasImage);
+  const cinematicFallbackSrc = showCinematicFallback ? (slideImgSrc || imageUri || null) : null;
 
   return (
     <View style={styles.container}>
@@ -382,7 +426,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
               <video
                 ref={webVideoRef}
                 src={videoSrc}
+                autoPlay
                 loop
+                muted
                 playsInline
                 onError={handleVideoError}
                 style={{
@@ -410,17 +456,23 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 onMessage={(event) => {
                   if (event.nativeEvent.data === 'video_error') {
                     handleVideoError();
+                  } else if (event.nativeEvent.data === 'video_loaded') {
+                    setVideoLoaded(true);
+                    if (videoTimeoutRef.current) {
+                      clearTimeout(videoTimeoutRef.current);
+                      videoTimeoutRef.current = null;
+                    }
                   }
                 }}
                 onError={handleVideoError}
               />
             )
-          ) : showFallbackSlideshow && fallbackImgSrc ? (
+          ) : showCinematicFallback && cinematicFallbackSrc ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only img element
               <img
                 key={slideImgKey}
-                src={fallbackImgSrc ?? ''}
+                src={cinematicFallbackSrc ?? ''}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -439,7 +491,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
               />
             ) : (
               <Image
-                source={{ uri: (fallbackImgSrc ?? '').startsWith('data:') ? (fallbackImgSrc ?? '') : (fallbackImgSrc ?? '') }}
+                source={{ uri: (cinematicFallbackSrc ?? '').startsWith('data:') ? (cinematicFallbackSrc ?? '') : (cinematicFallbackSrc ?? '') }}
                 style={{
                   position: 'absolute',
                   top: 0,

@@ -13,6 +13,7 @@ interface VideoPreviewProps {
 }
 
 const FALLBACK_SLIDE_INTERVAL_MS = 2500;
+const VIDEO_LOAD_TIMEOUT_MS = 8000;
 
 export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400, fallbackImages }: VideoPreviewProps) {
   const isImage = mimeType.includes('png') || mimeType.includes('jpeg') || mimeType.includes('jpg');
@@ -20,14 +21,17 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
 
   const [dataUri, setDataUri] = useState<string | null>(null);
   const [videoError, setVideoError] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFallbackImages = !!fallbackImages && fallbackImages.length > 0;
 
   // Reset error state when URI changes
   useEffect(() => {
     setVideoError(false);
+    setVideoLoaded(false);
   }, [uri]);
 
   // Fallback slideshow timer
@@ -46,6 +50,14 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
 
   const handleVideoError = useCallback(() => {
     setVideoError(true);
+  }, []);
+
+  const handleVideoLoaded = useCallback(() => {
+    setVideoLoaded(true);
+    if (videoTimeoutRef.current) {
+      clearTimeout(videoTimeoutRef.current);
+      videoTimeoutRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -71,8 +83,30 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
 
   const videoSrc = Platform.OS === 'web' ? uri : (dataUri || uri);
 
+  useEffect(() => {
+    if (isImage || !videoSrc) {
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current);
+    videoTimeoutRef.current = setTimeout(() => {
+      if (!videoLoaded) {
+        setVideoError(true);
+      }
+    }, VIDEO_LOAD_TIMEOUT_MS);
+    return () => {
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+    };
+  }, [videoSrc, videoLoaded, isImage]);
+
   const videoHtml = useMemo(
-    () => `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:contain;}</style></head><body><video src="${videoSrc}" controls autoplay loop muted playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>document.querySelector('video').addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});var v=document.querySelector('video');if(v.readyState===4&&v.networkState===3){window.ReactNativeWebView.postMessage('video_error');}</script></body></html>`,
+    () => `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:contain;}</style></head><body><video src="${videoSrc}" controls autoplay loop muted playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.querySelector('video');v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});v.addEventListener('canplay',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});v.addEventListener('loadeddata',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});setTimeout(function(){if(v.readyState===0){window.ReactNativeWebView.postMessage('video_error');}},8000);</script></body></html>`,
     [videoSrc],
   );
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
@@ -81,9 +115,12 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
   const renderFallbackSlideshow = () => {
     if (!hasFallbackImages) {
       return (
-        <View style={[styles.previewContainer, aspectStyle, { maxHeight, justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={[styles.previewContainer, aspectStyle, { maxHeight, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a14' }]}>
+          <View style={styles.fallbackIconWrap}>
+            <View style={styles.fallbackPulseRing} />
+          </View>
           <Text style={styles.errorText}>비디오를 불러올 수 없습니다</Text>
-          <Text style={styles.errorSubtext}>이미지 미리보기로 전환됩니다</Text>
+          <Text style={styles.errorSubtext}>잠시 후 다시 시도해주세요</Text>
         </View>
       );
     }
@@ -159,6 +196,8 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
         muted
         playsInline
         onError={handleVideoError}
+        onCanPlay={handleVideoLoaded}
+        onLoadedData={handleVideoLoaded}
         style={{
           width: '100%',
           aspectRatio: isVertical ? '9 / 16' : '16 / 9',
@@ -204,6 +243,8 @@ export function VideoPreview({ uri, mimeType, isVertical = true, maxHeight = 400
         onMessage={(event) => {
           if (event.nativeEvent.data === 'video_error') {
             handleVideoError();
+          } else if (event.nativeEvent.data === 'video_loaded') {
+            handleVideoLoaded();
           }
         }}
         onError={handleVideoError}
@@ -265,5 +306,19 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.warning[400],
+  },
+  fallbackIconWrap: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fallbackPulseRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: theme.colors.primary[400] + '60',
   },
 });
