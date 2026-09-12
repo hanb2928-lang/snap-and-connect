@@ -515,7 +515,7 @@ export default function ResultScreen() {
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
-          imageUrls: videoCutImages.length >= 5 ? videoCutImages.slice(0, 5) : undefined,
+          imageUrls: undefined,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);

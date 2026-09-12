@@ -144,6 +144,7 @@ Respond in Korean for all text fields except colorPalette and materialGuess.`;
         messages: [{ role: "user", content: contentParts }],
         max_tokens: 2000,
         temperature: 0.4,
+        response_format: { type: "json_object" },
       }),
       signal: controller.signal,
     });

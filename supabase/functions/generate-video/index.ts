@@ -79,11 +79,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const durationSec = 15;
+    const durationSec = Math.min(body.durationSec ?? 10, 10);
     const aspectRatio = body.aspectRatio ?? "9:16";
     const variationSeed = body.variationSeed ?? 0;
-    const imageUrls = body.imageUrls ?? null;
-    const primaryImageUrl = imageUrls && imageUrls.length > 0 ? imageUrls[0] : undefined;
 
     const motionPrompt = buildMotionPrompt(
       effectivePrompt,
@@ -99,13 +97,15 @@ Deno.serve(async (req: Request) => {
       body.productVision ?? null,
     );
 
+    const runwayPrompt = motionPrompt.slice(0, 500);
+
     let videoUrl: string | null = null;
     let taskId = "";
     let provider = "runway";
     let providerError: string | null = null;
 
     try {
-      const result = await generateWithRunway(motionPrompt, primaryImageUrl, runwayKey, aspectRatio, durationSec);
+      const result = await generateWithRunway(runwayPrompt, undefined, runwayKey, aspectRatio, durationSec);
       videoUrl = result.videoUrl;
       taskId = result.taskId;
     } catch (runwayErr) {
@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
           error: `AI 비디오 생성에 실패했습니다: ${errorDetail}`,
           step: "runway",
           provider,
-          motionPrompt: motionPrompt.slice(0, 500),
+          motionPrompt: runwayPrompt,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
         originalVideoUrl: videoUrl !== finalUrl ? videoUrl : undefined,
         jobId: taskId,
         provider,
-        motionPrompt,
+        motionPrompt: runwayPrompt,
         durationSec,
         aspectRatio,
         variationSeed,
