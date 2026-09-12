@@ -60,6 +60,7 @@ const fullSettings: UserSettings = {
   auto_publish_shorts: null,
   auto_publish_sandbox_mode: null,
   clean_footage_enabled: null,
+  runway_api_key: null,
 };
 
 describe('isCoupangUrl', () => {

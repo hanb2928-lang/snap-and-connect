@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from 'react-native';
-import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp, Music2 } from 'lucide-react-native';
+import { Camera, Sparkles, Info, ExternalLink, Link2, Check, Zap, ChevronDown, ChevronRight, Wallet, Plus, Trash2, Film, LayoutTemplate, BookOpen, Stamp, Upload, Key, Eye, EyeOff, Crown, Rocket, Building2, Coins, CircleDot, Baby, Activity, Sun, Palette, Smartphone, Layers, Wifi, Circle as XCircle, TriangleAlert as AlertTriangle, Play, Target, X, ShoppingBag, Flame, Globe, Megaphone, CalendarClock, ShieldCheck, ChartBar as BarChart3, ArrowRight, DollarSign, TrendingUp, Music2, Video } from 'lucide-react-native';
 import { SectionCard } from '@/components/SectionCard';
 import { theme as staticTheme } from '@/lib/theme';
 import { useAppTheme } from '@/hooks/useAppTheme';
@@ -85,6 +85,7 @@ export default function SettingsScreen() {
   const [openaiKey, setOpenaiKey] = useState('');
   const [pexelsKey, setPexelsKey] = useState('');
   const [ttsKey, setTtsKey] = useState('');
+  const [runwayKey, setRunwayKey] = useState('');
   const [savingKey, setSavingKey] = useState(false);
   const [savedKey, setSavedKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -157,6 +158,7 @@ export default function SettingsScreen() {
       setOpenaiKey(data?.openai_api_key || '');
       setPexelsKey(data?.pexels_api_key || '');
       setTtsKey(data?.tts_api_key || '');
+      setRunwayKey(data?.runway_api_key || '');
       setDefaultVideoDuration(data?.default_video_duration || '15s');
       setDefaultTtsVoice(data?.default_tts_voice || DEFAULT_TTS_VOICE);
       setTtsSpeed(data?.tts_speed ?? 1.0);
@@ -483,6 +485,7 @@ export default function SettingsScreen() {
             { label: 'OpenAI', value: openaiKey, color: theme.colors.primary[400], icon: 'AI' },
             { label: 'Pexels', value: pexelsKey, color: theme.colors.success[400], icon: 'PX' },
             { label: 'TTS', value: ttsKey, color: theme.colors.accent[400], icon: 'TTS' },
+            { label: 'Runway', value: runwayKey, color: theme.colors.warning[400], icon: 'RW' },
           ].map((item, i) => {
             const isSet = item.value && item.value.trim().length > 0;
             return (
@@ -2069,7 +2072,7 @@ export default function SettingsScreen() {
             setSavingKey(true);
             setSavedKey(false);
             try {
-              await updateUserSettings({ openai_api_key: openaiKey || null, pexels_api_key: pexelsKey || null, tts_api_key: ttsKey || null });
+              await updateUserSettings({ openai_api_key: openaiKey || null, pexels_api_key: pexelsKey || null, tts_api_key: ttsKey || null, runway_api_key: runwayKey || null });
               setSavedKey(true);
               setTimeout(() => setSavedKey(false), 2500);
             } catch (err) {
@@ -2159,6 +2162,40 @@ export default function SettingsScreen() {
             <ExternalLink size={12} color={theme.colors.accent[400]} strokeWidth={2} />
             <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.accent[400] }}>
               OpenAI에서 API 키 발급받기
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.idInputRow}>
+            <View style={[styles.idIconWrap, { backgroundColor: theme.colors.warning[500] + '20' }]}>
+              <Video size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+            </View>
+            <View style={styles.idInputBody}>
+              <Text style={styles.idInputLabel}>Runway API Key</Text>
+              <TextInput
+                style={styles.idInput}
+                value={runwayKey}
+                onChangeText={setRunwayKey}
+                placeholder="key_..."
+                placeholderTextColor={theme.colors.dark.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry={!showApiKey}
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginTop: 8, lineHeight: 16 }}>
+            Runway API 키를 입력하면 AI 영상 생성 기능이 활성화됩니다. 사진을 영상으로 변환하거나 숏폼 영상을 자동 생성할 때 사용됩니다.
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, alignSelf: 'flex-start' }}
+            onPress={() => Linking.openURL('https://runwayml.com/api/')}
+            activeOpacity={0.7}
+          >
+            <ExternalLink size={12} color={theme.colors.warning[400]} strokeWidth={2} />
+            <Text style={{ fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.warning[400] }}>
+              Runway에서 API 키 발급받기
             </Text>
           </TouchableOpacity>
         </View>

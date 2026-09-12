@@ -225,6 +225,7 @@ export interface UserSettings {
   auto_publish_shorts: boolean | null;
   auto_publish_sandbox_mode: boolean | null;
   clean_footage_enabled: boolean | null;
+  runway_api_key: string | null;
 }
 
 export type CardStyleKey = 'bold' | 'magazine' | 'minimal' | 'feed';
