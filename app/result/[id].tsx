@@ -368,15 +368,19 @@ export default function ResultScreen() {
     // Kick off AI video generation in parallel with copy regeneration
     const gazeImageUrl = scan.edited_image_url || scan.image_url || undefined;
     const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
+    const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
     const videoGenPromise = generateAiVideo(
       videoPromptText,
       {
         imageUrl: gazeImageUrl,
+        cutImages: videoCutImages,
         durationSec: Math.round(selectedDurationMs / 1000),
         aspectRatio: '9:16',
         productName: scan.product_name || undefined,
         scanId: scan.id,
         variationSeed: narrativeVariation + 1,
+        bgmMood: inlineEdit.bgmMood,
+        captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
       },
       (progress) => {
         if (mountedRef.current) setVideoGenProgress(progress);
@@ -2238,6 +2242,8 @@ export default function ResultScreen() {
           moodLabel={inlineEdit.bgmMood}
           productName={activeProductName || scan?.product_name || undefined}
           durationSec={Math.round(selectedDurationMs / 1000)}
+          generatedVideoUrl={generatedVideoUrl}
+          videoGenProgress={videoGenProgress}
         />
 
         <QuickTweakPanel

@@ -16,21 +16,28 @@ export interface VideoGenResult {
   durationSec: number;
   aspectRatio: string;
   variationSeed: number;
+  persisted: boolean;
+  provider: string;
 }
 
-const MAX_POLL_DURATION_MS = 180000;
-const PROGRESS_INTERVAL_MS = 2000;
+interface GenerateAiVideoOptions {
+  imageUrl?: string;
+  cutImages?: string[];
+  durationSec?: number;
+  aspectRatio?: '9:16' | '16:9' | '1:1';
+  productName?: string;
+  scanId?: string;
+  variationSeed?: number;
+  bgmMood?: string;
+  captionText?: string;
+}
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1500;
 
 export async function generateAiVideo(
   prompt: string,
-  options: {
-    imageUrl?: string;
-    durationSec?: number;
-    aspectRatio?: '9:16' | '16:9' | '1:1';
-    productName?: string;
-    scanId?: string;
-    variationSeed?: number;
-  },
+  options: GenerateAiVideoOptions,
   onProgress?: (progress: VideoGenProgress) => void,
 ): Promise<VideoGenResult> {
   const startTime = Date.now();
@@ -46,44 +53,57 @@ export async function generateAiVideo(
 
   report('submitting', 0.05, 'AI 비디오 생성 요청 전송 중...');
 
-  try {
-    const { data, error } = await supabase.functions.invoke('generate-video', {
-      body: {
-        prompt,
-        imageUrl: options.imageUrl,
-        durationSec: options.durationSec ?? 15,
-        aspectRatio: options.aspectRatio ?? '9:16',
-        productName: options.productName,
-        scanId: options.scanId,
-        variationSeed: options.variationSeed ?? 0,
-      },
-    });
+  let lastErr: Error | null = null;
 
-    if (error) {
-      report('error', 0, error.message ?? '비디오 생성 실패');
-      throw new Error(error.message ?? '비디오 생성 실패');
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-video', {
+        body: {
+          prompt,
+          imageUrl: options.imageUrl,
+          cutImages: options.cutImages,
+          durationSec: options.durationSec ?? 15,
+          aspectRatio: options.aspectRatio ?? '9:16',
+          productName: options.productName,
+          scanId: options.scanId,
+          variationSeed: options.variationSeed ?? 0,
+          bgmMood: options.bgmMood,
+          captionText: options.captionText,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message ?? '비디오 생성 실패');
+      }
+
+      if (!data || !data.videoUrl) {
+        throw new Error('비디오 URL을 받지 못했습니다');
+      }
+
+      report('completed', 1.0, 'AI 비디오 생성 완료');
+
+      return {
+        videoUrl: data.videoUrl as string,
+        jobId: data.jobId as string,
+        motionPrompt: data.motionPrompt as string,
+        durationSec: data.durationSec as number,
+        aspectRatio: data.aspectRatio as string,
+        variationSeed: data.variationSeed as number,
+        persisted: (data.persisted as boolean) ?? false,
+        provider: (data.provider as string) ?? 'unknown',
+      };
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      if (attempt < MAX_RETRIES) {
+        report('generating', 0.1 + attempt * 0.05, `재시도 중 (${attempt + 1}/${MAX_RETRIES})...`);
+        await delay(RETRY_DELAY_MS * (attempt + 1));
+      }
     }
-
-    if (!data || !data.videoUrl) {
-      report('error', 0, '비디오 URL을 받지 못했습니다');
-      throw new Error('비디오 URL을 받지 못했습니다');
-    }
-
-    report('completed', 1.0, 'AI 비디오 생성 완료');
-
-    return {
-      videoUrl: data.videoUrl as string,
-      jobId: data.jobId as string,
-      motionPrompt: data.motionPrompt as string,
-      durationSec: data.durationSec as number,
-      aspectRatio: data.aspectRatio as string,
-      variationSeed: data.variationSeed as number,
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : '비디오 생성 중 오류 발생';
-    report('error', 0, msg);
-    throw new Error(msg);
   }
+
+  const msg = lastErr?.message ?? '비디오 생성 중 오류 발생';
+  report('error', 0, msg);
+  throw new Error(msg);
 }
 
 export function createVideoGenProgressTracker(
@@ -107,4 +127,8 @@ export function createVideoGenProgressTracker(
       onProgress({ phase: 'completed', progress: 1.0, message, elapsedSec: Math.round((Date.now() - startTime) / 1000) });
     },
   };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

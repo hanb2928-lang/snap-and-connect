@@ -9,8 +9,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { Play, Pause, Eye, ChevronDown, ChevronUp, Film as FilmIcon } from 'lucide-react-native';
+import { Play, Pause, Eye, ChevronDown, ChevronUp, Film as FilmIcon, Loader2 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import type { VideoGenProgress } from '@/lib/aiVideoPipeline';
 
 interface InteractivePreviewSimulatorProps {
   promptText: string;
@@ -19,6 +20,8 @@ interface InteractivePreviewSimulatorProps {
   moodLabel?: string;
   productName?: string;
   durationSec?: number;
+  generatedVideoUrl?: string | null;
+  videoGenProgress?: VideoGenProgress | null;
 }
 
 const STEP_LABELS = ['시선 후킹', '닉즈 발견', '제품 체험', '변화 순간', 'CTA 전달'];
@@ -30,15 +33,21 @@ export function InteractivePreviewSimulator({
   moodLabel,
   productName,
   durationSec = 15,
+  generatedVideoUrl,
+  videoGenProgress,
 }: InteractivePreviewSimulatorProps) {
   const [expanded, setExpanded] = useState(true);
   const [simulating, setSimulating] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const stepCount = Math.max(cutImages.length, 1);
   const stepDurationMs = (durationSec * 1000) / stepCount;
+
+  const hasGeneratedVideo = !!generatedVideoUrl;
+  const isGeneratingVideo = !!videoGenProgress && videoGenProgress.phase !== 'completed' && videoGenProgress.phase !== 'error';
 
   const liveCaption = useMemo(() => {
     if (captionText) return captionText;
@@ -47,7 +56,25 @@ export function InteractivePreviewSimulator({
     return '프롬프트를 입력하면 실시간으로 자막이 반영됩니다';
   }, [captionText, promptText, productName]);
 
+  // Auto-play generated video when it arrives
   useEffect(() => {
+    if (Platform.OS === 'web' && hasGeneratedVideo && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [hasGeneratedVideo]);
+
+  // Slideshow simulation only when no generated video
+  useEffect(() => {
+    if (hasGeneratedVideo) {
+      // Stop slideshow when video is playing
+      progressAnim.stopAnimation();
+      if (stepTimerRef.current) {
+        clearInterval(stepTimerRef.current);
+        stepTimerRef.current = null;
+      }
+      return;
+    }
+
     if (simulating) {
       setActiveStep(0);
       progressAnim.setValue(0);
@@ -75,7 +102,7 @@ export function InteractivePreviewSimulator({
       progressAnim.stopAnimation();
       if (stepTimerRef.current) clearInterval(stepTimerRef.current);
     };
-  }, [simulating, stepCount, stepDurationMs, durationSec, progressAnim]);
+  }, [simulating, stepCount, stepDurationMs, durationSec, progressAnim, hasGeneratedVideo]);
 
   const currentImage = cutImages[activeStep] || cutImages[0] || null;
   const progressWidth = progressAnim.interpolate({
@@ -93,6 +120,11 @@ export function InteractivePreviewSimulator({
         <View style={styles.headerLeft}>
           <Eye size={15} color={theme.colors.primary[300]} strokeWidth={2} />
           <Text style={styles.headerTitle}>실시간 프리뷰 시뮬레이터</Text>
+          {hasGeneratedVideo && (
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveBadgeText}>AI 영상</Text>
+            </View>
+          )}
         </View>
         {expanded ? (
           <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
@@ -116,9 +148,30 @@ export function InteractivePreviewSimulator({
             )}
           </View>
 
-          {/* Preview area with current cut */}
+          {/* Preview area */}
           <View style={styles.previewArea}>
-            {currentImage ? (
+            {hasGeneratedVideo && generatedVideoUrl ? (
+              Platform.OS === 'web' ? (
+                // @ts-ignore web-only video element
+                <video
+                  ref={videoRef}
+                  src={generatedVideoUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover' as const,
+                    backgroundColor: '#000',
+                  }}
+                />
+              ) : null
+            ) : currentImage ? (
               <Image
                 source={{ uri: currentImage }}
                 style={styles.previewImage}
@@ -138,67 +191,99 @@ export function InteractivePreviewSimulator({
               </Text>
             </View>
 
-            {/* Step indicator badge */}
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>
-                {activeStep + 1}/{stepCount} · {STEP_LABELS[activeStep % STEP_LABELS.length]}
-              </Text>
-            </View>
+            {/* Step indicator badge (slideshow mode only) */}
+            {!hasGeneratedVideo && (
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>
+                  {activeStep + 1}/{stepCount} · {STEP_LABELS[activeStep % STEP_LABELS.length]}
+                </Text>
+              </View>
+            )}
 
-            {/* Simulation progress bar */}
-            {simulating && (
+            {/* Generated video badge */}
+            {hasGeneratedVideo && (
+              <View style={styles.aiVideoBadge}>
+                <Text style={styles.aiVideoBadgeText}>AI 생성 영상 재생 중</Text>
+              </View>
+            )}
+
+            {/* Simulation progress bar (slideshow mode) */}
+            {simulating && !hasGeneratedVideo && (
               <View style={styles.progressBar}>
                 <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
               </View>
             )}
-          </View>
 
-          {/* 5-cut step timeline */}
-          <View style={styles.stepBar}>
-            {Array.from({ length: stepCount }).map((_, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  styles.stepNode,
-                  activeStep === i && styles.stepNodeActive,
-                  i < stepCount - 1 && styles.stepNodeWithLine,
-                ]}
-                onPress={() => setActiveStep(i)}
-                activeOpacity={0.7}
-              >
-                <View style={[
-                  styles.stepDot,
-                  activeStep === i && styles.stepDotActive,
-                  simulating && i < activeStep && styles.stepDotDone,
-                ]} />
-                <Text style={[
-                  styles.stepLabel,
-                  activeStep === i && styles.stepLabelActive,
-                ]} numberOfLines={1}>
-                  {STEP_LABELS[i % STEP_LABELS.length]}
+            {/* AI video generation loading overlay */}
+            {isGeneratingVideo && videoGenProgress && (
+              <View style={styles.genOverlay}>
+                <View style={styles.genPulseRing} />
+                <Loader2 size={20} color={theme.colors.primary[300]} strokeWidth={2.5} />
+                <Text style={styles.genPhaseText}>
+                  {videoGenProgress.phase === 'submitting' ? 'AI 영상 생성 요청 중...' : 'AI가 영상을 생성하고 있어요'}
                 </Text>
-              </TouchableOpacity>
-            ))}
+                <View style={styles.genProgressBar}>
+                  <View style={[styles.genProgressFill, { width: `${Math.round(videoGenProgress.progress * 100)}%` }]} />
+                </View>
+                <Text style={styles.genDetailText} numberOfLines={1}>
+                  {videoGenProgress.message} · {videoGenProgress.elapsedSec}s
+                </Text>
+              </View>
+            )}
           </View>
 
-          {/* Simulation toggle */}
-          <TouchableOpacity
-            style={[styles.simBtn, simulating && styles.simBtnActive]}
-            onPress={() => setSimulating((v) => !v)}
-            activeOpacity={0.7}
-          >
-            {simulating ? (
-              <Pause size={15} color="#fff" strokeWidth={2} />
-            ) : (
-              <Play size={15} color="#fff" strokeWidth={2} />
-            )}
-            <Text style={styles.simBtnText}>
-              {simulating ? '시뮬레이션 일시정지' : '적용 결과 시뮬레이션'}
-            </Text>
-          </TouchableOpacity>
+          {/* 5-cut step timeline (slideshow mode only) */}
+          {!hasGeneratedVideo && (
+            <View style={styles.stepBar}>
+              {Array.from({ length: stepCount }).map((_, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[
+                    styles.stepNode,
+                    activeStep === i && styles.stepNodeActive,
+                    i < stepCount - 1 && styles.stepNodeWithLine,
+                  ]}
+                  onPress={() => setActiveStep(i)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.stepDot,
+                    activeStep === i && styles.stepDotActive,
+                    simulating && i < activeStep && styles.stepDotDone,
+                  ]} />
+                  <Text style={[
+                    styles.stepLabel,
+                    activeStep === i && styles.stepLabelActive,
+                  ]} numberOfLines={1}>
+                    {STEP_LABELS[i % STEP_LABELS.length]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Simulation toggle — only in slideshow mode */}
+          {!hasGeneratedVideo && (
+            <TouchableOpacity
+              style={[styles.simBtn, simulating && styles.simBtnActive]}
+              onPress={() => setSimulating((v) => !v)}
+              activeOpacity={0.7}
+            >
+              {simulating ? (
+                <Pause size={15} color="#fff" strokeWidth={2} />
+              ) : (
+                <Play size={15} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.simBtnText}>
+                {simulating ? '시뮬레이션 일시정지' : '적용 결과 시뮬레이션'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <Text style={styles.hintText}>
-            프롬프트와 무드 칩이 실시간으로 위 프리뷰에 반영됩니다
+            {hasGeneratedVideo
+              ? 'AI가 생성한 동적 영상이 실시간으로 재생되고 있습니다'
+              : '프롬프트와 무드 칩이 실시간으로 위 프리뷰에 반영됩니다'}
           </Text>
         </View>
       )}
@@ -234,6 +319,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
+  },
+  liveBadge: {
+    backgroundColor: theme.colors.success[500] + '30',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  liveBadgeText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   body: {
     padding: 12,
@@ -327,6 +423,23 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
   },
+  aiVideoBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  aiVideoBadgeText: {
+    fontSize: 8,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
+  },
   progressBar: {
     position: 'absolute',
     top: 0,
@@ -338,6 +451,50 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     backgroundColor: theme.colors.primary[400],
+  },
+  genOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  genPulseRing: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: theme.colors.primary[400] + '50',
+  },
+  genPhaseText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    marginTop: 4,
+  },
+  genProgressBar: {
+    width: '80%',
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  genProgressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary[400],
+    borderRadius: 2,
+  },
+  genDetailText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
   },
   stepBar: {
     flexDirection: 'row',
