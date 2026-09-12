@@ -2104,64 +2104,7 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* === 실시간 15초 미리보기 (단일 플레이어) === */}
-        <View style={styles.previewSection}>
-          {isRegenerating && (
-            <View style={styles.regenBanner}>
-              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
-            </View>
-          )}
-          <ShortFormPreviewPlayer
-            editPlan={previewEditPlan}
-            videoUri={generatedVideoUrl}
-            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
-            narrativePlan={narrativePlan}
-            videoGenProgress={videoGenProgress}
-            bgmVolume={bgmVolume}
-            copyOverlays={copyOverlaysForPreview}
-            narrationActive={narrationPlaying}
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          />
-        </View>
-
-        {/* === 2순위: 촬영된 5각도 입체 원본 컷 갤러리 === */}
-        {allCutImages.length > 0 && (
-          <View style={styles.angleGallerySection}>
-            <View style={styles.angleGalleryHeader}>
-              <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
-              <View style={styles.angleGalleryBadge}>
-                <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
-              </View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
-              {allCutImages.map((imgUrl, idx) => {
-                const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
-                const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.angleThumbWrap}
-                    onPress={() => {
-                      setGalleryModalIndex(idx);
-                      setGalleryModalVisible(true);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
-                    <View style={styles.angleThumbLabelWrap}>
-                      <Text style={styles.angleThumbLabel}>{label}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* === 3순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
+        {/* === 1순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
         <QuickTweakPanel
           hook={activeHook}
           productName={activeProductName}
@@ -2441,6 +2384,63 @@ export default function ResultScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        {/* === 실시간 15초 미리보기 (단일 플레이어) === */}
+        <View style={styles.previewSection}>
+          {isRegenerating && (
+            <View style={styles.regenBanner}>
+              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
+            </View>
+          )}
+          <ShortFormPreviewPlayer
+            editPlan={previewEditPlan}
+            videoUri={generatedVideoUrl}
+            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
+            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
+            narrativePlan={narrativePlan}
+            videoGenProgress={videoGenProgress}
+            bgmVolume={bgmVolume}
+            copyOverlays={copyOverlaysForPreview}
+            narrationActive={narrationPlaying}
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          />
+        </View>
+
+        {/* === 2순위: 촬영된 5각도 입체 원본 컷 갤러리 === */}
+        {allCutImages.length > 0 && (
+          <View style={styles.angleGallerySection}>
+            <View style={styles.angleGalleryHeader}>
+              <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
+              <View style={styles.angleGalleryBadge}>
+                <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
+              {allCutImages.map((imgUrl, idx) => {
+                const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
+                const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.angleThumbWrap}
+                    onPress={() => {
+                      setGalleryModalIndex(idx);
+                      setGalleryModalVisible(true);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
+                    <View style={styles.angleThumbLabelWrap}>
+                      <Text style={styles.angleThumbLabel}>{label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
 
         {/* === AI 비디오 변환 (크레딧 소모) === */}
         <View style={styles.promptSection}>
