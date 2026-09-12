@@ -7,6 +7,7 @@ import {
   Platform,
   Image,
   Modal,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -14,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, Zap, RotateCcw, X, Check, Sparkles, ArrowRight, Image as ImageIcon, Square, AlertCircle } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Shirt } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -35,7 +36,7 @@ import { friendlyError } from '@/lib/errors';
 import { getItem, setItem } from '@/lib/storage';
 import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
 import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
-import { WebCameraView, type CaptureModeType, type WebCameraHandle } from '@/components/WebCameraView';
+import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
@@ -45,7 +46,7 @@ import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
 const ANALYSIS_TIMEOUT_MS = 45000;
-const ONECLICK_RECORD_MAX_S = 15;
+const FITTING_TIMEOUT_MS = 120000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -55,7 +56,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-type ScreenPhase = 'mode_select' | 'camera';
+type ScreenPhase = 'mode_select' | 'camera' | 'fitting_product' | 'fitting_model' | 'fitting_result';
+type CaptureMode = 'single' | 'fitting';
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -76,15 +78,10 @@ export default function CameraScreen() {
   const [error, setError] = useState<string | null>(null);
   const [creditModalVisible, setCreditModalVisible] = useState(false);
   const [multiAngleVisible, setMultiAngleVisible] = useState(false);
-  const [captureMode, setCaptureMode] = useState<CaptureModeType>('oneclick');
   const [autoSaving, setAutoSaving] = useState(false);
   const [autoSaveToast, setAutoSaveToast] = useState<string | null>(null);
   const [autoSaveStep, setAutoSaveStep] = useState(1);
-  const [screenPhase, setScreenPhase] = useState<ScreenPhase>('mode_select');
   const genIdRef = useRef(0);
-  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordElapsed, setRecordElapsed] = useState(0);
   const [postCaptureVisible, setPostCaptureVisible] = useState(false);
   const [postCaptureVideoUri, setPostCaptureVideoUri] = useState<string | null>(null);
   const [postCaptureBase64, setPostCaptureBase64] = useState<string | null>(null);
@@ -92,11 +89,18 @@ export default function CameraScreen() {
   const [workflowMountKey, setWorkflowMountKey] = useState(0);
   const [stereoProgress, setStereoProgress] = useState<StereoPipelineProgress>(makeInitialProgress());
   const [stereoOverlayVisible, setStereoOverlayVisible] = useState(false);
+  const [screenPhase, setScreenPhase] = useState<ScreenPhase>('mode_select');
+  const [captureMode, setCaptureMode] = useState<CaptureMode>('single');
+
+  // Virtual fitting state
+  const [fittingProductBase64, setFittingProductBase64] = useState<string | null>(null);
+  const [fittingModelBase64, setFittingModelBase64] = useState<string | null>(null);
+  const [fittingResultBase64, setFittingResultBase64] = useState<string | null>(null);
+  const [fittingLoading, setFittingLoading] = useState(false);
 
   const postCaptureBase64Ref = useRef<string | null>(null);
   const postCaptureMimeRef = useRef<string>('video/webm');
   const postCaptureVideoUriRef = useRef<string | null>(null);
-  const captureModeRef = useRef<CaptureModeType>('oneclick');
 
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
@@ -130,16 +134,11 @@ export default function CameraScreen() {
         setCameraReady(false);
         setProcessing(false);
         setAutoSaving(false);
-        setIsRecording(false);
         setPostCaptureVisible(false);
         setPostCaptureVideoUri(null);
         postCaptureVideoUriRef.current = null;
         setPostCaptureBase64(null);
         postCaptureBase64Ref.current = null;
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
         genIdRef.current += 1;
         stopAutoSaveAnimation();
         cancelAnimation(autoSavePulse);
@@ -187,117 +186,34 @@ export default function CameraScreen() {
     }
   }, [router, startAutoSaveAnimation, stopAutoSaveAnimation]);
 
-  const stopRecording = useCallback(async () => {
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-    setIsRecording(false);
-    if (!cameraRef.current) return;
-    try {
-      await cameraRef.current.stopRecording();
-    } catch {
-      // already stopped
-    }
-  }, []);
-
-  const handleVideoRecorded = useCallback(async (videoUri: string) => {
-    setPostCaptureVideoUri(videoUri);
-    postCaptureVideoUriRef.current = videoUri;
-    setPostCaptureBase64(null);
-    postCaptureBase64Ref.current = null;
-    setPostCaptureMime('video/webm');
-    postCaptureMimeRef.current = 'video/webm';
-    setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
-  }, []);
-
-  const startRecording = useCallback(async () => {
-    if (!cameraRef.current || !cameraReady || isRecording) return;
-    try {
-      setIsRecording(true);
-      setRecordElapsed(0);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordElapsed((s) => {
-          if (s + 1 >= ONECLICK_RECORD_MAX_S) {
-            stopRecording();
-          }
-          return s + 1;
-        });
-      }, 1000);
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: ONECLICK_RECORD_MAX_S,
-        ...({ mute: true } as Record<string, unknown>),
-      }) as { uri: string } | undefined;
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      setIsRecording(false);
-      if (video?.uri) {
-        await handleVideoRecorded(video.uri);
-      }
-    } catch (err) {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      setIsRecording(false);
-      if (!isMountedRef.current) return;
-      setError(friendlyError(err, '동영상 녹화에 실패했습니다. 다시 시도해주세요.'));
-    }
-  }, [cameraReady, isRecording, stopRecording, handleVideoRecorded]);
-
-
   const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
 
     const base64 = postCaptureBase64Ref.current;
     const mimeType = postCaptureMimeRef.current;
     const videoUri = postCaptureVideoUriRef.current;
-    const mode = captureModeRef.current;
 
-    // 입체컷 오토 모드: AI 분석 없이 바로 편집 화면으로 진입
-    if (mode === 'single') {
-      try {
-        if (!base64) {
-          if (!videoUri) return;
-          const frame = await withTimeout(
-            extractVideoFrameBase64(videoUri, 1080, 0.7),
-            PICK_TIMEOUT_MS,
-            '동영상 프레임 추출',
-          );
-          const imageUrl = await uploadImage(frame.base64, frame.mimeType);
-          const scanId = await saveManualScan(imageUrl);
-          router.push({ pathname: '/editor', params: { id: scanId } });
-          return;
-        }
-        const imageUrl = await uploadImage(base64, mimeType);
+    try {
+      if (!base64) {
+        if (!videoUri) return;
+        const frame = await withTimeout(
+          extractVideoFrameBase64(videoUri, 1080, 0.7),
+          PICK_TIMEOUT_MS,
+          '동영상 프레임 추출',
+        );
+        const imageUrl = await uploadImage(frame.base64, frame.mimeType);
         const scanId = await saveManualScan(imageUrl);
         router.push({ pathname: '/editor', params: { id: scanId } });
-      } catch (err) {
-        if (!isMountedRef.current) return;
-        setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
+        return;
       }
-      return;
-    }
-
-    if (base64) {
-      await runAutoAnalysis(base64, mimeType);
-      return;
-    }
-    if (!videoUri) return;
-    try {
-      const { base64: frameB64, mimeType: frameMime } = await withTimeout(
-        extractVideoFrameBase64(videoUri, 1080, 0.7),
-        PICK_TIMEOUT_MS,
-        '동영상 프레임 추출',
-      );
-      await runAutoAnalysis(frameB64, frameMime);
+      const imageUrl = await uploadImage(base64, mimeType);
+      const scanId = await saveManualScan(imageUrl);
+      router.push({ pathname: '/editor', params: { id: scanId } });
     } catch (err) {
       if (!isMountedRef.current) return;
-      setError(friendlyError(err, '동영상 처리에 실패했습니다. 다시 시도해주세요.'));
+      setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));
     }
-  }, [runAutoAnalysis, router]);
+  }, [router]);
 
   const handlePostCaptureClose = useCallback(() => {
     setPostCaptureVisible(false);
@@ -309,53 +225,7 @@ export default function CameraScreen() {
 
   const handleCapture = async () => {
     if (!cameraRef.current || processing || !cameraReady || autoSaving) return;
-
-    if (captureMode === 'single') {
-      setMultiAngleVisible(true);
-      return;
-    }
-
-    if (captureMode === 'oneclick') {
-      if (isRecording) {
-        await stopRecording();
-        return;
-      }
-      await startRecording();
-      return;
-    }
-
-    const genId = genIdRef.current;
-    try {
-      const photo = await withTimeout(
-        cameraRef.current.takePictureAsync({
-          base64: true,
-          quality: 0.7,
-          shutterSound: false,
-          ...({ mute: true } as Record<string, unknown>),
-        }) as Promise<{ base64?: string; uri: string }>,
-        CAPTURE_TIMEOUT_MS,
-        '사진 촬영',
-      );
-      if (genIdRef.current !== genId) return;
-      if (!photo?.base64) throw new Error('Failed to capture image data');
-      const cleanB64 = cleanBase64(photo.base64);
-      const compressedDataUrl = await withTimeout(
-        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1080, 0.7, 'none' as MoodFilterType),
-        PICK_TIMEOUT_MS,
-        '이미지 압축',
-      );
-      if (!isMountedRef.current || genIdRef.current !== genId) return;
-      setPostCaptureBase64(cleanBase64(compressedDataUrl));
-      postCaptureBase64Ref.current = cleanBase64(compressedDataUrl);
-      setPostCaptureMime(getMimeTypeFromDataUrl(compressedDataUrl));
-      postCaptureMimeRef.current = getMimeTypeFromDataUrl(compressedDataUrl);
-      setPostCaptureVideoUri(null);
-      postCaptureVideoUriRef.current = null;
-      setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
-    } catch (err) {
-      if (!isMountedRef.current || genIdRef.current !== genId) return;
-      setError(friendlyError(err, '사진 촬영에 실패했습니다. 다시 시도해주세요.'));
-    }
+    setMultiAngleVisible(true);
   };
 
   const handlePickImage = async () => {
@@ -445,7 +315,6 @@ export default function CameraScreen() {
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
     if (isWebPlatform()) {
-      // Try live camera stream first — this is the real camera preview the user sees
       if (webCameraRef.current?.isReady()) {
         try {
           const result = await withTimeout(
@@ -458,7 +327,6 @@ export default function CameraScreen() {
           // Fall through to file picker
         }
       }
-      // Fallback: file picker with camera capture attribute (mobile browsers)
       try {
         const images = await withTimeout(pickImageWeb(false, 1, true), PICK_TIMEOUT_MS, '카메라 캡처');
         if (images.length === 0) return null;
@@ -544,15 +412,88 @@ export default function CameraScreen() {
     setWorkflowMountKey((k) => k + 1); setPostCaptureVisible(true);
   }, []);
 
-  const handleModeSelect = (mode: CaptureModeType) => {
-    setCaptureMode(mode);
-    captureModeRef.current = mode;
-    setError(null);
-    setScreenPhase('camera');
-    if (mode === 'single') {
-      setMultiAngleVisible(true);
+  // ─── Image picking helper for virtual fitting ───
+  const pickImageForFitting = useCallback(async (): Promise<string | null> => {
+    if (isWebPlatform()) {
+      try {
+        const images = await withTimeout(pickImageWeb(false, 1), PICK_TIMEOUT_MS, '사진 선택');
+        if (images.length === 0) return null;
+        const compressed = await withTimeout(
+          prepareImageForApi(buildDataUrl(cleanBase64(images[0].base64), images[0].mimeType), 1024, 0.8, 'none' as MoodFilterType),
+          PICK_TIMEOUT_MS,
+          '이미지 압축',
+        );
+        return cleanBase64(compressed);
+      } catch (err) {
+        setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
+        return null;
+      }
     }
-  };
+    try {
+      const result = await withTimeout(
+        ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          base64: false,
+          quality: 0.8,
+        }),
+        PICK_TIMEOUT_MS,
+        '사진 선택',
+      );
+      if (result.canceled || !result.assets?.[0]?.uri) return null;
+      const { base64 } = await withTimeout(
+        compressImageToBase64(result.assets[0].uri, 1024, 0.8),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
+      return base64;
+    } catch (err) {
+      setError(friendlyError(err, '사진 선택에 실패했습니다. 다시 시도해주세요.'));
+      return null;
+    }
+  }, []);
+
+  // ─── Virtual fitting: run edge function ───
+  const runVirtualFitting = useCallback(async () => {
+    const productB64 = fittingProductBase64;
+    const modelB64 = fittingModelBase64;
+    if (!productB64 || !modelB64) return;
+
+    setFittingLoading(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('virtual-fitting', {
+        body: {
+          productImage: buildDataUrl(productB64, 'image/jpeg'),
+          modelImage: buildDataUrl(modelB64, 'image/jpeg'),
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.image) throw new Error('가상 피팅 이미지를 생성하지 못했습니다.');
+
+      setFittingResultBase64(data.image as string);
+      setScreenPhase('fitting_result');
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      setError(friendlyError(err, '가상 피팅 생성 중 오류가 발생했습니다. 다시 시도해주세요.'));
+    } finally {
+      if (isMountedRef.current) setFittingLoading(false);
+    }
+  }, [fittingProductBase64, fittingModelBase64]);
+
+  const handleModeSelect = useCallback((mode: CaptureMode) => {
+    setCaptureMode(mode);
+    setError(null);
+    if (mode === 'single') {
+      setScreenPhase('camera');
+    } else if (mode === 'fitting') {
+      setFittingProductBase64(null);
+      setFittingModelBase64(null);
+      setFittingResultBase64(null);
+      setScreenPhase('fitting_product');
+    }
+  }, []);
 
   // ─── Mode Selection Screen ───
   if (screenPhase === 'mode_select') {
@@ -568,18 +509,18 @@ export default function CameraScreen() {
 
         <View style={styles.modeCardsWrap}>
           <ModeCard
-            icon={<Zap size={32} color="#fff" strokeWidth={2.5} />}
-            title="원클릭 촬영"
-            desc="탭 한 번으로 15초 동영상을 촬영해 바로 숏폼으로 완성"
-            color={theme.colors.warning[500]}
-            onPress={() => handleModeSelect('oneclick')}
-          />
-          <ModeCard
             icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
             title="입체컷 오토"
             desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
+          />
+          <ModeCard
+            icon={<Shirt size={32} color="#fff" strokeWidth={2.5} />}
+            title="AI 가상 피팅"
+            desc="의류 사진과 모델 사진을 업로드하면 AI가 가상 착용 결과를 생성"
+            color={theme.colors.accent[500]}
+            onPress={() => handleModeSelect('fitting')}
           />
         </View>
 
@@ -597,11 +538,258 @@ export default function CameraScreen() {
     );
   }
 
+  // ─── Virtual Fitting: Product Photo Step ───
+  if (screenPhase === 'fitting_product') {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => { setScreenPhase('mode_select'); setError(null); }}
+            activeOpacity={0.7}
+          >
+            <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.fittingStepTitle}>1/2 의류 사진</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          style={styles.fittingScroll}
+          contentContainerStyle={{ paddingTop: safeTop + 60, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.fittingDesc}>
+            착용시킬 의류/제품 사진을 선택해주세요. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.
+          </Text>
+
+          {fittingProductBase64 ? (
+            <View style={styles.fittingPreviewWrap}>
+              <Image
+                source={{ uri: buildDataUrl(fittingProductBase64, 'image/jpeg') }}
+                style={styles.fittingPreviewImg}
+                resizeMode="contain"
+              />
+              <View style={styles.fittingPreviewActions}>
+                <TouchableOpacity
+                  style={styles.fittingRetakeBtn}
+                  onPress={async () => {
+                    const b64 = await pickImageForFitting();
+                    if (b64) setFittingProductBase64(b64);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.fittingRetakeText}>다시 선택</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.fittingNextBtn}
+                  onPress={() => setScreenPhase('fitting_model')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.fittingNextText}>다음</Text>
+                  <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.fittingUploadBtn}
+              onPress={async () => {
+                const b64 = await pickImageForFitting();
+                if (b64) setFittingProductBase64(b64);
+              }}
+              activeOpacity={0.8}
+            >
+              <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.fittingUploadText}>의류 사진 선택</Text>
+              <Text style={styles.fittingUploadHint}>갤러리에서 의류/제품 사진을 불러옵니다</Text>
+            </TouchableOpacity>
+          )}
+
+          {error && (
+            <View style={styles.fittingErrorBanner}>
+              <Text style={styles.fittingErrorText}>{error}</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ─── Virtual Fitting: Model Photo Step ───
+  if (screenPhase === 'fitting_model') {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => { setScreenPhase('fitting_product'); setError(null); }}
+            activeOpacity={0.7}
+          >
+            <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.fittingStepTitle}>2/2 모델 사진</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          style={styles.fittingScroll}
+          contentContainerStyle={{ paddingTop: safeTop + 60, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.fittingDesc}>
+            의류를 입힐 모델 사진을 선택해주세요. 정면 전신 사진이 가장 좋은 결과를 제공합니다.
+          </Text>
+
+          {fittingModelBase64 ? (
+            <View style={styles.fittingPreviewWrap}>
+              <Image
+                source={{ uri: buildDataUrl(fittingModelBase64, 'image/jpeg') }}
+                style={styles.fittingPreviewImg}
+                resizeMode="contain"
+              />
+              <View style={styles.fittingPreviewActions}>
+                <TouchableOpacity
+                  style={styles.fittingRetakeBtn}
+                  onPress={async () => {
+                    const b64 = await pickImageForFitting();
+                    if (b64) setFittingModelBase64(b64);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.fittingRetakeText}>다시 선택</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.fittingNextBtn, fittingLoading && styles.fittingNextBtnDisabled]}
+                  onPress={runVirtualFitting}
+                  disabled={fittingLoading}
+                  activeOpacity={0.85}
+                >
+                  {fittingLoading ? (
+                    <Text style={styles.fittingNextText}>생성 중...</Text>
+                  ) : (
+                    <>
+                      <Sparkles size={18} color="#fff" strokeWidth={2.5} />
+                      <Text style={styles.fittingNextText}>AI 피팅 생성</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.fittingUploadBtn}
+              onPress={async () => {
+                const b64 = await pickImageForFitting();
+                if (b64) setFittingModelBase64(b64);
+              }}
+              activeOpacity={0.8}
+            >
+              <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={styles.fittingUploadText}>모델 사진 선택</Text>
+              <Text style={styles.fittingUploadHint}>갤러리에서 모델 전신 사진을 불러옵니다</Text>
+            </TouchableOpacity>
+          )}
+
+          {fittingLoading && (
+            <View style={styles.fittingLoadingCard}>
+              <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
+                <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={2} />
+              </Animated.View>
+              <Text style={styles.fittingLoadingTitle}>AI 가상 피팅 생성 중</Text>
+              <Text style={styles.fittingLoadingSub}>
+                모델에게 의류를 입히는 중입니다. 잠시만 기다려주세요.
+              </Text>
+            </View>
+          )}
+
+          {error && (
+            <View style={styles.fittingErrorBanner}>
+              <Text style={styles.fittingErrorText}>{error}</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ─── Virtual Fitting: Result Step ───
+  if (screenPhase === 'fitting_result' && fittingResultBase64) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => {
+              setFittingProductBase64(null);
+              setFittingModelBase64(null);
+              setFittingResultBase64(null);
+              setScreenPhase('mode_select');
+            }}
+            activeOpacity={0.7}
+          >
+            <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <Text style={styles.fittingStepTitle}>피팅 결과</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          style={styles.fittingScroll}
+          contentContainerStyle={{ paddingTop: safeTop + 60, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.fittingResultWrap}>
+            <Image
+              source={{ uri: buildDataUrl(fittingResultBase64, 'image/png') }}
+              style={styles.fittingResultImg}
+              resizeMode="contain"
+            />
+
+            <View style={styles.fittingResultActions}>
+              <TouchableOpacity
+                style={styles.fittingRetryBtn}
+                onPress={() => {
+                  setFittingResultBase64(null);
+                  setScreenPhase('fitting_model');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fittingRetryText}>다시 생성</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fittingSaveBtn}
+                onPress={async () => {
+                  try {
+                    const imageUrl = await uploadImage(fittingResultBase64, 'image/png');
+                    const scanId = await saveManualScan(imageUrl);
+                    router.push({ pathname: '/editor', params: { id: scanId } });
+                  } catch (err) {
+                    setError(friendlyError(err, '저장 중 오류가 발생했습니다. 다시 시도해주세요.'));
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Check size={18} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.fittingSaveText}>편집으로 이동</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {error && (
+            <View style={styles.fittingErrorBanner}>
+              <Text style={styles.fittingErrorText}>{error}</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
   // ─── Web Camera Screen ───
   if (isWebPlatform()) {
     return (
       <View style={styles.container}>
-        {/* Top bar: back only */}
         <View style={[styles.topBar, { top: safeTop + 8 }]}>
           <TouchableOpacity
             style={styles.topBarBtn}
@@ -609,6 +797,13 @@ export default function CameraScreen() {
             activeOpacity={0.7}
           >
             <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.topBarBtn}
+            onPress={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+            activeOpacity={0.7}
+          >
+            <RotateCcw size={20} color="#fff" strokeWidth={2} />
           </TouchableOpacity>
         </View>
 
@@ -621,7 +816,7 @@ export default function CameraScreen() {
             safeTop={safeTop}
             tabBarHeight={tabBarHeight}
             bottomInset={bottomInset}
-            captureMode={captureMode}
+            captureMode="single"
             onCaptureModeChange={() => {}}
             autoSaving={autoSaving}
             autoSaveToast={autoSaveToast}
@@ -695,7 +890,7 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top bar: back button only */}
+      {/* Top bar: back + flip camera */}
       <View style={[styles.topBar, { top: safeTop + 8 }]}>
         <TouchableOpacity
           style={styles.topBarBtn}
@@ -728,35 +923,9 @@ export default function CameraScreen() {
             <Camera size={36} color={theme.colors.dark.textDim} strokeWidth={1.5} />
           </View>
         )}
-
-        {/* 15s recording guide + timer */}
-        {captureMode === 'oneclick' && cameraReady && (
-          <View style={styles.recordGuideWrap} pointerEvents="none">
-            <View style={styles.recordGuideBadge}>
-              {isRecording ? (
-                <>
-                  <View style={styles.recordDotActive} />
-                  <Text style={styles.recordTimerText}>
-                    00:{String(recordElapsed).padStart(2, '0')} / 00:{String(ONECLICK_RECORD_MAX_S).padStart(2, '0')}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Zap size={14} color="#fff" strokeWidth={2.5} />
-                  <Text style={styles.recordGuideText}>15초 숏폼 최적 촬영 준비</Text>
-                </>
-              )}
-            </View>
-            {isRecording && (
-              <View style={styles.recordProgressBar}>
-                <View style={[styles.recordProgressFill, { width: `${(recordElapsed / ONECLICK_RECORD_MAX_S) * 100}%` }]} />
-              </View>
-            )}
-          </View>
-        )}
       </View>
 
-      {/* Bottom: single shutter button only */}
+      {/* Bottom: shutter button */}
       <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
         {error && (
           <View style={styles.errorBanner}>
@@ -770,29 +939,19 @@ export default function CameraScreen() {
             style={[
               styles.shutterBtn,
               !cameraReady && styles.shutterBtnDisabled,
-              captureMode === 'oneclick' && styles.shutterBtnOneclick,
               (autoSaving || processing) && styles.shutterBtnCapturing,
-              isRecording && styles.shutterBtnRecording,
             ]}
             onPress={handleCapture}
             disabled={processing || autoSaving || !cameraReady}
             activeOpacity={0.85}
           >
-            {isRecording ? (
-              <Square size={28} color="#fff" strokeWidth={2.5} />
-            ) : captureMode === 'oneclick' ? (
-              <Zap size={30} color="#fff" strokeWidth={2.5} />
-            ) : (
-              <Camera size={30} color="#fff" strokeWidth={2.5} />
-            )}
+            <Camera size={30} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
           <View style={{ width: 52 }} />
         </View>
 
         <Text style={styles.shutterHintText}>
           {autoSaving ? 'AI 자동 분석 중...' :
-           isRecording ? `녹화 중 · 15초 후 자동 완료 (${recordElapsed}/${ONECLICK_RECORD_MAX_S}s)` :
-           captureMode === 'oneclick' ? '탭하여 15초 동영상 녹화 시작' :
            '정면·좌측·우측·후면·상부 순차 촬영'}
         </Text>
       </View>
@@ -881,7 +1040,8 @@ function StereoProgressLightweight({
       <View style={styles.stereoLightOverlay}>
         <View style={styles.stereoLightCard}>
           {hasError ? (
-            <>\n              <AlertCircle size={28} color={theme.colors.error[400]} strokeWidth={2} />
+            <>
+              <AlertCircle size={28} color={theme.colors.error[400]} strokeWidth={2} />
               <Text style={styles.stereoLightTitle}>처리 중 오류</Text>
               <Text style={styles.stereoLightError}>{progress.error}</Text>
               <TouchableOpacity style={styles.stereoLightBtn} onPress={onDismiss} activeOpacity={0.7}>
@@ -953,9 +1113,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-  },
-  modeSelectHeaderLeft: {
-    width: 80,
   },
   modeCardsWrap: {
     flex: 1,
@@ -1117,59 +1274,6 @@ const styles = StyleSheet.create({
   shutterBtnCapturing: {
     opacity: 0.6,
   },
-  shutterBtnOneclick: {
-    backgroundColor: theme.colors.warning[500],
-  },
-  shutterBtnRecording: {
-    backgroundColor: theme.colors.error[500],
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  recordGuideWrap: {
-    position: 'absolute',
-    top: 16,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 15,
-    gap: 6,
-  },
-  recordGuideBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(10, 15, 30, 0.7)',
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  recordGuideText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
-  },
-  recordTimerText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
-  recordDotActive: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.error[400],
-  },
-  recordProgressBar: {
-    width: 200,
-    height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 1.5,
-    overflow: 'hidden',
-  },
-  recordProgressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.warning[400],
-    borderRadius: 1.5,
-  },
   shutterHintText: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
@@ -1248,6 +1352,162 @@ const styles = StyleSheet.create({
   autoSavingStepDotActive: {
     backgroundColor: theme.colors.primary[400],
   },
+  // Virtual fitting styles
+  fittingScroll: {
+    flex: 1,
+  },
+  fittingStepTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  fittingDesc: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
+  },
+  fittingUploadBtn: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+    borderStyle: 'dashed',
+    paddingVertical: theme.spacing.xxl + 8,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  fittingUploadText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  fittingUploadHint: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  fittingPreviewWrap: {
+    gap: theme.spacing.md,
+  },
+  fittingPreviewImg: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  fittingPreviewActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  fittingRetakeBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+  },
+  fittingRetakeText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  fittingNextBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.accent[500],
+  },
+  fittingNextBtnDisabled: {
+    opacity: 0.6,
+  },
+  fittingNextText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  fittingErrorBanner: {
+    backgroundColor: theme.colors.error[500] + '18',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: theme.spacing.md,
+  },
+  fittingErrorText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
+    textAlign: 'center',
+  },
+  fittingLoadingCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
+    maxWidth: 320,
+    alignSelf: 'center',
+  },
+  fittingLoadingTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  fittingLoadingSub: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  fittingResultWrap: {
+    gap: theme.spacing.md,
+  },
+  fittingResultImg: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  fittingResultActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  fittingRetryBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+  },
+  fittingRetryText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  fittingSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[600],
+  },
+  fittingSaveText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  // Stereo progress
   stereoLightOverlay: {
     flex: 1,
     backgroundColor: 'rgba(3, 5, 15, 0.88)',
@@ -1318,5 +1578,4 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
-
 });

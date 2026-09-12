@@ -40,19 +40,12 @@ interface GenerateVideoRequest {
   imageUrls?: string[] | null;
 }
 
-interface VideoJobResponse {
-  id: string;
-  status: "queued" | "generating" | "completed" | "failed";
-  videoUrl?: string;
-  error?: string;
-}
-
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 2000;
-const RUNWAY_POLL_INTERVAL_MS = 1000;
-const RUNWAY_MAX_POLL_ATTEMPTS = 120;
-const OPENAI_POLL_INTERVAL_MS = 3000;
-const OPENAI_MAX_POLL_ATTEMPTS = 60;
+const RUNWAY_POLL_INTERVAL_MS = 2000;
+const RUNWAY_MAX_POLL_ATTEMPTS = 70;
+const RUNWAY_SUBMIT_TIMEOUT_MS = 30000;
+const RUNWAY_POLL_TIMEOUT_MS = 10000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -68,18 +61,20 @@ Deno.serve(async (req: Request) => {
   try {
     const body: GenerateVideoRequest = await req.json();
 
-    // Auto-generate prompt if not provided — use product metadata and vision data
     let effectivePrompt = body.prompt ?? "";
     if (effectivePrompt.trim().length === 0) {
       effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText);
     }
 
     const runwayKey = await resolveRunwayKey();
-    const openaiKey = await resolveOpenAIKey();
 
-    if (!runwayKey && !openaiKey) {
+    if (!runwayKey) {
       return new Response(
-        JSON.stringify({ error: "AI 비디오 생성을 위한 API 키가 설정되지 않았습니다. 설정에서 Runway 또는 OpenAI API 키를 등록해주세요.", step: "key_resolution", provider: "none" }),
+        JSON.stringify({
+          error: "AI 비디오 생성을 위한 Runway API 키가 설정되지 않았습니다. 설정에서 Runway API 키를 등록해주세요.",
+          step: "key_resolution",
+          provider: "none",
+        }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -105,52 +100,31 @@ Deno.serve(async (req: Request) => {
     );
 
     let videoUrl: string | null = null;
-    let jobId = "";
-    let provider = "";
+    let taskId = "";
+    let provider = "runway";
+    let providerError: string | null = null;
 
-    // Try Runway first, fall back to OpenAI
-    if (runwayKey) {
-      try {
-        const result = await generateWithRunway(motionPrompt, primaryImageUrl, runwayKey, aspectRatio, durationSec);
-        videoUrl = result.videoUrl;
-        jobId = result.taskId;
-        provider = "runway";
-      } catch (runwayErr) {
-        if (!openaiKey) {
-          return new Response(
-            JSON.stringify({ error: runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패", step: "runway", provider: "runway" }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
-    }
-
-    if (!videoUrl && openaiKey) {
-      try {
-        const result = await generateWithOpenAI(motionPrompt, primaryImageUrl, openaiKey, aspectRatio, durationSec);
-        videoUrl = result.videoUrl;
-        jobId = result.jobId;
-        provider = "openai";
-      } catch (openaiErr) {
-        return new Response(
-          JSON.stringify({
-            error: openaiErr instanceof Error ? openaiErr.message : "OpenAI 비디오 생성 실패",
-            step: "openai",
-            provider: "openai",
-          }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+    try {
+      const result = await generateWithRunway(motionPrompt, primaryImageUrl, runwayKey, aspectRatio, durationSec);
+      videoUrl = result.videoUrl;
+      taskId = result.taskId;
+    } catch (runwayErr) {
+      providerError = runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패";
     }
 
     if (!videoUrl) {
+      const errorDetail = providerError ?? "알 수 없는 오류";
       return new Response(
-        JSON.stringify({ error: "비디오 생성에 실패했습니다. 모든 API 프로바이더에서 오류가 발생했습니다.", step: "all_providers_failed", provider: provider || "none" }),
+        JSON.stringify({
+          error: `AI 비디오 생성에 실패했습니다: ${errorDetail}`,
+          step: "runway",
+          provider,
+          motionPrompt: motionPrompt.slice(0, 500),
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Persist to Supabase storage
     let persistedUrl: string | null = null;
     if (body.scanId && supabaseUrl && serviceRoleKey) {
       persistedUrl = await uploadToStorage(videoUrl, body.scanId);
@@ -165,7 +139,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         videoUrl: finalUrl,
         originalVideoUrl: videoUrl !== finalUrl ? videoUrl : undefined,
-        jobId,
+        jobId: taskId,
         provider,
         motionPrompt,
         durationSec,
@@ -177,7 +151,11 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "비디오 생성 중 오류가 발생했습니다.", step: "unhandled", provider: "unknown" }),
+      JSON.stringify({
+        error: err instanceof Error ? err.message : "비디오 생성 중 오류가 발생했습니다.",
+        step: "unhandled",
+        provider: "unknown",
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
@@ -199,11 +177,13 @@ async function generateWithRunway(
 
   let videoUrl: string | null = null;
   let lastStatus = "PENDING";
+  let lastProgress = "";
 
   for (let attempt = 0; attempt < RUNWAY_MAX_POLL_ATTEMPTS; attempt++) {
     await delay(RUNWAY_POLL_INTERVAL_MS);
     const status = await pollRunwayTask(taskId, apiKey);
     lastStatus = status.status;
+    lastProgress = status.progress ?? "";
 
     if (status.status === "SUCCESS" && status.videoUrl) {
       videoUrl = status.videoUrl;
@@ -215,7 +195,7 @@ async function generateWithRunway(
   }
 
   if (!videoUrl) {
-    throw new Error(`Runway 비디오 생성 시간이 초과되었습니다. (상태: ${lastStatus})`);
+    throw new Error(`Runway 비디오 생성 시간이 초과되었습니다. (마지막 상태: ${lastStatus}${lastProgress ? `, 진행률: ${lastProgress}` : ""})`);
   }
 
   return { videoUrl, taskId };
@@ -229,7 +209,7 @@ async function submitRunwayTask(
   durationSec: number,
 ): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
     const payload: Record<string, unknown> = {
@@ -258,7 +238,12 @@ async function submitRunwayTask(
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Runway 생성 요청 실패: ${resp.status} ${errText.slice(0, 300)}`);
+      let errDetail = errText.slice(0, 500);
+      try {
+        const errJson = JSON.parse(errText);
+        errDetail = errJson?.error ?? errJson?.message ?? errDetail;
+      } catch { /* keep raw text */ }
+      throw new Error(`Runway 생성 요청 실패 (HTTP ${resp.status}): ${errDetail}`);
     }
 
     const result = await resp.json();
@@ -268,15 +253,18 @@ async function submitRunwayTask(
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Runway 생성 요청 시간이 초과되었습니다.");
+      throw new Error("Runway 생성 요청 시간이 초과되었습니다 (30초).");
     }
     throw err;
   }
 }
 
-async function pollRunwayTask(taskId: string, apiKey: string): Promise<{ status: string; videoUrl?: string; error?: string }> {
+async function pollRunwayTask(
+  taskId: string,
+  apiKey: string,
+): Promise<{ status: string; videoUrl?: string; error?: string; progress?: string }> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
 
   try {
     const resp = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
@@ -286,148 +274,32 @@ async function pollRunwayTask(taskId: string, apiKey: string): Promise<{ status:
     clearTimeout(timeoutId);
 
     if (!resp.ok) {
-      return { status: "FAILED", error: `Runway 폴링 실패: ${resp.status}` };
+      const errText = await resp.text().catch(() => "");
+      return { status: "FAILED", error: `Runway 폴링 실패 (HTTP ${resp.status}): ${errText.slice(0, 200)}` };
     }
 
     const result = await resp.json();
     const status = (result.status as string) ?? "PROCESSING";
+    const progress = result.progress != null ? String(result.progress) : "";
 
     if (status === "SUCCESS" || status === "COMPLETED") {
       const videoUrl = result.output?.[0] ?? result.output?.url ?? result.artifacts?.[0]?.url ?? result.url;
       if (!videoUrl) return { status: "FAILED", error: "Runway 비디오 URL이 없습니다." };
-      return { status: "SUCCESS", videoUrl };
+      return { status: "SUCCESS", videoUrl, progress };
     }
 
     if (status === "FAILED" || status === "CANCELED") {
-      return { status: "FAILED", error: result.failure ?? result.error ?? "Runway 생성 실패" };
+      const errMsg = result.failure ?? result.error ?? "Runway 생성 실패";
+      return { status: "FAILED", error: errMsg };
     }
 
-    return { status };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    return { status: "FAILED", error: err instanceof Error ? err.message : "Runway 폴링 오류" };
-  }
-}
-
-// === OpenAI Sora (fallback) ===
-
-async function generateWithOpenAI(
-  prompt: string,
-  imageUrl: string | undefined,
-  apiKey: string,
-  aspectRatio: string,
-  durationSec: number,
-): Promise<{ videoUrl: string; jobId: string }> {
-  const jobId = await submitWithRetry(
-    () => submitOpenAIJob(prompt, imageUrl, apiKey, aspectRatio, durationSec),
-    MAX_RETRIES,
-  );
-
-  let videoUrl: string | null = null;
-  let lastStatus = "queued";
-
-  for (let attempt = 0; attempt < OPENAI_MAX_POLL_ATTEMPTS; attempt++) {
-    await delay(OPENAI_POLL_INTERVAL_MS);
-    const status = await pollOpenAIJob(jobId, apiKey);
-    lastStatus = status.status;
-
-    if (status.status === "completed" && status.videoUrl) {
-      videoUrl = status.videoUrl;
-      break;
-    }
-    if (status.status === "failed") {
-      throw new Error(status.error ?? "OpenAI 비디오 생성에 실패했습니다.");
-    }
-  }
-
-  if (!videoUrl) {
-    throw new Error(`OpenAI 비디오 생성 시간이 초과되었습니다. (상태: ${lastStatus})`);
-  }
-
-  return { videoUrl, jobId };
-}
-
-async function submitOpenAIJob(
-  prompt: string,
-  imageUrl: string | undefined,
-  apiKey: string,
-  aspectRatio: string,
-  durationSec: number,
-): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-  try {
-    const requestPayload: Record<string, unknown> = {
-      model: "sora",
-      prompt,
-      size: aspectRatio === "9:16" ? "1080x1920" : aspectRatio === "16:9" ? "1920x1080" : "1080x1080",
-      duration: Math.min(durationSec, 20),
-      n: 1,
-    };
-
-    if (imageUrl) {
-      requestPayload.image = imageUrl;
-    }
-
-    const resp = await fetch("https://api.openai.com/v1/videos/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestPayload),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`OpenAI 비디오 생성 요청 실패: ${resp.status} ${errText.slice(0, 300)}`);
-    }
-
-    const result = await resp.json();
-    const jobId = result.id ?? result.data?.[0]?.id;
-    if (!jobId) throw new Error("OpenAI 작업 ID를 받지 못했습니다.");
-    return jobId;
+    return { status, progress };
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("OpenAI 비디오 생성 요청 시간이 초과되었습니다.");
+      return { status: "PROCESSING", progress: "polling timeout, retrying" };
     }
-    throw err;
-  }
-}
-
-async function pollOpenAIJob(jobId: string, apiKey: string): Promise<VideoJobResponse> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const resp = await fetch(`https://api.openai.com/v1/videos/generations/${jobId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!resp.ok) {
-      return { id: jobId, status: "failed", error: `OpenAI 폴링 실패: ${resp.status}` };
-    }
-
-    const result = await resp.json();
-    const status = (result.status as string) ?? "generating";
-
-    if (status === "completed") {
-      const videoUrl = result.video_url ?? result.output?.[0]?.url ?? result.data?.[0]?.url;
-      if (!videoUrl) return { id: jobId, status: "failed", error: "OpenAI 비디오 URL이 없습니다." };
-      return { id: jobId, status: "completed", videoUrl };
-    }
-
-    return { id: jobId, status: status as VideoJobResponse["status"] };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    return { id: jobId, status: "failed", error: err instanceof Error ? err.message : "OpenAI 폴링 오류" };
+    return { status: "FAILED", error: err instanceof Error ? err.message : "Runway 폴링 오류" };
   }
 }
 
@@ -525,10 +397,6 @@ function buildMotionPrompt(
   };
   const benchmark = platformBenchmarks[platform] ?? platformBenchmarks.shorts;
 
-  // === Top-1% Purchase-Conversion Psychology Framework ===
-  // Phase 1 (0-2s): Loss Aversion + Curiosity Hook
-  // Phase 2 (3-9s): Cognitive Friction Resolution + Before/After
-  // Phase 3 (10-15s): Social Proof + Scarcity + Urgency CTA
   const scenePhases = [
     {
       phase: "LOSS_AVERSION_HOOK",
@@ -782,39 +650,6 @@ async function resolveRunwayKey(): Promise<string | null> {
         const rows = await resp.json() as Array<{ runway_api_key: string | null }>;
         if (rows.length > 0 && rows[0].runway_api_key) {
           return rows[0].runway_api_key;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return null;
-}
-
-async function resolveOpenAIKey(): Promise<string | null> {
-  const serverKey = Deno.env.get("OPENAI_API_KEY");
-  if (serverKey) return serverKey;
-
-  if (supabaseUrl && serviceRoleKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const resp = await fetch(
-        `${supabaseUrl}/rest/v1/user_settings?select=openai_api_key&order=updated_at.desc&limit=1`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-          signal: controller.signal,
-        },
-      );
-      clearTimeout(timeoutId);
-      if (resp.ok) {
-        const rows = await resp.json() as Array<{ openai_api_key: string | null }>;
-        if (rows.length > 0 && rows[0].openai_api_key) {
-          return rows[0].openai_api_key;
         }
       }
     } catch {

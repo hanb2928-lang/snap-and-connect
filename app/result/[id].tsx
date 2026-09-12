@@ -103,7 +103,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2 } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -2097,10 +2097,15 @@ export default function ResultScreen() {
           {videoGenError && (
             <View style={styles.videoErrorToast}>
               <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
-              <Text style={styles.videoErrorToastText} numberOfLines={3}>AI 영상 생성 실패: {videoGenError}</Text>
-              <TouchableOpacity onPress={() => { setVideoGenError(null); }} activeOpacity={0.7}>
-                <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-              </TouchableOpacity>
+              <Text style={styles.videoErrorToastText} numberOfLines={5}>AI 영상 생성 실패: {videoGenError}</Text>
+              <View style={styles.videoErrorActions}>
+                <TouchableOpacity onPress={() => handleAiVideoGenerate()} activeOpacity={0.7}>
+                  <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setVideoGenError(null); }} activeOpacity={0.7}>
+                  <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           <ShortFormPreviewPlayer
@@ -4245,6 +4250,11 @@ iconButton: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.error[400],
+  },
+  videoErrorActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   modalOverlay: {
     position: 'absolute',

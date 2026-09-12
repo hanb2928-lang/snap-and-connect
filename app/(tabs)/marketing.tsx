@@ -165,7 +165,7 @@ export default function MarketingScreen() {
       await setItem('marketing_caption_tone', captionTone);
       await setItem('marketing_bgm_mood', bgmMood);
       await setItem('marketing_handoff', 'false');
-      await setItem('marketing_capture_mode', 'oneclick');
+      await setItem('marketing_capture_mode', 'single');
       try {
         const settings = await getUserSettings();
         if (settings?.brand_persona) {
