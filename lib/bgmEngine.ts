@@ -1,12 +1,25 @@
+import { Platform } from 'react-native';
+import {
+  resolveBundledTrackUri,
+  pickBundledTrack,
+  getBundledTrackForIdOrCategory,
+  hasBundledTracksForCategory,
+  bundledTrackToBgmTemplate,
+  type BundledBgmTrack,
+} from './bundledBgm';
+
 /**
- * Web Audio API BGM engine — FM synthesis + additive layers.
+ * Web Audio API BGM engine — supports both bundled audio files and FM synthesis fallback.
+ * When bundled royalty-free mastered tracks are available in assets/audio/,
+ * the engine plays them directly for studio-grade quality with zero network latency.
+ * Falls back to FM synthesis if the bundled file fails to load.
+ *
  * Each mood uses multi-oscillator FM patches emulating real instruments:
  *   - cinematic:  string pad (FM bell + saw) + timpani-style bass
  *   - hightension: supersaw lead + 808 sub bass + electronic drums
  *   - asmr:       soft electric piano (FM sine/sine) + warm sub
  *   - emotional:  acoustic piano emulation (FM triangle) + cello pad
  *   - lofi:       Rhodes EP (FM sine) + vinyl drum kit + wow/flutter
- * No external URLs — all synthesized in-browser.
  */
 
 export type BgmCategory = 'cinematic' | 'hightension' | 'asmr' | 'emotional' | 'lofi';
@@ -267,6 +280,9 @@ export class BgmPlayer {
   private currentStep = 0;
   private wowFlutterLfo: OscillatorNode | null = null;
   private wowFlutterGain: GainNode | null = null;
+  private bundledAudioEl: HTMLAudioElement | null = null;
+  private currentBundledTrack: BundledBgmTrack | null = null;
+  private usingBundledFile = false;
 
   private getOrCreateContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -342,6 +358,47 @@ export class BgmPlayer {
 
     const category = moodLabelToCategory(bgmTemplateId);
     this.currentCategory = category;
+
+    // Try bundled audio file first — zero network latency, studio-grade quality
+    if (Platform.OS === 'web' && hasBundledTracksForCategory(category)) {
+      const track = getBundledTrackForIdOrCategory(bgmTemplateId, category);
+      const uri = resolveBundledTrackUri(track);
+      try {
+        if (this.bundledAudioEl) {
+          this.bundledAudioEl.pause();
+          this.bundledAudioEl = null;
+        }
+        const audio = new Audio(uri);
+        audio.loop = true;
+        audio.volume = this.volume;
+        audio.crossOrigin = 'anonymous';
+        const sourceNode = ctx.createMediaElementSource(audio);
+        sourceNode.connect(this.dryGain);
+        sourceNode.connect(this.reverbConvolver);
+        audio.play().catch(() => {
+          // Bundled file failed — fall back to FM synthesis
+          this.usingBundledFile = false;
+          this.startFmSynthesis(category, bpm, ctx);
+        });
+        this.bundledAudioEl = audio;
+        this.currentBundledTrack = track;
+        this.usingBundledFile = true;
+        this.isPlaying = true;
+        this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+        this.masterGain.gain.setValueAtTime(0, ctx.currentTime);
+        this.masterGain.gain.linearRampToValueAtTime(this.volume, ctx.currentTime + 0.4);
+        return;
+      } catch {
+        // Fall through to FM synthesis
+      }
+    }
+
+    this.startFmSynthesis(category, bpm, ctx);
+  }
+
+  private startFmSynthesis(category: BgmCategory, bpm: number | undefined, ctx: AudioContext): void {
+    if (!this.masterGain || !this.dryGain || !this.reverbConvolver || !this.reverbGain || !this.delayNode || !this.delayFeedback || !this.delayWet) return;
+    this.usingBundledFile = false;
     const config = MOOD_SYNTH_CONFIGS[category];
     const effectiveBpm = bpm ?? MOOD_CONFIGS[category].bpm;
 
@@ -588,6 +645,9 @@ export class BgmPlayer {
   }
 
   pause(): void {
+    if (this.usingBundledFile && this.bundledAudioEl) {
+      this.bundledAudioEl.pause();
+    }
     if (this.schedulerTimer) { clearInterval(this.schedulerTimer); this.schedulerTimer = null; }
     if (this.masterGain && this.audioCtx) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
@@ -602,6 +662,10 @@ export class BgmPlayer {
     this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
     this.masterGain.gain.linearRampToValueAtTime(this.volume, this.audioCtx.currentTime + 0.2);
     this.isPlaying = true;
+    if (this.usingBundledFile && this.bundledAudioEl) {
+      this.bundledAudioEl.play().catch(() => {});
+      return;
+    }
     this.nextNoteTime = this.audioCtx.currentTime + 0.05;
     const config = MOOD_SYNTH_CONFIGS[this.currentCategory];
     const bpm = MOOD_CONFIGS[this.currentCategory].bpm;
@@ -622,6 +686,12 @@ export class BgmPlayer {
 
   stop(): void {
     this.isPlaying = false;
+    if (this.bundledAudioEl) {
+      this.bundledAudioEl.pause();
+      this.bundledAudioEl = null;
+    }
+    this.usingBundledFile = false;
+    this.currentBundledTrack = null;
     if (this.schedulerTimer) { clearInterval(this.schedulerTimer); this.schedulerTimer = null; }
     if (this.masterGain && this.audioCtx) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
@@ -631,6 +701,9 @@ export class BgmPlayer {
 
   setVolume(vol: number): void {
     this.volume = vol;
+    if (this.usingBundledFile && this.bundledAudioEl) {
+      this.bundledAudioEl.volume = vol;
+    }
     if (this.masterGain && this.audioCtx && this.isPlaying) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
       this.masterGain.gain.linearRampToValueAtTime(vol, this.audioCtx.currentTime + 0.05);
@@ -639,6 +712,7 @@ export class BgmPlayer {
 
   dispose(): void {
     this.stop();
+    if (this.bundledAudioEl) { this.bundledAudioEl.pause(); this.bundledAudioEl = null; }
     if (this.wowFlutterLfo) { try { this.wowFlutterLfo.stop(); } catch { /* ignore */ } this.wowFlutterLfo = null; this.wowFlutterGain = null; }
     if (this.audioCtx) {
       try { this.audioCtx.close(); } catch { /* ignore */ }
@@ -650,17 +724,32 @@ export class BgmPlayer {
 
   get playing(): boolean { return this.isPlaying; }
   get category(): BgmCategory { return this.currentCategory; }
+  get bundledTrack(): BundledBgmTrack | null { return this.currentBundledTrack; }
+  get isBundled(): boolean { return this.usingBundledFile; }
 }
 
 /* ─── Utility exports ─── */
 
-export function getBgmStreamUrl(_moodLabel: string, _trackIndex?: number): string { return ''; }
+export function getBgmStreamUrl(moodLabel: string, trackIndex?: number): string {
+  const category = moodLabelToCategory(moodLabel);
+  if (!hasBundledTracksForCategory(category)) return '';
+  const track = pickBundledTrack(category, trackIndex);
+  return resolveBundledTrackUri(track);
+}
+
+export function getBgmStreamUrlByMood(moodLabel: string, trackIndex?: number): string {
+  return getBgmStreamUrl(moodLabel, trackIndex);
+}
 
 export function getBgmTemplateForMood(moodLabel: string): {
   id: string; label: string; mood: string; bpm: number;
   highlightStartSec: number; highlightDurationSec: number; energyCurve: number[];
 } {
   const category = moodLabelToCategory(moodLabel);
+  if (hasBundledTracksForCategory(category)) {
+    const track = pickBundledTrack(category);
+    return bundledTrackToBgmTemplate(track);
+  }
   const config = MOOD_CONFIGS[category];
   const track = config.tracks[0];
   return { id: category, label: config.label, mood: config.label, bpm: config.bpm,
