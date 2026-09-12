@@ -2154,7 +2154,7 @@ export default function ResultScreen() {
             editPlan={previewEditPlan}
             videoUri={generatedVideoUrl}
             imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={narrativeReorderedImages.length > 1 ? narrativeReorderedImages : null}
+            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
           />
@@ -2372,10 +2372,18 @@ export default function ResultScreen() {
           </TouchableOpacity>
 
           {/* AI Video Generation — explicit trigger (costs API credits) */}
+          {allCutImages.length < 5 && (
+            <View style={styles.photoGuardTooltip}>
+              <AlertCircleIcon size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.photoGuardTooltipText}>
+                입체컷 5장 각도를 모두 채워주세요 ({allCutImages.length}/5)
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
-            style={[styles.aiVideoBtn, isGeneratingVideo && styles.aiVideoBtnDisabled]}
+            style={[styles.aiVideoBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.aiVideoBtnDisabled]}
             onPress={() => setShowVideoConfirm(true)}
-            disabled={isGeneratingVideo || !!generatedVideoUrl}
+            disabled={isGeneratingVideo || !!generatedVideoUrl || allCutImages.length < 5}
             activeOpacity={0.7}
           >
             {isGeneratingVideo ? (
@@ -2388,7 +2396,9 @@ export default function ResultScreen() {
                 ? 'AI 실사 비디오 생성 중...'
                 : generatedVideoUrl
                   ? 'AI 영상 생성됨'
-                  : 'AI 비디오 변환 (크레딧 소모)'}
+                  : allCutImages.length < 5
+                    ? '5장 각도를 모두 채워주세요'
+                    : 'AI 비디오 변환 (크레딧 소모)'}
             </Text>
           </TouchableOpacity>
 
@@ -4357,6 +4367,24 @@ const styles = StyleSheet.create({
   },
   aiVideoBtnDisabled: {
     opacity: 0.5,
+  },
+  photoGuardTooltip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.warning[400] + '30',
+  },
+  photoGuardTooltipText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.warning[400],
   },
   aiVideoBtnText: {
     fontSize: 13,

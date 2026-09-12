@@ -213,6 +213,21 @@ export class BgmPlayer {
     if (!audio) return;
     if (this.isPlaying) this.stop();
 
+    // Resume AudioContext if suspended (autoplay policy workaround)
+    try {
+      const AudioCtx = (typeof window !== 'undefined')
+        ? (window.AudioContext || (window as any).webkitAudioContext)
+        : null;
+      if (AudioCtx) {
+        const ctx = (window as any).__snapConnectAudioCtx;
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     const category = MOOD_LABEL_MAP[bgmTemplateId] ?? 'hightension';
     this.currentCategory = category;
     const track = pickTrack(category);
@@ -223,7 +238,6 @@ export class BgmPlayer {
       audio.play().then(() => {
         this.fadeIn();
       }).catch(() => {
-        // autoplay policy or network issue — try muted then unmute
         audio.muted = true;
         audio.play().then(() => {
           audio.muted = false;
