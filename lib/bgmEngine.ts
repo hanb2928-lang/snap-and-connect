@@ -147,6 +147,8 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
   },
 };
 
+const FALLBACK_TRACK_URL = 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_ae3008a39a.mp3';
+
 const MOOD_LABEL_MAP: Record<string, BgmCategory> = {
   '시네마틱': 'cinematic',
   '하이텐션': 'hightension',
@@ -182,10 +184,12 @@ function pickTrack(category: BgmCategory, seed?: number): BgmTrack {
 export class BgmPlayer {
   private audio: HTMLAudioElement | null = null;
   private isPlaying = false;
-  private volume = 0.6;
+  private volume = 1.0;
   private currentCategory: BgmCategory = 'hightension';
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;
   private audioUnlocked = false;
+  private usingFallback = false;
+  private loadErrorCount = 0;
 
   private ensureAudio(): HTMLAudioElement | null {
     if (typeof window === 'undefined' || typeof document === 'undefined') return null;
@@ -196,6 +200,30 @@ export class BgmPlayer {
         this.audio.loop = true;
         this.audio.preload = 'auto';
         this.audio.volume = this.volume;
+        this.audio.addEventListener('error', () => {
+          const url = this.audio?.src ?? '';
+          console.warn(`[BgmEngine] MP3 로드 실패: ${url}`);
+          if (!this.usingFallback && this.audio) {
+            this.usingFallback = true;
+            this.loadErrorCount++;
+            console.warn(`[BgmEngine] 폴백 음원 URL로 전환: ${FALLBACK_TRACK_URL}`);
+            this.audio.src = FALLBACK_TRACK_URL;
+            this.audio.load();
+            if (this.isPlaying) {
+              this.audio.play().then(() => this.fadeIn()).catch(() => {
+                this.audio!.muted = true;
+                this.audio!.play().then(() => {
+                  this.audio!.muted = false;
+                  this.fadeIn();
+                }).catch(() => {
+                  console.warn('[BgmEngine] 폴백 음원 재생도 실패 — BGM 음소거 상태로 진행');
+                });
+              });
+            }
+          } else if (this.usingFallback) {
+            console.warn('[BgmEngine] 폴백 음원도 로드 실패 — BGM 없이 진행');
+          }
+        });
       } catch {
         return null;
       }
@@ -256,8 +284,11 @@ export class BgmPlayer {
     const track = pickTrack(category);
 
     try {
+      this.usingFallback = false;
       audio.src = track.url;
+      audio.load();
       audio.volume = 0;
+      audio.muted = false;
       audio.play().then(() => {
         this.fadeIn();
       }).catch(() => {
@@ -266,7 +297,21 @@ export class BgmPlayer {
           audio.muted = false;
           this.fadeIn();
         }).catch(() => {
-          // cannot play — give up silently
+          console.warn(`[BgmEngine] 음원 재생 실패 (무드: ${bgmTemplateId}) — 폴백 URL 시도`);
+          this.usingFallback = true;
+          audio.src = FALLBACK_TRACK_URL;
+          audio.load();
+          audio.play().then(() => {
+            this.fadeIn();
+          }).catch(() => {
+            audio.muted = true;
+            audio.play().then(() => {
+              audio.muted = false;
+              this.fadeIn();
+            }).catch(() => {
+              console.warn('[BgmEngine] 폴백 음원 재생도 실패 — BGM 없이 진행');
+            });
+          });
         });
       });
       this.isPlaying = true;
@@ -290,6 +335,47 @@ export class BgmPlayer {
       }
     };
     fade();
+  }
+
+  pause(): void {
+    if (this.fadeTimer) {
+      clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+    if (this.audio) {
+      try {
+        this.audio.pause();
+      } catch { /* ignore */ }
+    }
+    this.isPlaying = false;
+  }
+
+  resume(): void {
+    if (!this.audio) return;
+    this.unlockAudio();
+    this.audio.muted = false;
+    this.audio.play().then(() => {
+      this.isPlaying = true;
+      this.fadeIn();
+    }).catch(() => {
+      this.audio!.muted = true;
+      this.audio!.play().then(() => {
+        this.audio!.muted = false;
+        this.isPlaying = true;
+        this.fadeIn();
+      }).catch(() => {
+        console.warn('[BgmEngine] resume 실패 — 폴백 URL로 재시도');
+        this.usingFallback = true;
+        this.audio!.src = FALLBACK_TRACK_URL;
+        this.audio!.load();
+        this.audio!.play().then(() => {
+          this.isPlaying = true;
+          this.fadeIn();
+        }).catch(() => {
+          console.warn('[BgmEngine] resume 폴백도 실패');
+        });
+      });
+    });
   }
 
   stop(): void {
@@ -420,11 +506,25 @@ export async function mixBgmIntoVideo(
     const bgmAudio = new Audio(bgmUrl);
     bgmAudio.crossOrigin = 'anonymous';
     bgmAudio.loop = true;
-    await new Promise<void>((resolve, reject) => {
-      bgmAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
-      bgmAudio.addEventListener('error', () => reject(new Error('bgm load failed')), { once: true });
-      setTimeout(() => reject(new Error('bgm load timeout')), 15000);
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        bgmAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
+        bgmAudio.addEventListener('error', () => reject(new Error('bgm load failed')), { once: true });
+        setTimeout(() => reject(new Error('bgm load timeout')), 15000);
+      });
+    } catch (loadErr) {
+      console.warn(`[BgmEngine] mixBgmIntoVideo: 음원 로드 실패 (${bgmUrl}) — 폴백 URL 사용: ${FALLBACK_TRACK_URL}`);
+      bgmAudio.src = FALLBACK_TRACK_URL;
+      bgmAudio.load();
+      await new Promise<void>((resolve, reject) => {
+        bgmAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
+        bgmAudio.addEventListener('error', () => reject(new Error('bgm fallback load failed')), { once: true });
+        setTimeout(() => reject(new Error('bgm fallback load timeout')), 10000);
+      }).catch(() => {
+        console.warn('[BgmEngine] mixBgmIntoVideo: 폴백 음원도 로드 실패 — 원본 비디오 반환');
+        return videoUri;
+      });
+    }
 
     const bgmSource = audioCtx.createMediaElementSource(bgmAudio);
     const bgmGain = audioCtx.createGain();

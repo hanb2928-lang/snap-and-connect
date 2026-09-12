@@ -219,18 +219,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     const handlePlaying = () => {
       setVideoBuffering(false);
       if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
-        bgmPlayerRef.current.start(
-          editPlan.bgmTemplate.id,
-          editPlan.pacingBpm,
-          editPlan.bgmTemplate.highlightStartSec,
-          editPlan.bgmTemplate.highlightDurationSec,
-          editPlan.bgmTemplate.energyCurve,
-        );
+        bgmPlayerRef.current.resume();
       }
     };
     const handlePause = () => {
       if (bgmPlayerRef.current) {
-        bgmPlayerRef.current.stop();
+        bgmPlayerRef.current.pause();
       }
     };
     const handleEnded = () => {
@@ -241,7 +235,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     const handleWaiting = () => {
       setVideoBuffering(true);
       if (bgmPlayerRef.current) {
-        bgmPlayerRef.current.stop();
+        bgmPlayerRef.current.pause();
       }
       if (bufferingTimeoutRef.current) clearTimeout(bufferingTimeoutRef.current);
       bufferingTimeoutRef.current = setTimeout(() => {
@@ -256,13 +250,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         bufferingTimeoutRef.current = null;
       }
       if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
-        bgmPlayerRef.current.start(
-          editPlan.bgmTemplate.id,
-          editPlan.pacingBpm,
-          editPlan.bgmTemplate.highlightStartSec,
-          editPlan.bgmTemplate.highlightDurationSec,
-          editPlan.bgmTemplate.energyCurve,
-        );
+        bgmPlayerRef.current.resume();
       }
     };
     const handleSeeked = () => {
@@ -379,7 +367,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   useEffect(() => {
     if (!isPlaying) {
       if (bgmPlayerRef.current) {
-        bgmPlayerRef.current.stop();
+        bgmPlayerRef.current.pause();
       }
       return;
     }
@@ -397,6 +385,22 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       );
     }
   }, [isPlaying, videoReady, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
+
+  const prevBgmIdRef = useRef<string>('');
+  useEffect(() => {
+    if (!isPlaying) return;
+    if (!bgmPlayerRef.current) return;
+    if (prevBgmIdRef.current === editPlan.bgmTemplate.id) return;
+    prevBgmIdRef.current = editPlan.bgmTemplate.id;
+    bgmPlayerRef.current.stop();
+    bgmPlayerRef.current.start(
+      editPlan.bgmTemplate.id,
+      editPlan.pacingBpm,
+      editPlan.bgmTemplate.highlightStartSec,
+      editPlan.bgmTemplate.highlightDurationSec,
+      editPlan.bgmTemplate.energyCurve,
+    );
+  }, [isPlaying, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   useEffect(() => {
     if (isPlaying) {
