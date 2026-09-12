@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2 } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -366,7 +366,9 @@ export default function ResultScreen() {
   const [galleryModalIndex, setGalleryModalIndex] = useState(0);
   const [angleGalleryExpanded, setAngleGalleryExpanded] = useState(false);
   const [showManualSettings, setShowManualSettings] = useState(false);
-  const [autoGenTriggered, setAutoGenTriggered] = useState(false);
+  const [videoGenMode, setVideoGenMode] = useState<'auto' | 'manual'>('auto');
+  const [manualHook, setManualHook] = useState('');
+  const [manualKeywords, setManualKeywords] = useState('');
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -498,8 +500,17 @@ export default function ResultScreen() {
       if (mountedRef.current) setVisionAnalyzing(false);
     }
 
-    // Build prompt: user override > hook > summary > auto-generated from vision metadata
-    let videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || scan.product_name || '';
+    // Build prompt: manual mode uses user-edited hook + keywords; auto mode uses AI-generated content
+    let videoPromptText: string;
+    if (videoGenMode === 'manual' && (manualHook.trim() || manualKeywords.trim())) {
+      const parts: string[] = [];
+      if (manualHook.trim()) parts.push(manualHook.trim());
+      if (manualKeywords.trim()) parts.push(`Keywords: ${manualKeywords.trim()}`);
+      parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
+      videoPromptText = parts.join('. ');
+    } else {
+      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || scan.product_name || '';
+    }
     if (!videoPromptText.trim()) {
       if (visionData) {
         const v = visionData;
@@ -556,7 +567,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -1328,13 +1339,7 @@ export default function ResultScreen() {
     return images;
   }, [scan?.image_url, scan?.additional_image_urls]);
 
-  // Zero-Touch AI: auto-generate video when page loads with 5 photos and no existing video
-  useEffect(() => {
-    if (!scan || autoGenTriggered || isGeneratingVideo || generatedVideoUrl) return;
-    if (allCutImages.length < 5) return;
-    setAutoGenTriggered(true);
-    handleAiVideoGenerate();
-  }, [scan, autoGenTriggered, isGeneratingVideo, generatedVideoUrl, allCutImages.length, handleAiVideoGenerate]);
+
 
   const narrativePlan: NarrativePlan | null = useMemo(() => {
     if (allCutImages.length === 0) return null;
@@ -2143,7 +2148,7 @@ export default function ResultScreen() {
             <View style={styles.videoErrorToast}>
               <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
               <Text style={styles.videoErrorToastText} numberOfLines={3}>AI 영상 생성 실패: {videoGenError}</Text>
-              <TouchableOpacity onPress={() => { setVideoGenError(null); setAutoGenTriggered(false); }} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => { setVideoGenError(null); }} activeOpacity={0.7}>
                 <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
               </TouchableOpacity>
             </View>
@@ -2572,9 +2577,9 @@ export default function ResultScreen() {
             activeOpacity={0.7}
           >
             {isGeneratingVideo ? (
-              <Loader2Icon size={16} color="#fff" strokeWidth={2} />
+              <Loader2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
             ) : (
-              <VideoIcon size={16} color="#fff" strokeWidth={2} />
+              <VideoIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
             )}
             <Text style={styles.aiVideoBtnText}>
               {isGeneratingVideo
@@ -2686,17 +2691,94 @@ export default function ResultScreen() {
           </View>
         </Modal>
 
-        {/* AI Video Generation Confirmation Modal */}
+        {/* AI Video Generation Panel: platform + mode selection */}
         {showVideoConfirm && (
           <View style={styles.modalOverlay}>
-            <View style={styles.confirmModal}>
+            <View style={styles.videoGenModal}>
               <View style={styles.confirmModalHeader}>
                 <VideoIcon size={20} color={theme.colors.primary[300]} strokeWidth={2} />
                 <Text style={styles.confirmModalTitle}>AI 실사 비디오 생성</Text>
+                <TouchableOpacity onPress={() => setShowVideoConfirm(false)} activeOpacity={0.7} style={styles.videoGenCloseBtn}>
+                  <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
               </View>
-              <Text style={styles.confirmModalDesc}>
-                Runway AI를 사용해 15초 실사 비디오를 생성합니다. API 크레딧이 소모됩니다. 진행하시겠습니까?
-              </Text>
+
+              {/* Platform selection */}
+              <Text style={styles.videoGenLabel}>플랫폼 선택</Text>
+              <View style={styles.videoGenPlatformRow}>
+                {([
+                  { key: 'shorts', label: 'YouTube Shorts' },
+                  { key: 'tiktok', label: 'TikTok' },
+                  { key: 'reels', label: 'Instagram Reels' },
+                ] as const).map((p) => (
+                  <TouchableOpacity
+                    key={p.key}
+                    style={[styles.videoGenPlatformPill, targetPlatform === p.key && styles.videoGenPlatformPillActive]}
+                    onPress={() => handleTargetPlatformChange(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.videoGenPlatformPillText, targetPlatform === p.key && styles.videoGenPlatformPillTextActive]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Mode selection tabs */}
+              <Text style={styles.videoGenLabel}>생성 모드</Text>
+              <View style={styles.videoGenModeRow}>
+                <TouchableOpacity
+                  style={[styles.videoGenModeTab, videoGenMode === 'auto' && styles.videoGenModeTabActive]}
+                  onPress={() => setVideoGenMode('auto')}
+                  activeOpacity={0.7}
+                >
+                  <ZapIcon size={15} color={videoGenMode === 'auto' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={[styles.videoGenModeTabText, videoGenMode === 'auto' && styles.videoGenModeTabTextActive]}>
+                    자동 생성
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.videoGenModeTab, videoGenMode === 'manual' && styles.videoGenModeTabActive]}
+                  onPress={() => setVideoGenMode('manual')}
+                  activeOpacity={0.7}
+                >
+                  <Settings2 size={15} color={videoGenMode === 'manual' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+                  <Text style={[styles.videoGenModeTabText, videoGenMode === 'manual' && styles.videoGenModeTabTextActive]}>
+                    고급 수동 입력
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Manual mode: editable hook + keywords */}
+              {videoGenMode === 'manual' && (
+                <View style={styles.videoGenManualPanel}>
+                  <Text style={styles.videoGenInputLabel}>훅 문구 (후킹 멘트)</Text>
+                  <TextInput
+                    style={styles.videoGenTextInput}
+                    value={manualHook}
+                    onChangeText={setManualHook}
+                    placeholder="예: 이거 몰랐다면 손해! 지금 확인하세요"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    multiline
+                  />
+                  <Text style={styles.videoGenInputLabel}>주요 키워드</Text>
+                  <TextInput
+                    style={styles.videoGenTextInput}
+                    value={manualKeywords}
+                    onChangeText={setManualKeywords}
+                    placeholder="예: 한정판, 가성비, 베스트셀러"
+                    placeholderTextColor={theme.colors.dark.textFaint}
+                    multiline
+                  />
+                </View>
+              )}
+
+              {videoGenMode === 'auto' && (
+                <Text style={styles.confirmModalDesc}>
+                  AI가 분석 결과를 바탕으로 15초 실사 비디오를 자동 생성합니다. API 크레딧이 소모됩니다.
+                </Text>
+              )}
+
               <View style={styles.confirmModalBtns}>
                 <TouchableOpacity
                   style={styles.confirmCancelBtn}
@@ -2710,7 +2792,8 @@ export default function ResultScreen() {
                   onPress={handleAiVideoGenerate}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.confirmOkBtnText}>생성 시작</Text>
+                  <Sparkles size={15} color="#fff" strokeWidth={2} />
+                  <Text style={styles.confirmOkBtnText}>AI 영상 생성</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -4473,6 +4556,103 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     gap: 14,
     ...theme.shadows.card,
+  },
+  videoGenModal: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    width: '90%',
+    maxWidth: 360,
+    gap: 12,
+    ...theme.shadows.card,
+  },
+  videoGenCloseBtn: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  videoGenLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 2,
+  },
+  videoGenPlatformRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  videoGenPlatformPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  videoGenPlatformPillActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[500],
+  },
+  videoGenPlatformPillText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  videoGenPlatformPillTextActive: {
+    color: '#fff',
+  },
+  videoGenModeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  videoGenModeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  videoGenModeTabActive: {
+    backgroundColor: theme.colors.primary[500],
+    borderColor: theme.colors.primary[500],
+  },
+  videoGenModeTabText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  videoGenModeTabTextActive: {
+    color: '#fff',
+  },
+  videoGenManualPanel: {
+    gap: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  videoGenInputLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  videoGenTextInput: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 44,
   },
   confirmModalHeader: {
     flexDirection: 'row',
