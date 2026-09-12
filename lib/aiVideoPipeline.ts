@@ -82,11 +82,11 @@ export async function generateAiVideo(
       });
 
       if (error) {
-        throw new Error(error.message ?? '비디오 생성 실패');
+        throw await buildVideoFunctionError(error);
       }
 
-      if (!data || !data.videoUrl) {
-        throw new Error('비디오 URL을 받지 못했습니다');
+      if (!data || typeof data !== 'object' || typeof data.videoUrl !== 'string' || data.videoUrl.length === 0) {
+        throw new Error('서버가 유효한 비디오 URL을 반환하지 않았습니다. 응답을 확인해주세요.');
       }
 
       report('completed', 1.0, 'AI 비디오 생성 완료');
@@ -136,6 +136,35 @@ export function createVideoGenProgressTracker(
       onProgress({ phase: 'completed', progress: 1.0, message, elapsedSec: Math.round((Date.now() - startTime) / 1000) });
     },
   };
+}
+
+async function buildVideoFunctionError(error: unknown): Promise<Error> {
+  const fallback = error instanceof Error ? error.message : '비디오 생성 요청에 실패했습니다.';
+  const response = (error as { context?: unknown } | null)?.context;
+
+  if (response && typeof response === 'object' && 'clone' in response) {
+    try {
+      const cloned = (response as Response).clone();
+      const contentType = cloned.headers.get('content-type') ?? '';
+      const payload = contentType.includes('application/json')
+        ? await cloned.json() as { error?: unknown; message?: unknown; step?: unknown; provider?: unknown }
+        : { error: await cloned.text() };
+      const message = typeof payload.error === 'string'
+        ? payload.error
+        : typeof payload.message === 'string'
+          ? payload.message
+          : fallback;
+      const details = [
+        typeof payload.step === 'string' ? `단계: ${payload.step}` : '',
+        typeof payload.provider === 'string' ? `프로바이더: ${payload.provider}` : '',
+      ].filter(Boolean).join(' · ');
+      return new Error(details ? `${message} (${details})` : message);
+    } catch {
+      return new Error(fallback);
+    }
+  }
+
+  return new Error(fallback);
 }
 
 function delay(ms: number): Promise<void> {

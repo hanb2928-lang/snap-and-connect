@@ -490,7 +490,7 @@ export default function ResultScreen() {
       }
     } catch (err) {
       if (mountedRef.current) {
-        const msg = err instanceof Error ? err.message : 'AI 영상 생성 오류: 기본 시네마틱 모드로 유지합니다';
+        const msg = err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.';
         setVideoGenError(msg);
       }
     }
@@ -2507,7 +2507,7 @@ export default function ResultScreen() {
           {videoGenError && (
             <View style={styles.videoErrorToast}>
               <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
-              <Text style={styles.videoErrorToastText}>AI 영상 생성 오류: 기본 시네마틱 모드로 유지합니다</Text>
+              <Text style={styles.videoErrorToastText} numberOfLines={3}>AI 영상 생성 실패: {videoGenError}</Text>
               <TouchableOpacity onPress={() => setVideoGenError(null)} activeOpacity={0.7}>
                 <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
               </TouchableOpacity>
@@ -2524,7 +2524,7 @@ export default function ResultScreen() {
                 <Text style={styles.confirmModalTitle}>AI 실사 비디오 생성</Text>
               </View>
               <Text style={styles.confirmModalDesc}>
-                Runway AI를 사용해 5초 실사 비디오를 생성합니다. API 크레딧이 소모됩니다. 진행하시겠습니까?
+                Runway AI를 사용해 15초 실사 비디오를 생성합니다. API 크레딧이 소모됩니다. 진행하시겠습니까?
               </Text>
               <View style={styles.confirmModalBtns}>
                 <TouchableOpacity

@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
 
     if (!runwayKey && !openaiKey) {
       return new Response(
-        JSON.stringify({ error: "AI 비디오 생성을 위한 API 키가 설정되지 않았습니다. 설정에서 Runway 또는 OpenAI API 키를 등록해주세요." }),
+        JSON.stringify({ error: "AI 비디오 생성을 위한 API 키가 설정되지 않았습니다. 설정에서 Runway 또는 OpenAI API 키를 등록해주세요.", step: "key_resolution", provider: "none" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
         // Runway failed — try OpenAI if available
         if (!openaiKey) {
           return new Response(
-            JSON.stringify({ error: runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패" }),
+            JSON.stringify({ error: runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패", step: "runway", provider: "runway" }),
             { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
@@ -130,15 +130,26 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!videoUrl && openaiKey) {
-      const result = await generateWithOpenAI(motionPrompt, primaryImage, openaiKey, aspectRatio, durationSec);
-      videoUrl = result.videoUrl;
-      jobId = result.jobId;
-      provider = "openai";
+      try {
+        const result = await generateWithOpenAI(motionPrompt, primaryImage, openaiKey, aspectRatio, durationSec);
+        videoUrl = result.videoUrl;
+        jobId = result.jobId;
+        provider = "openai";
+      } catch (openaiErr) {
+        return new Response(
+          JSON.stringify({
+            error: openaiErr instanceof Error ? openaiErr.message : "OpenAI 비디오 생성 실패",
+            step: "openai",
+            provider: "openai",
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     if (!videoUrl) {
       return new Response(
-        JSON.stringify({ error: "비디오 생성에 실패했습니다. 모든 API 프로바이더에서 오류가 발생했습니다." }),
+        JSON.stringify({ error: "비디오 생성에 실패했습니다. 모든 API 프로바이더에서 오류가 발생했습니다.", step: "all_providers_failed", provider: provider || "none" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -170,7 +181,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "비디오 생성 중 오류가 발생했습니다." }),
+      JSON.stringify({ error: err instanceof Error ? err.message : "비디오 생성 중 오류가 발생했습니다.", step: "unhandled", provider: "unknown" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
