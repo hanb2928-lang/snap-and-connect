@@ -243,6 +243,9 @@ async function submitRunwayTask(
         const errJson = JSON.parse(errText);
         errDetail = errJson?.error ?? errJson?.message ?? errDetail;
       } catch { /* keep raw text */ }
+      if (resp.status === 401) {
+        throw new Error(`Runway API 키가 유효하지 않거나 비활성화되었습니다. 설정에서 활성화된 Runway API 키를 다시 등록해주세요. (HTTP 401): ${errDetail}`);
+      }
       throw new Error(`Runway 생성 요청 실패 (HTTP ${resp.status}): ${errDetail}`);
     }
 
@@ -628,8 +631,7 @@ function delay(ms: number): Promise<void> {
 }
 
 async function resolveRunwayKey(): Promise<string | null> {
-  const serverKey = Deno.env.get("RUNWAY_API_KEY");
-  if (serverKey) return serverKey;
+  const serverKey = Deno.env.get("RUNWAY_API_KEY") ?? null;
 
   if (supabaseUrl && serviceRoleKey) {
     try {
@@ -657,5 +659,5 @@ async function resolveRunwayKey(): Promise<string | null> {
     }
   }
 
-  return null;
+  return serverKey || null;
 }
