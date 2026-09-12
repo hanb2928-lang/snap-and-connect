@@ -131,6 +131,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const [luminanceLevel, setLuminanceLevel] = useState<LuminanceLevel>('dark');
   const [displayedImage, setDisplayedImage] = useState<string | null>(null);
   const [displayedSegIndex, setDisplayedSegIndex] = useState(0);
+  const [videoError, setVideoError] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -148,6 +149,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       setVideoSrc(null);
       return;
     }
+    setVideoError(false);
     if (Platform.OS === 'web') {
       setVideoSrc(videoUri);
       return;
@@ -350,13 +352,20 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
     const playCmd = isPlaying ? 'play()' : 'pause()';
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" muted loop playsinline webkit-playsinline></video><script>var v=document.getElementById('v');v.${playCmd};</script></body></html>`;
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" muted loop playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.getElementById('v');v.${playCmd};v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});</script></body></html>`;
   }, [videoSrc, isPlaying]);
 
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
 
   const slideImgSrc = hasSlideshow ? displayedImage : null;
   const slideImgKey = `${displayedSegIndex}-${displayedImage?.slice(-20) ?? ''}`;
+
+  const showFallbackSlideshow = videoError && (hasSlideshow || hasImage);
+  const fallbackImgSrc = showFallbackSlideshow ? (slideImgSrc || imageUri || null) : null;
+
+  const handleVideoError = useCallback(() => {
+    setVideoError(true);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -367,7 +376,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
       <View style={styles.previewFrame}>
         <View style={styles.videoArea}>
-          {hasGeneratedVideo && videoSrc ? (
+          {hasGeneratedVideo && videoSrc && !videoError ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element
               <video
@@ -375,6 +384,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 src={videoSrc}
                 loop
                 playsInline
+                onError={handleVideoError}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -397,14 +407,20 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 mixedContentMode="always"
                 originWhitelist={['*']}
                 allowFileAccess
+                onMessage={(event) => {
+                  if (event.nativeEvent.data === 'video_error') {
+                    handleVideoError();
+                  }
+                }}
+                onError={handleVideoError}
               />
             )
-          ) : hasSlideshow && slideImgSrc ? (
+          ) : showFallbackSlideshow && fallbackImgSrc ? (
             Platform.OS === 'web' ? (
               // @ts-ignore web-only img element
               <img
                 key={slideImgKey}
-                src={slideImgSrc}
+                src={fallbackImgSrc ?? ''}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -423,7 +439,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
               />
             ) : (
               <Image
-                source={{ uri: slideImgSrc.startsWith('data:') ? slideImgSrc : slideImgSrc }}
+                source={{ uri: (fallbackImgSrc ?? '').startsWith('data:') ? (fallbackImgSrc ?? '') : (fallbackImgSrc ?? '') }}
                 style={{
                   position: 'absolute',
                   top: 0,
