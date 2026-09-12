@@ -344,7 +344,6 @@ export default function ResultScreen() {
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [showVideoConfirm, setShowVideoConfirm] = useState(false);
   const [videoGenError, setVideoGenError] = useState<string | null>(null);
   const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
@@ -476,7 +475,6 @@ export default function ResultScreen() {
 
   const handleAiVideoGenerate = useCallback(async () => {
     if (!scan || isGeneratingVideo) return;
-    setShowVideoConfirm(false);
     setIsGeneratingVideo(true);
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
@@ -2215,21 +2213,6 @@ export default function ResultScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity
-            style={[styles.regenBtnLarge, isRegenerating && styles.regenBtnDisabled]}
-            onPress={handleRegenerate}
-            disabled={isRegenerating}
-            activeOpacity={0.7}
-          >
-            {isRegenerating ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Sparkles size={18} color="#fff" strokeWidth={2} />
-            )}
-            <Text style={styles.regenBtnText}>
-              {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* === 하단: 상세 수동 설정 (전문가용) 접이식 메뉴 === */}
@@ -2542,27 +2525,10 @@ export default function ResultScreen() {
               </ScrollView>
             </View>
           )}
-          <TouchableOpacity
-            style={[styles.regenBtnLarge, isRegenerating && styles.regenBtnDisabled]}
-            onPress={handleRegenerate}
-            disabled={isRegenerating}
-            activeOpacity={0.7}
-          >
-            {isRegenerating ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Sparkles size={18} color="#fff" strokeWidth={2} />
-            )}
-            <Text style={styles.regenBtnText}>
-              {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
-
-        {/* === AI 비디오 변환 (크레딧 소모) === */}
-        <View style={styles.promptSection}>
-          {/* AI Video Generation — explicit trigger (costs API credits) */}
+        {/* === AI 실사 비디오 생성 (플랫폼 선택 + 듀얼 모드 버튼) === */}
+        <View style={styles.videoGenSection}>
           {allCutImages.length < 5 && (
             <View style={styles.photoGuardTooltip}>
               <AlertCircleIcon size={13} color={theme.colors.warning[400]} strokeWidth={2} />
@@ -2571,27 +2537,115 @@ export default function ResultScreen() {
               </Text>
             </View>
           )}
-          <TouchableOpacity
-            style={[styles.aiVideoBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.aiVideoBtnDisabled]}
-            onPress={() => setShowVideoConfirm(true)}
-            disabled={isGeneratingVideo || !!generatedVideoUrl || allCutImages.length < 5}
-            activeOpacity={0.7}
-          >
-            {isGeneratingVideo ? (
-              <Loader2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-            ) : (
-              <VideoIcon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-            )}
-            <Text style={styles.aiVideoBtnText}>
-              {isGeneratingVideo
-                ? 'AI 실사 비디오 생성 중...'
-                : generatedVideoUrl
-                  ? 'AI 영상 생성됨'
-                  : allCutImages.length < 5
-                    ? '5장 각도를 모두 촬영/업로드해 주세요'
-                    : 'AI 비디오 변환 (크레딧 소모)'}
+
+          {/* 플랫폼 선택 */}
+          <Text style={styles.videoGenLabel}>플랫폼 선택</Text>
+          <View style={styles.videoGenPlatformRow}>
+            {([
+              { key: 'shorts', label: 'YouTube Shorts' },
+              { key: 'tiktok', label: 'TikTok' },
+              { key: 'reels', label: 'Instagram Reels' },
+            ] as const).map((p) => (
+              <TouchableOpacity
+                key={p.key}
+                style={[styles.videoGenPlatformPill, targetPlatform === p.key && styles.videoGenPlatformPillActive]}
+                onPress={() => handleTargetPlatformChange(p.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.videoGenPlatformPillText, targetPlatform === p.key && styles.videoGenPlatformPillTextActive]}>
+                  {p.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* 모드 선택 + 수동 입력 */}
+          <Text style={styles.videoGenLabel}>생성 모드</Text>
+          <View style={styles.videoGenModeRow}>
+            <TouchableOpacity
+              style={[styles.videoGenModeTab, videoGenMode === 'auto' && styles.videoGenModeTabActive]}
+              onPress={() => setVideoGenMode('auto')}
+              activeOpacity={0.7}
+            >
+              <ZapIcon size={15} color={videoGenMode === 'auto' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={[styles.videoGenModeTabText, videoGenMode === 'auto' && styles.videoGenModeTabTextActive]}>
+                자동 생성
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.videoGenModeTab, videoGenMode === 'manual' && styles.videoGenModeTabActive]}
+              onPress={() => setVideoGenMode('manual')}
+              activeOpacity={0.7}
+            >
+              <Settings2 size={15} color={videoGenMode === 'manual' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={[styles.videoGenModeTabText, videoGenMode === 'manual' && styles.videoGenModeTabTextActive]}>
+                수동 선택
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {videoGenMode === 'manual' && (
+            <View style={styles.videoGenManualPanel}>
+              <Text style={styles.videoGenInputLabel}>훅 문구 (후킹 멘트)</Text>
+              <TextInput
+                style={styles.videoGenTextInput}
+                value={manualHook}
+                onChangeText={setManualHook}
+                placeholder="예: 이거 몰랐다면 손해! 지금 확인하세요"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                multiline
+              />
+              <Text style={styles.videoGenInputLabel}>주요 키워드</Text>
+              <TextInput
+                style={styles.videoGenTextInput}
+                value={manualKeywords}
+                onChangeText={setManualKeywords}
+                placeholder="예: 한정판, 가성비, 베스트셀러"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                multiline
+              />
+            </View>
+          )}
+
+          {videoGenMode === 'auto' && (
+            <Text style={styles.videoGenDescText}>
+              AI가 분석 결과를 바탕으로 실사 비디오를 자동 생성합니다. API 크레딧이 소모됩니다.
             </Text>
-          </TouchableOpacity>
+          )}
+
+          {/* 듀얼 생성 버튼 */}
+          <View style={styles.videoGenDualBtnRow}>
+            <TouchableOpacity
+              style={[styles.videoGenDualBtn, styles.videoGenAutoBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
+              onPress={() => { setVideoGenMode('auto'); handleAiVideoGenerate(); }}
+              disabled={isGeneratingVideo || allCutImages.length < 5}
+              activeOpacity={0.7}
+            >
+              {isGeneratingVideo && videoGenMode === 'auto' ? (
+                <Loader2Icon size={18} color="#fff" strokeWidth={2} />
+              ) : (
+                <ZapIcon size={18} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.videoGenDualBtnText}>
+                {isGeneratingVideo && videoGenMode === 'auto' ? '생성 중...' : 'AI 자동 생성'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.videoGenDualBtn, styles.videoGenManualBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
+              onPress={() => { setVideoGenMode('manual'); handleAiVideoGenerate(); }}
+              disabled={isGeneratingVideo || allCutImages.length < 5}
+              activeOpacity={0.7}
+            >
+              {isGeneratingVideo && videoGenMode === 'manual' ? (
+                <Loader2Icon size={18} color="#fff" strokeWidth={2} />
+              ) : (
+                <Settings2 size={18} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.videoGenDualBtnText}>
+                {isGeneratingVideo && videoGenMode === 'manual' ? '생성 중...' : '수동 선택'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {productVision && !isGeneratingVideo && (
             <View style={styles.photoGuardTooltip}>
@@ -2692,114 +2746,7 @@ export default function ResultScreen() {
           </View>
         </Modal>
 
-        {/* AI Video Generation Panel: platform + mode selection */}
-        {showVideoConfirm && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.videoGenModal}>
-              <View style={styles.confirmModalHeader}>
-                <VideoIcon size={20} color={theme.colors.primary[300]} strokeWidth={2} />
-                <Text style={styles.confirmModalTitle}>AI 실사 비디오 생성</Text>
-                <TouchableOpacity onPress={() => setShowVideoConfirm(false)} activeOpacity={0.7} style={styles.videoGenCloseBtn}>
-                  <X size={18} color={theme.colors.dark.textDim} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
 
-              {/* Platform selection */}
-              <Text style={styles.videoGenLabel}>플랫폼 선택</Text>
-              <View style={styles.videoGenPlatformRow}>
-                {([
-                  { key: 'shorts', label: 'YouTube Shorts' },
-                  { key: 'tiktok', label: 'TikTok' },
-                  { key: 'reels', label: 'Instagram Reels' },
-                ] as const).map((p) => (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={[styles.videoGenPlatformPill, targetPlatform === p.key && styles.videoGenPlatformPillActive]}
-                    onPress={() => handleTargetPlatformChange(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.videoGenPlatformPillText, targetPlatform === p.key && styles.videoGenPlatformPillTextActive]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Mode selection tabs */}
-              <Text style={styles.videoGenLabel}>생성 모드</Text>
-              <View style={styles.videoGenModeRow}>
-                <TouchableOpacity
-                  style={[styles.videoGenModeTab, videoGenMode === 'auto' && styles.videoGenModeTabActive]}
-                  onPress={() => setVideoGenMode('auto')}
-                  activeOpacity={0.7}
-                >
-                  <ZapIcon size={15} color={videoGenMode === 'auto' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={[styles.videoGenModeTabText, videoGenMode === 'auto' && styles.videoGenModeTabTextActive]}>
-                    자동 생성
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.videoGenModeTab, videoGenMode === 'manual' && styles.videoGenModeTabActive]}
-                  onPress={() => setVideoGenMode('manual')}
-                  activeOpacity={0.7}
-                >
-                  <Settings2 size={15} color={videoGenMode === 'manual' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
-                  <Text style={[styles.videoGenModeTabText, videoGenMode === 'manual' && styles.videoGenModeTabTextActive]}>
-                    고급 수동 입력
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Manual mode: editable hook + keywords */}
-              {videoGenMode === 'manual' && (
-                <View style={styles.videoGenManualPanel}>
-                  <Text style={styles.videoGenInputLabel}>훅 문구 (후킹 멘트)</Text>
-                  <TextInput
-                    style={styles.videoGenTextInput}
-                    value={manualHook}
-                    onChangeText={setManualHook}
-                    placeholder="예: 이거 몰랐다면 손해! 지금 확인하세요"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                    multiline
-                  />
-                  <Text style={styles.videoGenInputLabel}>주요 키워드</Text>
-                  <TextInput
-                    style={styles.videoGenTextInput}
-                    value={manualKeywords}
-                    onChangeText={setManualKeywords}
-                    placeholder="예: 한정판, 가성비, 베스트셀러"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                    multiline
-                  />
-                </View>
-              )}
-
-              {videoGenMode === 'auto' && (
-                <Text style={styles.confirmModalDesc}>
-                  AI가 분석 결과를 바탕으로 15초 실사 비디오를 자동 생성합니다. API 크레딧이 소모됩니다.
-                </Text>
-              )}
-
-              <View style={styles.confirmModalBtns}>
-                <TouchableOpacity
-                  style={styles.confirmCancelBtn}
-                  onPress={() => setShowVideoConfirm(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.confirmCancelBtnText}>취소</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmOkBtn}
-                  onPress={handleAiVideoGenerate}
-                  activeOpacity={0.7}
-                >
-                  <Sparkles size={15} color="#fff" strokeWidth={2} />
-                  <Text style={styles.confirmOkBtnText}>AI 영상 생성</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
 
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
           <AffiliatePromptBanner
@@ -4481,6 +4428,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  videoGenSection: {
+    marginHorizontal: theme.spacing.md,
+    marginVertical: 6,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    ...theme.shadows.card,
+  },
+  videoGenDualBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  videoGenDualBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: theme.radius.md,
+    ...theme.shadows.card,
+  },
+  videoGenAutoBtn: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  videoGenManualBtn: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  videoGenBtnDisabled: {
+    opacity: 0.5,
+  },
+  videoGenDualBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  videoGenDescText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
   },
   aiVideoBtn: {
     flexDirection: 'row',
