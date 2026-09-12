@@ -57,8 +57,11 @@ const CAPTION_TONE_PRESETS = [
 ] as const;
 
 const BGM_MOOD_PRESETS = [
-  { key: 'pop', label: '트렌디 팝', desc: '빠른 템포', icon: Music, color: theme.colors.accent[400] },
-  { key: 'lofi', label: '릴렉스 Lofi', desc: '감성 무드', icon: Music, color: theme.colors.primary[400] },
+  { key: 'hightension', label: '하이텐션', desc: '빠른 템포', icon: Music, color: theme.colors.accent[400] },
+  { key: 'cinematic', label: '시네마틱', desc: '웅장한 빌드업', icon: Film, color: theme.colors.primary[400] },
+  { key: 'emotional', label: '감성', desc: '따뜻한 선율', icon: Music, color: theme.colors.accent[300] },
+  { key: 'lofi', label: '로파이', desc: '편안한 비트', icon: Music, color: theme.colors.primary[400] },
+  { key: 'asmr', label: 'ASMR', desc: '차분한 앰비언트', icon: Music, color: theme.colors.success[400] },
   { key: 'none', label: '자막 전용', desc: '음악 없음', icon: Type, color: theme.colors.dark.textFaint },
 ] as const;
 
@@ -86,7 +89,7 @@ export default function MarketingScreen() {
   const [storeSaved, setStoreSaved] = useState(false);
   const [videoLength, setVideoLength] = useState('15s');
   const [captionTone, setCaptionTone] = useState('hook');
-  const [bgmMood, setBgmMood] = useState('pop');
+  const [bgmMood, setBgmMood] = useState('hightension');
   const [selectedHook, setSelectedHook] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [manualPromptOpen, setManualPromptOpen] = useState(false);

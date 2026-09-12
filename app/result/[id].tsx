@@ -157,7 +157,7 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
     defaultPrompt: '유튜브 쇼츠 알고리즘 최적화: 첫 3초 강렬한 후킹, 검색 키워드 포함, 시청 지속률 극대화',
     captionFont: '고딕 굵게',
     captionPosition: '하단 고정',
-    bgmMood: '트렌디',
+    bgmMood: '하이텐션',
     videoTemplate: '스토리텔링',
     hashtags: ['쇼츠', '숏폼', '리뷰', '제품추천', '유튜브쇼츠'],
   },
@@ -2119,7 +2119,7 @@ export default function ResultScreen() {
               <Text style={styles.chipGroupLabel}>BGM 분위기</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이', '트렌디'].map((mood) => (
+              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이'].map((mood) => (
                 <TouchableOpacity
                   key={mood}
                   style={[styles.chipPill, inlineEdit.bgmMood === mood && styles.chipPillActive]}

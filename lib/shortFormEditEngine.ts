@@ -1,6 +1,7 @@
 import { PLATFORM_SPECS, getPlatformSpec, type PlatformSpec, type SafeZoneRect } from '@/lib/platformSpecs';
 import { getDisclosureForPlatforms, getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { type EmotionPhase } from '@/lib/psychologyEngine';
+import { getBgmTemplateForMood, type BgmCategory } from '@/lib/bgmEngine';
 
 export type ShortFormPlatform = 'instagram' | 'tiktok' | 'youtube' | 'naver_clip';
 
@@ -424,18 +425,18 @@ export function buildShortFormEditPlan(
     }
     const promptLower = customPrompt.toLowerCase();
     if (promptLower.includes('의류') || promptLower.includes('신발') || promptLower.includes('런칭') || promptLower.includes('새제품') || promptLower.includes('패션')) {
-      return { id: 'energy_hiphop', label: '다이나믹 힙합 비트', mood: '강렬·후킹', bpm: 140 };
+      return getBgmTemplateForMood('하이텐션');
     }
     if (promptLower.includes('카페') || promptLower.includes('베이커리') || promptLower.includes('소품') || promptLower.includes('힐링') || promptLower.includes('일상')) {
-      return { id: 'lofi_chill', label: '감성 로파이 비트', mood: '감성·편안', bpm: 85 };
+      return getBgmTemplateForMood('로파이');
     }
     if (promptLower.includes('수제') || promptLower.includes('디저트') || promptLower.includes('자연') || promptLower.includes('친환경') || promptLower.includes('따뜻')) {
-      return { id: 'acoustic_indie', label: '어쿠스틱 인디 기타', mood: '따뜻·선율', bpm: 95 };
+      return getBgmTemplateForMood('감성');
     }
     if (promptLower.includes('할인') || promptLower.includes('재고') || promptLower.includes('매진') || promptLower.includes('품절') || promptLower.includes('꿀팁') || promptLower.includes('해결')) {
-      return { id: 'upbeat_pop', label: '트렌디 업비트 팝', mood: '경쾌·트렌드', bpm: 128 };
+      return getBgmTemplateForMood('하이텐션');
     }
-    return { id: 'upbeat_pop', label: '트렌디 업비트 팝', mood: '경쾌·트렌드', bpm: 128 };
+    return getBgmTemplateForMood('하이텐션');
   })();
 
   const autoEnhancements: AutoEnhancement[] = [
