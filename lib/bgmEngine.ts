@@ -162,8 +162,18 @@ const MOOD_LABEL_MAP: Record<string, BgmCategory> = {
   'energy_hiphop': 'hightension',
 };
 
+const CATEGORY_TO_BGM_CATEGORY: Record<string, BgmCategory> = {
+  cinematic: 'cinematic',
+  hightension: 'hightension',
+  asmr: 'asmr',
+  emotional: 'emotional',
+  lofi: 'lofi',
+};
+
 export function moodLabelToCategory(moodLabel: string): BgmCategory {
-  return MOOD_LABEL_MAP[moodLabel] ?? 'hightension';
+  if (MOOD_LABEL_MAP[moodLabel]) return MOOD_LABEL_MAP[moodLabel];
+  if (CATEGORY_TO_BGM_CATEGORY[moodLabel]) return CATEGORY_TO_BGM_CATEGORY[moodLabel];
+  return 'hightension';
 }
 
 export function categoryToMoodLabel(category: BgmCategory): string {
@@ -333,7 +343,7 @@ export class BgmPlayer {
 
     this.unlockAudio();
 
-    const category = MOOD_LABEL_MAP[bgmTemplateId] ?? 'hightension';
+    const category = moodLabelToCategory(bgmTemplateId);
     this.currentCategory = category;
     const track = pickTrack(category);
 
@@ -454,7 +464,7 @@ export class BgmPlayer {
  * Used when only the URL is needed (e.g., mixing into video).
  */
 export function getBgmStreamUrl(moodLabel: string, trackIndex?: number): string {
-  const category = MOOD_LABEL_MAP[moodLabel] ?? 'hightension';
+  const category = moodLabelToCategory(moodLabel);
   const config = MOOD_CONFIGS[category];
   const track = trackIndex != null ? config.tracks[trackIndex % config.tracks.length] : pickTrack(category);
   return track.url;
@@ -472,7 +482,7 @@ export function getBgmTemplateForMood(moodLabel: string): {
   highlightDurationSec: number;
   energyCurve: number[];
 } {
-  const category = MOOD_LABEL_MAP[moodLabel] ?? 'hightension';
+  const category = moodLabelToCategory(moodLabel);
   const config = MOOD_CONFIGS[category];
   const track = config.tracks[0];
   return {
@@ -651,7 +661,7 @@ export async function fetchBgmRecommendation(
 
     const raw = data as Record<string, unknown>;
     const rawCategory = String(raw.category ?? raw.templateId ?? '');
-    const mappedCategory: BgmCategory = MOOD_LABEL_MAP[rawCategory] ?? (rawCategory in MOOD_CONFIGS ? rawCategory as BgmCategory : 'hightension');
+    const mappedCategory: BgmCategory = moodLabelToCategory(rawCategory);
 
     return {
       category: mappedCategory,

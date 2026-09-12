@@ -120,6 +120,7 @@ import type { InlineEditState, HookEffectType } from '@/components/AIProcessAcco
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
+import { getBgmTemplateForMood } from '@/lib/bgmEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
 import { analyzeProductVision, type ProductVisionResult } from '@/lib/productVision';
@@ -1121,16 +1122,30 @@ export default function ResultScreen() {
   );
 
   const previewEditPlan = useMemo(
-    () => buildShortFormEditPlan(
-      targetPlatform,
-      inlineEdit.aiPrompt || activeOneLiner || scan?.summary || '',
-      activeHook || null,
-      activeProductName || undefined,
-      affiliatePlatforms,
-      true,
-      false,
-    ),
-    [targetPlatform, inlineEdit.aiPrompt, activeOneLiner, scan?.summary, activeHook, activeProductName, affiliatePlatforms],
+    () => {
+      const bgmTemplate = getBgmTemplateForMood(inlineEdit.bgmMood);
+      const bgmOverride = {
+        templateId: bgmTemplate.id,
+        label: bgmTemplate.label,
+        mood: bgmTemplate.mood,
+        bpm: bgmTemplate.bpm,
+        highlightStartSec: bgmTemplate.highlightStartSec,
+        highlightDurationSec: bgmTemplate.highlightDurationSec,
+        energyCurve: bgmTemplate.energyCurve,
+      };
+      return buildShortFormEditPlan(
+        targetPlatform,
+        inlineEdit.aiPrompt || activeOneLiner || scan?.summary || '',
+        activeHook || null,
+        activeProductName || undefined,
+        affiliatePlatforms,
+        true,
+        false,
+        undefined,
+        bgmOverride,
+      );
+    },
+    [targetPlatform, inlineEdit.aiPrompt, inlineEdit.bgmMood, activeOneLiner, scan?.summary, activeHook, activeProductName, affiliatePlatforms],
   );
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms);
@@ -2200,6 +2215,7 @@ export default function ResultScreen() {
             slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
+            bgmVolume={bgmVolume}
           />
 
           {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}

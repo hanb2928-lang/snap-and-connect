@@ -39,6 +39,7 @@ interface ShortFormPreviewPlayerProps {
   slideshowImages?: string[] | null;
   narrativePlan?: NarrativePlan | null;
   videoGenProgress?: VideoGenProgress | null;
+  bgmVolume?: number;
 }
 
 const TOTAL_DURATION = 15;
@@ -127,7 +128,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75 }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -357,7 +358,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
           bgmPlayerRef.current = new BgmPlayer();
         }
         bgmPlayerRef.current.unlockAudio();
-        bgmPlayerRef.current.setVolume(1.0);
+        bgmPlayerRef.current.setVolume(bgmVolume);
       }
       setIsPlaying(true);
     }
@@ -376,7 +377,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     if (!bgmPlayerRef.current) {
       bgmPlayerRef.current = new BgmPlayer();
     }
-    bgmPlayerRef.current.setVolume(1.0);
+    bgmPlayerRef.current.setVolume(bgmVolume);
     if (!videoReady) {
       bgmPlayerRef.current.start(
         editPlan.bgmTemplate.id,
@@ -403,6 +404,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       editPlan.bgmTemplate.energyCurve,
     );
   }, [isPlaying, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
+
+  useEffect(() => {
+    if (!bgmPlayerRef.current) return;
+    bgmPlayerRef.current.setVolume(bgmVolume);
+  }, [bgmVolume]);
 
   useEffect(() => {
     if (isPlaying) {
