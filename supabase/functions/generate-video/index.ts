@@ -20,6 +20,9 @@ interface GenerateVideoRequest {
   variationSeed?: number;
   bgmMood?: string;
   captionText?: string;
+  platform?: string;
+  hookCategory?: string;
+  cutCount?: number;
 }
 
 interface VideoJobResponse {
@@ -82,6 +85,9 @@ Deno.serve(async (req: Request) => {
       body.bgmMood,
       body.captionText,
       cutImages.length,
+      body.platform ?? "shorts",
+      body.hookCategory ?? "curiosity",
+      body.cutCount,
     );
 
     let videoUrl: string | null = null;
@@ -445,43 +451,165 @@ function buildMotionPrompt(
   bgmMood: string | undefined,
   captionText: string | undefined,
   cutCount: number,
+  platform: string = "shorts",
+  hookCategory: string = "curiosity",
+  explicitCutCount?: number,
 ): string {
-  const productContext = productName ? ` featuring ${productName}` : "";
-  const orientation = aspectRatio === "9:16" ? "vertical portrait" : aspectRatio === "16:9" ? "horizontal landscape" : "square";
+  const orientation = aspectRatio === "9:16" ? "vertical portrait 9:16" : aspectRatio === "16:9" ? "horizontal landscape 16:9" : "square 1:1";
+  const effectiveCutCount = explicitCutCount ?? Math.max(cutCount, 5);
 
-  const variationHints = [
-    "smooth cinematic camera dolly with gentle parallax",
-    "dynamic handheld movement with natural motion blur",
-    "elegant slow pan with rack focus transition",
-    "gentle zoom with shallow depth of field",
-    "orbital camera arc with soft bokeh",
-  ];
-  const variationHint = variationHints[variationSeed % variationHints.length];
-
-  const moodToMotion: Record<string, string> = {
-    "하이텐션": "fast-paced energetic cuts with rapid zoom",
-    "시네마틱": "dramatic slow-motion with cinematic color grading",
-    "ASMR": "intimate close-up with soft focus and minimal movement",
-    "감성": "gentle floating movement with warm color tones",
-    "로파이": "laid-back slow drift with muted vintage aesthetics",
-    "트렌디": "modern punchy transitions with vibrant color pop",
+  const platformBenchmarks: Record<string, {
+    composition: string; gaze: string; lighting: string; transition: string; colorGrade: string; cutInterval: number; hookSec: number;
+  }> = {
+    shorts: {
+      composition: "Rule of thirds, subject upper-third, negative space lower third for captions",
+      gaze: "Direct eye contact with lens, subject fills 60-70% frame width",
+      lighting: "Soft key light 45° camera-left, rim light for depth, no harsh shadows",
+      transition: "Match-cut on motion, whip-pan at beat peaks, zero cross-dissolves",
+      colorGrade: "Warm highlights +200K, crushed blacks, saturation +15%",
+      cutInterval: 1.8,
+      hookSec: 2.0,
+    },
+    tiktok: {
+      composition: "Center-weighted, subject fills 70-80% frame, high contrast against background",
+      gaze: "Immediate direct-to-camera gaze, fast subject movement within 0.5s",
+      lighting: "High-key bright, ring light primary, ambient fill, no moody low-key",
+      transition: "Jump cuts every 1.5s, zoom-punch on beat drops, screen-shake on impact",
+      colorGrade: "Vibrant pop, saturation +25%, warm skin tones, teal shadows",
+      cutInterval: 1.5,
+      hookSec: 0.5,
+    },
+    reels: {
+      composition: "Cinematic asymmetry, subject in left/right third, shallow depth of field",
+      gaze: "Soft gaze, storytelling expression, emotional micro-expressions in first 2s",
+      lighting: "Golden hour warmth, natural window light, soft diffusion, backlight halo",
+      transition: "Smooth speed-ramp transitions, seamless match-action, minimal hard cuts",
+      colorGrade: "Filmic teal-orange, muted mid-tones, warm highlights, deep blacks",
+      cutInterval: 2.0,
+      hookSec: 2.5,
+    },
+    naverclip: {
+      composition: "Product-centric center, clean uncluttered background, info-dense framing",
+      gaze: "Product hero shot first, presenter gaze to product, trust-building angle",
+      lighting: "Clean bright studio, even key+fill ratio, minimal shadows for clarity",
+      transition: "Information cuts, text-overlay transitions, clean wipe synced to VO",
+      colorGrade: "Neutral natural colors, accurate product representation, slight warmth",
+      cutInterval: 2.5,
+      hookSec: 3.0,
+    },
   };
-  const motionStyle = bgmMood ? (moodToMotion[bgmMood] ?? variationHint) : variationHint;
+  const benchmark = platformBenchmarks[platform] ?? platformBenchmarks.shorts;
 
-  const narrativeContext = cutCount > 1
-    ? ` The video should flow through ${cutCount} key moments: gaze hook, need discovery, product experience, transformation, and CTA delivery.`
-    : "";
+  const cameraSpecs = [
+    {
+      phase: "HOOK",
+      shot: "Extreme close-up, subject eyes fill upper third",
+      lens: "85mm equiv, f/1.8, shallow depth of field, bokeh background isolation",
+      light: "Rembrandt key 45° camera-left at eye level, fill 1:4 ratio, rim light",
+      motion: `Slow dolly-in 1.05x→1.22x over ${benchmark.hookSec}s, handheld micro-tremor`,
+      micro: "0.5° rotation drift, natural breathing sway, 2px vertical drift",
+    },
+    {
+      phase: "DISCOVERY",
+      shot: "Medium close-up, product visible with environmental context",
+      lens: "50mm equiv, f/2.8, context visible but subject prioritized",
+      light: "Practical lighting integrated, soft bounce fill, ambient atmosphere",
+      motion: "Lateral pan +4 to -4 on X axis, ease-in-out cubic, 1.5s",
+      micro: "Parallax shift on background, focus pull foreground→product at midpoint",
+    },
+    {
+      phase: "TRANSFORMATION",
+      shot: "Medium shot, full product-in-use context visible",
+      lens: "35mm equiv, f/4.0, full scene sharp for transformation reveal",
+      light: "Motivated lighting shift: warm key → cool key, simulating time passage",
+      motion: "Tilt reveal +4 to -4 on Y axis, ease-out quart, ascending",
+      micro: "Rack focus from hands→product→face, 0.3s each beat",
+    },
+    {
+      phase: "CTA",
+      shot: "Medium-wide, subject + product + CTA text space in lower third",
+      lens: "35mm equiv, f/3.5, subject and product both in focus",
+      light: "Even key+fill, bright approachable, no dramatic shadows for CTA clarity",
+      motion: "Slow pull-back 1.3x→1.0x, stabilizing to fixed frame for text overlay",
+      micro: "Settling motion, zero drift after 0.5s, locked frame for CTA burn-in",
+    },
+  ];
 
-  const captionHint = captionText
-    ? ` Visual should complement the caption: "${captionText.slice(0, 80)}".`
-    : "";
+  const moodGrades: Record<string, string> = {
+    "하이텐션": "High-energy: saturation +25%, contrast +20%, punchy highlights, motion blur on fast cuts",
+    "시네마틱": "Cinematic: teal-orange split tone, film grain 15%, anamorphic lens flare, letterbox safe",
+    "ASMR": "Soft intimate: warm muted tones, f/1.4 shallow DOF, gentle glow on highlights",
+    "감성": "Emotional: warm golden tones, soft contrast, bloom on highlights, gentle vignette",
+    "로파이": "Lofi: desaturated -10%, warm tint, slight grain, vintage film emulation",
+  };
+  const moodGrade = bgmMood ? (moodGrades[bgmMood] ?? moodGrades["하이텐션"]) : moodGrades["하이텐션"];
 
-  return (
-    `${userPrompt}${productContext}.${narrativeContext}${captionHint} ` +
-    `${orientation} format, ${motionStyle}, ` +
-    `photorealistic, natural lighting, high detail, 4k quality, ` +
-    `seamless motion, no text overlays, no captions, clean composition.`
-  );
+  const hookPatterns: Record<string, string[]> = {
+    curiosity: ["이거 진짜였어?", "다들 놀라는 중", "왜 이제야 알았지"],
+    problem: ["이거 때문에 스트레스", "다들 이걸로 고생함", "해결책 찾았어"],
+    transformation: ["before 이랬는데 after 이렇게", "사용 전후 비교 충격", "이거 쓰고 달라졌어"],
+    social_proof: ["이 동네 1위", "다들 이거 사감", "리뷰 1만 개"],
+    fomo: ["품절 전에 확인", "선찹순 마감 임박", "놓치면 다시 없어"],
+  };
+  const hookTexts = hookPatterns[hookCategory] ?? hookPatterns.curiosity;
+  const hookText = hookTexts[variationSeed % hookTexts.length];
+
+  const gazeAnchors: Record<string, string> = {
+    shorts: "Direct eye contact with lens, subject upper-third, expression: subtle surprise→confidence",
+    tiktok: "Fast head turn to camera at 0.3s, eyes wide, micro-expression of discovery, leaning in",
+    reels: "Soft gaze off-camera then slow turn to lens at 1.5s, vulnerability→empowerment",
+    naverclip: "Product hero shot centered, presenter hand enters at 0.5s pointing to key feature",
+  };
+  const motionTriggers: Record<string, string> = {
+    shorts: `Slow dolly-in 1.05x→1.22x over ${benchmark.hookSec}s with handheld micro-tremor`,
+    tiktok: "Snap zoom to 1.3x at 0.2s then settle to 1.15x by 1s, screen-shake on beat 1",
+    reels: "Gentle push-in 1.0x→1.1x over 2.5s, parallax drift on background bokeh, dreamy motion",
+    naverclip: "Static locked frame 1s, then 5° tilt-down reveal of product detail at 1.5s",
+  };
+
+  const segmentDirectives = cameraSpecs.slice(0, Math.min(effectiveCutCount, cameraSpecs.length)).map((spec, i) => {
+    const startSec = i === 0 ? 0 : Math.round(i * (15 / effectiveCutCount) * 10) / 10;
+    const endSec = i === Math.min(effectiveCutCount, cameraSpecs.length) - 1 ? 15 : Math.round((i + 1) * (15 / effectiveCutCount) * 10) / 10;
+    return `[${startSec}-${endSec}s] ${spec.phase}: ${spec.shot}. Camera: ${spec.motion}. Lens: ${spec.lens}. Light: ${spec.light}. Micro: ${spec.micro}.`;
+  }).join("\n");
+
+  const hookDirective =
+    `HOOK (first ${benchmark.hookSec}s): ${gazeAnchors[platform] ?? gazeAnchors.shorts}. ` +
+    `Motion: ${motionTriggers[platform] ?? motionTriggers.shorts}. ` +
+    `Text: "${hookText}" at 0.3s, kinetic typography 120% pop-in. ` +
+    `ZERO scene changes in first ${benchmark.hookSec}s — locked frame, escalating audio only.`;
+
+  const retentionDirective =
+    `Cut interval ${benchmark.cutInterval}s accelerating. Pattern interrupts every 3-4s. ` +
+    `Kill-point captions 0.3s before audio peaks. Last 3s: locked frame for CTA. ` +
+    `Audio-visual sync: 0.1s max desync.`;
+
+  const captionHint = captionText ? `\nCaption context: "${captionText.slice(0, 80)}".` : "";
+
+  return [
+    `### CINEMATIC VIDEO PROMPT — TOP-1% VIRAL QUALITY`,
+    ``,
+    `Subject: ${userPrompt}${productName ? ` featuring ${productName}` : ""}.`,
+    `Format: ${orientation}.`,
+    ``,
+    `### HOOK STRUCTURE (first ${benchmark.hookSec}s)`,
+    hookDirective,
+    ``,
+    `### CINEMATOGRAPHY — PER-SEGMENT CAMERA SPECS`,
+    segmentDirectives,
+    ``,
+    `### PLATFORM OPTIMIZATION — ${platform.toUpperCase()}`,
+    `Composition: ${benchmark.composition}. Gaze: ${benchmark.gaze}. Transition: ${benchmark.transition}.`,
+    ``,
+    `### COLOR GRADING`,
+    `${moodGrade}. Base: ${benchmark.colorGrade}.`,
+    ``,
+    `### RETENTION ENGINE`,
+    retentionDirective,
+    ``,
+    `### QUALITY LOCK`,
+    `Photorealistic, 4K, natural skin tones, no text artifacts, no warped faces, seamless motion, clean composition, professional color science.${captionHint}`,
+  ].join("\n");
 }
 
 async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): Promise<string> {

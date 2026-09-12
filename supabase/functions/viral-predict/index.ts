@@ -28,6 +28,12 @@ interface ViralPredictRequest {
   hasTTS?: boolean;
   episodeMode?: boolean;
   trendingKeywords?: string[];
+  platform?: string;
+  hookCategory?: string;
+  cameraMovementCount?: number;
+  hasCinematicLighting?: boolean;
+  cutIntervalSec?: number;
+  promptQualityScore?: number;
 }
 
 interface ViralPrediction {
@@ -118,15 +124,17 @@ async function resolveOpenAIKey(): Promise<string | null> {
 async function predictWithOpenAI(data: ViralPredictRequest, apiKey: string): Promise<ViralPrediction> {
   const systemPrompt =
     "너는 숏폼 바이럴 예측 AI야. 틱톡·릴스·쇼츠 알고리즘 트렌드를 분석해서 콘텐츠의 바이럴 확률을 예측해.\n" +
+    "상위 1% 바이럴 영상의 성공 요인을 기준으로 평가해.\n" +
     "0~100점 사이의 점수를 매기고, 등급(S/A/B/C/D)을 부여해.\n" +
-    "점수 기준:\n" +
-    "- 후킹 문구의 임팩트 (감정 자극, 호기심 유발)\n" +
+    "점수 기준 (상위 1% 벤치마크):\n" +
+    "- 시각적 몰입도: 시네마틱 구도, 조명 설계, 시선 집중 요소 (25점)\n" +
+    "- 후킹 & 유지율: 초반 1~3초 시청자 이탈 방지 구조 (25점)\n" +
+    "- 카메라 연출 복잡도: 다양한 카메라 무빙, 마이크로 모션, 렌즈 스펙 (20점)\n" +
+    "- 프롬프트 품질: 카메라 워킹, 조명, 색보정 명시도 (15점)\n" +
+    "- 후킹 문구의 임팩트: 감정 자극, 호기심 유발 (15점)\n" +
     "- 해시태그 트렌드 적합도\n" +
-    "- 제품 카테고리의 숏폼 인기도\n" +
-    "- 만화 스타일과 패널 수의 시각적 다양성\n" +
     "- 트렌드 키워드 포함 여부\n" +
     "- TTS 내레이션 포함 여부 (시청 지속 시간 증가)\n" +
-    "- 에피소드 모드 (시청 지속 시간 증가)\n" +
     "결과는 JSON만 반환: {\n" +
     "  \"score\": number,\n" +
     "  \"grade\": string,\n" +
@@ -134,18 +142,21 @@ async function predictWithOpenAI(data: ViralPredictRequest, apiKey: string): Pro
     "  \"suggestions\": [{ \"type\": string, \"label\": string, \"detail\": string }],\n" +
     "  \"predictedViews\": string\n" +
     "}\n" +
-    "factors는 4~6개, suggestions는 2~3개로 작성해.\n" +
-    "predictedViews는 '5천~1만', '1만~5만', '5만~10만', '10만 이상' 형식으로 작성해.";
+    "factors는 6~8개, suggestions는 2~3개로 작성해.\n" +
+    "predictedViews는 '5천~1만', '1만~5만', '5만~10만', '10만 이상' 형식으로 작성해.\n" +
+    "반드시 시각적 몰입도, 후킹 구조, 카메라 연출 요소를 분석에 포함해.";
 
   const userPrompt =
     `후킹 문구: ${data.hook || '없음'}\n` +
     `제품명: ${data.productName || '없음'}\n` +
     `카테고리: ${data.productCategory || '없음'}\n` +
     `해시태그: ${(data.hashtags || []).join(', ') || '없음'}\n` +
-    `만화 스타일: ${data.comicStyle || '기본'}\n` +
-    `패널 수: ${data.panelCount || 1}\n` +
+    `플랫폼: ${data.platform || 'shorts'}\n` +
+    `카메라 무빙 수: ${data.cameraMovementCount ?? '미측정'}\n` +
+    `시네마틱 조명: ${data.hasCinematicLighting ? '적용됨' : '미적용'}\n` +
+    `컷 간격: ${data.cutIntervalSec ?? '미측정'}초\n` +
+    `프롬프트 품질 점수: ${data.promptQualityScore ?? '미측정'}/100\n` +
     `TTS 내레이션: ${data.hasTTS ? '있음' : '없음'}\n` +
-    `에피소드 모드: ${data.episodeMode ? '있음' : '없음'}\n` +
     `트렌드 키워드: ${(data.trendingKeywords || []).join(', ') || '없음'}\n`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -183,7 +194,7 @@ async function predictWithOpenAI(data: ViralPredictRequest, apiKey: string): Pro
   return {
     score: clampScore(parsed.score),
     grade: String(parsed.grade || 'B'),
-    factors: Array.isArray(parsed.factors) ? parsed.factors.filter((f: unknown) => f && typeof f === 'object').slice(0, 6).map((f: Record<string, unknown>) => ({
+    factors: Array.isArray(parsed.factors) ? parsed.factors.filter((f: unknown) => f && typeof f === 'object').slice(0, 8).map((f: Record<string, unknown>) => ({
       label: String(f.label || '').slice(0, 30),
       positive: !!f.positive,
       detail: String(f.detail || '').slice(0, 100),
@@ -204,32 +215,54 @@ function clampScore(raw: unknown): number {
 }
 
 function predictLocal(data: ViralPredictRequest): ViralPrediction {
-  let score = 40;
+  let score = 35;
   const factors: { label: string; positive: boolean; detail: string }[] = [];
   const suggestions: { type: string; label: string; detail: string }[] = [];
 
-  const hook = data.hook || '';
-  if (hook.length > 5) { score += 10; factors.push({ label: '후킹 문구', positive: true, detail: '감정을 자극하는 후킹 문구가 포함되어 있습니다.' }); }
-  else { factors.push({ label: '후킹 문구', positive: false, detail: '후킹 문구가 짧거나 없습니다. 호기심을 유발하는 문구를 추가해보세요.' }); }
+  // === Visual Impact (0-25) ===
+  const cameraCount = data.cameraMovementCount ?? 0;
+  if (cameraCount >= 4) { score += 20; factors.push({ label: '시각적 몰입도', positive: true, detail: '4개 이상의 카메라 무빙으로 시네마틱 연출이 적용되었습니다.' }); }
+  else if (cameraCount >= 2) { score += 12; factors.push({ label: '시각적 몰입도', positive: true, detail: '기본 카메라 무빙이 포함되어 있습니다.' }); }
+  else { factors.push({ label: '시각적 몰입도', positive: false, detail: '카메라 무빙이 부족합니다. 상위 1% 영상은 평균 4개 이상의 카메라 무빙을 사용합니다.' }); }
 
+  if (data.hasCinematicLighting) { score += 8; factors.push({ label: '조명 설계', positive: true, detail: '시네마틱 조명이 적용되어 피사체 분리와 분위기 연출이 우수합니다.' }); }
+  else { factors.push({ label: '조명 설계', positive: false, detail: '전문 조명 설계가 미적용 상태입니다.' }); }
+
+  // === Hook & Retention (0-25) ===
+  const hook = data.hook || '';
+  const hookCategory = data.hookCategory || 'curiosity';
+  const strongHookCategories = ['curiosity', 'fomo', 'transformation'];
+  if (hook.length > 5 && strongHookCategories.includes(hookCategory)) { score += 18; factors.push({ label: '후킹 구조', positive: true, detail: '강력한 감정 자극 후킹이 첫 1-3초에 배치되어 이탈률을 최소화합니다.' }); }
+  else if (hook.length > 5) { score += 10; factors.push({ label: '후킹 구조', positive: true, detail: '후킹 문구가 포함되어 있습니다.' }); }
+  else { factors.push({ label: '후킹 구조', positive: false, detail: '후킹 문구가 짧거나 없습니다. 첫 1-3초 시선 강탈 문구가 필요합니다.' }); }
+
+  const cutInterval = data.cutIntervalSec ?? 0;
+  if (cutInterval > 0 && cutInterval <= 2.0) { score += 7; factors.push({ label: '컷 전환 속도', positive: true, detail: `컷 간격 ${cutInterval}초로 상위 1% 평균(1.5-2.0초)에 부합합니다.` }); }
+  else if (cutInterval > 0) { factors.push({ label: '컷 전환 속도', positive: false, detail: `컷 간격 ${cutInterval}초는 상위 1% 대비 느립니다. 2초 이하를 권장합니다.` }); }
+
+  // === Prompt Quality (0-15) ===
+  const promptScore = data.promptQualityScore ?? 0;
+  if (promptScore >= 70) { score += 12; factors.push({ label: '프롬프트 품질', positive: true, detail: `프롬프트 품질 ${promptScore}점으로 상위 1% 수준의 카메라/조명/색보정 명시가 완료되었습니다.` }); }
+  else if (promptScore >= 40) { score += 6; factors.push({ label: '프롬프트 품질', positive: true, detail: `프롬프트 품질 ${promptScore}점으로 기본 수준입니다.` }); }
+  else { factors.push({ label: '프롬프트 품질', positive: false, detail: '프롬프트에 카메라 워킹, 조명, 색보정 명시가 부족합니다.' }); }
+
+  // === Traditional factors ===
   const hashtags = data.hashtags || [];
-  if (hashtags.length >= 3) { score += 10; factors.push({ label: '해시태그', positive: true, detail: `${hashtags.length}개의 해시태그가 포함되어 알고리즘 노출에 유리합니다.` }); }
+  if (hashtags.length >= 3) { score += 5; factors.push({ label: '해시태그', positive: true, detail: `${hashtags.length}개의 해시태그가 포함되어 알고리즘 노출에 유리합니다.` }); }
   else { factors.push({ label: '해시태그', positive: false, detail: '해시태그가 부족합니다. 5~8개를 권장합니다.' }); }
 
-  if (data.trendingKeywords && data.trendingKeywords.length > 0) { score += 15; factors.push({ label: '트렌드 키워드', positive: true, detail: '실시간 트렌드 키워드가 포함되어 알고리즘 선택 확률이 높습니다.' }); }
-  else { factors.push({ label: '트렌드 키워드', positive: false, detail: '트렌드 키워드가 없습니다. 트렌딩 해시태그를 추가해보세요.' }); }
+  if (data.trendingKeywords && data.trendingKeywords.length > 0) { score += 5; factors.push({ label: '트렌드 키워드', positive: true, detail: '실시간 트렌드 키워드가 포함되어 알고리즘 선택 확률이 높습니다.' }); }
 
-  if (data.hasTTS) { score += 10; factors.push({ label: 'AI 내레이션', positive: true, detail: '음성 더빙이 포함되어 시청 지속 시간이 증가합니다.' }); }
+  if (data.hasTTS) { score += 5; factors.push({ label: 'AI 내레이션', positive: true, detail: '음성 더빙이 포함되어 시청 지속 시간이 증가합니다.' }); }
   else { factors.push({ label: 'AI 내레이션', positive: false, detail: '내레이션이 없으면 무음 영상은 스크롤 이탈이 빠릅니다.' }); }
 
-  if (data.episodeMode) { score += 10; factors.push({ label: '에피소드 구성', positive: true, detail: '연작 스토리 구성이 시청 지속 시간을 늘립니다.' }); }
-
-  if ((data.panelCount || 1) >= 2) { score += 5; factors.push({ label: '컷 분할', positive: true, detail: '다중 컷 구성이 시각적 다양성을 제공합니다.' }); }
-
-  if (score < 50) suggestions.push({ type: 'hook', label: '후킹 강화', detail: '첫 1초 시선을 사로잡는 감정 자극 문구를 추가해보세요. "이거 모르면 손해!" 같은 표현이 효과적입니다.' });
-  if (hashtags.length < 5) suggestions.push({ type: 'hashtag', label: '해시태그 추가', detail: '제품 카테고리 관련 트렌딩 해시태그를 5~8개 추가하면 알고리즘 노출이 늘어납니다.' });
+  // === Suggestions ===
+  if (cameraCount < 4) suggestions.push({ type: 'camera', label: '카메라 무빙 강화', detail: '상위 1% 영상은 평균 4개 이상의 카메라 무빙(돌리, 팬, 틸트, 줌)을 사용합니다. 시네마틱 연출을 추가해보세요.' });
+  if (!data.hasCinematicLighting) suggestions.push({ type: 'lighting', label: '조명 설계 추가', detail: 'Rembrand트 키라이트 + 림라이트 조합으로 피사체 분리를 강화하면 시각적 몰입도가 30% 이상 향상됩니다.' });
+  if (hook.length <= 5) suggestions.push({ type: 'hook', label: '후킹 강화', detail: '첫 1-3초 시선을 사로잡는 감정 자극 문구를 추가하세요. "이거 모르면 손해!" 같은 표현이 효과적입니다.' });
+  if (hashtags.length < 5) suggestions.push({ type: 'hashtag', label: '해시태그 추가', detail: '제품 카테고리 관련 트렌딩 해시태그 5~8개를 추가하면 알고리즘 노출이 늘어납니다.' });
   if (!data.hasTTS) suggestions.push({ type: 'tts', label: 'AI 내레이션 켜기', detail: '음성 더빙을 켜면 시청 지속 시간이 평균 30% 증가합니다.' });
-  if (!data.episodeMode) suggestions.push({ type: 'episode', label: '에피소드 모드', detail: '연작 스토리로 구성하면 시청자가 끝까지 보게 됩니다.' });
+  if (promptScore < 70) suggestions.push({ type: 'prompt', label: '프롬프트 보정', detail: '카메라 렌즈 스펙(85mm f/1.8), 조명 설계, 색보정 등 시네마틱 프롬프트를 추가하면 영상 품질이 상위 1% 수준으로 향상됩니다.' });
 
   score = Math.min(score, 95);
   const grade = score >= 85 ? 'S' : score >= 70 ? 'A' : score >= 55 ? 'B' : score >= 40 ? 'C' : 'D';

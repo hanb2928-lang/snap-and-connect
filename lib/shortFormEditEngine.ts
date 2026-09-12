@@ -261,10 +261,10 @@ const STORY_CTA: string[] = [
 ];
 
 const NARRATION_CUES = {
-  gazeHook: 'VO: 인물의 시선이 카메라를 향한다 — 호기심 자극, 2초 후킹',
-  needDiscovery: 'VO: 왜 이 제품인가 — 상황 설정과 문제 정의',
-  transformation: 'VO: 사용 후 변화 — 감성 충전과 몰입',
-  ctaCall: 'VO: 행동 유도 — 시청자를 향한 직접적 메시지',
+  gazeHook: 'VO: 인물의 시선이 카메라를 응시한다 — 0~3초 시선 강탈 후킹, 화면 전환 없음, 오디오 빌드업만으로 이탈 방지',
+  needDiscovery: 'VO: 왜 이 제품인가 — 3~7초 리얼리티 서사, 다각도 입체 컷 전환으로 시각적 패턴 인터럽트',
+  transformation: 'VO: 사용 후 변화 — 7~11초 감성 충전, 디테일 클로즈업 틸트 리빌, 킬링 포인트 자막 0.3초 선행',
+  ctaCall: 'VO: 행동 유도 — 11~15초 카메라 고정, CTA 자막 번인, 마지막 3초 시청자 행동 유도',
 };
 
 function pickStoryText(pool: string[], productHint: string): string {
@@ -354,7 +354,7 @@ export function buildShortFormEditPlan(
       startSec: 0,
       endSec: 3,
       label: '시선 포착',
-      purpose: '인물이 카메라를 응시하는 순간으로 시선 강탈, 상황 정의',
+      purpose: '상위 1% 후킹: 0~3초 시선 강탈, 화면 전환 없음, 오디오 빌드업으로 이탈 방지',
       textOverlay: story.gazeHook,
       position: 'center',
       storyPhase: 'gaze_hook',

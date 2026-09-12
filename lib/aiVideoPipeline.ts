@@ -30,6 +30,9 @@ interface GenerateAiVideoOptions {
   variationSeed?: number;
   bgmMood?: string;
   captionText?: string;
+  platform?: string;
+  hookCategory?: string;
+  cutCount?: number;
 }
 
 const MAX_RETRIES = 2;
@@ -69,6 +72,9 @@ export async function generateAiVideo(
           variationSeed: options.variationSeed ?? 0,
           bgmMood: options.bgmMood,
           captionText: options.captionText,
+          platform: options.platform ?? 'shorts',
+          hookCategory: options.hookCategory ?? 'curiosity',
+          cutCount: options.cutCount,
         },
       });
 
