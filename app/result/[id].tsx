@@ -2101,14 +2101,6 @@ export default function ResultScreen() {
           </View>
         )}
 
-        {/* === AI Narration Player === */}
-        <NarrationPlayer
-          ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
-          narrationText={activeHook || activeOneLiner || scan?.summary || ''}
-          onPlayStateChange={setNarrationPlaying}
-        />
-
         {/* === Target Platform Selector === */}
         <View style={styles.targetPlatformSection}>
           <View style={styles.targetPlatformHeader}>
@@ -2188,6 +2180,14 @@ export default function ResultScreen() {
               ))}
             </ScrollView>
           </View>
+
+          {/* AI Narration — integrated into sound settings */}
+          <NarrationPlayer
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+            ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
+            narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+            onPlayStateChange={setNarrationPlaying}
+          />
         </View>
 
         {/* === 영상 길이 선택 (간소화) === */}
@@ -3236,17 +3236,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   angleGallerySection: {
-    marginTop: theme.spacing.md,
+    marginTop: theme.spacing.sm,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
+    padding: theme.spacing.sm,
     ...theme.shadows.card,
   },
   angleGalleryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: theme.spacing.sm,
+    marginBottom: 6,
   },
   angleGalleryTitle: {
     flex: 1,
@@ -3269,11 +3269,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   angleThumbWrap: {
-    width: 80,
-    height: 80,
+    width: 68,
+    height: 68,
     borderRadius: theme.radius.md,
     overflow: 'hidden',
-    marginRight: theme.spacing.sm,
+    marginRight: 8,
     position: 'relative',
     backgroundColor: theme.colors.dark.surfaceLight,
   },
@@ -4029,11 +4029,11 @@ const styles = StyleSheet.create({
   },
   promptSection: {
     marginHorizontal: theme.spacing.md,
-    marginVertical: theme.spacing.sm,
+    marginVertical: 6,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    gap: 10,
+    padding: 10,
+    gap: 8,
     borderWidth: 1.5,
     borderColor: theme.colors.primary[400] + '30',
     ...theme.shadows.card,

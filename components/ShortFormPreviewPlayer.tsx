@@ -50,8 +50,8 @@ interface ShortFormPreviewPlayerProps {
 const TOTAL_DURATION = 15;
 const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
-const PREVIEW_FRAME_WIDTH = 135;
-const PREVIEW_FRAME_HEIGHT = 240;
+const PREVIEW_FRAME_WIDTH = 120;
+const PREVIEW_FRAME_HEIGHT = 200;
 const VIDEO_LOAD_TIMEOUT_MS = 5000;
 const BUFFERING_TIMEOUT_MS = 5000;
 
@@ -898,12 +898,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 1.5,
     borderColor: theme.colors.primary[500] + '40',
-    padding: 12,
-    gap: 10,
+    padding: 8,
+    gap: 7,
   },
   labelRow: {
     flexDirection: 'row',
@@ -1037,17 +1037,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: theme.colors.primary[600],
     justifyContent: 'center',
     alignItems: 'center',
   },
   resetBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Volume2, Play, Pause, Loader2, RefreshCw, AlertCircle, VolumeX } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform, ViewStyle } from 'react-native';
+import { Volume2, Play, Pause, Loader2, AlertCircle, VolumeX } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface NarrationPlayerProps {
@@ -56,7 +56,6 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
 
   const speakWithWebSpeech = useCallback((text: string): boolean => {
     if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.speechSynthesis) {
-      console.error('Narration generation failed: Web Speech API not available');
       return false;
     }
     window.speechSynthesis.cancel();
@@ -69,8 +68,7 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       notifyPlayState(false);
       onEndedCallbackRef.current?.();
     };
-    utter.onerror = (e) => {
-      console.error('Narration generation failed: Web Speech synthesis error', e);
+    utter.onerror = () => {
       notifyPlayState(false);
       setPlayError('폴백 음성 재생에 실패했습니다');
     };
@@ -81,13 +79,8 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
     return true;
   }, [notifyPlayState]);
 
-  /**
-   * User Gesture Unlock — 재생 버튼 클릭 시 즉시 AudioContext를 생성/resume하고
-   * 무음 펄스를 재생하여 브라우저 자동재생 잠금을 해제한다.
-   */
   const unlockAudioContext = useCallback((): AudioContext | null => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
-
     if (!audioCtxRef.current) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return null;
@@ -98,13 +91,10 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       audioCtxRef.current = ctx;
       masterGainRef.current = gain;
     }
-
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
-
-    // 무음 펄스 재생으로 잠금 해제
     try {
       const pulse = ctx.createOscillator();
       const pulseGain = ctx.createGain();
@@ -113,30 +103,19 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       pulseGain.connect(ctx.destination);
       pulse.start();
       pulse.stop(ctx.currentTime + 0.01);
-    } catch {
-      /* ignore */
-    }
-
+    } catch { /* ignore */ }
     return ctx;
   }, []);
 
-  /**
-   * 오디오 버퍼가 충분히 로드될 때까지 대기한 후 play() 실행.
-   * canplaythrough 이벤트를 대기하거나 readyState >= 3을 확인한다.
-   */
   const playWhenReady = useCallback((audio: HTMLAudioElement): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('timeout'));
-      }, 10000);
-
+      const timeout = setTimeout(() => { reject(new Error('timeout')); }, 10000);
       const startPlayback = () => {
         clearTimeout(timeout);
         audio.removeEventListener('canplaythrough', startPlayback);
         audio.removeEventListener('loadeddata', startPlayback);
         audio.play().then(resolve).catch(reject);
       };
-
       if (audio.readyState >= 3) {
         clearTimeout(timeout);
         audio.play().then(resolve).catch(reject);
@@ -152,46 +131,21 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
     if (!ttsUrl) return;
     setPlayError(null);
     setNeedsTouchRetry(false);
-
-    if (Platform.OS !== 'web') {
-      setPlayError('웹에서만 재생할 수 있습니다');
-      return;
-    }
-
-    // 일시정지 요청
+    if (Platform.OS !== 'web') { setPlayError('웹에서만 재생할 수 있습니다'); return; }
     if (isPlaying) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      if (usingFallback && typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      if (audioRef.current) audioRef.current.pause();
+      if (usingFallback && typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
       notifyPlayState(false);
       return;
     }
-
-    // 기존 오디오 정리
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     setUsingFallback(false);
     setIsLoading(true);
-
     try {
-      if (!ttsUrl) {
-        throw new Error('No TTS URL provided');
-      }
-
-      // 1. User Gesture Unlock — 즉시 AudioContext resume + 무음 펄스
+      if (!ttsUrl) throw new Error('No TTS URL provided');
       const ctx = unlockAudioContext();
-
-      // 2. 새 오디오 엘리먼트 생성 — src 할당 후 null check
       const audio = new Audio();
-      if (!audio) {
-        throw new Error('Failed to create Audio element');
-      }
+      if (!audio) throw new Error('Failed to create Audio element');
       audio.src = ttsUrl;
       audio.volume = 1.0;
       audio.muted = false;
@@ -199,63 +153,31 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       audio.crossOrigin = 'anonymous';
       audio.preload = 'auto';
       audioRef.current = audio;
-
-      // src 할당 검증
-      if (!audio.src) {
-        console.error('Narration generation failed: audio.src is empty after assignment', { ttsUrl });
-        throw new Error('audio.src assignment failed');
-      }
-
+      if (!audio.src) throw new Error('audio.src assignment failed');
       audio.onended = () => notifyPlayState(false);
       audio.onpause = () => {
-        // pause() 호출에 의한 일시정지만 반영
-        if (audioRef.current === audio && !audio.ended) {
-          notifyPlayState(false);
-        }
+        if (audioRef.current === audio && !audio.ended) notifyPlayState(false);
       };
-      audio.onerror = () => {
-        setIsLoading(false);
-        notifyPlayState(false);
-        setPlayError('오디오 재생에 실패했습니다');
-      };
-
-      // 3. Web Audio API에 연결 (AudioContext가 있는 경우)
+      audio.onerror = () => { setIsLoading(false); notifyPlayState(false); setPlayError('오디오 재생에 실패했습니다'); };
       if (ctx && masterGainRef.current) {
         try {
-          // 기존 sourceNode가 있으면 disconnect
-          if (sourceNodeRef.current) {
-            try { sourceNodeRef.current.disconnect(); } catch { /* ignore */ }
-          }
+          if (sourceNodeRef.current) { try { sourceNodeRef.current.disconnect(); } catch { /* ignore */ } }
           const source = ctx.createMediaElementSource(audio);
           source.connect(masterGainRef.current);
           sourceNodeRef.current = source;
-        } catch {
-          // createMediaElementSource 실패 시 일반 재생으로 폴백
-        }
+        } catch { /* fallback to plain playback */ }
       }
-
-      // 4. 버퍼 로드 대기 후 play() 실행
       await playWhenReady(audio);
       setIsLoading(false);
       notifyPlayState(true);
     } catch (err) {
-      console.error('Narration generation failed:', err);
       setIsLoading(false);
       notifyPlayState(false);
-
       const errMsg = err instanceof Error ? err.message : String(err);
-
-      // Web Speech API 폴백 — TTS URL 로드/재생 실패 시 즉시 전환
       if (narrationText && narrationText.trim().length > 0) {
         const fallbackOk = speakWithWebSpeech(narrationText);
-        if (fallbackOk) {
-          setPlayError(null);
-          setNeedsTouchRetry(false);
-          return;
-        }
+        if (fallbackOk) { setPlayError(null); setNeedsTouchRetry(false); return; }
       }
-
-      // 브라우저 자동재생 차단 — muted 재생 후 터치 재시도 안내
       if (errMsg.includes('NotAllowed') || errMsg.includes('not allowed') || errMsg.includes('user gesture') || errMsg.includes('NotAllowedError')) {
         try {
           if (audioRef.current) {
@@ -265,9 +187,7 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
             setNeedsTouchRetry(true);
             setPlayError('브라우저 정책으로 인해 일시적으로 무음 재생됩니다. 다시 한 번 재생 버튼을 눌러주세요.');
           }
-        } catch {
-          setPlayError('재생을 시작할 수 없습니다. 다시 한 번 재생 버튼을 눌러주세요.');
-        }
+        } catch { setPlayError('재생을 시작할 수 없습니다. 다시 한 번 재생 버튼을 눌러주세요.'); }
       } else if (errMsg.includes('timeout')) {
         setPlayError('오디오 로딩 시간이 초과되었습니다. 다시 시도해주세요.');
       } else {
@@ -276,241 +196,190 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
     }
   }, [ttsUrl, isPlaying, usingFallback, narrationText, notifyPlayState, unlockAudioContext, playWhenReady, speakWithWebSpeech]);
 
-  /**
-   * 무음 재생 상태에서 사용자가 다시 터치하면 muted 해제 후 정상 재생.
-   */
   const handleTouchRetry = useCallback(async () => {
     if (!audioRef.current) return;
     setNeedsTouchRetry(false);
     setPlayError(null);
-
     const ctx = unlockAudioContext();
-    if (ctx && ctx.state === 'suspended') {
-      await ctx.resume().catch(() => {});
-    }
-
+    if (ctx && ctx.state === 'suspended') await ctx.resume().catch(() => {});
     audioRef.current.muted = false;
     audioRef.current.volume = 1.0;
     if (audioRef.current.paused) {
-      try {
-        await audioRef.current.play();
-        notifyPlayState(true);
-      } catch {
-        setPlayError('재생을 시작할 수 없습니다');
-      }
-    } else {
-      notifyPlayState(true);
-    }
+      try { await audioRef.current.play(); notifyPlayState(true); }
+      catch { setPlayError('재생을 시작할 수 없습니다'); }
+    } else { notifyPlayState(true); }
   }, [unlockAudioContext, notifyPlayState]);
 
   const handlePlayPress = useCallback(() => {
-    if (needsTouchRetry) {
-      handleTouchRetry();
-    } else {
-      handlePlayPause();
-    }
+    if (needsTouchRetry) handleTouchRetry();
+    else handlePlayPause();
   }, [needsTouchRetry, handleTouchRetry, handlePlayPause]);
 
   const hasAudio = !!ttsUrl;
-  const previewText = narrationText.length > 80 ? narrationText.slice(0, 80) + '...' : narrationText;
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Volume2 size={16} color={theme.colors.primary[400]} strokeWidth={2} />
-        <Text style={styles.title}>AI 나레이션</Text>
-        {ttsLoading && !hasAudio && (
-          <View style={styles.generatingBadge}>
-            <Loader2 size={11} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.generatingText}>생성 중</Text>
+  // Slim toggle state — before TTS is ready
+  if (!hasAudio) {
+    return (
+      <View style={styles.slimRow}>
+        <View style={styles.slimLeft}>
+          <View style={styles.slimIconWrap}>
+            <Volume2 size={13} color={theme.colors.primary[400]} strokeWidth={2} />
           </View>
-        )}
-        {hasAudio && (
-          <View style={styles.readyBadge}>
-            <Text style={styles.readyText}>준비됨</Text>
+          <Text style={styles.slimLabel}>AI 나레이션</Text>
+        </View>
+        {ttsLoading ? (
+          <View style={styles.slimStatusWrap}>
+            <Loader2 size={12} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            <Text style={styles.slimStatusGenerating}>생성 중</Text>
           </View>
+        ) : (
+          <Text style={styles.slimStatusPending}>대기</Text>
         )}
       </View>
+    );
+  }
 
-      {previewText && (
-        <Text style={styles.previewText} numberOfLines={2}>{previewText}</Text>
-      )}
-
-      {playError && (
-        <View style={styles.errorRow}>
-          <AlertCircle size={12} color={theme.colors.error[400]} strokeWidth={2} />
-          <Text style={styles.errorText}>{playError}</Text>
+  // Compact player — TTS is ready
+  return (
+    <View style={styles.compactContainer}>
+      <View style={styles.compactHeader}>
+        <View style={styles.compactLeft}>
+          <View style={styles.slimIconWrap}>
+            <Volume2 size={13} color={theme.colors.primary[400]} strokeWidth={2} />
+          </View>
+          <Text style={styles.compactLabel}>AI 나레이션</Text>
+          <View style={styles.readyDot} />
         </View>
-      )}
-
-      {needsTouchRetry && (
-        <View style={styles.retryHintRow}>
-          <VolumeX size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-          <Text style={styles.retryHintText}>소리를 들으려면 재생 버튼을 다시 눌러주세요</Text>
-        </View>
-      )}
-
-      <View style={styles.controls}>
         <TouchableOpacity
-          style={[styles.playBtn, !hasAudio && styles.playBtnDisabled]}
+          style={[styles.compactPlayBtn, isLoading && styles.compactPlayBtnDisabled]}
           onPress={handlePlayPress}
-          disabled={!hasAudio || isLoading}
+          disabled={isLoading}
           activeOpacity={0.7}
         >
           {isLoading ? (
-            <ActivityIndicator size={16} color="#fff" />
+            <ActivityIndicator size={14} color="#fff" />
           ) : isPlaying && !needsTouchRetry ? (
-            <Pause size={16} color="#fff" strokeWidth={2} />
+            <Pause size={14} color="#fff" strokeWidth={2.5} />
           ) : needsTouchRetry ? (
-            <VolumeX size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+            <VolumeX size={14} color={theme.colors.warning[400]} strokeWidth={2.5} />
           ) : (
-            <Play size={16} color="#fff" strokeWidth={2} fill="#fff" />
+            <Play size={14} color="#fff" strokeWidth={2.5} fill="#fff" />
           )}
-          <Text style={styles.playBtnText}>
-            {isLoading ? '로딩 중...' : isPlaying && !needsTouchRetry ? '일시정지' : needsTouchRetry ? '소리 켜기' : '재생'}
+          <Text style={styles.compactPlayText}>
+            {isLoading ? '로딩' : isPlaying && !needsTouchRetry ? '정지' : needsTouchRetry ? '소리' : '재생'}
           </Text>
         </TouchableOpacity>
-
-        {onRegenerate && hasAudio && (
-          <TouchableOpacity
-            style={styles.regenerateBtn}
-            onPress={onRegenerate}
-            activeOpacity={0.7}
-          >
-            <RefreshCw size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={styles.regenerateBtnText}>다시 생성</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      {ttsLoading && !hasAudio && (
-        <Text style={styles.hintText}>
-          AI가 분석 결과를 바탕으로 자연스러운 한국어 나레이션을 생성하고 있습니다. 완료되면 자동으로 재생 버튼이 활성화됩니다.
-        </Text>
-      )}
-
-      {!ttsLoading && !hasAudio && (
-        <Text style={styles.hintText}>
-          분석이 완료되면 AI 나레이션이 자동 생성됩니다.
-        </Text>
+      {playError && (
+        <View style={styles.compactErrorRow}>
+          <AlertCircle size={11} color={theme.colors.error[400]} strokeWidth={2} />
+          <Text style={styles.compactErrorText} numberOfLines={2}>{playError}</Text>
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
-  header: {
+  slimRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+  } as ViewStyle,
+  slimLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
   },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
+  slimIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  slimLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
-    flex: 1,
   },
-  generatingBadge: {
+  slimStatusWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: theme.colors.primary[400] + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
   },
-  generatingText: {
-    fontSize: 11,
+  slimStatusGenerating: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
-    fontWeight: '500',
   },
-  readyBadge: {
-    backgroundColor: theme.colors.success[400] + '15',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+  slimStatusPending: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textFaint,
   },
-  readyText: {
-    fontSize: 11,
-    color: theme.colors.success[400],
-    fontWeight: '500',
-  },
-  previewText: {
-    fontSize: 13,
-    color: theme.colors.dark.textDim,
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  errorRow: {
+  compactContainer: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+  } as ViewStyle,
+  compactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
+    justifyContent: 'space-between',
   },
-  errorText: {
+  compactLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactLabel: {
     fontSize: 12,
-    color: theme.colors.error[400],
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
   },
-  retryHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
+  readyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.success[400],
   },
-  retryHintText: {
-    fontSize: 12,
-    color: theme.colors.warning[400],
-    fontWeight: '500',
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  playBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.primary[400],
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  playBtnDisabled: {
-    backgroundColor: theme.colors.dark.border,
-  },
-  playBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  regenerateBtn: {
+  compactPlayBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    backgroundColor: theme.colors.primary[500],
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
+    paddingVertical: 6,
+    borderRadius: theme.radius.sm,
   },
-  regenerateBtnText: {
-    fontSize: 13,
-    color: theme.colors.dark.textDim,
+  compactPlayBtnDisabled: {
+    opacity: 0.6,
   },
-  hintText: {
+  compactPlayText: {
     fontSize: 12,
-    color: theme.colors.dark.textFaint,
-    lineHeight: 17,
-    marginTop: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  compactErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  compactErrorText: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.error[400],
   },
 });
