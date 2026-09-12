@@ -615,12 +615,18 @@ useEffect(() => {
           {/* Placeholder when no video, no fallback image, and no generated video */}
           {showPlaceholder ? (
             <View style={styles.videoPlaceholder}>
-              <Text style={styles.videoPlaceholderText}>영상 없음</Text>
-              <Text style={styles.videoPlaceholderHint}>촬영 후 미리보기 가능</Text>
+              {!isGeneratingVideo ? (
+                <>
+                  <Text style={styles.videoPlaceholderText}>영상이 아직 없어요</Text>
+                  <Text style={styles.videoPlaceholderHint}>5각도 사진으로 AI 영상이 자동 생성됩니다</Text>
+                </>
+              ) : (
+                <Text style={styles.videoPlaceholderHint}>잠시만 기다려주세요...</Text>
+              )}
             </View>
           ) : null}
 
-          {activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
+          {hasGeneratedVideo && activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
             <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
               <Text
                 style={{
@@ -641,7 +647,7 @@ useEffect(() => {
           )}
 
           {/* === Vision AI 입체 자막 카피라이팅 레이어 === */}
-          {activeCopyOverlay && isPlaying && !isDisclosureActive && (
+          {hasGeneratedVideo && activeCopyOverlay && isPlaying && !isDisclosureActive && (
             <View
               style={[
                 styles.copyOverlayBase,
@@ -672,13 +678,13 @@ useEffect(() => {
             </View>
           )}
 
-          {isBgmActive && (
+          {hasGeneratedVideo && isBgmActive && (
             <View style={styles.bgmIndicator}>
               <Text style={styles.bgmText} numberOfLines={1}>{editPlan.bgmTemplate.label}</Text>
             </View>
           )}
 
-          {activeSegment && isPlaying && (
+          {hasGeneratedVideo && activeSegment && isPlaying && (
             <View style={styles.sceneBadge}>
               <View style={[styles.sceneDot, { backgroundColor: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} />
               <Text style={[styles.sceneBadgeText, { color: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} numberOfLines={1}>
@@ -687,9 +693,11 @@ useEffect(() => {
             </View>
           )}
 
-          <View style={styles.timeBadge}>
-            <Text style={styles.timeText}>{currentSec.toFixed(1)}s / {TOTAL_DURATION}s</Text>
-          </View>
+          {hasGeneratedVideo && (
+            <View style={styles.timeBadge}>
+              <Text style={styles.timeText}>{currentSec.toFixed(1)}s / {TOTAL_DURATION}s</Text>
+            </View>
+          )}
 
           {isGeneratingVideo && videoGenProgress && (
             <View style={styles.videoGenOverlay}>
@@ -708,50 +716,54 @@ useEffect(() => {
         </View>
       </View>
 
-      <View style={styles.controlsRow}>
-        <TouchableOpacity style={styles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
-          {isPlaying ? (
-            <Pause size={20} color="#fff" strokeWidth={2.5} />
-          ) : (
-            <Play size={20} color="#fff" strokeWidth={2.5} />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.resetBtn} onPress={reset} activeOpacity={0.7}>
-          <RotateCcw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-        </TouchableOpacity>
-        <View style={styles.progressTrack}>
-          <View style={styles.progressBackground} />
-          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+      {hasGeneratedVideo && (
+        <View style={styles.controlsRow}>
+          <TouchableOpacity style={styles.playBtn} onPress={togglePlay} activeOpacity={0.8}>
+            {isPlaying ? (
+              <Pause size={20} color="#fff" strokeWidth={2.5} />
+            ) : (
+              <Play size={20} color="#fff" strokeWidth={2.5} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resetBtn} onPress={reset} activeOpacity={0.7}>
+            <RotateCcw size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          </TouchableOpacity>
+          <View style={styles.progressTrack}>
+            <View style={styles.progressBackground} />
+            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            {editPlan.segments.map((seg) => (
+              <View
+                key={seg.index}
+                style={[styles.segmentMarker, { left: `${(seg.startSec / TOTAL_DURATION) * 100}%` }]}
+              />
+            ))}
+            {editPlan.disclosureEnabled && (
+              <View
+                style={[styles.segmentMarker, styles.disclosureMarker, { left: `${(editPlan.disclosureOverlay.startSec / TOTAL_DURATION) * 100}%` }]}
+              />
+            )}
+          </View>
+        </View>
+      )}
+
+      {hasGeneratedVideo && (
+        <View style={styles.segmentLabels}>
           {editPlan.segments.map((seg) => (
-            <View
-              key={seg.index}
-              style={[styles.segmentMarker, { left: `${(seg.startSec / TOTAL_DURATION) * 100}%` }]}
-            />
+            <View key={seg.index} style={[styles.segmentLabelChip, { flex: seg.endSec - seg.startSec }]}>
+              <Text style={styles.segmentLabelText} numberOfLines={1}>{seg.label}</Text>
+            </View>
           ))}
-          {editPlan.disclosureEnabled && (
-            <View
-              style={[styles.segmentMarker, styles.disclosureMarker, { left: `${(editPlan.disclosureOverlay.startSec / TOTAL_DURATION) * 100}%` }]}
-            />
+          {editPlan.disclosureEnabled ? (
+            <View style={[styles.segmentLabelChip, styles.disclosureChip, { flex: editPlan.disclosureOverlay.durationSec }]}>
+              <Text style={styles.segmentLabelText} numberOfLines={1}>공정위</Text>
+            </View>
+          ) : (
+            <View style={[styles.segmentLabelChip, styles.extraChip, { flex: editPlan.disclosureOverlay.durationSec }]}>
+              <Text style={styles.segmentLabelText} numberOfLines={1}>여유</Text>
+            </View>
           )}
         </View>
-      </View>
-
-      <View style={styles.segmentLabels}>
-        {editPlan.segments.map((seg) => (
-          <View key={seg.index} style={[styles.segmentLabelChip, { flex: seg.endSec - seg.startSec }]}>
-            <Text style={styles.segmentLabelText} numberOfLines={1}>{seg.label}</Text>
-          </View>
-        ))}
-        {editPlan.disclosureEnabled ? (
-          <View style={[styles.segmentLabelChip, styles.disclosureChip, { flex: editPlan.disclosureOverlay.durationSec }]}>
-            <Text style={styles.segmentLabelText} numberOfLines={1}>공정위</Text>
-          </View>
-        ) : (
-          <View style={[styles.segmentLabelChip, styles.extraChip, { flex: editPlan.disclosureOverlay.durationSec }]}>
-            <Text style={styles.segmentLabelText} numberOfLines={1}>여유</Text>
-          </View>
-        )}
-      </View>
+      )}
     </View>
   );
 }

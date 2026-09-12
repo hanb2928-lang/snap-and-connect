@@ -1331,11 +1331,10 @@ export default function ResultScreen() {
   // Zero-Touch AI: auto-generate video when page loads with 5 photos and no existing video
   useEffect(() => {
     if (!scan || autoGenTriggered || isGeneratingVideo || generatedVideoUrl) return;
-    if (analysisStatus === 'processing' || analysisStatus === 'error') return;
     if (allCutImages.length < 5) return;
     setAutoGenTriggered(true);
     handleAiVideoGenerate();
-  }, [scan, autoGenTriggered, isGeneratingVideo, generatedVideoUrl, analysisStatus, allCutImages.length, handleAiVideoGenerate]);
+  }, [scan, autoGenTriggered, isGeneratingVideo, generatedVideoUrl, allCutImages.length, handleAiVideoGenerate]);
 
   const narrativePlan: NarrativePlan | null = useMemo(() => {
     if (allCutImages.length === 0) return null;
