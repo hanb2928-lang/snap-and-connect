@@ -2135,53 +2135,26 @@ export default function ResultScreen() {
           </View>
         </View>
 
-        <AiSoloDirectorCard
-          productName={scan?.product_name || ''}
-          platform={targetPlatform}
-          scanId={scan?.id ?? null}
-          customPrompt={inlineEdit.aiPrompt}
-        />
-
-        {/* === Viral Audio Sync Status === */}
-        <View style={styles.syncStatusSection}>
-          <View style={styles.syncStatusHeader}>
-            <AudioLines size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-            <Text style={styles.syncStatusTitle}>인간 감성 지능형 오디오 동기화</Text>
-          </View>
-          <View style={styles.syncMetricRow}>
-            <View style={styles.syncMetricChip}>
-              <Clock size={11} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.syncMetricText}>{Math.round(selectedDurationMs / 1000)}초</Text>
-            </View>
-            <View style={styles.syncMetricChip}>
-              <Sparkles size={11} color={theme.colors.accent[400]} strokeWidth={2} />
-              <Text style={styles.syncMetricText}>{getSyncAccuracyLabel(buildViralAudioSyncProfile(targetPlatform, contentPurpose, selectedDurationMs, mapVoiceKeyToProsody('viral_female_1'), inlineEdit.captionText || activeHook || scan?.summary || ''))}</Text>
-            </View>
-            <View style={styles.syncMetricChip}>
-              <ZapIcon size={11} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.syncMetricText}>상위 1% 벤치마크</Text>
-            </View>
-          </View>
-          <View style={styles.durationSelectorRow}>
-            <Text style={styles.durationSelectorLabel}>영상 길이</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
-              {DURATION_PRESETS.map((p) => {
-                const isActive = selectedDurationMs === p.value;
-                return (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[styles.durationChip, isActive && styles.durationChipActive]}
-                    onPress={() => setSelectedDurationMs(p.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+        {/* === 영상 길이 선택 (간소화) === */}
+        <View style={styles.durationSelectorRow}>
+          <Text style={styles.durationSelectorLabel}>영상 길이</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
+            {DURATION_PRESETS.map((p) => {
+              const isActive = selectedDurationMs === p.value;
+              return (
+                <TouchableOpacity
+                  key={p.value}
+                  style={[styles.durationChip, isActive && styles.durationChipActive]}
+                  onPress={() => setSelectedDurationMs(p.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* === Live Short-Form Preview === */}
@@ -2194,6 +2167,27 @@ export default function ResultScreen() {
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
           />
+
+          {/* === 한 줄 후킹 편집 바 (미리보기 직하단) === */}
+          <View style={styles.hookEditBar}>
+            <TextInput
+              style={styles.hookEditInput}
+              value={hookOverride ?? activeHook}
+              onChangeText={(text) => setHookOverride(text)}
+              placeholder="후킹 멘트를 여기서 바로 수정하세요"
+              placeholderTextColor={theme.colors.dark.textFaint}
+              numberOfLines={1}
+            />
+            {hookOverride && hookOverride !== activeHook && (
+              <TouchableOpacity
+                style={styles.hookEditReset}
+                onPress={() => setHookOverride(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.hookEditResetText}>원본</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* === AI Prompt + Regenerate === */}
@@ -2710,7 +2704,7 @@ export default function ResultScreen() {
             )}
           </View>
 
-          <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
+          {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
 
           {/* Cloud save — final step after platform selection */}
           <View style={styles.cloudSaveSection}>
@@ -4057,6 +4051,35 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.colors.primary[400] + '30',
     ...theme.shadows.card,
+  },
+  hookEditBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '30',
+  },
+  hookEditInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+    paddingVertical: 4,
+  },
+  hookEditReset: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.dark.surface,
+  },
+  hookEditResetText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
   },
   promptHeader: {
     flexDirection: 'row',
