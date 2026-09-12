@@ -133,6 +133,7 @@ import {
 import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { DEFAULT_DURATION, DURATION_PRESETS } from '@/lib/durationPresets';
 import { getDeepLink } from '@/lib/platformUpload';
+import { NarrationPlayer } from '@/components/NarrationPlayer';
 
 type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
 
@@ -2102,6 +2103,13 @@ export default function ResultScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* === AI Narration Player === */}
+        <NarrationPlayer
+          ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
+          narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+        />
 
         {/* === Target Platform Selector === */}
         <View style={styles.targetPlatformSection}>

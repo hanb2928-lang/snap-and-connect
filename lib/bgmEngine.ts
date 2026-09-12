@@ -1,8 +1,12 @@
 /**
- * Web Audio API BGM synthesizer — rich layered sound engine.
- * 16-step sequencer with independent bass, melody, pad, and drum tracks.
- * Dual detuned oscillators, filter LFO, algorithmic reverb, swing, humanization.
- * No external URLs, no CORS, no dead links.
+ * Web Audio API BGM engine — FM synthesis + additive layers.
+ * Each mood uses multi-oscillator FM patches emulating real instruments:
+ *   - cinematic:  string pad (FM bell + saw) + timpani-style bass
+ *   - hightension: supersaw lead + 808 sub bass + electronic drums
+ *   - asmr:       soft electric piano (FM sine/sine) + warm sub
+ *   - emotional:  acoustic piano emulation (FM triangle) + cello pad
+ *   - lofi:       Rhodes EP (FM sine) + vinyl drum kit + wow/flutter
+ * No external URLs — all synthesized in-browser.
  */
 
 export type BgmCategory = 'cinematic' | 'hightension' | 'asmr' | 'emotional' | 'lofi';
@@ -28,79 +32,34 @@ const LOW_ENERGY_CURVE: number[] = [0.15, 0.22, 0.3, 0.35, 0.4, 0.45, 0.5, 0.52,
 const HIGH_ENERGY_CURVE: number[] = [0.4, 0.6, 0.8, 1.0, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5];
 
 const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
-  cinematic: {
-    category: 'cinematic',
-    label: '시네마틱',
-    bpm: 90,
+  cinematic: { category: 'cinematic', label: '시네마틱', bpm: 90,
     energyCurve: [0.2, 0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 0.95, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.3],
-    tracks: [
-      { url: '', title: 'Cinematic Epic Build', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 },
-      { url: '', title: 'Cinematic Orchestra', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 12 },
-    ],
-  },
-  hightension: {
-    category: 'hightension',
-    label: '하이텐션',
-    bpm: 128,
+    tracks: [{ url: '', title: 'Cinematic Epic Build', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 }] },
+  hightension: { category: 'hightension', label: '하이텐션', bpm: 128,
     energyCurve: HIGH_ENERGY_CURVE,
-    tracks: [
-      { url: '', title: 'Energetic Electronic Beat', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 10 },
-      { url: '', title: 'Upbeat Future Bass', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 8 },
-    ],
-  },
-  asmr: {
-    category: 'asmr',
-    label: 'ASMR',
-    bpm: 60,
+    tracks: [{ url: '', title: 'Energetic Electronic', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 10 }] },
+  asmr: { category: 'asmr', label: 'ASMR', bpm: 60,
     energyCurve: LOW_ENERGY_CURVE,
-    tracks: [
-      { url: '', title: 'Soft Ambient Whisper', durationSec: 30, highlightStartSec: 2, highlightDurationSec: 14 },
-      { url: '', title: 'Minimal Calm', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 12 },
-    ],
-  },
-  emotional: {
-    category: 'emotional',
-    label: '감성',
-    bpm: 75,
+    tracks: [{ url: '', title: 'Soft Ambient', durationSec: 30, highlightStartSec: 2, highlightDurationSec: 14 }] },
+  emotional: { category: 'emotional', label: '감성', bpm: 75,
     energyCurve: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.8, 0.75, 0.7, 0.6, 0.5, 0.4, 0.3],
-    tracks: [
-      { url: '', title: 'Emotional Piano', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 },
-      { url: '', title: 'Warm Strings', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 12 },
-    ],
-  },
-  lofi: {
-    category: 'lofi',
-    label: '로파이',
-    bpm: 85,
+    tracks: [{ url: '', title: 'Emotional Piano', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 }] },
+  lofi: { category: 'lofi', label: '로파이', bpm: 82,
     energyCurve: LOW_ENERGY_CURVE,
-    tracks: [
-      { url: '', title: 'Lofi Chill Beats', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 12 },
-      { url: '', title: 'Lofi Study Session', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 10 },
-    ],
-  },
+    tracks: [{ url: '', title: 'Lofi Chill', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 12 }] },
 };
 
 const FALLBACK_TRACK_URL = '';
 
 const MOOD_LABEL_MAP: Record<string, BgmCategory> = {
-  '시네마틱': 'cinematic',
-  '하이텐션': 'hightension',
-  'ASMR': 'asmr',
-  '감성': 'emotional',
-  '로파이': 'lofi',
-  '트렌디': 'hightension',
-  'upbeat_pop': 'hightension',
-  'lofi_chill': 'lofi',
-  'acoustic_indie': 'emotional',
-  'energy_hiphop': 'hightension',
+  '시네마틱': 'cinematic', '하이텐션': 'hightension', 'ASMR': 'asmr',
+  '감성': 'emotional', '로파이': 'lofi', '트렌디': 'hightension',
+  'upbeat_pop': 'hightension', 'lofi_chill': 'lofi',
+  'acoustic_indie': 'emotional', 'energy_hiphop': 'hightension',
 };
-
 const CATEGORY_TO_BGM_CATEGORY: Record<string, BgmCategory> = {
-  cinematic: 'cinematic',
-  hightension: 'hightension',
-  asmr: 'asmr',
-  emotional: 'emotional',
-  lofi: 'lofi',
+  cinematic: 'cinematic', hightension: 'hightension', asmr: 'asmr',
+  emotional: 'emotional', lofi: 'lofi',
 };
 
 export function moodLabelToCategory(moodLabel: string): BgmCategory {
@@ -120,58 +79,78 @@ function pickTrack(category: BgmCategory, seed?: number): BgmTrack {
   return config.tracks[idx];
 }
 
-/* ─── Note frequency computation ─── */
-
 const SEMITONE_MAP: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-
 function noteFreq(note: string): number {
-  const match = note.match(/^([A-G])([#b]?)(\d)$/);
-  if (!match) return 0;
-  const [, letter, accidental, octaveStr] = match;
-  let semitone = SEMITONE_MAP[letter] ?? 0;
-  if (accidental === '#') semitone += 1;
-  if (accidental === 'b') semitone -= 1;
-  const midi = (parseInt(octaveStr) + 1) * 12 + semitone;
+  const m = note.match(/^([A-G])([#b]?)(\d)$/);
+  if (!m) return 0;
+  const [, letter, accidental, octaveStr] = m;
+  let st = SEMITONE_MAP[letter] ?? 0;
+  if (accidental === '#') st += 1;
+  if (accidental === 'b') st -= 1;
+  const midi = (parseInt(octaveStr) + 1) * 12 + st;
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-/* ─── Synth configuration ─── */
+const REST = -1;
+
+/* ─── Patch definitions ─── */
+
+type PatchType = 'piano' | 'ep' | 'pad' | 'supersaw' | 'sub808' | 'cello' | 'bell' | 'timpani';
+
+interface PatchParams {
+  type: PatchType;
+  carrier: OscillatorType;
+  modulator: OscillatorType;
+  modRatio: number;
+  modIndex: number;
+  detune: number;
+  unison: number;
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  gain: number;
+  filterFreq: number;
+  filterQ: number;
+}
+
+function makePatch(type: PatchType, overrides: Partial<PatchParams> = {}): PatchParams {
+  const defaults: Record<PatchType, PatchParams> = {
+    piano:    { type: 'piano',    carrier: 'triangle', modulator: 'sine',     modRatio: 2,  modIndex: 3,  detune: 2,  unison: 2, attack: 0.003, decay: 0.25, sustain: 0.0,  release: 0.4,  gain: 0.3,  filterFreq: 4000, filterQ: 0.5 },
+    ep:       { type: 'ep',       carrier: 'sine',     modulator: 'sine',     modRatio: 4,  modIndex: 1.5,detune: 4,  unison: 2, attack: 0.01,  decay: 0.6,  sustain: 0.3,  release: 0.5,  gain: 0.25, filterFreq: 2500, filterQ: 0.4 },
+    pad:      { type: 'pad',      carrier: 'sawtooth', modulator: 'sine',     modRatio: 1,  modIndex: 0.5,detune: 7,  unison: 3, attack: 0.6,   decay: 0.3,  sustain: 0.8,  release: 1.5,  gain: 0.08, filterFreq: 1500, filterQ: 0.7 },
+    supersaw: { type: 'supersaw', carrier: 'sawtooth', modulator: 'square',   modRatio: 0.5,modIndex: 0.3,detune: 12, unison: 4, attack: 0.01,  decay: 0.15, sustain: 0.6,  release: 0.2,  gain: 0.12, filterFreq: 3000, filterQ: 1.0 },
+    sub808:   { type: 'sub808',   carrier: 'sine',     modulator: 'sine',     modRatio: 0.5,modIndex: 0,  detune: 0,  unison: 1, attack: 0.02,  decay: 0.3,  sustain: 0.5,  release: 0.3,  gain: 0.35, filterFreq: 300,  filterQ: 0.5 },
+    cello:    { type: 'cello',    carrier: 'sawtooth', modulator: 'triangle', modRatio: 1,  modIndex: 1,  detune: 3,  unison: 2, attack: 0.08,  decay: 0.2,  sustain: 0.7,  release: 0.6,  gain: 0.12, filterFreq: 2000, filterQ: 0.6 },
+    bell:     { type: 'bell',     carrier: 'sine',     modulator: 'sine',     modRatio: 3,  modIndex: 2,  detune: 5,  unison: 2, attack: 0.001, decay: 1.5,  sustain: 0.0,  release: 1.0,  gain: 0.1,  filterFreq: 5000, filterQ: 0.3 },
+    timpani:  { type: 'timpani',  carrier: 'sine',     modulator: 'triangle', modRatio: 0.25,modIndex: 0.8,detune: 0,  unison: 1, attack: 0.005, decay: 0.6,  sustain: 0.0,  release: 0.3,  gain: 0.4,  filterFreq: 600,  filterQ: 0.8 },
+  };
+  return { ...defaults[type], ...overrides };
+}
 
 interface DrumPattern {
   kick: number[];
   snare: number[];
   hh: number[];
-  hhOpen: number[];
 }
 
 interface MoodSynthConfig {
   chords: string[][];
-  padWaveform: OscillatorType;
-  padGain: number;
-  padAttack: number;
-  padRelease: number;
-  padDetune: number;
-  melodyWaveform: OscillatorType;
-  melodyGain: number;
-  melodyDetune: number;
-  bassWaveform: OscillatorType;
-  bassGain: number;
-  bassDetune: number;
+  bassPatch: PatchParams;
   bassPattern: number[];
+  melodyPatch: PatchParams;
   melodyPattern: number[];
+  padPatch: PatchParams;
   drums: DrumPattern | null;
-  filterFreq: number;
-  filterQ: number;
-  filterLfoFreq: number;
-  filterLfoDepth: number;
   reverbDuration: number;
   reverbDecay: number;
   reverbWet: number;
   swing: number;
   humanize: number;
+  delayMs: number;
+  delayFeedback: number;
+  delayWet: number;
 }
-
-const REST = -1;
 
 const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
   cinematic: {
@@ -181,29 +160,15 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
       ['F2', 'Ab2', 'C3', 'Eb3'],
       ['G2', 'B2', 'D3', 'F3'],
     ],
-    padWaveform: 'sine',
-    padGain: 0.07,
-    padAttack: 0.4,
-    padRelease: 1.8,
-    padDetune: 6,
-    melodyWaveform: 'sine',
-    melodyGain: 0.12,
-    melodyDetune: 4,
-    bassWaveform: 'triangle',
-    bassGain: 0.2,
-    bassDetune: 3,
-    bassPattern: [0, REST, REST, REST, REST, REST, 7, REST, REST, REST, REST, REST, 5, REST, REST, REST],
-    melodyPattern: [REST, REST, REST, 12, REST, REST, 15, REST, REST, 12, REST, REST, 10, REST, 7, REST],
+    bassPatch: makePatch('timpani'),
+    bassPattern: [0,REST,REST,REST, REST,REST,7,REST, REST,REST,REST,REST, REST,REST,5,REST],
+    melodyPatch: makePatch('bell', { gain: 0.15, release: 1.5 }),
+    melodyPattern: [REST,REST,REST,12, REST,REST,15,REST, REST,REST,12,REST, 10,REST,7,REST],
+    padPatch: makePatch('pad', { carrier: 'sawtooth', gain: 0.06, attack: 0.8, release: 2.0, filterFreq: 1200 }),
     drums: null,
-    filterFreq: 1600,
-    filterQ: 0.8,
-    filterLfoFreq: 0.3,
-    filterLfoDepth: 400,
-    reverbDuration: 3.5,
-    reverbDecay: 2.5,
-    reverbWet: 0.35,
-    swing: 0,
-    humanize: 0.03,
+    reverbDuration: 4, reverbDecay: 2.5, reverbWet: 0.4,
+    swing: 0, humanize: 0.04,
+    delayMs: 375, delayFeedback: 0.3, delayWet: 0.2,
   },
   hightension: {
     chords: [
@@ -212,34 +177,19 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
       ['G3', 'B3', 'D4', 'F4'],
       ['E3', 'G3', 'B3', 'D4'],
     ],
-    padWaveform: 'sawtooth',
-    padGain: 0.05,
-    padAttack: 0.03,
-    padRelease: 0.4,
-    padDetune: 8,
-    melodyWaveform: 'sawtooth',
-    melodyGain: 0.1,
-    melodyDetune: 7,
-    bassWaveform: 'square',
-    bassGain: 0.18,
-    bassDetune: 5,
-    bassPattern: [0, 0, REST, 0, 7, REST, 0, 0, 0, REST, 5, REST, 0, 0, 3, REST],
-    melodyPattern: [12, REST, 15, REST, 12, 10, REST, 12, 15, REST, 12, REST, 10, 7, REST, REST],
+    bassPatch: makePatch('sub808', { gain: 0.3 }),
+    bassPattern: [0,0,REST,0, 7,REST,0,0, 0,REST,5,REST, 0,0,3,REST],
+    melodyPatch: makePatch('supersaw', { gain: 0.1, detune: 14, filterFreq: 3500 }),
+    melodyPattern: [12,REST,15,REST, 12,10,REST,12, 15,REST,12,REST, 10,7,REST,REST],
+    padPatch: makePatch('supersaw', { gain: 0.04, attack: 0.05, release: 0.3, filterFreq: 2000 }),
     drums: {
       kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
       snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
       hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
-      hhOpen:[0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
     },
-    filterFreq: 2800,
-    filterQ: 1.2,
-    filterLfoFreq: 0.5,
-    filterLfoDepth: 700,
-    reverbDuration: 1.2,
-    reverbDecay: 3,
-    reverbWet: 0.12,
-    swing: 0,
-    humanize: 0.02,
+    reverbDuration: 1, reverbDecay: 3, reverbWet: 0.1,
+    swing: 0, humanize: 0.02,
+    delayMs: 187, delayFeedback: 0.25, delayWet: 0.08,
   },
   asmr: {
     chords: [
@@ -248,29 +198,15 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
       ['F3', 'A3', 'C4', 'E4'],
       ['G3', 'B3', 'D4', 'F4'],
     ],
-    padWaveform: 'sine',
-    padGain: 0.06,
-    padAttack: 1.0,
-    padRelease: 3.0,
-    padDetune: 8,
-    melodyWaveform: 'sine',
-    melodyGain: 0.08,
-    melodyDetune: 5,
-    bassWaveform: 'sine',
-    bassGain: 0.12,
-    bassDetune: 2,
-    bassPattern: [0, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST],
-    melodyPattern: [REST, REST, REST, REST, 12, REST, REST, REST, REST, REST, REST, REST, REST, 10, REST, REST],
+    bassPatch: makePatch('sub808', { gain: 0.12, attack: 0.3, release: 0.8 }),
+    bassPattern: [0,REST,REST,REST, REST,REST,REST,REST, REST,REST,REST,REST, REST,REST,REST,REST],
+    melodyPatch: makePatch('ep', { gain: 0.12, attack: 0.05, release: 1.0, filterFreq: 1800 }),
+    melodyPattern: [REST,REST,REST,REST, 12,REST,REST,REST, REST,REST,REST,REST, REST,10,REST,REST],
+    padPatch: makePatch('pad', { carrier: 'sine', gain: 0.05, attack: 1.5, release: 3.0, filterFreq: 600, detune: 8 }),
     drums: null,
-    filterFreq: 700,
-    filterQ: 0.4,
-    filterLfoFreq: 0.08,
-    filterLfoDepth: 150,
-    reverbDuration: 5,
-    reverbDecay: 2,
-    reverbWet: 0.55,
-    swing: 0,
-    humanize: 0.04,
+    reverbDuration: 6, reverbDecay: 2, reverbWet: 0.55,
+    swing: 0, humanize: 0.05,
+    delayMs: 500, delayFeedback: 0.35, delayWet: 0.15,
   },
   emotional: {
     chords: [
@@ -279,29 +215,15 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
       ['F2', 'A2', 'C3', 'E3'],
       ['G2', 'B2', 'D3', 'F3'],
     ],
-    padWaveform: 'triangle',
-    padGain: 0.08,
-    padAttack: 0.15,
-    padRelease: 1.2,
-    padDetune: 5,
-    melodyWaveform: 'triangle',
-    melodyGain: 0.13,
-    melodyDetune: 4,
-    bassWaveform: 'sine',
-    bassGain: 0.18,
-    bassDetune: 3,
-    bassPattern: [0, REST, REST, 7, REST, REST, 5, REST, REST, 3, REST, REST, 7, REST, REST, REST],
-    melodyPattern: [REST, REST, 12, REST, 10, REST, 12, REST, 15, REST, 12, REST, 10, REST, 7, REST],
+    bassPatch: makePatch('cello', { gain: 0.15, filterFreq: 1500 }),
+    bassPattern: [0,REST,REST,7, REST,REST,5,REST, REST,3,REST,REST, 7,REST,REST,REST],
+    melodyPatch: makePatch('piano', { gain: 0.2, release: 0.6 }),
+    melodyPattern: [REST,REST,12,REST, 10,REST,12,REST, 15,REST,12,REST, 10,REST,7,REST],
+    padPatch: makePatch('cello', { gain: 0.06, attack: 0.3, release: 1.0 }),
     drums: null,
-    filterFreq: 1400,
-    filterQ: 0.6,
-    filterLfoFreq: 0.2,
-    filterLfoDepth: 250,
-    reverbDuration: 2.5,
-    reverbDecay: 2.5,
-    reverbWet: 0.3,
-    swing: 0,
-    humanize: 0.03,
+    reverbDuration: 3, reverbDecay: 2.5, reverbWet: 0.3,
+    swing: 0, humanize: 0.03,
+    delayMs: 320, delayFeedback: 0.3, delayWet: 0.12,
   },
   lofi: {
     chords: [
@@ -310,34 +232,19 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
       ['G2', 'Bb2', 'D3', 'F3'],
       ['A2', 'C3', 'E3', 'G3'],
     ],
-    padWaveform: 'sine',
-    padGain: 0.07,
-    padAttack: 0.12,
-    padRelease: 0.9,
-    padDetune: 10,
-    melodyWaveform: 'sine',
-    melodyGain: 0.1,
-    melodyDetune: 6,
-    bassWaveform: 'triangle',
-    bassGain: 0.16,
-    bassDetune: 4,
-    bassPattern: [0, REST, REST, 3, REST, 5, REST, 3, REST, REST, 7, REST, 5, REST, 3, REST],
-    melodyPattern: [REST, REST, 15, REST, 12, REST, REST, 10, REST, 12, REST, REST, 7, REST, REST, REST],
+    bassPatch: makePatch('sub808', { carrier: 'triangle', gain: 0.18, filterFreq: 500 }),
+    bassPattern: [0,REST,REST,3, REST,5,REST,3, REST,REST,7,REST, 5,REST,3,REST],
+    melodyPatch: makePatch('ep', { gain: 0.14, detune: 7, filterFreq: 1200, attack: 0.02, release: 0.8 }),
+    melodyPattern: [REST,REST,15,REST, 12,REST,REST,10, REST,12,REST,REST, 7,REST,REST,REST],
+    padPatch: makePatch('pad', { carrier: 'sine', gain: 0.05, attack: 0.2, release: 1.2, filterFreq: 1000, detune: 12 }),
     drums: {
       kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
       snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
       hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-      hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
     },
-    filterFreq: 1100,
-    filterQ: 0.7,
-    filterLfoFreq: 0.12,
-    filterLfoDepth: 180,
-    reverbDuration: 1.8,
-    reverbDecay: 2.8,
-    reverbWet: 0.22,
-    swing: 0.15,
-    humanize: 0.05,
+    reverbDuration: 2, reverbDecay: 2.8, reverbWet: 0.22,
+    swing: 0.18, humanize: 0.06,
+    delayMs: 292, delayFeedback: 0.28, delayWet: 0.1,
   },
 };
 
@@ -346,18 +253,20 @@ const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
 export class BgmPlayer {
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
-  private filterNode: BiquadFilterNode | null = null;
   private dryGain: GainNode | null = null;
   private reverbConvolver: ConvolverNode | null = null;
   private reverbGain: GainNode | null = null;
-  private lfoOsc: OscillatorNode | null = null;
-  private lfoDepthGain: GainNode | null = null;
+  private delayNode: DelayNode | null = null;
+  private delayFeedback: GainNode | null = null;
+  private delayWet: GainNode | null = null;
   private isPlaying = false;
-  private volume = 0.75;
+  private volume = 0.7;
   private currentCategory: BgmCategory = 'hightension';
   private schedulerTimer: ReturnType<typeof setInterval> | null = null;
   private nextNoteTime = 0;
   private currentStep = 0;
+  private wowFlutterLfo: OscillatorNode | null = null;
+  private wowFlutterGain: GainNode | null = null;
 
   private getOrCreateContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -370,30 +279,28 @@ export class BgmPlayer {
       this.masterGain.gain.value = 0;
       this.masterGain.connect(ctx.destination);
 
-      this.filterNode = ctx.createBiquadFilter();
-      this.filterNode.type = 'lowpass';
-      this.filterNode.frequency.value = 2000;
-      this.filterNode.Q.value = 0.7;
-
+      // Dry path
       this.dryGain = ctx.createGain();
-      this.dryGain.gain.value = 0.7;
-      this.filterNode.connect(this.dryGain);
+      this.dryGain.gain.value = 0.75;
       this.dryGain.connect(this.masterGain);
 
+      // Reverb send
       this.reverbGain = ctx.createGain();
       this.reverbGain.gain.value = 0;
       this.reverbConvolver = ctx.createConvolver();
       this.reverbConvolver.connect(this.reverbGain);
       this.reverbGain.connect(this.masterGain);
 
-      this.lfoDepthGain = ctx.createGain();
-      this.lfoDepthGain.gain.value = 0;
-      this.lfoOsc = ctx.createOscillator();
-      this.lfoOsc.type = 'sine';
-      this.lfoOsc.frequency.value = 0.3;
-      this.lfoOsc.connect(this.lfoDepthGain);
-      this.lfoDepthGain.connect(this.filterNode.frequency);
-      this.lfoOsc.start();
+      // Delay send
+      this.delayWet = ctx.createGain();
+      this.delayWet.gain.value = 0;
+      this.delayNode = ctx.createDelay(2);
+      this.delayFeedback = ctx.createGain();
+      this.delayFeedback.gain.value = 0.3;
+      this.delayNode.connect(this.delayFeedback);
+      this.delayFeedback.connect(this.delayNode);
+      this.delayNode.connect(this.delayWet);
+      this.delayWet.connect(this.masterGain);
 
       this.audioCtx = ctx;
     }
@@ -401,24 +308,22 @@ export class BgmPlayer {
   }
 
   private createReverbImpulse(ctx: AudioContext, durationSec: number, decay: number): AudioBuffer {
-    const sampleRate = ctx.sampleRate;
-    const length = Math.floor(sampleRate * durationSec);
-    const impulse = ctx.createBuffer(2, length, sampleRate);
+    const sr = ctx.sampleRate;
+    const len = Math.floor(sr * durationSec);
+    const buf = ctx.createBuffer(2, len, sr);
     for (let ch = 0; ch < 2; ch++) {
-      const data = impulse.getChannelData(ch);
-      for (let i = 0; i < length; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
       }
     }
-    return impulse;
+    return buf;
   }
 
   unlockAudio(): void {
     const ctx = this.getOrCreateContext();
     if (!ctx) return;
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   }
 
   start(
@@ -429,25 +334,37 @@ export class BgmPlayer {
     _energyCurve?: number[],
   ): void {
     const ctx = this.getOrCreateContext();
-    if (!ctx || !this.masterGain || !this.filterNode || !this.reverbConvolver || !this.reverbGain || !this.lfoOsc || !this.lfoDepthGain) return;
+    if (!ctx || !this.masterGain || !this.dryGain || !this.reverbConvolver || !this.reverbGain || !this.delayNode || !this.delayFeedback || !this.delayWet) return;
     if (this.isPlaying) this.stop();
 
     this.unlockAudio();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
     const category = moodLabelToCategory(bgmTemplateId);
     this.currentCategory = category;
     const config = MOOD_SYNTH_CONFIGS[category];
     const effectiveBpm = bpm ?? MOOD_CONFIGS[category].bpm;
 
-    this.filterNode.frequency.value = config.filterFreq;
-    this.filterNode.Q.value = config.filterQ;
-    this.lfoOsc.frequency.value = config.filterLfoFreq;
-    this.lfoDepthGain.gain.value = config.filterLfoDepth;
     this.reverbConvolver.buffer = this.createReverbImpulse(ctx, config.reverbDuration, config.reverbDecay);
     this.reverbGain.gain.value = config.reverbWet;
+    this.delayNode.delayTime.value = config.delayMs / 1000;
+    this.delayFeedback.gain.value = config.delayFeedback;
+    this.delayWet.gain.value = config.delayWet;
+
+    // Lofi wow/flutter — subtle pitch wobble
+    if (category === 'lofi' && !this.wowFlutterLfo) {
+      this.wowFlutterLfo = ctx.createOscillator();
+      this.wowFlutterLfo.type = 'sine';
+      this.wowFlutterLfo.frequency.value = 0.6;
+      this.wowFlutterGain = ctx.createGain();
+      this.wowFlutterGain.gain.value = 3;
+      this.wowFlutterLfo.connect(this.wowFlutterGain);
+      this.wowFlutterLfo.start();
+    } else if (category !== 'lofi' && this.wowFlutterLfo) {
+      try { this.wowFlutterLfo.stop(); } catch { /* ignore */ }
+      this.wowFlutterLfo = null;
+      this.wowFlutterGain = null;
+    }
 
     this.isPlaying = true;
     this.currentStep = 0;
@@ -457,10 +374,10 @@ export class BgmPlayer {
     const totalSteps = config.chords.length * 16;
 
     const scheduleNotes = () => {
-      if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
+      if (!this.isPlaying || !this.audioCtx || !this.dryGain) return;
       while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
-        const swungTime = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
-        this.playStep(config, this.currentStep, swungTime, stepDurSec, totalSteps);
+        const t = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
+        this.playStep(config, this.currentStep, t, stepDurSec);
         this.currentStep = (this.currentStep + 1) % totalSteps;
         this.nextNoteTime += stepDurSec;
       }
@@ -476,194 +393,202 @@ export class BgmPlayer {
 
   private applySwing(step: number, time: number, stepDur: number, swing: number): number {
     if (swing <= 0) return time;
-    const barStep = step % 16;
-    if (barStep % 2 === 1) {
-      return time + stepDur * swing;
-    }
+    if (step % 2 === 1) return time + stepDur * swing;
     return time;
   }
 
-  private playStep(
-    config: MoodSynthConfig,
-    step: number,
-    time: number,
-    stepDur: number,
-    totalSteps: number,
-  ): void {
-    if (!this.audioCtx || !this.filterNode || !this.masterGain) return;
+  private playStep(config: MoodSynthConfig, step: number, time: number, stepDur: number): void {
+    if (!this.audioCtx || !this.dryGain || !this.reverbConvolver || !this.delayNode) return;
 
     const barStep = step % 16;
-    const chordIndex = Math.floor(step / 16) % config.chords.length;
-    const chord = config.chords[chordIndex];
+    const chordIdx = Math.floor(step / 16) % config.chords.length;
+    const chord = config.chords[chordIdx];
     const rootFreq = noteFreq(chord[0]);
     if (rootFreq <= 0) return;
 
+    // Pad on chord change
     if (barStep === 0) {
-      this.playPad(chord, time, stepDur * 16, config);
+      for (const note of chord) {
+        this.playFmNote(noteFreq(note), time, stepDur * 16, config.padPatch, config);
+      }
     }
 
-    const bassOffset = config.bassPattern[barStep];
-    if (bassOffset !== undefined && bassOffset >= 0) {
-      const freq = rootFreq * Math.pow(2, bassOffset / 12);
-      const humanizedGain = config.bassGain * (1 - config.humanize + Math.random() * config.humanize * 2);
-      this.playNoteLayered(freq, time, stepDur * 2.2, config.bassWaveform, humanizedGain, config.bassDetune, config, false);
+    // Bass
+    const bassOff = config.bassPattern[barStep];
+    if (bassOff !== undefined && bassOff >= 0) {
+      const f = rootFreq * Math.pow(2, bassOff / 12);
+      this.playFmNote(f, time, stepDur * 2.5, config.bassPatch, config);
     }
 
-    const melodyOffset = config.melodyPattern[barStep];
-    if (melodyOffset !== undefined && melodyOffset >= 0) {
-      const freq = rootFreq * Math.pow(2, melodyOffset / 12);
-      const humanizedGain = config.melodyGain * (1 - config.humanize + Math.random() * config.humanize * 2);
-      this.playNoteLayered(freq, time, stepDur * 1.8, config.melodyWaveform, humanizedGain, config.melodyDetune, config, true);
+    // Melody
+    const melOff = config.melodyPattern[barStep];
+    if (melOff !== undefined && melOff >= 0) {
+      const f = rootFreq * Math.pow(2, melOff / 12);
+      const humanGain = 1 - config.humanize + Math.random() * config.humanize * 2;
+      this.playFmNote(f, time, stepDur * 2, { ...config.melodyPatch, gain: config.melodyPatch.gain * humanGain }, config);
     }
 
+    // Drums
     if (config.drums) {
       if (config.drums.kick[barStep]) this.playKick(time);
       if (config.drums.snare[barStep]) this.playSnare(time);
-      if (config.drums.hh[barStep]) this.playHihat(time, config.drums.hhOpen[barStep] === 1);
+      if (config.drums.hh[barStep]) this.playHihat(time, barStep % 4 === 2);
     }
   }
 
-  private playPad(chord: string[], time: number, durationSec: number, config: MoodSynthConfig): void {
-    if (!this.audioCtx || !this.filterNode) return;
-    for (const note of chord) {
-      const freq = noteFreq(note);
-      if (freq <= 0) continue;
-      this.playNoteLayered(freq, time, durationSec, config.padWaveform, config.padGain, config.padDetune, config, true);
+  private playFmNote(freq: number, time: number, durationSec: number, patch: PatchParams, config: MoodSynthConfig): void {
+    if (!this.audioCtx || !this.dryGain || !this.reverbConvolver || !this.delayNode) return;
+    const ctx = this.audioCtx;
+
+    const totalGain = ctx.createGain();
+    const a = Math.min(patch.attack, durationSec * 0.4);
+    const d = Math.min(patch.decay, durationSec * 0.3);
+    const s = patch.sustain;
+    const r = Math.min(patch.release, durationSec * 0.5);
+    const peak = patch.gain;
+    const sustainLevel = peak * s;
+
+    totalGain.gain.setValueAtTime(0, time);
+    totalGain.gain.linearRampToValueAtTime(peak, time + a);
+    totalGain.gain.linearRampToValueAtTime(sustainLevel, time + a + d);
+    const releaseStart = Math.max(time + a + d, time + durationSec - r);
+    totalGain.gain.setValueAtTime(sustainLevel, releaseStart);
+    totalGain.gain.linearRampToValueAtTime(0, time + durationSec);
+
+    // Filter
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = patch.filterFreq;
+    filter.Q.value = patch.filterQ;
+    filter.connect(totalGain);
+
+    // Unison oscillators with FM
+    const detuneSpread = patch.detune;
+    for (let i = 0; i < patch.unison; i++) {
+      const detune = patch.unison > 1
+        ? (i / (patch.unison - 1) - 0.5) * detuneSpread * 2
+        : 0;
+
+      // Carrier
+      const carrier = ctx.createOscillator();
+      carrier.type = patch.carrier;
+      carrier.frequency.value = freq;
+
+      // Apply wow/flutter for lofi
+      if (this.wowFlutterGain && this.currentCategory === 'lofi') {
+        this.wowFlutterGain.connect(carrier.detune);
+      }
+      carrier.detune.value = detune;
+
+      // Modulator
+      const modulator = ctx.createOscillator();
+      modulator.type = patch.modulator;
+      modulator.frequency.value = freq * patch.modRatio;
+
+      const modGain = ctx.createGain();
+      modGain.gain.value = freq * patch.modIndex;
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency);
+
+      carrier.connect(filter);
+      carrier.start(time);
+      modulator.start(time);
+      carrier.stop(time + durationSec + 0.1);
+      modulator.stop(time + durationSec + 0.1);
     }
-  }
 
-  private playNoteLayered(
-    freq: number,
-    time: number,
-    durationSec: number,
-    waveform: OscillatorType,
-    gainValue: number,
-    detuneCents: number,
-    config: MoodSynthConfig,
-    useFilter: boolean,
-  ): void {
-    if (!this.audioCtx) return;
-    const dest = useFilter && this.filterNode ? this.filterNode : this.masterGain;
-    if (!dest) return;
-
-    const gain = this.audioCtx.createGain();
-    const attackSec = Math.min(config.padAttack, durationSec * 0.5);
-    const releaseSec = Math.min(config.padRelease, durationSec * 0.5);
-
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(gainValue, time + attackSec);
-    gain.gain.setValueAtTime(gainValue, time + durationSec - releaseSec);
-    gain.gain.linearRampToValueAtTime(0, time + durationSec);
-
-    const osc1 = this.audioCtx.createOscillator();
-    osc1.type = waveform;
-    osc1.frequency.value = freq;
-    osc1.detune.value = -detuneCents / 2;
-    osc1.connect(gain);
-
-    const osc2 = this.audioCtx.createOscillator();
-    osc2.type = waveform;
-    osc2.frequency.value = freq;
-    osc2.detune.value = detuneCents / 2;
-    osc2.connect(gain);
-
-    gain.connect(dest);
-    osc1.start(time);
-    osc2.start(time);
-    osc1.stop(time + durationSec + 0.05);
-    osc2.stop(time + durationSec + 0.05);
+    // Send to dry, reverb, delay
+    totalGain.connect(this.dryGain);
+    totalGain.connect(this.reverbConvolver);
+    if (patch.type !== 'sub808' && patch.type !== 'timpani') {
+      totalGain.connect(this.delayNode);
+    }
   }
 
   private playKick(time: number): void {
-    if (!this.audioCtx || !this.masterGain) return;
-    const osc = this.audioCtx.createOscillator();
+    if (!this.audioCtx || !this.dryGain || !this.reverbConvolver) return;
+    const ctx = this.audioCtx;
+
+    const osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(130, time);
+    osc.frequency.setValueAtTime(140, time);
     osc.frequency.exponentialRampToValueAtTime(38, time + 0.12);
 
-    const gain = this.audioCtx.createGain();
-    gain.gain.setValueAtTime(0.5, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+    const click = ctx.createOscillator();
+    click.type = 'square';
+    click.frequency.value = 800;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(0.08, time);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.008);
+    click.connect(clickGain);
+    clickGain.connect(this.dryGain);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.55, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(time);
-    osc.stop(time + 0.22);
+    gain.connect(this.dryGain);
+    gain.connect(this.reverbConvolver);
+
+    osc.start(time); osc.stop(time + 0.25);
+    click.start(time); click.stop(time + 0.02);
   }
 
   private playSnare(time: number): void {
-    if (!this.audioCtx || !this.masterGain) return;
+    if (!this.audioCtx || !this.dryGain || !this.reverbConvolver) return;
+    const ctx = this.audioCtx;
 
-    const bufferSize = Math.floor(this.audioCtx.sampleRate * 0.15);
-    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
-    const noise = this.audioCtx.createBufferSource();
-    noise.buffer = buffer;
+    // Noise component
+    const noiseLen = 0.15;
+    const bufSize = Math.floor(ctx.sampleRate * noiseLen);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'bandpass'; nf.frequency.value = 2000; nf.Q.value = 0.7;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.3, time);
+    ng.gain.exponentialRampToValueAtTime(0.001, time + 0.13);
+    noise.connect(nf); nf.connect(ng); ng.connect(this.dryGain); ng.connect(this.reverbConvolver);
 
-    const noiseFilter = this.audioCtx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 1800;
-    noiseFilter.Q.value = 0.8;
+    // Tonal component
+    const tone = ctx.createOscillator();
+    tone.type = 'triangle';
+    tone.frequency.setValueAtTime(200, time);
+    tone.frequency.exponentialRampToValueAtTime(120, time + 0.08);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.18, time);
+    tg.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    tone.connect(tg); tg.connect(this.dryGain);
 
-    const noiseGain = this.audioCtx.createGain();
-    noiseGain.gain.setValueAtTime(0.25, time);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
-
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-
-    const toneOsc = this.audioCtx.createOscillator();
-    toneOsc.type = 'triangle';
-    toneOsc.frequency.value = 180;
-    const toneGain = this.audioCtx.createGain();
-    toneGain.gain.setValueAtTime(0.15, time);
-    toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
-    toneOsc.connect(toneGain);
-    toneGain.connect(this.masterGain);
-
-    noise.start(time);
-    noise.stop(time + 0.16);
-    toneOsc.start(time);
-    toneOsc.stop(time + 0.1);
+    noise.start(time); noise.stop(time + 0.16);
+    tone.start(time); tone.stop(time + 0.12);
   }
 
   private playHihat(time: number, open: boolean): void {
-    if (!this.audioCtx || !this.masterGain) return;
-    const dur = open ? 0.12 : 0.04;
-    const bufferSize = Math.floor(this.audioCtx.sampleRate * dur);
-    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
-    }
-    const noise = this.audioCtx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = this.audioCtx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 7000;
-
-    const gain = this.audioCtx.createGain();
-    const peakGain = open ? 0.06 : 0.09;
-    gain.gain.setValueAtTime(peakGain, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-    noise.start(time);
-    noise.stop(time + dur + 0.02);
+    if (!this.audioCtx || !this.dryGain) return;
+    const ctx = this.audioCtx;
+    const dur = open ? 0.1 : 0.035;
+    const bufSize = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 8000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(open ? 0.05 : 0.08, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    noise.connect(hp); hp.connect(g); g.connect(this.dryGain);
+    noise.start(time); noise.stop(time + dur + 0.02);
   }
 
   pause(): void {
-    if (this.schedulerTimer) {
-      clearInterval(this.schedulerTimer);
-      this.schedulerTimer = null;
-    }
+    if (this.schedulerTimer) { clearInterval(this.schedulerTimer); this.schedulerTimer = null; }
     if (this.masterGain && this.audioCtx) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
       this.masterGain.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 0.1);
@@ -678,17 +603,15 @@ export class BgmPlayer {
     this.masterGain.gain.linearRampToValueAtTime(this.volume, this.audioCtx.currentTime + 0.2);
     this.isPlaying = true;
     this.nextNoteTime = this.audioCtx.currentTime + 0.05;
-
     const config = MOOD_SYNTH_CONFIGS[this.currentCategory];
     const bpm = MOOD_CONFIGS[this.currentCategory].bpm;
     const stepDurSec = 60 / bpm / 4;
     const totalSteps = config.chords.length * 16;
-
     const scheduleNotes = () => {
-      if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
+      if (!this.isPlaying || !this.audioCtx || !this.dryGain) return;
       while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
-        const swungTime = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
-        this.playStep(config, this.currentStep, swungTime, stepDurSec, totalSteps);
+        const t = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
+        this.playStep(config, this.currentStep, t, stepDurSec);
         this.currentStep = (this.currentStep + 1) % totalSteps;
         this.nextNoteTime += stepDurSec;
       }
@@ -699,10 +622,7 @@ export class BgmPlayer {
 
   stop(): void {
     this.isPlaying = false;
-    if (this.schedulerTimer) {
-      clearInterval(this.schedulerTimer);
-      this.schedulerTimer = null;
-    }
+    if (this.schedulerTimer) { clearInterval(this.schedulerTimer); this.schedulerTimer = null; }
     if (this.masterGain && this.audioCtx) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
       this.masterGain.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 0.15);
@@ -719,143 +639,55 @@ export class BgmPlayer {
 
   dispose(): void {
     this.stop();
-    if (this.lfoOsc) {
-      try { this.lfoOsc.stop(); } catch { /* ignore */ }
-      this.lfoOsc = null;
-    }
+    if (this.wowFlutterLfo) { try { this.wowFlutterLfo.stop(); } catch { /* ignore */ } this.wowFlutterLfo = null; this.wowFlutterGain = null; }
     if (this.audioCtx) {
       try { this.audioCtx.close(); } catch { /* ignore */ }
-      this.audioCtx = null;
-      this.masterGain = null;
-      this.filterNode = null;
-      this.dryGain = null;
-      this.reverbConvolver = null;
-      this.reverbGain = null;
-      this.lfoDepthGain = null;
+      this.audioCtx = null; this.masterGain = null; this.dryGain = null;
+      this.reverbConvolver = null; this.reverbGain = null;
+      this.delayNode = null; this.delayFeedback = null; this.delayWet = null;
     }
   }
 
-  get playing(): boolean {
-    return this.isPlaying;
-  }
-
-  get category(): BgmCategory {
-    return this.currentCategory;
-  }
+  get playing(): boolean { return this.isPlaying; }
+  get category(): BgmCategory { return this.currentCategory; }
 }
 
 /* ─── Utility exports ─── */
 
-export function getBgmStreamUrl(_moodLabel: string, _trackIndex?: number): string {
-  return '';
-}
+export function getBgmStreamUrl(_moodLabel: string, _trackIndex?: number): string { return ''; }
 
 export function getBgmTemplateForMood(moodLabel: string): {
-  id: string;
-  label: string;
-  mood: string;
-  bpm: number;
-  highlightStartSec: number;
-  highlightDurationSec: number;
-  energyCurve: number[];
+  id: string; label: string; mood: string; bpm: number;
+  highlightStartSec: number; highlightDurationSec: number; energyCurve: number[];
 } {
   const category = moodLabelToCategory(moodLabel);
   const config = MOOD_CONFIGS[category];
   const track = config.tracks[0];
-  return {
-    id: category,
-    label: config.label,
-    mood: config.label,
-    bpm: config.bpm,
-    highlightStartSec: track.highlightStartSec,
-    highlightDurationSec: track.highlightDurationSec,
-    energyCurve: config.energyCurve,
-  };
+  return { id: category, label: config.label, mood: config.label, bpm: config.bpm,
+    highlightStartSec: track.highlightStartSec, highlightDurationSec: track.highlightDurationSec, energyCurve: config.energyCurve };
 }
 
-export async function mixBgmIntoVideo(
-  _videoUri: string,
-  _bgmTemplateId: string,
-  _bpm?: number,
-  _durationSec?: number,
-  _highlightStartSec?: number,
-  _highlightDurationSec?: number,
-  _energyCurve?: number[],
-): Promise<string> {
-  return _videoUri;
-}
+export async function mixBgmIntoVideo(_videoUri: string, _bgmTemplateId: string, _bpm?: number, _durationSec?: number, _highlightStartSec?: number, _highlightDurationSec?: number, _energyCurve?: number[]): Promise<string> { return _videoUri; }
 
-export interface BgmRecommendation {
-  category: BgmCategory;
-  templateId: string;
-  label: string;
-  description: string;
-  bpm: number;
-  reason: string;
-  highlightStartSec: number;
-  highlightDurationSec: number;
-  energyCurve: number[];
-}
+export interface BgmRecommendation { category: BgmCategory; templateId: string; label: string; description: string; bpm: number; reason: string; highlightStartSec: number; highlightDurationSec: number; energyCurve: number[]; }
 
-const FALLBACK_RECOMMENDATION: BgmRecommendation = {
-  category: 'hightension',
-  templateId: 'hightension',
-  label: '하이텐션',
-  description: '틱톡 및 릴스에서 가장 인기 있는 경쾌한 일렉트로닉 비트',
-  bpm: 128,
-  reason: '이미지 분석 없이 하이텐션 무드를 기본 추천했습니다.',
-  highlightStartSec: 3,
-  highlightDurationSec: 10,
-  energyCurve: HIGH_ENERGY_CURVE,
-};
+const FALLBACK_RECOMMENDATION: BgmRecommendation = { category: 'hightension', templateId: 'hightension', label: '하이텐션', description: '틱톡 및 릴스에서 가장 인기 있는 경쾌한 일렉트로닉 비트', bpm: 128, reason: '이미지 분석 없이 하이텐션 무드를 기본 추천했습니다.', highlightStartSec: 3, highlightDurationSec: 10, energyCurve: HIGH_ENERGY_CURVE };
 
-const MOOD_DESCRIPTIONS: Record<BgmCategory, string> = {
-  cinematic: '웅장하고 드라마틱한 오케스트라 빌드업 — 제품 집중, 네이버 클립에 최적',
-  hightension: '빠르고 에너제틱한 일렉트로닉 비트 — 틱톡/쇼츠 FYP 진입용',
-  asmr: '차분하고 미니멀한 앰비언트 — 제품 디테일 어필, 광고 전환용',
-  emotional: '따뜻하고 감성적인 피아노/스트링 — 인스타 릴스 스토리텔링용',
-  lofi: '편안한 로파이 비트 — 카페/일상/힐링 콘텐츠에 최적',
-};
+const MOOD_DESCRIPTIONS: Record<BgmCategory, string> = { cinematic: '웅장하고 드라마틱한 오케스트라 빌드업 — 제품 집중, 네이버 클립에 최적', hightension: '빠르고 에너제틱한 일렉트로닉 비트 — 틱톡/쇼츠 FYP 진입용', asmr: '차분하고 미니멀한 앰비언트 — 제품 디테일 어필, 광고 전환용', emotional: '따뜻하고 감성적인 피아노/스트링 — 인스타 릴스 스토리텔링용', lofi: '편안한 로파이 비트 — 카페/일상/힐링 콘텐츠에 최적' };
 
-export async function fetchBgmRecommendation(
-  imageDataUrl: string,
-  mimeType: string = 'image/jpeg',
-): Promise<BgmRecommendation> {
+export async function fetchBgmRecommendation(imageDataUrl: string, mimeType: string = 'image/jpeg'): Promise<BgmRecommendation> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const { data, error } = await supabase.functions.invoke('recommend-bgm', {
-      body: { imageDataUrl, mimeType },
-    });
+    const { data, error } = await supabase.functions.invoke('recommend-bgm', { body: { imageDataUrl, mimeType } });
     if (error || !data) return FALLBACK_RECOMMENDATION;
-
     const raw = data as Record<string, unknown>;
     const rawCategory = String(raw.category ?? raw.templateId ?? '');
     const mappedCategory: BgmCategory = moodLabelToCategory(rawCategory);
-
-    return {
-      category: mappedCategory,
-      templateId: mappedCategory,
-      label: MOOD_CONFIGS[mappedCategory].label,
-      description: String(raw.description ?? MOOD_DESCRIPTIONS[mappedCategory]),
-      bpm: Number(raw.bpm ?? MOOD_CONFIGS[mappedCategory].bpm),
-      reason: String(raw.reason ?? `${MOOD_CONFIGS[mappedCategory].label} 무드를 추천했습니다.`),
-      highlightStartSec: Number(raw.highlightStartSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightStartSec),
-      highlightDurationSec: Number(raw.highlightDurationSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightDurationSec),
-      energyCurve: Array.isArray(raw.energyCurve) ? raw.energyCurve as number[] : MOOD_CONFIGS[mappedCategory].energyCurve,
-    };
-  } catch {
-    return FALLBACK_RECOMMENDATION;
-  }
+    return { category: mappedCategory, templateId: mappedCategory, label: MOOD_CONFIGS[mappedCategory].label, description: String(raw.description ?? MOOD_DESCRIPTIONS[mappedCategory]), bpm: Number(raw.bpm ?? MOOD_CONFIGS[mappedCategory].bpm), reason: String(raw.reason ?? `${MOOD_CONFIGS[mappedCategory].label} 무드를 추천했습니다.`), highlightStartSec: Number(raw.highlightStartSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightStartSec), highlightDurationSec: Number(raw.highlightDurationSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightDurationSec), energyCurve: Array.isArray(raw.energyCurve) ? raw.energyCurve as number[] : MOOD_CONFIGS[mappedCategory].energyCurve };
+  } catch { return FALLBACK_RECOMMENDATION; }
 }
 
-export const BGM_CATEGORY_LABELS: Record<BgmCategory, string> = {
-  cinematic: '시네마틱',
-  hightension: '하이텐션',
-  asmr: 'ASMR',
-  emotional: '감성',
-  lofi: '로파이',
-};
-
+export const BGM_CATEGORY_LABELS: Record<BgmCategory, string> = { cinematic: '시네마틱', hightension: '하이텐션', asmr: 'ASMR', emotional: '감성', lofi: '로파이' };
 export const BGM_MOOD_LIST: { label: string; category: BgmCategory; description: string }[] = [
   { label: '시네마틱', category: 'cinematic', description: MOOD_DESCRIPTIONS.cinematic },
   { label: '하이텐션', category: 'hightension', description: MOOD_DESCRIPTIONS.hightension },
