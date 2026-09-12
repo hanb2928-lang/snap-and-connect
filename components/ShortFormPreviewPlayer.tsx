@@ -31,6 +31,8 @@ import {
   type LuminanceLevel,
   type CaptionStyle,
 } from '@/lib/captionStyling';
+import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
+import { getActiveCopyOverlay } from '@/lib/promptBuilder';
 
 interface ShortFormPreviewPlayerProps {
   editPlan: ShortFormEditPlan;
@@ -40,6 +42,7 @@ interface ShortFormPreviewPlayerProps {
   narrativePlan?: NarrativePlan | null;
   videoGenProgress?: VideoGenProgress | null;
   bgmVolume?: number;
+  copyOverlays?: CopyOverlayTimeline[] | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -128,7 +131,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75 }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -476,6 +479,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   }, []);
 
   const activeSegment = getActiveSegment(editPlan.segments, currentSec);
+  const activeCopyOverlay = copyOverlays ? getActiveCopyOverlay(copyOverlays, currentSec) : null;
   const isDisclosureActive =
     editPlan.disclosureEnabled &&
     currentSec >= editPlan.disclosureOverlay.startSec &&
@@ -638,13 +642,15 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
             )
           ) : null}
 
-          {/* Loading spinner overlay while video URL is being fetched/loaded */}
-          {showVideoLoadingSpinner ? (
+          {/* Loading spinner + 3D Depth 줌 슬라이드쇼 폴백 — 검은 화면 방지 */}
+          {(showVideoLoadingSpinner || (isGeneratingVideo && !videoGenProgress)) && (
             <View style={styles.videoLoadingOverlay} pointerEvents="none">
               <Loader2 size={24} color={theme.colors.primary[400]} strokeWidth={2.5} />
-              <Text style={styles.videoLoadingText}>영상 로딩 중...</Text>
+              <Text style={styles.videoLoadingText}>
+                {isGeneratingVideo ? 'AI 3D 비디오 생성 중...' : '영상 로딩 중...'}
+              </Text>
             </View>
-          ) : null}
+          )}
 
           {/* Buffering overlay — video paused for network buffering, BGM also paused */}
           {videoBuffering && !showVideoLoadingSpinner ? (
@@ -678,6 +684,30 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
                 numberOfLines={2}
               >
                 {activeSegment.textOverlay}
+              </Text>
+            </View>
+          )}
+
+          {/* === Vision AI 입체 자막 카피라이팅 레이어 === */}
+          {activeCopyOverlay && isPlaying && !isDisclosureActive && (
+            <View
+              style={[
+                styles.copyOverlayBase,
+                activeCopyOverlay.position === 'top' && { top: safeZonePadding.paddingTop + 4, bottom: undefined },
+                activeCopyOverlay.position === 'bottom' && { bottom: safeZonePadding.paddingBottom + 8, top: undefined },
+                activeCopyOverlay.position === 'center' && { top: '35%' },
+              ]}
+              pointerEvents="none"
+            >
+              <Text
+                style={[
+                  activeCopyOverlay.style === 'title' && styles.copyOverlayTitle,
+                  activeCopyOverlay.style === 'feature' && styles.copyOverlayFeature,
+                  activeCopyOverlay.style === 'cta' && styles.copyOverlayCta,
+                ]}
+                numberOfLines={2}
+              >
+                {activeCopyOverlay.text}
               </Text>
             </View>
           )}
@@ -1048,5 +1078,42 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  copyOverlayBase: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    alignItems: 'center',
+    zIndex: 3,
+  },
+  copyOverlayTitle: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    lineHeight: 14,
+  },
+  copyOverlayFeature: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    lineHeight: 12,
+  },
+  copyOverlayCta: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.warning[400],
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    lineHeight: 13,
   },
 });

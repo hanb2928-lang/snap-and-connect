@@ -134,6 +134,8 @@ import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { DEFAULT_DURATION, DURATION_PRESETS } from '@/lib/durationPresets';
 import { getDeepLink } from '@/lib/platformUpload';
 import { NarrationPlayer } from '@/components/NarrationPlayer';
+import { buildCopyOverlayTimeline } from '@/lib/promptBuilder';
+import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
 
 type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
 
@@ -1275,6 +1277,17 @@ export default function ResultScreen() {
     return narrativePlan.reorderedCuts.orderedImageUrls;
   }, [narrativePlan, allCutImages]);
 
+  const copyOverlaysForPreview: CopyOverlayTimeline[] | null = useMemo(() => {
+    if (!productVision) return null;
+    return buildCopyOverlayTimeline({
+      title: productVision.suggestedCopyLayers.primary,
+      hookCopy: productVision.suggestedCopyLayers.primary,
+      featureCopy: productVision.visualFeatures.slice(0, 3).join(' · '),
+      ctaCopy: productVision.suggestedCopyLayers.tertiary,
+      subtitleCopy: productVision.suggestedCopyLayers.secondary,
+    });
+  }, [productVision]);
+
   const trendingSuggestions = getTrendingSuggestions(trendingHashtags, [...activeHashtags, ...addedHashtags]);
 
   const handleAddTrendingHashtag = (tag: string) => {
@@ -2224,6 +2237,7 @@ export default function ResultScreen() {
             narrativePlan={narrativePlan}
             videoGenProgress={videoGenProgress}
             bgmVolume={bgmVolume}
+            copyOverlays={copyOverlaysForPreview}
           />
 
           {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}

@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const durationSec = body.durationSec ?? 15;
+    const durationSec = 15;
     const aspectRatio = body.aspectRatio ?? "9:16";
     const variationSeed = body.variationSeed ?? 0;
     const cutImages = body.cutImages ?? [];
@@ -653,7 +653,7 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     : "  • Front: product face detail\n  • 45° side: depth and form\n  • Top: texture overview\n  • Close-up: material detail\n  • Context: lifestyle placement";
 
   return [
-    `### VISION AI PRODUCT ANALYSIS — 3D ORBITAL AD FORMAT`,
+    `### VISION AI PRODUCT ANALYSIS — 3D ORBITAL AD FORMAT (15s)`,
     ``,
     `Product: ${vision.productName}`,
     `Category: ${vision.productCategory}`,
@@ -667,15 +667,34 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     `### MULTI-ANGLE REFERENCE (from 5 captured cuts)`,
     angleDescs,
     ``,
-    `### 3D CAMERA ORBITAL TRAJECTORY`,
+    `### 3D ORBITAL ARC SHOT — 360° CAMERA TRAJECTORY`,
     `Orbital Focus Point: ${vision.orbitalFocusPoint || "product center mass"}`,
     `Parallax Depth Layers: ${depthLayers}`,
     ``,
-    `Camera path: Start frontal close-up → orbital arc clockwise 90° over 4s (radius 1.5x product width) →`,
-    `parallax drift through depth layers at 6s → reverse arc counter-clockwise 45° at 10s →`,
-    `settle to frontal zoom-out reveal at 13s → locked hero frame for CTA 14-15s.`,
-    `Maintain product as orbital anchor; background parallax shifts with camera angle.`,
-    `Depth: foreground product sharp, midground 50% blur, background 85% bokeh blur.`,
+    `Camera path (15s locked timeline):`,
+    `  [0-4s] Frontal close-up → orbital arc clockwise 90° (radius 1.5x product width, smooth ease-in-out)`,
+    `  [4-7s] Parallax drift through depth layers — foreground separates from midground/background`,
+    `  [7-10s] Cinematic depth tilt: camera tilts 15° on Y-axis while orbiting counter-clockwise 45°`,
+    `  [10-13s] Reverse arc clockwise 45° returning to frontal, zoom-out reveal showing full product`,
+    `  [13-15s] Locked hero frame, product centered, CTA text burn-in zone`,
+    ``,
+    `Maintain product as orbital anchor at all times. Background parallax shifts with camera angle.`,
+    `Depth separation: foreground product razor-sharp, midground 50% blur, background 85% bokeh blur.`,
+    `Steroscopic depth must be preserved from the 5-cut input images — frontal and side cuts provide real parallax data.`,
+    ``,
+    `### CINEMATIC PARALLAX ZOOM & DEPTH TILT`,
+    `  • Multi-layer parallax: product (z=0) moves at 1.0x speed, midground (z=0.5) at 0.6x, background (z=1.0) at 0.3x`,
+    `  • Depth tilt: subtle 5-15° Y-axis rotation during arc transitions to enhance stereoscopic separation`,
+    `  • Parallax zoom: 1.05x → 1.3x during orbital arc, 1.3x → 0.9x during zoom-out reveal`,
+    `  • Focus pull: rack focus between depth layers at 5s and 9s for dramatic depth emphasis`,
+    ``,
+    `### DYNAMIC COMMERCIAL LIGHTING & STUDIO PARTICLE EFFECTS`,
+    `  • Studio key light: 3-point setup — soft key 45° camera-left, rim light 135° camera-right, fill 1:3 ratio`,
+    `  • Product-matched color temperature: warm key (3200K) for lifestyle products, cool key (5600K) for tech products`,
+    `  • Motivated lighting shift: key light rotates with orbital camera, simulating real studio arc`,
+    `  • Particle effects: subtle dust motes in background bokeh (8-12 particles, 2-4px, drifting upward 0.5px/frame)`,
+    `  • Lens flare: anamorphic horizontal flare on rim light peaks at 4s and 10s, 15% opacity, 2px height`,
+    `  • Specular highlights: controlled highlights on product surfaces following material properties (${vision.materialGuess})`,
     ``,
     `### STEREOSCOPIC COPYWRITING LAYERS (3D Z-AXIS TEXT)`,
     `Primary (z=0, foreground): "${copyLayers.primary}" — kinetic typography, 120% pop, drop shadow depth 4px`,
