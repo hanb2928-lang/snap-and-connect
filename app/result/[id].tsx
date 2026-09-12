@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   TextInput,
   AppState,
+  Linking,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -130,6 +131,7 @@ import {
 } from '@/lib/viralAudioSyncEngine';
 import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { DEFAULT_DURATION, DURATION_PRESETS } from '@/lib/durationPresets';
+import { getDeepLink } from '@/lib/platformUpload';
 
 type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
 
@@ -256,6 +258,13 @@ const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = 
   tiktok: 'monetization',
   reels: 'monetization',
   naverclip: 'adConversion',
+};
+
+const TARGET_TO_UPLOAD_PLATFORM: Record<TargetPlatformKey, 'youtube' | 'tiktok' | 'instagram' | 'naver_clip'> = {
+  shorts: 'youtube',
+  tiktok: 'tiktok',
+  reels: 'instagram',
+  naverclip: 'naver_clip',
 };
 
 
@@ -1116,6 +1125,37 @@ export default function ResultScreen() {
       : `${fullCaption}\n\n${disclosureText}`);
 
   const shareText = captionWithLink;
+
+  const handlePlatformUpload = useCallback(async () => {
+    try {
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      } else {
+        await Clipboard.setStringAsync(shareText);
+      }
+    } catch {
+      // clipboard copy failed silently
+    }
+
+    const uploadKey = TARGET_TO_UPLOAD_PLATFORM[targetPlatform];
+    const deepLink = getDeepLink(uploadKey);
+    const url = Platform.OS === 'web' ? deepLink.uploadWebUrl : deepLink.uploadAppUrl;
+    if (!url) return;
+    try {
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+      } else {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+        } else {
+          await Linking.openURL(deepLink.uploadWebUrl);
+        }
+      }
+    } catch {
+      // link open failed silently
+    }
+  }, [shareText, targetPlatform]);
 
   useEffect(() => {
     if (!scan) return;
@@ -2864,24 +2904,16 @@ export default function ResultScreen() {
             <View style={styles.bottomShareRow}>
               <TouchableOpacity
                 style={[styles.bottomShareBtn, styles.bottomShareBtnPrimary, { flex: 1 }]}
-                onPress={async () => {
-                  try {
-                    if (Platform.OS === 'web' && navigator.clipboard) {
-                      await navigator.clipboard.writeText(shareText);
-                    } else {
-                      await Clipboard.setStringAsync(shareText);
-                    }
-                    if (Platform.OS !== 'web') {
-                      await RNShare.share({ message: shareText });
-                    }
-                  } catch {
-                    // clipboard/share failed silently
-                  }
-                }}
+                onPress={handlePlatformUpload}
                 activeOpacity={0.7}
               >
-                <Share2 size={18} color="#fff" strokeWidth={2} />
-                <Text style={styles.bottomShareBtnText}>SNS 바로 공유</Text>
+                {(() => {
+                  const PlatformIcon = TARGET_PLATFORM_PRESETS[targetPlatform].icon;
+                  return <PlatformIcon size={18} color="#fff" strokeWidth={2} />;
+                })()}
+                <Text style={styles.bottomShareBtnText}>
+                  {TARGET_PLATFORM_PRESETS[targetPlatform].label} 바로 업로드
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
