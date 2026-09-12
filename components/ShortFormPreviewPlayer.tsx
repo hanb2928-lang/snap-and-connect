@@ -88,7 +88,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
-  const hasGeneratedVideo = !!videoUri;
+  const hasGeneratedVideo = !!videoUri && !videoError && !videoFallbackMode;
   const isGeneratingVideo = !!videoGenProgress && videoGenProgress.phase !== 'completed' && videoGenProgress.phase !== 'error';
 
   useEffect(() => {
@@ -212,6 +212,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
     v.addEventListener('waiting', handleWaiting);
     v.addEventListener('canplaythrough', handleCanPlayAfterBuffer);
     v.addEventListener('seeked', handleSeeked);
+    // Race condition guard: video may have already loaded before listeners were attached
+    if (v.readyState >= 2) {
+      handleCanPlay();
+    }
     if (isPlaying) {
       v.play().catch(() => {
         setVideoError(true);
@@ -387,7 +391,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
     }
   }, [narrationActive, bgmVolume]);
 
-  const videoReady = hasGeneratedVideo && videoSrc && !videoError && !videoFallbackMode;
+  const videoReady = !!videoUri && !!videoSrc && !videoError && !videoFallbackMode;
 
   useEffect(() => {
     if (!isPlaying) {
@@ -528,8 +532,8 @@ useEffect(() => {
     setVideoFallbackMode(true);
   }, []);
 
-  const showVideoLoadingSpinner = hasGeneratedVideo && !videoLoaded && !videoError && !videoFallbackMode;
-  const showPlaceholder = !hasGeneratedVideo || videoError;
+  const showVideoLoadingSpinner = !!videoUri && !videoLoaded && !videoError && !videoFallbackMode;
+  const showPlaceholder = !videoUri || videoError || videoFallbackMode;
 
   return (
     <View style={styles.container}>
