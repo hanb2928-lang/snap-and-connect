@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { uploadImage, saveManualScan } from './analysis';
 import { supabase } from './supabase';
-import { invokeStereoCutAuto, type AngleImagePayload, type CloudPipelineResult } from './cloudPipeline';
 import { runSynthesis, getSynthesisSummary, type AngleInput } from './aiSynthesisEngine';
 import { buildShortFormEditPlan, type ShortFormPlatform } from './shortFormEditEngine';
 import { buildDirectingPlan, getDirectingSummary, type DirectingPlan } from './directingEngine';
@@ -9,6 +8,22 @@ import { buildMultiPlatformPublishPlans, type PublishPlan } from './publishManag
 import { getDeepLink } from './platformUpload';
 import * as Linking from 'expo-linking';
 import type { AngleShot } from '@/components/MultiAngleCaptureGuide';
+
+export interface AngleImagePayload {
+  key: string;
+  label: string;
+  base64: string;
+  mimeType?: string;
+  orderIndex: number;
+}
+
+export interface CloudPipelineResult {
+  synthesis: {
+    spatialDepthHint: string;
+    volumeEstimate: { confidence: number };
+    contextMatch: { label: string; context: string };
+  };
+}
 
 export type StereoStepKey = 'upload' | 'synthesis' | 'directing' | 'render' | 'publish';
 
@@ -70,6 +85,23 @@ export function makeInitialProgress(): StereoPipelineProgress {
   };
 }
 
+async function invokeStereoCutAuto(
+  _payloads: AngleImagePayload[],
+  _context: string,
+  _style: string,
+  scanId: string,
+): Promise<CloudPipelineResult | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('stereo-cut-auto', {
+      body: { scanId, angles: _payloads },
+    });
+    if (error || !data) return null;
+    return data as CloudPipelineResult;
+  } catch {
+    return null;
+  }
+}
+
 export async function runStereoPipeline(
   shots: AngleShot[],
   onProgress: (progress: StereoPipelineProgress) => void,
@@ -82,7 +114,6 @@ export async function runStereoPipeline(
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
 
-  // ─── Step 1: Upload 5 angles & cloud AI synthesis ───
   steps[0].status = 'active';
   steps[0].detail = '5각도 이미지 전송 및 3D 볼륨 복원 중...';
   report(0, 0.05);
@@ -106,7 +137,6 @@ export async function runStereoPipeline(
     await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
   }
 
-  // Build angle payloads for cloud
   const anglePayloads: AngleImagePayload[] = sorted
     .filter((s) => s.base64)
     .map((s) => ({
@@ -117,7 +147,6 @@ export async function runStereoPipeline(
       orderIndex: s.orderIndex,
     }));
 
-  // On-device synthesis (for immediate context detection + fallback)
   const angleInputs: AngleInput[] = sorted
     .filter((s) => s.base64)
     .map((s) => ({
@@ -130,13 +159,11 @@ export async function runStereoPipeline(
 
   const localSynthesis = runSynthesis(angleInputs, '');
 
-  // Cloud synthesis
   let cloudResult: CloudPipelineResult | null = null;
   try {
     steps[0].detail = '클라우드 GPU에서 3D 볼륨 복원 및 보간 진행 중...';
     report(0, 0.15);
     cloudResult = await invokeStereoCutAuto(anglePayloads, '', '', scanId);
-    // Defensive: verify the response has the expected shape
     if (!cloudResult?.synthesis?.spatialDepthHint) {
       cloudResult = null;
     }
@@ -155,12 +182,10 @@ export async function runStereoPipeline(
   steps[0].detail = synthesisSummary;
   report(0, 0.25);
 
-  // ─── Step 2: Psychological rhythm directing engine ───
   steps[1].status = 'active';
   steps[1].detail = '초반 3초 패러독스 훅 + 비트 싱크 설계 중...';
   report(1, 0.3);
 
-  // Build edit plan for directing engine input
   const editPlan = buildShortFormEditPlan(
     'youtube', '', 'curiosity_gap', '', undefined, undefined, true, undefined, undefined,
   );
@@ -174,21 +199,18 @@ export async function runStereoPipeline(
 
   const directingSummary = getDirectingSummary(directingPlan);
 
-  // Simulate processing delay for UX (let user see the step)
   await new Promise((r) => setTimeout(r, 600));
 
   steps[1].status = 'done';
   steps[1].detail = `훅: ${directingPlan.hookTransition.description} | SFX ${directingPlan.sfxPlans.length}건 | 킬링포인트 자막 ${directingPlan.killPointCaptions.length}건`;
   report(1, 0.5);
 
-  // ─── Step 3: Multi-platform rendering & AI metadata ───
   steps[2].status = 'active';
   steps[2].detail = '9:16 H.264 렌더링 코덱 적용 & 메타데이터 생성 중...';
   report(2, 0.55);
 
   const publishPlans = buildMultiPlatformPublishPlans('', context, ['youtube', 'instagram', 'tiktok']);
 
-  // Build publish target info with deep links
   const publishTargets = PUBLISH_TARGETS.map(({ key, label }) => {
     const dl = getDeepLink(key);
     return { key, label, deepLinkApp: dl.appUrl, deepLinkWeb: dl.webUrl };
@@ -201,13 +223,10 @@ export async function runStereoPipeline(
   steps[2].detail = `3개 플랫폼 렌더링 준비 완료 | ${metadataSummary}`;
   report(2, 0.75);
 
-  // ─── Step 4: Gallery save & publish readiness ───
   steps[3].status = 'active';
   steps[3].detail = '비차단 갤러리 저장 처리 및 퍼블리시 딥링크 준비 중...';
   report(3, 0.8);
 
-  // Non-blocking: store first image for gallery download (web) / save (native)
-  // The actual save happens in the overlay's "저장" button — here we just prepare
   const firstDataUrl = `data:${sorted[0].mimeType};base64,${sorted[0].base64}`;
 
   await new Promise((r) => setTimeout(r, 400));
@@ -216,7 +235,6 @@ export async function runStereoPipeline(
   steps[3].detail = '갤러리 저장 준비 완료 · 3개 플랫폼 퍼블리시 대기';
   report(3, 0.95);
 
-  // ─── Publish step ───
   steps[4].status = 'active';
   steps[4].detail = '퍼블리시 대기 — 플랫폼 선택 후 원클릭 업로드 가능';
   report(4, 1.0);
@@ -235,7 +253,6 @@ export async function runStereoPipeline(
   steps[4].detail = '파이프라인 완료 · 편집 화면으로 이동 가능';
   report(4, 1.0, null, result);
 
-  // Suppress unused var warnings for platform-specific code paths
   if (Platform.OS !== 'web') {
     void firstDataUrl;
     void Linking;

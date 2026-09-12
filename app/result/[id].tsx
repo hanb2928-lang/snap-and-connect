@@ -1145,17 +1145,44 @@ export default function ResultScreen() {
       if (Platform.OS === 'web') {
         window.open(url, '_blank');
       } else {
-        const supported = await Linking.canOpenURL(url);
-        if (supported) {
-          await Linking.openURL(url);
-        } else {
-          await Linking.openURL(deepLink.uploadWebUrl);
+        try {
+          const supported = await Linking.canOpenURL(url);
+          if (supported) {
+            await Linking.openURL(url);
+          } else {
+            await Linking.openURL(deepLink.uploadWebUrl);
+          }
+        } catch {
+          // App scheme failed — fall back to web upload page
+          try {
+            await Linking.openURL(deepLink.uploadWebUrl);
+          } catch {
+            // web fallback also failed — silently ignore
+          }
         }
       }
     } catch {
-      // link open failed silently
+      // Last resort: try web URL if available
+      if (deepLink.uploadWebUrl && Platform.OS !== 'web') {
+        try { await Linking.openURL(deepLink.uploadWebUrl); } catch { /* ignore */ }
+      }
     }
   }, [shareText, targetPlatform]);
+
+  const handleOtherSnsShare = useCallback(async () => {
+    const fullShareText = `${shareText}${shortUrl ? `\n\n${shortUrl}` : ''}`;
+    try {
+      if (Platform.OS === 'web' && navigator.share) {
+        await navigator.share({ title: activeProductName || scan?.title || 'SnapConnect', text: fullShareText, url: shortUrl || undefined });
+      } else if (Platform.OS === 'web') {
+        if (navigator.clipboard) await navigator.clipboard.writeText(fullShareText);
+      } else {
+        await RNShare.share({ message: fullShareText, title: activeProductName || scan?.title || 'SnapConnect' });
+      }
+    } catch {
+      // user cancelled or share failed — silently ignore
+    }
+  }, [shareText, shortUrl, activeProductName, scan?.title]);
 
   useEffect(() => {
     if (!scan) return;
@@ -1936,7 +1963,7 @@ export default function ResultScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom + 72 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {analysisStatus === 'processing' && (
           <View style={styles.analysisPendingCard}>
             <View style={styles.analysisPendingHeader}>
@@ -2376,7 +2403,7 @@ export default function ResultScreen() {
             <View style={styles.photoGuardTooltip}>
               <AlertCircleIcon size={13} color={theme.colors.warning[400]} strokeWidth={2} />
               <Text style={styles.photoGuardTooltipText}>
-                입체컷 5장 각도를 모두 채워주세요 ({allCutImages.length}/5)
+                5장 각도를 모두 촬영/업로드해 주세요 ({allCutImages.length}/5)
               </Text>
             </View>
           )}
@@ -2397,7 +2424,7 @@ export default function ResultScreen() {
                 : generatedVideoUrl
                   ? 'AI 영상 생성됨'
                   : allCutImages.length < 5
-                    ? '5장 각도를 모두 채워주세요'
+                    ? '5장 각도를 모두 촬영/업로드해 주세요'
                     : 'AI 비디오 변환 (크레딧 소모)'}
             </Text>
           </TouchableOpacity>
@@ -2841,13 +2868,14 @@ export default function ResultScreen() {
 
           {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
 
-          {/* Cloud save — final step after platform selection */}
-          <View style={styles.cloudSaveSection}>
+          {/* === Bottom action bar (scroll-end, no floating bar) === */}
+          <View style={styles.bottomActionSection}>
+            {/* 1. Cloud save */}
             <TouchableOpacity
-              style={[styles.cloudSaveBtn, uploadProgress !== null && { opacity: 0.5 }]}
+              style={[styles.cloudSaveBtn, (uploadProgress !== null || uploadDone) && { opacity: 0.5 }]}
               onPress={handleSaveAndShare}
               activeOpacity={0.7}
-              disabled={uploadProgress !== null}
+              disabled={uploadProgress !== null || uploadDone}
             >
               {uploadDone ? (
                 <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
@@ -2878,6 +2906,33 @@ export default function ResultScreen() {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* 2. Platform direct upload */}
+            <TouchableOpacity
+              style={[styles.bottomShareBtn, styles.bottomShareBtnPrimary]}
+              onPress={handlePlatformUpload}
+              activeOpacity={0.7}
+            >
+              {(() => {
+                const PlatformIcon = TARGET_PLATFORM_PRESETS[targetPlatform].icon;
+                return <PlatformIcon size={18} color="#fff" strokeWidth={2} />;
+              })()}
+              <Text style={styles.bottomShareBtnText}>
+                {TARGET_PLATFORM_PRESETS[targetPlatform].label} 바로 업로드
+              </Text>
+            </TouchableOpacity>
+
+            {/* 3. Other SNS share */}
+            <TouchableOpacity
+              style={styles.bottomShareBtn}
+              onPress={handleOtherSnsShare}
+              activeOpacity={0.7}
+            >
+              <Share2Icon size={18} color={theme.colors.dark.text} strokeWidth={2} />
+              <Text style={[styles.bottomShareBtnText, { color: theme.colors.dark.text }]}>
+                다른 SNS 공유
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {disclosureText ? (
@@ -2909,24 +2964,6 @@ export default function ResultScreen() {
               minute: '2-digit',
             })}
           </Text>
-
-          <View style={styles.bottomShareSection}>
-            <View style={styles.bottomShareRow}>
-              <TouchableOpacity
-                style={[styles.bottomShareBtn, styles.bottomShareBtnPrimary, { flex: 1 }]}
-                onPress={handlePlatformUpload}
-                activeOpacity={0.7}
-              >
-                {(() => {
-                  const PlatformIcon = TARGET_PLATFORM_PRESETS[targetPlatform].icon;
-                  return <PlatformIcon size={18} color="#fff" strokeWidth={2} />;
-                })()}
-                <Text style={styles.bottomShareBtnText}>
-                  {TARGET_PLATFORM_PRESETS[targetPlatform].label} 바로 업로드
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
@@ -3435,6 +3472,12 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xxl,
     paddingHorizontal: theme.spacing.sm,
     paddingBottom: theme.spacing.xl,
+  },
+  bottomActionSection: {
+    marginTop: theme.spacing.xxl,
+    paddingHorizontal: theme.spacing.sm,
+    paddingBottom: theme.spacing.xl,
+    gap: 10,
   },
   bottomShareRow: {
     flexDirection: 'row',
