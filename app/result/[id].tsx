@@ -2049,24 +2049,6 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
-        {/* === 9:16 Immersive Preview === */}
-        <View style={styles.previewFrame}>
-          <View style={styles.previewInner}>
-            {isRegenerating && (
-              <View style={styles.previewLoadingOverlay}>
-                <View style={styles.regenPulseRing} />
-                <View style={styles.regenPulseRing2} />
-                <View style={styles.regenIconWrap}>
-                  <Sparkles size={28} color={theme.colors.primary[300]} strokeWidth={2} />
-                </View>
-                <Text style={styles.previewLoadingText}>AI가 새로운 비주얼 생성 중</Text>
-                <Text style={styles.previewLoadingSub}>방금 선택한 스타일이 실시간으로 입혀지고 있어요</Text>
-              </View>
-            )}
-          </View>
-
-        </View>
-
         {/* === 5-Cut Original Thumbnail Strip === */}
         {allCutImages.length > 1 && (
           <View style={styles.thumbnailStripSection}>
@@ -2101,8 +2083,14 @@ export default function ResultScreen() {
           </View>
         )}
 
-        {/* === 1순위: Live Short-Form Preview (단일 실시간 15초 미리보기) === */}
+        {/* === 실시간 15초 미리보기 (단일 플레이어) === */}
         <View style={styles.previewSection}>
+          {isRegenerating && (
+            <View style={styles.regenBanner}>
+              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
+            </View>
+          )}
           <ShortFormPreviewPlayer
             editPlan={previewEditPlan}
             videoUri={generatedVideoUrl}
@@ -3779,61 +3767,20 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: theme.colors.primary[400],
   },
-  previewFrame: {
-    position: 'relative',
+  regenBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: theme.spacing.sm,
-  },
-  previewInner: {
-    width: '100%',
-    maxWidth: 360,
-    aspectRatio: 9 / 16,
-    borderRadius: theme.radius.xl,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.dark.surface,
-    ...theme.shadows.elevated,
-  },
-  previewLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 5, 15, 0.78)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10,
-  },
-  previewLoadingText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
-  },
-  previewLoadingSub: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-  },
-  regenIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primary[500] + '30',
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500] + '15',
     marginBottom: 4,
   },
-  regenPulseRing: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: theme.colors.primary[400] + '40',
-  },
-  regenPulseRing2: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 1,
-    borderColor: theme.colors.primary[500] + '20',
+  regenBannerText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   targetPlatformSection: {
     paddingHorizontal: theme.spacing.md,
