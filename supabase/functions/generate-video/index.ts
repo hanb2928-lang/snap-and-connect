@@ -67,11 +67,10 @@ Deno.serve(async (req: Request) => {
   try {
     const body: GenerateVideoRequest = await req.json();
 
-    if (!body.prompt || body.prompt.trim().length === 0) {
-      return new Response(
-        JSON.stringify({ error: "비디오 생성 프롬프트를 입력해주세요." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    // Auto-generate prompt if not provided — use product metadata and vision data
+    let effectivePrompt = body.prompt ?? "";
+    if (effectivePrompt.trim().length === 0) {
+      effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText);
     }
 
     const runwayKey = await resolveRunwayKey();
@@ -89,7 +88,7 @@ Deno.serve(async (req: Request) => {
     const variationSeed = body.variationSeed ?? 0;
 
     const motionPrompt = buildMotionPrompt(
-      body.prompt,
+      effectivePrompt,
       body.productName,
       aspectRatio,
       variationSeed,
@@ -464,6 +463,40 @@ async function pollOpenAIJob(jobId: string, apiKey: string): Promise<VideoJobRes
 }
 
 // === Shared helpers ===
+
+function buildAutoPrompt(
+  productName: string | undefined,
+  vision: ProductVisionData | null,
+  captionText: string | undefined,
+): string {
+  const parts: string[] = [];
+
+  const name = productName || vision?.productName || "제품";
+  parts.push(`Cinematic 3D commercial for ${name}`);
+
+  if (vision) {
+    if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
+    if (vision.visualFeatures.length > 0) parts.push(`key features: ${vision.visualFeatures.slice(0, 4).join(", ")}`);
+    if (vision.marketingPoints.length > 0) parts.push(`marketing angles: ${vision.marketingPoints.slice(0, 2).join(" / ")}`);
+    if (vision.shapeDescription) parts.push(`shape: ${vision.shapeDescription}`);
+    if (vision.materialGuess) parts.push(`material: ${vision.materialGuess}`);
+    if (vision.textureDescription) parts.push(`texture: ${vision.textureDescription}`);
+    if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
+    if (vision.orbitalFocusPoint) parts.push(`focal point: ${vision.orbitalFocusPoint}`);
+    const copy = vision.suggestedCopyLayers;
+    if (copy.primary || copy.secondary || copy.tertiary) {
+      parts.push(`copy layers — hook: "${copy.primary}", benefit: "${copy.secondary}", CTA: "${copy.tertiary}"`);
+    }
+  }
+
+  if (captionText && captionText.trim()) {
+    parts.push(`caption context: "${captionText.slice(0, 100)}"`);
+  }
+
+  parts.push("15-second vertical short-form commercial with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA");
+
+  return parts.join(". ");
+}
 
 function buildMotionPrompt(
   userPrompt: string,

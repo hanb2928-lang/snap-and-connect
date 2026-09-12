@@ -479,7 +479,6 @@ export default function ResultScreen() {
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
 
-    const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
     const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
 
     let visionData: ProductVisionResult | null = productVision;
@@ -497,6 +496,31 @@ export default function ResultScreen() {
         // Vision analysis failed — proceed without it
       }
       if (mountedRef.current) setVisionAnalyzing(false);
+    }
+
+    // Build prompt: user override > hook > summary > auto-generated from vision metadata
+    let videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || scan.product_name || '';
+    if (!videoPromptText.trim()) {
+      if (visionData) {
+        const v = visionData;
+        const visionParts: string[] = [`Cinematic 3D commercial for ${v.productName || scan.product_name || '제품'}`];
+        if (v.visualFeatures.length > 0) visionParts.push(`features: ${v.visualFeatures.slice(0, 4).join(', ')}`);
+        if (v.marketingPoints.length > 0) visionParts.push(`marketing: ${v.marketingPoints.slice(0, 2).join(' / ')}`);
+        if (v.shapeDescription) visionParts.push(`shape: ${v.shapeDescription}`);
+        if (v.materialGuess) visionParts.push(`material: ${v.materialGuess}`);
+        if (v.textureDescription) visionParts.push(`texture: ${v.textureDescription}`);
+        if (v.orbitalFocusPoint) visionParts.push(`focal: ${v.orbitalFocusPoint}`);
+        const copy = v.suggestedCopyLayers;
+        if (copy.primary) visionParts.push(`hook: "${copy.primary}"`);
+        if (copy.secondary) visionParts.push(`benefit: "${copy.secondary}"`);
+        if (copy.tertiary) visionParts.push(`CTA: "${copy.tertiary}"`);
+        visionParts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
+        videoPromptText = visionParts.join('. ');
+      } else if (scan.product_name) {
+        videoPromptText = `Cinematic 3D commercial for ${scan.product_name}. 15-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.`;
+      } else {
+        videoPromptText = 'Cinematic 3D product commercial. 15-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.';
+      }
     }
 
     try {
