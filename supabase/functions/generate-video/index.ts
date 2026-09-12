@@ -216,14 +216,14 @@ async function submitRunwayTask(
       promptText: prompt,
       model: "gen3-alpha_turbo",
       seconds: Math.min(Math.max(durationSec, 4), 10),
-      ratio: aspectRatio === "9:16" ? "720:1280" : aspectRatio === "16:9" ? "1280:720" : "1080:1080",
+      ratio: aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768",
     };
 
     if (imageUrl) {
       payload.promptImage = imageUrl;
     }
 
-    const resp = await fetch("https://api.runwayml.com/v1/image_to_video", {
+    const resp = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -267,7 +267,7 @@ async function pollRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
 
   try {
-    const resp = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
+    const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: controller.signal,
     });

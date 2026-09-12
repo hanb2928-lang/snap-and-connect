@@ -158,7 +158,22 @@ Respond in Korean for all text fields except colorPalette and materialGuess.`;
     const data = await resp.json();
     const rawContent = data.choices?.[0]?.message?.content ?? "";
     const cleaned = stripJsonFence(rawContent);
-    const parsed = JSON.parse(cleaned) as ProductVisionResult;
+
+    let parsed: ProductVisionResult;
+    try {
+      parsed = JSON.parse(cleaned) as ProductVisionResult;
+    } catch {
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]) as ProductVisionResult;
+        } catch {
+          throw new Error("Vision AI가 유효한 JSON을 반환하지 않았습니다. 잠시 후 다시 시도해주세요.");
+        }
+      } else {
+        throw new Error("Vision AI가 유효한 JSON을 반환하지 않았습니다. 잠시 후 다시 시도해주세요.");
+      }
+    }
 
     return {
       productName: parsed.productName ?? "",
