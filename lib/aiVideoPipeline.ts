@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { ProductVisionResult } from './productVision';
 
 export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error';
 
@@ -33,6 +34,7 @@ interface GenerateAiVideoOptions {
   platform?: string;
   hookCategory?: string;
   cutCount?: number;
+  productVision?: ProductVisionResult | null;
 }
 
 const MAX_RETRIES = 2;
@@ -75,6 +77,7 @@ export async function generateAiVideo(
           platform: options.platform ?? 'shorts',
           hookCategory: options.hookCategory ?? 'curiosity',
           cutCount: options.cutCount,
+          productVision: options.productVision ?? null,
         },
       });
 

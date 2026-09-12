@@ -122,6 +122,7 @@ import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { analyzeProductVision, type ProductVisionResult } from '@/lib/productVision';
 import {
   buildViralAudioSyncProfile,
   buildRegenerationPayload,
@@ -339,6 +340,8 @@ export default function ResultScreen() {
   const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
   const [contentPurpose, setContentPurpose] = useState<ContentPurpose>('monetization');
   const [selectedDurationMs, setSelectedDurationMs] = useState<number>(DEFAULT_DURATION);
+  const [productVision, setProductVision] = useState<ProductVisionResult | null>(null);
+  const [visionAnalyzing, setVisionAnalyzing] = useState(false);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -445,6 +448,19 @@ export default function ResultScreen() {
     const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
     const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
 
+    let visionData: ProductVisionResult | null = productVision;
+    if (!visionData && videoCutImages.length >= 5) {
+      setVisionAnalyzing(true);
+      setVideoGenProgress({ phase: 'submitting', progress: 0.02, message: 'Vision AI 사물 분석 중...', elapsedSec: 0 });
+      try {
+        visionData = await analyzeProductVision(videoCutImages.slice(0, 5), scan.product_name || undefined);
+        if (mountedRef.current) setProductVision(visionData);
+      } catch {
+        // Vision analysis failed — proceed without it
+      }
+      if (mountedRef.current) setVisionAnalyzing(false);
+    }
+
     try {
       const result = await generateAiVideo(
         videoPromptText,
@@ -458,6 +474,7 @@ export default function ResultScreen() {
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
           captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
+          productVision: visionData,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
@@ -477,7 +494,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, narrativeVariation]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, narrativeVariation, productVision]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2427,6 +2444,24 @@ export default function ResultScreen() {
                     : 'AI 비디오 변환 (크레딧 소모)'}
             </Text>
           </TouchableOpacity>
+
+          {productVision && !isGeneratingVideo && (
+            <View style={styles.photoGuardTooltip}>
+              <Check size={13} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={styles.photoGuardTooltipText}>
+                Vision AI 분석 완료: {productVision.productName} · {productVision.visualFeatures.length}개 특징 · 3D 궤도 모션 준비됨
+              </Text>
+            </View>
+          )}
+
+          {visionAnalyzing && (
+            <View style={styles.photoGuardTooltip}>
+              <Loader2Icon size={13} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.photoGuardTooltipText}>
+                Vision AI가 5장 사진에서 사물 특징을 추출하는 중...
+              </Text>
+            </View>
+          )}
 
           {videoGenError && (
             <View style={styles.videoErrorToast}>

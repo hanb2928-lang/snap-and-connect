@@ -9,6 +9,21 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+interface ProductVisionData {
+  productName: string;
+  productCategory: string;
+  visualFeatures: string[];
+  marketingPoints: string[];
+  textureDescription: string;
+  colorPalette: string[];
+  shapeDescription: string;
+  materialGuess: string;
+  keyAngles: { angle: string; description: string }[];
+  orbitalFocusPoint: string;
+  parallaxDepthLayers: string[];
+  suggestedCopyLayers: { primary: string; secondary: string; tertiary: string };
+}
+
 interface GenerateVideoRequest {
   prompt: string;
   imageUrl?: string;
@@ -23,6 +38,7 @@ interface GenerateVideoRequest {
   platform?: string;
   hookCategory?: string;
   cutCount?: number;
+  productVision?: ProductVisionData | null;
 }
 
 interface VideoJobResponse {
@@ -88,6 +104,7 @@ Deno.serve(async (req: Request) => {
       body.platform ?? "shorts",
       body.hookCategory ?? "curiosity",
       body.cutCount,
+      body.productVision ?? null,
     );
 
     let videoUrl: string | null = null;
@@ -454,6 +471,7 @@ function buildMotionPrompt(
   platform: string = "shorts",
   hookCategory: string = "curiosity",
   explicitCutCount?: number,
+  productVision?: ProductVisionData | null,
 ): string {
   const orientation = aspectRatio === "9:16" ? "vertical portrait 9:16" : aspectRatio === "16:9" ? "horizontal landscape 16:9" : "square 1:1";
   const effectiveCutCount = explicitCutCount ?? Math.max(cutCount, 5);
@@ -586,7 +604,9 @@ function buildMotionPrompt(
 
   const captionHint = captionText ? `\nCaption context: "${captionText.slice(0, 80)}".` : "";
 
-  return [
+  const visionSection = productVision ? buildVisionPromptSection(productVision) : "";
+
+  const promptParts = [
     `### CINEMATIC VIDEO PROMPT — TOP-1% VIRAL QUALITY`,
     ``,
     `Subject: ${userPrompt}${productName ? ` featuring ${productName}` : ""}.`,
@@ -606,9 +626,61 @@ function buildMotionPrompt(
     ``,
     `### RETENTION ENGINE`,
     retentionDirective,
+  ];
+
+  if (visionSection) {
+    promptParts.push(``, visionSection);
+  }
+
+  promptParts.push(
     ``,
     `### QUALITY LOCK`,
     `Photorealistic, 4K, natural skin tones, no text artifacts, no warped faces, seamless motion, clean composition, professional color science.${captionHint}`,
+  );
+
+  return promptParts.join("\n");
+}
+
+function buildVisionPromptSection(vision: ProductVisionData): string {
+  const features = vision.visualFeatures.slice(0, 5).join(", ");
+  const marketingPoints = vision.marketingPoints.slice(0, 3).join(" / ");
+  const depthLayers = vision.parallaxDepthLayers.length > 0
+    ? vision.parallaxDepthLayers.join(" → ")
+    : "foreground product → midground context → background bokeh";
+  const copyLayers = vision.suggestedCopyLayers;
+  const angleDescs = vision.keyAngles.length > 0
+    ? vision.keyAngles.map((a) => `  • ${a.angle}: ${a.description}`).join("\n")
+    : "  • Front: product face detail\n  • 45° side: depth and form\n  • Top: texture overview\n  • Close-up: material detail\n  • Context: lifestyle placement";
+
+  return [
+    `### VISION AI PRODUCT ANALYSIS — 3D ORBITAL AD FORMAT`,
+    ``,
+    `Product: ${vision.productName}`,
+    `Category: ${vision.productCategory}`,
+    `Visual Features: ${features}`,
+    `Marketing Points: ${marketingPoints}`,
+    `Texture: ${vision.textureDescription}`,
+    `Material: ${vision.materialGuess}`,
+    `Color Palette: ${vision.colorPalette.join(", ")}`,
+    `Shape: ${vision.shapeDescription}`,
+    ``,
+    `### MULTI-ANGLE REFERENCE (from 5 captured cuts)`,
+    angleDescs,
+    ``,
+    `### 3D CAMERA ORBITAL TRAJECTORY`,
+    `Orbital Focus Point: ${vision.orbitalFocusPoint || "product center mass"}`,
+    `Parallax Depth Layers: ${depthLayers}`,
+    ``,
+    `Camera path: Start frontal close-up → orbital arc clockwise 90° over 4s (radius 1.5x product width) →`,
+    `parallax drift through depth layers at 6s → reverse arc counter-clockwise 45° at 10s →`,
+    `settle to frontal zoom-out reveal at 13s → locked hero frame for CTA 14-15s.`,
+    `Maintain product as orbital anchor; background parallax shifts with camera angle.`,
+    `Depth: foreground product sharp, midground 50% blur, background 85% bokeh blur.`,
+    ``,
+    `### STEREOSCOPIC COPYWRITING LAYERS (3D Z-AXIS TEXT)`,
+    `Primary (z=0, foreground): "${copyLayers.primary}" — kinetic typography, 120% pop, drop shadow depth 4px`,
+    `Secondary (z=0.5, midground): "${copyLayers.secondary}" — fades in at 4s, 80% opacity, parallax drift -8px`,
+    `Tertiary (z=1.0, background): "${copyLayers.tertiary}" — subtle ambient text, 40% opacity, static placement`,
   ].join("\n");
 }
 
