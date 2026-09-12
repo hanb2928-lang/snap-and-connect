@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -2008,7 +2008,7 @@ export default function ResultScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: theme.spacing.xxl + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {analysisStatus === 'processing' && (
           <View style={styles.analysisPendingCard}>
             <View style={styles.analysisPendingHeader}>
@@ -2821,6 +2821,49 @@ export default function ResultScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* === 하단 고정 액션 바: 저장 / 업로드 === */}
+      <View style={[styles.stickyActionBar, { paddingBottom: 8 + insets.bottom }]}>
+        {uploadError ? (
+          <View style={styles.stickyErrorRow}>
+            <AlertCircleIcon size={14} color={theme.colors.error[400]} strokeWidth={2} />
+            <Text style={styles.stickyErrorText} numberOfLines={1}>{uploadError}</Text>
+            <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
+              <Text style={styles.stickyErrorDismiss}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        ) : uploadDone ? (
+          <View style={styles.stickySuccessRow}>
+            <ShieldIcon size={14} color={theme.colors.success[400]} strokeWidth={2} />
+            <Text style={styles.stickySuccessText}>저장 완료! 갤러리에서 확인하세요</Text>
+          </View>
+        ) : null}
+        <View style={styles.stickyBtnRow}>
+          <TouchableOpacity
+            style={styles.stickySaveBtn}
+            onPress={handleSaveAndShare}
+            disabled={uploadProgress !== null}
+            activeOpacity={0.8}
+          >
+            {uploadProgress !== null ? (
+              <Loader2Icon size={18} color="#fff" strokeWidth={2.5} />
+            ) : (
+              <Download size={18} color="#fff" strokeWidth={2.5} />
+            )}
+            <Text style={styles.stickySaveBtnText}>
+              {uploadProgress !== null ? '저장 중...' : '저장'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.stickyUploadBtn}
+            onPress={handlePlatformUpload}
+            activeOpacity={0.8}
+          >
+            <Upload size={18} color={theme.colors.primary[300]} strokeWidth={2.5} />
+            <Text style={styles.stickyUploadBtnText}>업로드</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <AccountSafetyChecker
         platform={activePlatform}
         visible={safetyCheckerVisible}
@@ -2867,6 +2910,89 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     alignSelf: 'center',
     width: '100%',
+  },
+  stickyActionBar: {
+    maxWidth: 600,
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 8,
+    backgroundColor: theme.colors.dark.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.dark.border,
+    ...theme.shadows.elevated,
+  },
+  stickyBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  stickySaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500],
+  },
+  stickySaveBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  stickyUploadBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  stickyUploadBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.primary[300],
+  },
+  stickyErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.error[500] + '12',
+  },
+  stickyErrorText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.error[400],
+  },
+  stickyErrorDismiss: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  stickySuccessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.success[500] + '12',
+  },
+  stickySuccessText: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.success[400],
   },
   body: {
     padding: theme.spacing.lg,
