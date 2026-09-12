@@ -2194,22 +2194,42 @@ export default function ResultScreen() {
           </ScrollView>
         </View>
 
-        {/* === 하단: 상세 수동 설정 (전문가용) 접이식 메뉴 === */}
-        <TouchableOpacity
-          style={styles.advancedToggle}
-          onPress={() => setShowManualSettings((v) => !v)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.detailToggleLeft}>
-            <SlidersIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={styles.advancedToggleText}>⚙️ 상세 수동 설정 (전문가용)</Text>
-          </View>
-          {showManualSettings ? (
-            <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          ) : (
-            <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
+        {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
+        <View style={styles.dualActionRow}>
+          <TouchableOpacity
+            style={[styles.dualActionBtn, styles.dualActionPrimary, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
+            onPress={() => handleAiVideoGenerate()}
+            disabled={isGeneratingVideo || !scan}
+            activeOpacity={0.7}
+          >
+            {isGeneratingVideo ? (
+              <Loader2Icon size={18} color="#fff" strokeWidth={2} />
+            ) : (
+              <ZapIcon size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.dualActionBtnText} numberOfLines={1}>
+              {isGeneratingVideo ? '생성 중...' : 'AI 자동 생성'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.dualActionBtn, styles.dualActionSecondary, showManualSettings && styles.dualActionSecondaryActive]}
+            onPress={() => setShowManualSettings((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <SlidersIcon size={18} color={showManualSettings ? theme.colors.accent[300] : theme.colors.dark.textDim} strokeWidth={2} />
+            <Text
+              style={[styles.dualActionBtnTextSecondary, showManualSettings && { color: theme.colors.accent[300] }]}
+              numberOfLines={1}
+            >
+              상세 수동 설정
+            </Text>
+            {showManualSettings ? (
+              <ChevronUp size={16} color={theme.colors.accent[300]} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         {showManualSettings && (
         <>
@@ -4100,6 +4120,47 @@ iconButton: {
     marginTop: 8,
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
+  },
+  dualActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    marginHorizontal: theme.spacing.md,
+  },
+  dualActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    ...theme.shadows.card,
+  },
+  dualActionPrimary: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  dualActionSecondary: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  dualActionSecondaryActive: {
+    borderColor: theme.colors.accent[400] + '60',
+    backgroundColor: theme.colors.accent[400] + '15',
+  },
+  dualActionDisabled: {
+    opacity: 0.5,
+  },
+  dualActionBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  dualActionBtnTextSecondary: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
   },
   advancedToggleText: {
     fontSize: 13,
