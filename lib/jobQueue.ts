@@ -195,11 +195,10 @@ async function triggerQueueProcessor(): Promise<void> {
       signal: controller.signal,
     });
     if (!resp.ok) {
-      const errBody = await resp.text().catch(() => '');
-      console.warn('process-queue trigger failed', resp.status, errBody);
+      await resp.text().catch(() => '');
     }
-  } catch (err) {
-    console.warn('process-queue trigger network error', err instanceof Error ? err.message : String(err));
+  } catch {
+    // network error — queue will retry on next trigger
   } finally {
     clearTimeout(timeoutId);
   }
