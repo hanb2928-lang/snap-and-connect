@@ -19,8 +19,6 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
-  Eye,
-  Share2,
   CircleCheck as CheckCircle2,
   CircleAlert,
 } from 'lucide-react-native';
@@ -30,38 +28,28 @@ export interface QuickTweakProps {
   hook: string;
   productName: string;
   priceEstimate: string;
-  affiliateUrl: string | null;
-  affiliateLabel: string;
   shortUrl: string | null;
   onHookChange: (hook: string) => void;
   onProductNameChange: (name: string) => void;
   onPriceChange: (price: string) => void;
-  onAffiliateChange: (url: string, label: string) => void;
-  onSaveAndShare: () => void;
 }
 
-type EditField = 'hook' | 'product' | 'price' | 'link' | null;
+type EditField = 'hook' | 'product' | 'price' | null;
 
 export function QuickTweakPanel({
   hook,
   productName,
   priceEstimate,
-  affiliateUrl,
-  affiliateLabel,
   shortUrl,
   onHookChange,
   onProductNameChange,
   onPriceChange,
-  onAffiliateChange,
-  onSaveAndShare,
 }: QuickTweakProps) {
   const [expanded, setExpanded] = useState(true);
   const [editingField, setEditingField] = useState<EditField>(null);
   const [hookInput, setHookInput] = useState(hook);
   const [productInput, setProductInput] = useState(productName);
   const [priceInput, setPriceInput] = useState(priceEstimate);
-  const [linkUrlInput, setLinkUrlInput] = useState(affiliateUrl || '');
-  const [linkLabelInput, setLinkLabelInput] = useState(affiliateLabel || '');
   const [savedField, setSavedField] = useState<EditField>(null);
 
   const startEdit = useCallback((field: EditField) => {
@@ -69,9 +57,7 @@ export function QuickTweakPanel({
     setHookInput(hook);
     setProductInput(productName);
     setPriceInput(priceEstimate);
-    setLinkUrlInput(affiliateUrl || '');
-    setLinkLabelInput(affiliateLabel || '');
-  }, [hook, productName, priceEstimate, affiliateUrl, affiliateLabel]);
+  }, [hook, productName, priceEstimate]);
 
   const cancelEdit = useCallback(() => {
     setEditingField(null);
@@ -84,16 +70,13 @@ export function QuickTweakPanel({
       onProductNameChange(productInput.trim());
     } else if (field === 'price') {
       onPriceChange(priceInput.trim());
-    } else if (field === 'link') {
-      onAffiliateChange(linkUrlInput.trim(), linkLabelInput.trim());
     }
     setEditingField(null);
     setSavedField(field);
     setTimeout(() => setSavedField(null), 2000);
-  }, [hookInput, productInput, priceInput, linkUrlInput, linkLabelInput, onHookChange, onProductNameChange, onPriceChange, onAffiliateChange]);
+  }, [hookInput, productInput, priceInput, onHookChange, onProductNameChange, onPriceChange]);
 
   const hasAllContent = !!(hook && productName);
-  const hasLink = !!affiliateUrl;
 
   return (
     <View style={styles.container}>
@@ -120,7 +103,7 @@ export function QuickTweakPanel({
 
       {expanded && (
         <View style={styles.body}>
-          {/* Sync status badges */}
+          {/* Sync status badge */}
           <View style={styles.badgeRow}>
             <View style={[styles.syncBadge, hasAllContent ? styles.syncOk : styles.syncWarn]}>
               {hasAllContent ? (
@@ -130,16 +113,6 @@ export function QuickTweakPanel({
               )}
               <Text style={[styles.syncBadgeText, hasAllContent ? styles.syncTextOk : styles.syncTextWarn]}>
                 {hasAllContent ? '싱크로율 양호' : '정보 누락'}
-              </Text>
-            </View>
-            <View style={[styles.syncBadge, hasLink ? styles.syncOk : styles.syncWarn]}>
-              {hasLink ? (
-                <CheckCircle2 size={12} color={theme.colors.success[400]} strokeWidth={2.5} />
-              ) : (
-                <CircleAlert size={12} color={theme.colors.warning[400]} strokeWidth={2.5} />
-              )}
-              <Text style={[styles.syncBadgeText, hasLink ? styles.syncTextOk : styles.syncTextWarn]}>
-                {hasLink ? '제휴 링크 연결됨' : '링크 미연결'}
               </Text>
             </View>
           </View>
@@ -280,63 +253,6 @@ export function QuickTweakPanel({
             </View>
           </View>
 
-          {/* Affiliate link row */}
-          <View style={styles.tweakRow}>
-            <View style={styles.tweakIconWrap}>
-              <Link2 size={14} color={theme.colors.success[400]} strokeWidth={2} />
-            </View>
-            <View style={styles.tweakContent}>
-              <Text style={styles.tweakLabel}>제휴 상품 / 링크</Text>
-              {editingField === 'link' ? (
-                <View style={styles.editWrap}>
-                  <TextInput
-                    style={styles.editInput}
-                    value={linkUrlInput}
-                    onChangeText={setLinkUrlInput}
-                    placeholder="제휴 링크 URL"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                    autoFocus
-                  />
-                  <TextInput
-                    style={[styles.editInput, styles.editInputLabel]}
-                    value={linkLabelInput}
-                    onChangeText={setLinkLabelInput}
-                    placeholder="링크 표시 이름 (선택)"
-                    placeholderTextColor={theme.colors.dark.textFaint}
-                  />
-                  <View style={styles.editActions}>
-                    <TouchableOpacity style={styles.editCancelBtn} onPress={cancelEdit} activeOpacity={0.7}>
-                      <X size={13} color={theme.colors.dark.textDim} strokeWidth={2.5} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.editConfirmBtn} onPress={() => confirmEdit('link')} activeOpacity={0.7}>
-                      <Check size={13} color="#fff" strokeWidth={2.5} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.tweakDisplay}
-                  onPress={() => startEdit('link')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.tweakValue, !hasLink && styles.tweakValueEmpty]} numberOfLines={1}>
-                    {hasLink
-                      ? (affiliateLabel || affiliateUrl || '링크 연결됨')
-                      : '(미연결) 터치해서 제휴 링크 입력'}
-                  </Text>
-                  {savedField === 'link' ? (
-                    <Check size={13} color={theme.colors.success[400]} strokeWidth={2.5} />
-                  ) : (
-                    <Pencil size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
           {/* Short URL display */}
           {shortUrl && (
             <View style={styles.shortUrlRow}>
@@ -344,18 +260,6 @@ export function QuickTweakPanel({
               <Text style={styles.shortUrlText} numberOfLines={1}>단축 URL: {shortUrl}</Text>
             </View>
           )}
-
-          {/* Action buttons */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.saveShareBtn}
-              onPress={onSaveAndShare}
-              activeOpacity={0.8}
-            >
-              <Share2 size={15} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.saveShareText}>저장 후 공유하기</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       )}
     </View>
@@ -535,23 +439,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.primary[300],
-  },
-  actionRow: {
-    marginTop: 4,
-  },
-  saveShareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500],
-    ...theme.shadows.glowPrimary,
-  },
-  saveShareText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
 });

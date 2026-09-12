@@ -13,13 +13,12 @@ import {
   TextInput,
   AppState,
   Linking,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import {
   ArrowLeft,
-  Tag,
-  Info,
   Share2,
-  Download,
   Trash2,
   Sparkles,
   Pencil,
@@ -345,6 +344,8 @@ export default function ResultScreen() {
   const [selectedDurationMs, setSelectedDurationMs] = useState<number>(DEFAULT_DURATION);
   const [productVision, setProductVision] = useState<ProductVisionResult | null>(null);
   const [visionAnalyzing, setVisionAnalyzing] = useState(false);
+  const [galleryModalVisible, setGalleryModalVisible] = useState(false);
+  const [galleryModalIndex, setGalleryModalIndex] = useState(0);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -2226,6 +2227,41 @@ export default function ResultScreen() {
             ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
           />
 
+          {/* === 촬영된 5각도 입체 원본 컷 갤러리 === */}
+          {allCutImages.length > 0 && (
+            <View style={styles.angleGallerySection}>
+              <View style={styles.angleGalleryHeader}>
+                <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
+                <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
+                <View style={styles.angleGalleryBadge}>
+                  <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
+                </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
+                {allCutImages.map((imgUrl, idx) => {
+                  const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
+                  const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.angleThumbWrap}
+                      onPress={() => {
+                        setGalleryModalIndex(idx);
+                        setGalleryModalVisible(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
+                      <View style={styles.angleThumbLabelWrap}>
+                        <Text style={styles.angleThumbLabel}>{label}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}
           <View style={styles.hookEditBar}>
             <TextInput
@@ -2382,6 +2418,21 @@ export default function ResultScreen() {
           )}
         </View>
 
+        <QuickTweakPanel
+          hook={activeHook}
+          productName={activeProductName}
+          priceEstimate={activePriceEstimate}
+          shortUrl={shortUrl}
+          onHookChange={(h) => setHookOverride(h)}
+          onProductNameChange={(name) => {
+            if (scan) {
+              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
+              setScan({ ...scan, product_name: name });
+            }
+          }}
+          onPriceChange={(price) => setPriceOverride(price)}
+        />
+
         {/* === AI Prompt + Regenerate === */}
         <View style={styles.promptSection}>
           <View style={styles.promptHeader}>
@@ -2498,6 +2549,76 @@ export default function ResultScreen() {
           )}
         </View>
 
+        {/* === 5각도 원본 컷 풀스크린 뷰어 === */}
+        <Modal visible={galleryModalVisible} transparent animationType="fade" onRequestClose={() => setGalleryModalVisible(false)}>
+          <View style={styles.galleryModalOverlay}>
+            <View style={styles.galleryModalContent}>
+              <View style={styles.galleryModalHeader}>
+                <Text style={styles.galleryModalTitle} numberOfLines={1}>
+                  {['정면', '좌측', '우측', '후면', '상부'][galleryModalIndex] ?? `컷 ${galleryModalIndex + 1}`} 컷
+                </Text>
+                <TouchableOpacity style={styles.galleryModalCloseBtn} onPress={() => setGalleryModalVisible(false)} activeOpacity={0.7}>
+                  <X size={20} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              <Image
+                source={{ uri: allCutImages[galleryModalIndex] ?? allCutImages[0] }}
+                style={styles.galleryModalImage}
+                resizeMode="contain"
+              />
+              <View style={styles.galleryModalActions}>
+                <TouchableOpacity
+                  style={styles.galleryModalActionBtn}
+                  onPress={() => {
+                    setGalleryModalVisible(false);
+                    router.push(`/editor?id=${scan.id}`);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Pencil size={15} color={theme.colors.dark.text} strokeWidth={2} />
+                  <Text style={styles.galleryModalActionText}>이 컷 수정</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.galleryModalActionBtn, styles.galleryModalActionPrimary]}
+                  onPress={() => {
+                    setGalleryModalVisible(false);
+                    router.push('/(tabs)/index');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <CameraIcon size={15} color="#fff" strokeWidth={2} />
+                  <Text style={[styles.galleryModalActionText, { color: '#fff' }]}>재촬영</Text>
+                </TouchableOpacity>
+              </View>
+              {allCutImages.length > 1 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.galleryModalThumbScroll}
+                  contentContainerStyle={styles.galleryModalThumbContent}
+                >
+                  {allCutImages.map((imgUrl, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setGalleryModalIndex(idx)}
+                      activeOpacity={0.85}
+                    >
+                      <Image
+                        source={{ uri: imgUrl }}
+                        style={[
+                          styles.galleryModalThumb,
+                          idx === galleryModalIndex && styles.galleryModalThumbActive,
+                        ]}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+
         {/* AI Video Generation Confirmation Modal */}
         {showVideoConfirm && (
           <View style={styles.modalOverlay}>
@@ -2529,31 +2650,6 @@ export default function ResultScreen() {
           </View>
         )}
 
-        <QuickTweakPanel
-          hook={activeHook}
-          productName={activeProductName}
-          priceEstimate={activePriceEstimate}
-          affiliateUrl={customLinkForCurrentProduct?.url ?? (primaryAffiliateUrl || null)}
-          affiliateLabel={customLinkForCurrentProduct?.label ?? ''}
-          shortUrl={shortUrl}
-          onHookChange={(h) => setHookOverride(h)}
-          onProductNameChange={(name) => {
-            if (scan) {
-              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
-              setScan({ ...scan, product_name: name });
-            }
-          }}
-          onPriceChange={(price) => setPriceOverride(price)}
-          onAffiliateChange={(url, label) => {
-            if (scan && url) {
-              handleSaveCustomLink(url, label, selectedProductIndex);
-            } else if (scan && !url) {
-              handleRemoveCustomLink(selectedProductIndex);
-            }
-          }}
-          onSaveAndShare={handleSaveAndShare}
-        />
-
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
           <AffiliatePromptBanner
             productName={activeProductName}
@@ -2565,55 +2661,6 @@ export default function ResultScreen() {
         ) : null}
 
         <View style={styles.body}>
-          <View style={styles.titleRow}>
-            <Sparkles size={20} color={theme.colors.primary[400]} strokeWidth={2} />
-            <Text style={styles.title} numberOfLines={2}>{scan.title || '제품 분석 결과'}</Text>
-          </View>
-
-          {scan.summary ? (
-            <Text style={styles.summary}>{scan.summary}</Text>
-          ) : (
-            <Text style={styles.summaryFaint}>요약 정보가 없습니다</Text>
-          )}
-
-          {activePriceEstimate ? (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>예상 가격</Text>
-              <Text style={styles.priceValue}>{activePriceEstimate}</Text>
-            </View>
-          ) : null}
-
-          {(scan.tags ?? []).length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>태그</Text>
-              <View style={styles.tagRow}>
-                {(scan.tags ?? []).map((tag, i) => (
-                  <View key={i} style={styles.tag}>
-                    <Tag size={11} color={theme.colors.primary[300]} strokeWidth={2} />
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {(scan.contacts ?? []).length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>연결 정보</Text>
-              {(scan.contacts ?? []).map((contact, i) => (
-                <View key={i} style={styles.contactCard}>
-                  <View style={styles.contactIconWrap}>
-                    <Info size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  </View>
-                  <View style={styles.contactBody}>
-                    <Text style={styles.contactLabel}>{contact.label}</Text>
-                    <Text style={styles.contactValue} numberOfLines={2}>{contact.value}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
           {detectedProducts.length > 1 && (
             <View style={styles.section}>
               <ProductSelector
@@ -2786,73 +2833,6 @@ export default function ResultScreen() {
 
           {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
 
-          {/* === Bottom action bar (scroll-end, no floating bar) === */}
-          <View style={styles.bottomActionSection}>
-            {/* 1. Cloud save */}
-            <TouchableOpacity
-              style={[styles.cloudSaveBtn, (uploadProgress !== null || uploadDone) && { opacity: 0.5 }]}
-              onPress={handleSaveAndShare}
-              activeOpacity={0.7}
-              disabled={uploadProgress !== null || uploadDone}
-            >
-              {uploadDone ? (
-                <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
-              ) : uploadProgress !== null ? (
-                <ActivityIndicator size="small" color={theme.colors.dark.text} />
-              ) : (
-                <Download size={18} color={theme.colors.dark.text} strokeWidth={2} />
-              )}
-              <Text style={styles.cloudSaveBtnText}>
-                {uploadDone ? '저장됨' : uploadProgress !== null ? '저장 중...' : '클라우드로 저장'}
-              </Text>
-            </TouchableOpacity>
-            {uploadProgress !== null && (
-              <View style={styles.uploadProgressWrap}>
-                <View style={styles.uploadProgressTrack}>
-                  <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
-                </View>
-                <Text style={styles.uploadProgressText}>
-                  {uploadDone ? '클라우드 저장 완료!' : uploadProgress < 100 ? `클라우드 업로드 중... ${uploadProgress}%` : '저장 처리 중...'}
-                </Text>
-              </View>
-            )}
-            {uploadError && (
-              <View style={styles.uploadErrorWrap}>
-                <Text style={styles.uploadErrorText}>{uploadError}</Text>
-                <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
-                  <X size={16} color={theme.colors.error[400]} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* 2. Platform direct upload */}
-            <TouchableOpacity
-              style={[styles.bottomShareBtn, styles.bottomShareBtnPrimary]}
-              onPress={handlePlatformUpload}
-              activeOpacity={0.7}
-            >
-              {(() => {
-                const PlatformIcon = TARGET_PLATFORM_PRESETS[targetPlatform].icon;
-                return <PlatformIcon size={18} color="#fff" strokeWidth={2} />;
-              })()}
-              <Text style={styles.bottomShareBtnText}>
-                {TARGET_PLATFORM_PRESETS[targetPlatform].label} 바로 업로드
-              </Text>
-            </TouchableOpacity>
-
-            {/* 3. Other SNS share */}
-            <TouchableOpacity
-              style={styles.bottomShareBtn}
-              onPress={handleOtherSnsShare}
-              activeOpacity={0.7}
-            >
-              <Share2Icon size={18} color={theme.colors.dark.text} strokeWidth={2} />
-              <Text style={[styles.bottomShareBtnText, { color: theme.colors.dark.text }]}>
-                다른 SNS 공유
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           {disclosureText ? (
             <View style={styles.disclosureSection}>
               <TouchableOpacity
@@ -2936,50 +2916,6 @@ const styles = StyleSheet.create({
   body: {
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
-  },
-  title: {
-    flex: 1,
-    fontSize: theme.typography.title,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  summary: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 26,
-  },
-  summaryFaint: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-    fontStyle: 'italic',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  priceLabel: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  priceValue: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.primary[300],
   },
   section: {
     marginTop: theme.spacing.xl,
@@ -3081,62 +3017,6 @@ const styles = StyleSheet.create({
     color: theme.colors.dark.textDim,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.primary[500] + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.radius.full,
-  },
-  tagText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.primary[300],
-  },
-  contactCard: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    alignItems: 'center',
-    ...theme.shadows.card,
-  },
-  contactIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contactBody: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
-  },
-  contactLabel: {
-    fontSize: theme.typography.micro,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  contactValue: {
-    fontSize: theme.typography.body,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    marginTop: 2,
-  },
-  templateWrap: {
-    alignItems: 'center',
   },
   captionCard: {
     backgroundColor: theme.colors.dark.surface,
@@ -3355,95 +3235,144 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     textAlign: 'center',
   },
-  bottomShareSection: {
-    marginTop: theme.spacing.xxl,
-    paddingHorizontal: theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
+  angleGallerySection: {
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
   },
-  bottomActionSection: {
-    marginTop: theme.spacing.xxl,
-    paddingHorizontal: theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
-    gap: 10,
-  },
-  bottomShareRow: {
+  angleGalleryHeader: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: theme.spacing.sm,
   },
-  bottomShareBtn: {
+  angleGalleryTitle: {
+    flex: 1,
+    fontSize: theme.typography.caption,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  angleGalleryBadge: {
+    backgroundColor: theme.colors.accent[500] + '25',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  angleGalleryBadgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+  },
+  angleGalleryScroll: {
+    flexDirection: 'row',
+  },
+  angleThumbWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    marginRight: theme.spacing.sm,
+    position: 'relative',
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  angleThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  angleThumbLabelWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  angleThumbLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  galleryModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryModalContent: {
+    flex: 1,
+    width: Dimensions.get('window').width,
+    maxHeight: Dimensions.get('window').height,
+  },
+  galleryModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 12,
+  },
+  galleryModalTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  galleryModalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryModalImage: {
+    flex: 1,
+    width: Dimensions.get('window').width,
+  },
+  galleryModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  galleryModalActionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
+    gap: 6,
+    paddingVertical: 14,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
   },
-  bottomShareBtnPrimary: {
+  galleryModalActionPrimary: {
     backgroundColor: theme.colors.primary[500],
   },
-  bottomShareBtnText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-  },
-  cloudSaveSection: {
-    marginTop: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  cloudSaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary[400] + '40',
-  },
-  cloudSaveBtnText: {
+  galleryModalActionText: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
-  uploadProgressWrap: {
-    flexDirection: 'column',
-    gap: 6,
+  galleryModalThumbScroll: {
+    paddingBottom: 30,
   },
-  uploadProgressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    overflow: 'hidden',
-  },
-  uploadProgressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.primary[500],
-    borderRadius: 2,
-  },
-  uploadProgressText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-    textAlign: 'center',
-  },
-  uploadErrorWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  galleryModalThumbContent: {
+    paddingHorizontal: 16,
     gap: 8,
-    backgroundColor: theme.colors.error[500] + '15',
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
   },
-  uploadErrorText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.error[400],
+  galleryModalThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.sm,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  galleryModalThumbActive: {
+    borderColor: theme.colors.primary[400],
   },
   errorTitle: {
     fontSize: theme.typography.heading,
