@@ -2101,65 +2101,153 @@ export default function ResultScreen() {
           </View>
         )}
 
-        {/* === Target Platform Selector === */}
-        <View style={styles.targetPlatformSection}>
-          <View style={styles.targetPlatformHeader}>
-            <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
-            {TARGET_PLATFORM_LIST.map((p) => {
-              const isActive = targetPlatform === p.key;
-              const Icon = p.icon;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                  onPress={() => handleTargetPlatformChange(p.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.targetPlatformHint}>
-            {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
-          </Text>
-
-          {/* Content Purpose Selector */}
-          <View style={styles.purposeRow}>
-            <Text style={styles.purposeLabel}>목적</Text>
-            {CONTENT_PURPOSE_LIST.map((p) => {
-              const isActive = contentPurpose === p.key;
-              const Icon = p.icon;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                  onPress={() => handleContentPurposeChange(p.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <Text style={styles.strategyHint}>
-            {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
-          </Text>
+        {/* === 1순위: Live Short-Form Preview (단일 실시간 15초 미리보기) === */}
+        <View style={styles.previewSection}>
+          <ShortFormPreviewPlayer
+            editPlan={previewEditPlan}
+            videoUri={generatedVideoUrl}
+            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
+            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
+            narrativePlan={narrativePlan}
+            videoGenProgress={videoGenProgress}
+            bgmVolume={bgmVolume}
+            copyOverlays={copyOverlaysForPreview}
+            narrationActive={narrationPlaying}
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          />
         </View>
 
-        {/* === Template + Caption + BGM chips === */}
-        <View style={styles.chipSection}>
-          {/* 자막 스타일 & 영상 템플릿 — 고급 설정으로 이동 (접이식) */}
+        {/* === 2순위: 촬영된 5각도 입체 원본 컷 갤러리 === */}
+        {allCutImages.length > 0 && (
+          <View style={styles.angleGallerySection}>
+            <View style={styles.angleGalleryHeader}>
+              <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
+              <View style={styles.angleGalleryBadge}>
+                <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
+              {allCutImages.map((imgUrl, idx) => {
+                const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
+                const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.angleThumbWrap}
+                    onPress={() => {
+                      setGalleryModalIndex(idx);
+                      setGalleryModalVisible(true);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
+                    <View style={styles.angleThumbLabelWrap}>
+                      <Text style={styles.angleThumbLabel}>{label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
+        {/* === 3순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
+        <QuickTweakPanel
+          hook={activeHook}
+          productName={activeProductName}
+          priceEstimate={activePriceEstimate}
+          shortUrl={shortUrl}
+          onHookChange={(h) => setHookOverride(h)}
+          onProductNameChange={(name) => {
+            if (scan) {
+              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
+              setScan({ ...scan, product_name: name });
+            }
+          }}
+          onPriceChange={(price) => setPriceOverride(price)}
+        />
+
+        {/* === 4순위: BGM / AI 나레이션 스타일 설정 (플랫폼, 목적, BGM 분위기, 나레이션 통합) === */}
+        <View style={styles.chipSection}>
+          {/* 플랫폼 선택 */}
+          <View style={styles.targetPlatformSection}>
+            <View style={styles.targetPlatformHeader}>
+              <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
+              {TARGET_PLATFORM_LIST.map((p) => {
+                const isActive = targetPlatform === p.key;
+                const Icon = p.icon;
+                return (
+                  <TouchableOpacity
+                    key={p.key}
+                    style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                    onPress={() => handleTargetPlatformChange(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <Text style={styles.targetPlatformHint}>
+              {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
+            </Text>
+
+            {/* 목적 선택 */}
+            <View style={styles.purposeRow}>
+              <Text style={styles.purposeLabel}>목적</Text>
+              {CONTENT_PURPOSE_LIST.map((p) => {
+                const isActive = contentPurpose === p.key;
+                const Icon = p.icon;
+                return (
+                  <TouchableOpacity
+                    key={p.key}
+                    style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                    onPress={() => handleContentPurposeChange(p.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.strategyHint}>
+              {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
+            </Text>
+          </View>
+
+          {/* 영상 길이 선택 */}
+          <View style={styles.durationSelectorRow}>
+            <Text style={styles.durationSelectorLabel}>영상 길이</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
+              {DURATION_PRESETS.map((p) => {
+                const isActive = selectedDurationMs === p.value;
+                return (
+                  <TouchableOpacity
+                    key={p.value}
+                    style={[styles.durationChip, isActive && styles.durationChipActive]}
+                    onPress={() => setSelectedDurationMs(p.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* BGM 분위기 */}
           <View style={styles.chipGroup}>
             <View style={styles.chipGroupHeader}>
               <FilmIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
@@ -2188,81 +2276,8 @@ export default function ResultScreen() {
             narrationText={activeHook || activeOneLiner || scan?.summary || ''}
             onPlayStateChange={setNarrationPlaying}
           />
-        </View>
 
-        {/* === 영상 길이 선택 (간소화) === */}
-        <View style={styles.durationSelectorRow}>
-          <Text style={styles.durationSelectorLabel}>영상 길이</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
-            {DURATION_PRESETS.map((p) => {
-              const isActive = selectedDurationMs === p.value;
-              return (
-                <TouchableOpacity
-                  key={p.value}
-                  style={[styles.durationChip, isActive && styles.durationChipActive]}
-                  onPress={() => setSelectedDurationMs(p.value)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* === Live Short-Form Preview === */}
-        <View style={styles.promptSection}>
-          <ShortFormPreviewPlayer
-            editPlan={previewEditPlan}
-            videoUri={generatedVideoUrl}
-            imageUri={captureImageUrl || scan?.edited_image_url || scan?.image_url || null}
-            slideshowImages={allCutImages.length > 1 ? (narrativeReorderedImages.length > 1 ? narrativeReorderedImages : allCutImages) : null}
-            narrativePlan={narrativePlan}
-            videoGenProgress={videoGenProgress}
-            bgmVolume={bgmVolume}
-            copyOverlays={copyOverlaysForPreview}
-            narrationActive={narrationPlaying}
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          />
-
-          {/* === 촬영된 5각도 입체 원본 컷 갤러리 === */}
-          {allCutImages.length > 0 && (
-            <View style={styles.angleGallerySection}>
-              <View style={styles.angleGalleryHeader}>
-                <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
-                <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
-                <View style={styles.angleGalleryBadge}>
-                  <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
-                </View>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
-                {allCutImages.map((imgUrl, idx) => {
-                  const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
-                  const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
-                  return (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.angleThumbWrap}
-                      onPress={() => {
-                        setGalleryModalIndex(idx);
-                        setGalleryModalVisible(true);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
-                      <View style={styles.angleThumbLabelWrap}>
-                        <Text style={styles.angleThumbLabel}>{label}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}
+          {/* 한 줄 후킹 편집 바 + 상세 자막 토글 */}
           <View style={styles.hookEditBar}>
             <TextInput
               style={styles.hookEditInput}
@@ -2291,7 +2306,7 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* === 상세 자막/폰트 편집 (접이식) === */}
+          {/* 상세 자막/폰트 편집 (접이식) */}
           {showAdvancedCaption && (
             <View style={styles.advancedPanel}>
               <Text style={styles.advancedPanelLabel}>자막 스타일</Text>
@@ -2327,7 +2342,7 @@ export default function ResultScreen() {
             </View>
           )}
 
-          {/* === 고급 카메라 모션 수동 설정 (접이식) === */}
+          {/* 고급 카메라 모션 수동 설정 (접이식) */}
           <TouchableOpacity
             style={styles.advancedToggle}
             onPress={() => setShowAdvancedCamera((v) => !v)}
@@ -2378,7 +2393,7 @@ export default function ResultScreen() {
             </View>
           )}
 
-          {/* === 음량/믹싱 수동 조절 (접이식) === */}
+          {/* 음량/믹싱 수동 조절 (접이식) */}
           <TouchableOpacity
             style={styles.advancedToggle}
             onPress={() => setShowAdvancedAudio((v) => !v)}
@@ -2416,25 +2431,8 @@ export default function ResultScreen() {
               </View>
             </View>
           )}
-        </View>
 
-        <QuickTweakPanel
-          hook={activeHook}
-          productName={activeProductName}
-          priceEstimate={activePriceEstimate}
-          shortUrl={shortUrl}
-          onHookChange={(h) => setHookOverride(h)}
-          onProductNameChange={(name) => {
-            if (scan) {
-              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
-              setScan({ ...scan, product_name: name });
-            }
-          }}
-          onPriceChange={(price) => setPriceOverride(price)}
-        />
-
-        {/* === AI Prompt + Regenerate === */}
-        <View style={styles.promptSection}>
+          {/* AI 가상 영상 프롬프트 — 스타일 카드 내부에 통합 */}
           <View style={styles.promptHeader}>
             <Wand2 size={16} color={theme.colors.primary[300]} strokeWidth={2} />
             <Text style={styles.promptTitle}>AI 가상 영상 프롬프트</Text>
@@ -2488,7 +2486,10 @@ export default function ResultScreen() {
               {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
             </Text>
           </TouchableOpacity>
+        </View>
 
+        {/* === AI 비디오 변환 (크레딧 소모) === */}
+        <View style={styles.promptSection}>
           {/* AI Video Generation — explicit trigger (costs API credits) */}
           {allCutImages.length < 5 && (
             <View style={styles.photoGuardTooltip}>
@@ -3236,10 +3237,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   angleGallerySection: {
-    marginTop: theme.spacing.sm,
+    marginTop: 4,
+    marginHorizontal: theme.spacing.md,
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.sm,
+    padding: 8,
     ...theme.shadows.card,
   },
   angleGalleryHeader: {
@@ -3986,8 +3988,8 @@ const styles = StyleSheet.create({
   },
   chipSection: {
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    gap: 10,
+    paddingVertical: 4,
+    gap: 8,
   },
   chipGroup: {
     gap: 6,
@@ -4035,6 +4037,17 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 8,
     borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '30',
+    ...theme.shadows.card,
+  },
+  previewSection: {
+    marginHorizontal: theme.spacing.md,
+    marginVertical: 2,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 6,
+    gap: 4,
+    borderWidth: 1,
     borderColor: theme.colors.primary[400] + '30',
     ...theme.shadows.card,
   },

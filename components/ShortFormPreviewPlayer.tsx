@@ -50,8 +50,8 @@ interface ShortFormPreviewPlayerProps {
 const TOTAL_DURATION = 15;
 const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
-const PREVIEW_FRAME_WIDTH = 120;
-const PREVIEW_FRAME_HEIGHT = 200;
+const PREVIEW_FRAME_WIDTH = 108;
+const PREVIEW_FRAME_HEIGHT = 160;
 const VIDEO_LOAD_TIMEOUT_MS = 5000;
 const BUFFERING_TIMEOUT_MS = 5000;
 
@@ -898,12 +898,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: theme.colors.primary[500] + '40',
-    padding: 8,
-    gap: 7,
+    padding: 6,
+    gap: 5,
   },
   labelRow: {
     flexDirection: 'row',
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: PREVIEW_FRAME_WIDTH,
     height: PREVIEW_FRAME_HEIGHT,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#000',
     borderWidth: 1,
@@ -1037,17 +1037,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   playBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: theme.colors.primary[600],
     justifyContent: 'center',
     alignItems: 'center',
   },
   resetBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: theme.colors.dark.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
@@ -1091,10 +1091,10 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   segmentLabelChip: {
-    borderRadius: 4,
+    borderRadius: 3,
     backgroundColor: theme.colors.primary[600] + '30',
-    paddingHorizontal: 4,
-    paddingVertical: 3,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
