@@ -352,11 +352,12 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       if (currentSec >= TOTAL_DURATION) {
         setCurrentSec(0);
       }
-      if (Platform.OS === 'web' && !bgmPlayerRef.current) {
-        bgmPlayerRef.current = new BgmPlayer();
-      }
-      if (bgmPlayerRef.current) {
+      if (Platform.OS === 'web') {
+        if (!bgmPlayerRef.current) {
+          bgmPlayerRef.current = new BgmPlayer();
+        }
         bgmPlayerRef.current.unlockAudio();
+        bgmPlayerRef.current.setVolume(1.0);
       }
       setIsPlaying(true);
     }
@@ -375,6 +376,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     if (!bgmPlayerRef.current) {
       bgmPlayerRef.current = new BgmPlayer();
     }
+    bgmPlayerRef.current.setVolume(1.0);
     if (!videoReady) {
       bgmPlayerRef.current.start(
         editPlan.bgmTemplate.id,

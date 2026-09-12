@@ -190,6 +190,7 @@ export class BgmPlayer {
   private audioUnlocked = false;
   private usingFallback = false;
   private loadErrorCount = 0;
+  private readyPromise: Promise<boolean> | null = null;
 
   private ensureAudio(): HTMLAudioElement | null {
     if (typeof window === 'undefined' || typeof document === 'undefined') return null;
@@ -210,15 +211,7 @@ export class BgmPlayer {
             this.audio.src = FALLBACK_TRACK_URL;
             this.audio.load();
             if (this.isPlaying) {
-              this.audio.play().then(() => this.fadeIn()).catch(() => {
-                this.audio!.muted = true;
-                this.audio!.play().then(() => {
-                  this.audio!.muted = false;
-                  this.fadeIn();
-                }).catch(() => {
-                  console.warn('[BgmEngine] 폴백 음원 재생도 실패 — BGM 음소거 상태로 진행');
-                });
-              });
+              this.playWhenReady();
             }
           } else if (this.usingFallback) {
             console.warn('[BgmEngine] 폴백 음원도 로드 실패 — BGM 없이 진행');
@@ -231,38 +224,99 @@ export class BgmPlayer {
     return this.audio;
   }
 
+  private getOrCreateAudioContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return null;
+    let ctx = (window as any).__snapConnectAudioCtx as AudioContext | undefined;
+    if (!ctx) {
+      ctx = new AudioCtx();
+      (window as any).__snapConnectAudioCtx = ctx;
+    }
+    return ctx;
+  }
+
   unlockAudio(): void {
-    if (this.audioUnlocked) return;
     const audio = this.ensureAudio();
     if (!audio) return;
 
     try {
-      const AudioCtx = (typeof window !== 'undefined')
-        ? (window.AudioContext || (window as any).webkitAudioContext)
-        : null;
-      if (AudioCtx) {
-        let ctx = (window as any).__snapConnectAudioCtx;
-        if (!ctx) {
-          ctx = new AudioCtx();
-          (window as any).__snapConnectAudioCtx = ctx;
-        }
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
-        }
+      const ctx = this.getOrCreateAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
 
-      audio.muted = true;
-      audio.volume = 0;
-      audio.play().then(() => {
-        audio.pause();
-        audio.currentTime = 0;
-        audio.muted = false;
-        this.audioUnlocked = true;
-      }).catch(() => {
-        audio.muted = false;
-      });
+      // Unlock the Audio element by playing a muted blank, then pausing.
+      // Do NOT touch volume — leave it at this.volume (1.0) for subsequent start().
+      if (!this.audioUnlocked) {
+        audio.muted = true;
+        const prevSrc = audio.src;
+        if (!prevSrc) {
+          // No src yet — use a tiny silent data URI to unlock the element
+          audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+        }
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+          if (!prevSrc) {
+            audio.removeAttribute('src');
+            audio.load();
+          }
+          this.audioUnlocked = true;
+        }).catch(() => {
+          audio.muted = false;
+          if (!prevSrc) {
+            audio.removeAttribute('src');
+            audio.load();
+          }
+        });
+      }
     } catch {
       // ignore
+    }
+  }
+
+  private playWhenReady(): void {
+    const audio = this.audio;
+    if (!audio) return;
+
+    const attemptPlay = () => {
+      audio.muted = false;
+      audio.volume = this.volume;
+      audio.play().then(() => {
+        this.isPlaying = true;
+        this.fadeIn();
+      }).catch(() => {
+        // Autoplay blocked — try muted then unmute
+        audio.muted = true;
+        audio.play().then(() => {
+          audio.muted = false;
+          audio.volume = this.volume;
+          this.isPlaying = true;
+          this.fadeIn();
+        }).catch(() => {
+          console.warn('[BgmEngine] play() 최종 실패 — BGM 없이 진행');
+          this.isPlaying = false;
+        });
+      });
+    };
+
+    // Wait for canplaythrough before playing. If already ready, play immediately.
+    if (audio.readyState >= 3) {
+      attemptPlay();
+    } else {
+      const timeout = setTimeout(() => {
+        audio.removeEventListener('canplaythrough', onReady);
+        console.warn('[BgmEngine] canplaythrough 타임아웃 — 강제 재생 시도');
+        attemptPlay();
+      }, 8000);
+      const onReady = () => {
+        clearTimeout(timeout);
+        audio.removeEventListener('canplaythrough', onReady);
+        attemptPlay();
+      };
+      audio.addEventListener('canplaythrough', onReady, { once: true });
     }
   }
 
@@ -285,36 +339,12 @@ export class BgmPlayer {
 
     try {
       this.usingFallback = false;
+      audio.crossOrigin = 'anonymous';
       audio.src = track.url;
       audio.load();
-      audio.volume = 0;
       audio.muted = false;
-      audio.play().then(() => {
-        this.fadeIn();
-      }).catch(() => {
-        audio.muted = true;
-        audio.play().then(() => {
-          audio.muted = false;
-          this.fadeIn();
-        }).catch(() => {
-          console.warn(`[BgmEngine] 음원 재생 실패 (무드: ${bgmTemplateId}) — 폴백 URL 시도`);
-          this.usingFallback = true;
-          audio.src = FALLBACK_TRACK_URL;
-          audio.load();
-          audio.play().then(() => {
-            this.fadeIn();
-          }).catch(() => {
-            audio.muted = true;
-            audio.play().then(() => {
-              audio.muted = false;
-              this.fadeIn();
-            }).catch(() => {
-              console.warn('[BgmEngine] 폴백 음원 재생도 실패 — BGM 없이 진행');
-            });
-          });
-        });
-      });
-      this.isPlaying = true;
+      audio.volume = this.volume;
+      this.playWhenReady();
     } catch {
       this.stop();
     }
@@ -323,8 +353,8 @@ export class BgmPlayer {
   private fadeIn(): void {
     if (!this.audio) return;
     const targetVol = this.volume;
-    const fadeSteps = 20;
-    const fadeInterval = 25;
+    const fadeSteps = 10;
+    const fadeInterval = 20;
     let step = 0;
     const fade = () => {
       if (!this.audio || !this.isPlaying) return;
@@ -332,6 +362,9 @@ export class BgmPlayer {
       this.audio.volume = Math.min(targetVol, (targetVol * step) / fadeSteps);
       if (step < fadeSteps) {
         this.fadeTimer = setTimeout(fade, fadeInterval);
+      } else {
+        // Ensure final volume is exactly target
+        if (this.audio) this.audio.volume = targetVol;
       }
     };
     fade();
@@ -354,6 +387,7 @@ export class BgmPlayer {
     if (!this.audio) return;
     this.unlockAudio();
     this.audio.muted = false;
+    this.audio.volume = this.volume;
     this.audio.play().then(() => {
       this.isPlaying = true;
       this.fadeIn();
@@ -361,6 +395,7 @@ export class BgmPlayer {
       this.audio!.muted = true;
       this.audio!.play().then(() => {
         this.audio!.muted = false;
+        this.audio!.volume = this.volume;
         this.isPlaying = true;
         this.fadeIn();
       }).catch(() => {
@@ -368,12 +403,7 @@ export class BgmPlayer {
         this.usingFallback = true;
         this.audio!.src = FALLBACK_TRACK_URL;
         this.audio!.load();
-        this.audio!.play().then(() => {
-          this.isPlaying = true;
-          this.fadeIn();
-        }).catch(() => {
-          console.warn('[BgmEngine] resume 폴백도 실패');
-        });
+        this.playWhenReady();
       });
     });
   }
