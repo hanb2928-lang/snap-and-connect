@@ -33,7 +33,6 @@ interface GenerateAiVideoOptions {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionResult | null;
-  imageUrls?: string[];
 }
 
 const MAX_RETRIES = 2;
@@ -64,7 +63,7 @@ export async function generateAiVideo(
       const { data, error } = await supabase.functions.invoke('generate-video', {
         body: {
           prompt,
-          durationSec: options.durationSec ?? 15,
+          durationSec: options.durationSec ?? 10,
           aspectRatio: options.aspectRatio ?? '9:16',
           productName: options.productName,
           scanId: options.scanId,
@@ -75,7 +74,6 @@ export async function generateAiVideo(
           hookCategory: options.hookCategory ?? 'curiosity',
           cutCount: options.cutCount,
           productVision: options.productVision ?? null,
-          imageUrls: options.imageUrls ?? null,
         },
       });
 

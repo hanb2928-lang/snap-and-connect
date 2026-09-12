@@ -505,7 +505,7 @@ export default function ResultScreen() {
       const result = await generateAiVideo(
         videoPromptText,
         {
-          durationSec: 15,
+          durationSec: 10,
           aspectRatio: '9:16',
           productName: scan.product_name || undefined,
           scanId: scan.id,
@@ -515,7 +515,6 @@ export default function ResultScreen() {
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
-          imageUrls: undefined,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);

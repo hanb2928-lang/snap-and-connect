@@ -37,15 +37,14 @@ interface GenerateVideoRequest {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionData | null;
-  imageUrls?: string[] | null;
 }
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 2000;
-const RUNWAY_POLL_INTERVAL_MS = 2000;
-const RUNWAY_MAX_POLL_ATTEMPTS = 70;
+const RUNWAY_POLL_INTERVAL_MS = 5000;
+const RUNWAY_MAX_POLL_ATTEMPTS = 72;
 const RUNWAY_SUBMIT_TIMEOUT_MS = 30000;
-const RUNWAY_POLL_TIMEOUT_MS = 10000;
+const RUNWAY_POLL_TIMEOUT_MS = 15000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -60,6 +59,16 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: GenerateVideoRequest = await req.json();
+
+    console.log("[generate-video] Incoming payload:", JSON.stringify({
+      promptLength: body.prompt?.length ?? 0,
+      durationSec: body.durationSec,
+      aspectRatio: body.aspectRatio,
+      productName: body.productName,
+      scanId: body.scanId,
+      variationSeed: body.variationSeed,
+      hasProductVision: !!body.productVision,
+    }));
 
     let effectivePrompt = body.prompt ?? "";
     if (effectivePrompt.trim().length === 0) {
@@ -212,23 +221,33 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
-    const validDurations = [5, 10];
-    const clampedSeconds = validDurations.reduce((closest, valid) =>
-      Math.abs(valid - durationSec) < Math.abs(closest - durationSec) ? valid : closest, 5);
-    const ratioValue = aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768";
+    const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 10);
+    const ratioValue = aspectRatio === "9:16" ? "720:1280" : aspectRatio === "16:9" ? "1280:720" : "960:960";
 
     const payload: Record<string, unknown> = {
       promptText: prompt,
       model: "gen4.5",
-      seconds: clampedSeconds,
+      duration: clampedDuration,
     };
     if (imageUrl) {
-      payload.promptImage = { uri: imageUrl };
+      payload.promptImage = imageUrl;
     } else {
       payload.ratio = ratioValue;
     }
 
-    const resp = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
+    const endpoint = imageUrl ? "image_to_video" : "text_to_video";
+
+    console.log("[generate-video] Runway payload:", JSON.stringify({
+      endpoint,
+      model: payload.model,
+      duration: payload.duration,
+      ratio: payload.ratio ?? "(omitted, promptImage set)",
+      promptLength: prompt.length,
+      promptPreview: prompt.slice(0, 100),
+      hasPromptImage: !!payload.promptImage,
+    }));
+
+    const resp = await fetch(`https://api.dev.runwayml.com/v1/${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -243,6 +262,7 @@ async function submitRunwayTask(
 
     if (!resp.ok) {
       const errText = await resp.text();
+      console.error("[generate-video] Runway error:", resp.status, errText.slice(0, 500));
       let errDetail = errText.slice(0, 500);
       try {
         const errJson = JSON.parse(errText);
@@ -259,6 +279,7 @@ async function submitRunwayTask(
 
     const result = await resp.json();
     const taskId = result.taskId ?? result.id;
+    console.log("[generate-video] Runway task created:", taskId, "status:", result.status);
     if (!taskId) throw new Error("Runway 작업 ID를 받지 못했습니다.");
     return taskId;
   } catch (err) {
@@ -279,7 +300,10 @@ async function pollRunwayTask(
 
   try {
     const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "X-Runway-Version": "2024-11-06",
+      },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -293,7 +317,7 @@ async function pollRunwayTask(
     const status = (result.status as string) ?? "PROCESSING";
     const progress = result.progress != null ? String(result.progress) : "";
 
-    if (status === "SUCCESS" || status === "COMPLETED") {
+    if (status === "SUCCESS" || status === "SUCCEEDED" || status === "COMPLETED") {
       const videoUrl = result.output?.[0] ?? result.output?.url ?? result.artifacts?.[0]?.url ?? result.url;
       if (!videoUrl) return { status: "FAILED", error: "Runway 비디오 URL이 없습니다." };
       return { status: "SUCCESS", videoUrl, progress };
