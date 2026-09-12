@@ -255,6 +255,24 @@ const CONTENT_PURPOSE_PRESETS: Record<ContentPurpose, ContentPurposePreset> = {
 
 const CONTENT_PURPOSE_LIST = Object.values(CONTENT_PURPOSE_PRESETS);
 
+// === One-Click Mood Preset Chips ===
+interface MoodPreset {
+  key: string;
+  label: string;
+  emoji: string;
+  hookCategory: string;
+  bgmMood: string;
+  promptSuffix: string;
+}
+
+const MOOD_PRESETS: MoodPreset[] = [
+  { key: 'strong_hook', label: '더 강한 훅', emoji: '🔥', hookCategory: 'curiosity', bgmMood: '하이텐션', promptSuffix: 'Maximum loss-aversion hook, dramatic reveal, intense urgency in first 2 seconds' },
+  { key: 'urgency', label: '긴박감 유발', emoji: '⚡', hookCategory: 'fomo', bgmMood: '하이텐션', promptSuffix: 'Extreme scarcity and FOMO, countdown timer, limited stock urgency, fast cuts' },
+  { key: 'emotional', label: '감성 자극', emoji: '💧', hookCategory: 'transformation', bgmMood: '감성', promptSuffix: 'Emotional before/after transformation, storytelling, warm cinematic mood' },
+  { key: 'social_proof', label: '사회적 증명', emoji: '⭐', hookCategory: 'social_proof', bgmMood: '시네마틱', promptSuffix: 'Heavy social proof, review badges, star ratings, sales counters, trust-building' },
+  { key: 'problem_solve', label: '문제 해결', emoji: '🔧', hookCategory: 'problem', bgmMood: 'ASMR', promptSuffix: 'Clear problem-solution structure, cognitive friction resolution, practical demonstration' },
+];
+
 const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = {
   shorts: 'monetization',
   tiktok: 'monetization',
@@ -347,6 +365,8 @@ export default function ResultScreen() {
   const [galleryModalVisible, setGalleryModalVisible] = useState(false);
   const [galleryModalIndex, setGalleryModalIndex] = useState(0);
   const [angleGalleryExpanded, setAngleGalleryExpanded] = useState(false);
+  const [showManualSettings, setShowManualSettings] = useState(false);
+  const [autoGenTriggered, setAutoGenTriggered] = useState(false);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -374,6 +394,16 @@ export default function ResultScreen() {
     setContentPurpose(key);
     applyCombinedPreset(targetPlatform, key);
   }, [targetPlatform, applyCombinedPreset]);
+
+  const handleMoodPreset = useCallback((preset: MoodPreset) => {
+    setInlineEdit((prev) => ({
+      ...prev,
+      hookEffect: preset.hookCategory as HookEffectType,
+      bgmMood: preset.bgmMood,
+      aiPrompt: prev.aiPrompt ? `${prev.aiPrompt} | ${preset.promptSuffix}` : preset.promptSuffix,
+    }));
+    setNarrativeVariation((v) => v + 1);
+  }, []);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -528,9 +558,13 @@ export default function ResultScreen() {
         if (mountedRef.current) setError('스캔을 찾을 수 없습니다');
       } else {
         if (!mountedRef.current) return;
-        setScan(scanResult.data as Scan);
-        setCustomAffiliateLinks((scanResult.data as Scan).custom_affiliate_links ?? []);
-        setLocalStoreInfo((scanResult.data as Scan).local_store_info ?? null);
+        const scanData = scanResult.data as Scan;
+        setScan(scanData);
+        setCustomAffiliateLinks(scanData.custom_affiliate_links ?? []);
+        setLocalStoreInfo(scanData.local_store_info ?? null);
+        if (scanData.video_url) {
+          setGeneratedVideoUrl(scanData.video_url);
+        }
       }
       if (mountedRef.current) setSettings(settingsResult);
       setCleanMode(!!settingsResult?.clean_footage_enabled);
@@ -1265,6 +1299,15 @@ export default function ResultScreen() {
     }
     return images;
   }, [scan?.image_url, scan?.additional_image_urls]);
+
+  // Zero-Touch AI: auto-generate video when page loads with 5 photos and no existing video
+  useEffect(() => {
+    if (!scan || autoGenTriggered || isGeneratingVideo || generatedVideoUrl) return;
+    if (analysisStatus === 'processing' || analysisStatus === 'error') return;
+    if (allCutImages.length < 5) return;
+    setAutoGenTriggered(true);
+    handleAiVideoGenerate();
+  }, [scan, autoGenTriggered, isGeneratingVideo, generatedVideoUrl, analysisStatus, allCutImages.length, handleAiVideoGenerate]);
 
   const narrativePlan: NarrativePlan | null = useMemo(() => {
     if (allCutImages.length === 0) return null;
@@ -2049,7 +2092,48 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
-        {/* === 0순위: 플랫폼 선택 (최상단) === */}
+        {/* === 1순위: 실시간 자동 완성 영상 (최상단, Zero-Touch 자동 재생) === */}
+        <View style={styles.previewSection}>
+          {isRegenerating && (
+            <View style={styles.regenBanner}>
+              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
+            </View>
+          )}
+          {isGeneratingVideo && (
+            <View style={styles.regenBanner}>
+              <Loader2Icon size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>AI 영상 생성 중... 잠시만 기다려주세요</Text>
+            </View>
+          )}
+          {visionAnalyzing && (
+            <View style={styles.regenBanner}>
+              <Sparkles size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.regenBannerText}>Vision AI가 제품을 분석하는 중...</Text>
+            </View>
+          )}
+          {videoGenError && (
+            <View style={styles.videoErrorToast}>
+              <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.videoErrorToastText} numberOfLines={3}>AI 영상 생성 실패: {videoGenError}</Text>
+              <TouchableOpacity onPress={() => { setVideoGenError(null); setAutoGenTriggered(false); }} activeOpacity={0.7}>
+                <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+          )}
+          <ShortFormPreviewPlayer
+            editPlan={previewEditPlan}
+            videoUri={generatedVideoUrl}
+            narrativePlan={narrativePlan}
+            videoGenProgress={videoGenProgress}
+            bgmVolume={bgmVolume}
+            copyOverlays={copyOverlaysForPreview}
+            narrationActive={narrationPlaying}
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          />
+        </View>
+
+        {/* === 2순위: 플랫폼 선택 === */}
         <View style={styles.targetPlatformSection}>
           <View style={styles.targetPlatformHeader}>
             <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
@@ -2077,8 +2161,65 @@ export default function ResultScreen() {
           <Text style={styles.targetPlatformHint}>
             {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
           </Text>
+        </View>
 
-          {/* 목적 선택 */}
+        {/* === 3순위: AI 원클릭 무드 변경 프리셋 === */}
+        <View style={styles.chipSection}>
+          <View style={styles.chipGroupHeader}>
+            <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.chipGroupLabel}>AI 원클릭 무드 변경</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+            {MOOD_PRESETS.map((preset) => (
+              <TouchableOpacity
+                key={preset.key}
+                style={styles.moodPresetChip}
+                onPress={() => handleMoodPreset(preset)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.moodPresetEmoji}>{preset.emoji}</Text>
+                <Text style={styles.moodPresetLabel}>{preset.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={[styles.regenBtnLarge, isRegenerating && styles.regenBtnDisabled]}
+            onPress={handleRegenerate}
+            disabled={isRegenerating}
+            activeOpacity={0.7}
+          >
+            {isRegenerating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Sparkles size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.regenBtnText}>
+              {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* === 하단: 상세 수동 설정 (전문가용) 접이식 메뉴 === */}
+        <TouchableOpacity
+          style={styles.advancedToggle}
+          onPress={() => setShowManualSettings((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.detailToggleLeft}>
+            <SlidersIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.advancedToggleText}>⚙️ 상세 수동 설정 (전문가용)</Text>
+          </View>
+          {showManualSettings ? (
+            <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          ) : (
+            <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
+
+        {showManualSettings && (
+        <>
+        {/* 목적 선택 */}
+        <View style={styles.targetPlatformSection}>
           <View style={styles.purposeRow}>
             <Text style={styles.purposeLabel}>목적</Text>
             {CONTENT_PURPOSE_LIST.map((p) => {
@@ -2104,27 +2245,7 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* === 2순위: 실시간 15초 미리보기 (단일 플레이어) === */}
-        <View style={styles.previewSection}>
-          {isRegenerating && (
-            <View style={styles.regenBanner}>
-              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
-            </View>
-          )}
-          <ShortFormPreviewPlayer
-            editPlan={previewEditPlan}
-            videoUri={generatedVideoUrl}
-            narrativePlan={narrativePlan}
-            videoGenProgress={videoGenProgress}
-            bgmVolume={bgmVolume}
-            copyOverlays={copyOverlaysForPreview}
-            narrationActive={narrationPlaying}
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          />
-        </View>
-
-        {/* === 3순위: Quick-Tweak 정보 입력 (훅 문구, 상품명, 특가 금액) === */}
+        {/* Quick-Tweak 정보 입력 */}
         <QuickTweakPanel
           hook={activeHook}
           productName={activeProductName}
@@ -2140,7 +2261,7 @@ export default function ResultScreen() {
           onPriceChange={(price) => setPriceOverride(price)}
         />
 
-        {/* === 3순위: Quick-Tweak 편집 세팅 (영상 길이, BGM, 나레이션, 자막, 카메라 모션, 음량, AI 프롬프트, AI 재생성) === */}
+        {/* Quick-Tweak 편집 세팅 */}
         <View style={styles.chipSection}>
           {/* 영상 길이 선택 */}
           <View style={styles.durationSelectorRow}>
@@ -2782,6 +2903,9 @@ export default function ResultScreen() {
             })}
           </Text>
         </View>
+        </>
+        )}
+
         {/* === 4순위: 촬영된 5각도 입체 원본 컷 갤러리 (최하단, 접기 가능) === */}
         {allCutImages.length > 0 && (
           <View style={styles.angleGallerySection}>
@@ -4030,6 +4154,26 @@ const styles = StyleSheet.create({
   chipPillTextActive: {
     color: '#fff',
     fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  moodPresetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderRadius: theme.radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 8,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  moodPresetEmoji: {
+    fontSize: 16,
+  },
+  moodPresetLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   promptSection: {
     marginHorizontal: theme.spacing.md,

@@ -479,7 +479,7 @@ function buildMotionPrompt(
   productVision?: ProductVisionData | null,
 ): string {
   const orientation = aspectRatio === "9:16" ? "vertical portrait 9:16" : aspectRatio === "16:9" ? "horizontal landscape 16:9" : "square 1:1";
-  const effectiveCutCount = explicitCutCount ?? 4;
+  const effectiveCutCount = explicitCutCount ?? 3;
 
   const platformBenchmarks: Record<string, {
     composition: string; gaze: string; lighting: string; transition: string; colorGrade: string; cutInterval: number; hookSec: number;
@@ -523,30 +523,28 @@ function buildMotionPrompt(
   };
   const benchmark = platformBenchmarks[platform] ?? platformBenchmarks.shorts;
 
+  // === Top-1% Purchase-Conversion Psychology Framework ===
+  // Phase 1 (0-2s): Loss Aversion + Curiosity Hook
+  // Phase 2 (3-9s): Cognitive Friction Resolution + Before/After
+  // Phase 3 (10-15s): Social Proof + Scarcity + Urgency CTA
   const scenePhases = [
     {
-      phase: "HOOK",
-      scene: `Cinematic 3D product reveal — ${productName ?? "product"} emerges from darkness with particle dispersion, volumetric light shafts, and dramatic slow-motion materialization`,
-      camera: `Dolly-in from black 1.05x→1.3x over ${benchmark.hookSec}s, shallow DOF, bokeh particles drifting through foreground`,
-      lighting: `Single motivated key light 45° camera-left, rim light revealing product silhouette, ambient glow buildup`,
+      phase: "LOSS_AVERSION_HOOK",
+      scene: `Cinematic 3D product reveal — ${productName ?? "product"} emerges from darkness with particle dispersion, volumetric light shafts, and dramatic slow-motion materialization. Visual metaphor: product appears as the ONE thing the viewer is about to miss. Dark crimson rim lighting creates sense of urgency and danger-of-missing-out.`,
+      camera: `Dolly-in from black 1.05x→1.3x over ${benchmark.hookSec}s, shallow DOF, bokeh particles drifting through foreground. Camera pushes toward product as if viewer is being pulled in by curiosity.`,
+      lighting: `Single motivated key light 45° camera-left, crimson rim light revealing product silhouette, ambient glow buildup. Shadow-heavy to create tension and loss-aversion feeling.`,
     },
     {
-      phase: "DISCOVERY",
-      scene: `Dynamic AI art showcase — ${productName ?? "product"} floating in 3D space with animated graphic elements, feature callout text-materializing in air, color-graded environment shift`,
-      camera: `Orbital arc 90° clockwise around product, radius 1.5x product width, ease-in-out cubic, parallax background drift`,
-      lighting: `Color-shifting key light cycling through brand palette, studio practicals pulsing to beat, particle accents`,
+      phase: "PROBLEM_SOLUTION",
+      scene: `Dynamic AI art showcase — ${productName ?? "product"} floating in 3D space with animated graphic elements. Split-screen before/after visual: left side shows problem state (desaturated, chaotic), right side shows solution state (vibrant, ordered with product). Cognitive friction resolved through clear visual contrast. Feature callout text materializes in air pointing to key product benefits.`,
+      camera: `Orbital arc 90° clockwise around product, radius 1.5x product width, ease-in-out cubic, parallax background drift. Camera pauses at 45° to emphasize before/after split, then continues to full product reveal.`,
+      lighting: `Color-shifting key light: starts cool/blue (problem state) transitions to warm/golden (solution state), simulating the transformation the product provides. Studio practicals pulsing to beat.`,
     },
     {
-      phase: "TRANSFORMATION",
-      scene: `Cinematic commercial sequence — ${productName ?? "product"} in aspirational lifestyle context, 3D environment morph, before/after energy shift with lighting transformation`,
-      camera: `Tilt reveal +8° on Y-axis, ascending crane move, depth layers separating foreground product from environment`,
-      lighting: `Motivated lighting shift: warm key → cool key, simulating time-of-day passage, lens flare accents at transition peaks`,
-    },
-    {
-      phase: "CTA",
-      scene: `Hero product frame with kinetic CTA text overlay — ${productName ?? "product"} centered, clean background, animated text burn-in, subtle particle fade`,
-      camera: `Slow pull-back 1.3x→1.0x, stabilizing to locked hero frame for text overlay, zero drift after 0.5s`,
-      lighting: `Even key+fill, bright approachable, no dramatic shadows for CTA clarity, soft bloom on product edges`,
+      phase: "SOCIAL_PROOF_URGENCY",
+      scene: `Cinematic commercial sequence — ${productName ?? "product"} in aspirational lifestyle context with floating social proof elements (animated star ratings, review count badges, "1만+ 판매" counters materializing in 3D space). 3D environment morph into lifestyle context. Urgency elements: countdown timer overlay, "한정" badge pulsing, stock bar depleting. CTA text burns in with kinetic typography.`,
+      camera: `Tilt reveal +8° on Y-axis, ascending crane move revealing full lifestyle context. Depth layers separating foreground product from social proof badges in midground. Final 2s: camera locks to hero frame for CTA text overlay.`,
+      lighting: `Motivated lighting shift: warm key → bright approachable, simulating time-of-day passage from problem to solution. Lens flare accents at transition peaks. Final CTA frame: even key+fill, bright approachable, no dramatic shadows for CTA clarity, soft bloom on product edges.`,
     },
   ];
 
@@ -570,20 +568,22 @@ function buildMotionPrompt(
   const hookText = hookTexts[variationSeed % hookTexts.length];
 
   const segmentDirectives = scenePhases.slice(0, Math.min(effectiveCutCount, scenePhases.length)).map((spec, i) => {
-    const startSec = i === 0 ? 0 : Math.round(i * (15 / effectiveCutCount) * 10) / 10;
-    const endSec = i === Math.min(effectiveCutCount, scenePhases.length) - 1 ? 15 : Math.round((i + 1) * (15 / effectiveCutCount) * 10) / 10;
-    return `[${startSec}-${endSec}s] ${spec.phase}: ${spec.scene}. Camera: ${spec.camera}. Lighting: ${spec.lighting}.`;
+    const phaseRanges = ["0-2s", "3-9s", "10-15s"];
+    const timeRange = phaseRanges[i] ?? `${i * 5}-${(i + 1) * 5}s`;
+    return `[${timeRange}] ${spec.phase}: ${spec.scene}. Camera: ${spec.camera}. Lighting: ${spec.lighting}.`;
   }).join("\n");
 
   const hookDirective =
-    `HOOK (first ${benchmark.hookSec}s): Cinematic 3D product materialization from darkness. ` +
+    `HOOK (0-2s): LOSS AVERSION + CURIOSITY. Cinematic 3D product materialization from darkness. ` +
     `Motion: Slow dolly-in with particle dispersion and volumetric light reveal. ` +
+    `Psychology: Create immediate sense that viewer is about to miss something important. Dark crimson rim lighting = danger/urgency. ` +
     `Text: "${hookText}" materializes at 0.3s with kinetic 3D typography, 120% pop-in, depth shadow. ` +
     `ZERO scene changes in first ${benchmark.hookSec}s — escalating visual intensity only.`;
 
   const retentionDirective =
+    `PSYCHOLOGY TIMELINE: [0-2s] Loss Aversion Hook → [3-9s] Problem/Solution Before-After → [10-15s] Social Proof + Urgency CTA. ` +
     `Cut interval ${benchmark.cutInterval}s accelerating. 3D scene morphs every 3-4s. ` +
-    `Kinetic captions 0.3s before audio peaks. Last 3s: locked hero frame for CTA. ` +
+    `Kinetic captions 0.3s before audio peaks. Last 3s: locked hero frame for CTA with urgency text. ` +
     `Audio-visual sync: 0.1s max desync.`;
 
   const captionHint = captionText ? `\nCaption context: "${captionText.slice(0, 80)}".` : "";
@@ -591,19 +591,24 @@ function buildMotionPrompt(
   const visionSection = productVision ? buildVisionPromptSection(productVision) : "";
 
   const promptParts = [
-    `### DYNAMIC AI ART & CINEMATIC COMMERCIAL — FULLY GENERATED VIDEO (no source photos)`,
+    `### PURCHASE-CONVERSION PSYCHOLOGY COMMERCIAL — TOP-1% AI-GENERATED VIDEO (no source photos)`,
     ``,
     `Create a completely new 15-second AI-generated commercial video featuring ${productName ?? "the product"}.`,
     `Do NOT use any input photographs as video frames. The 5 captured product photos were used ONLY for Vision AI metadata extraction.`,
     `All visual content must be freshly generated as dynamic AI artwork and cinematic 3D commercial scenes.`,
     ``,
+    `### CONVERSION PSYCHOLOGY FRAMEWORK (3-Phase Timeline)`,
+    `Phase 1 [0-2s] VISUAL HOOK: Loss Aversion + Curiosity — make viewer feel they're about to miss something critical`,
+    `Phase 2 [3-9s] PROBLEM & SOLUTION: Cognitive Friction Resolution — before/after contrast, product as the clear solution`,
+    `Phase 3 [10-15s] SOCIAL PROOF & URGENCY: Scarcity + Immediate Action CTA — social proof badges, countdown, stock urgency`,
+    ``,
     `Subject: ${userPrompt}${productName ? ` featuring ${productName}` : ""}.`,
     `Format: ${orientation}.`,
     ``,
-    `### HOOK STRUCTURE (first ${benchmark.hookSec}s)`,
+    `### HOOK STRUCTURE (0-2s) — LOSS AVERSION`,
     hookDirective,
     ``,
-    `### CINEMATIC SCENE SEQUENCE — AI-GENERATED 3D COMMERCIAL SCENES`,
+    `### CINEMATIC SCENE SEQUENCE — PSYCHOLOGY-DRIVEN 3D COMMERCIAL SCENES`,
     segmentDirectives,
     ``,
     `### PLATFORM OPTIMIZATION — ${platform.toUpperCase()}`,
@@ -612,7 +617,7 @@ function buildMotionPrompt(
     `### COLOR GRADING & MOOD`,
     `${moodGrade}. Base: ${benchmark.colorGrade}.`,
     ``,
-    `### RETENTION ENGINE`,
+    `### RETENTION ENGINE — CONVERSION OPTIMIZED`,
     retentionDirective,
   ];
 
@@ -623,7 +628,7 @@ function buildMotionPrompt(
   promptParts.push(
     ``,
     `### QUALITY LOCK`,
-    `Fully AI-generated 3D cinematic visuals, 4K quality, professional commercial-grade rendering, no source photo frames, no slideshow, no image-to-image transitions. All scenes must be newly created digital artwork with product-accurate appearance derived from Vision AI metadata.${captionHint}`,
+    `Fully AI-generated 3D cinematic visuals, 4K quality, professional commercial-grade rendering, no source photo frames, no slideshow, no image-to-image transitions. All scenes must be newly created digital artwork with product-accurate appearance derived from Vision AI metadata. Psychology framework: loss aversion → problem/solution → social proof/urgency must be visually evident throughout.${captionHint}`,
   );
 
   return promptParts.join("\n");
@@ -657,12 +662,12 @@ function buildVisionPromptSection(vision: ProductVisionData): string {
     `Product appearance must match: shape (${vision.shapeDescription}), material (${vision.materialGuess}), color palette, and texture.`,
     `Do NOT reproduce the reference photographs. Create new cinematic commercial scenes from imagination guided by product metadata.`,
     ``,
-    `### 3D ORBITAL CAMERA TRAJECTORY (15s timeline)`,
-    `  [0-4s] Product materializes from darkness — particle dispersion reveals product shape, volumetric light build-up`,
-    `  [4-7s] Orbital arc clockwise 90° around product — parallax depth layers: ${depthLayers}`,
-    `  [7-10s] Cinematic environment morph — product transitions into lifestyle/usage context, lighting atmosphere shift`,
-    `  [10-13s] Reverse arc returning to hero frontal — zoom-out reveal showing full product in environment`,
-    `  [13-15s] Locked hero frame, product centered, CTA text burn-in zone with kinetic typography`,
+    `### 3D ORBITAL CAMERA TRAJECTORY — PSYCHOLOGY-DRIVEN (15s timeline)`,
+    `  [0-2s] LOSS AVERSION HOOK: Product materializes from darkness — particle dispersion reveals product shape, dark crimson rim lighting, tension buildup`,
+    `  [3-5s] PROBLEM STATE: Orbital arc clockwise 45° — desaturated cool tones, chaotic background elements suggesting the problem. Parallax depth layers: ${depthLayers}`,
+    `  [5-9s] SOLUTION REVEAL: Arc continues to 90° — lighting shifts warm/golden, background orders itself, product becomes hero. Before/after visual contrast resolved.`,
+    `  [10-13s] SOCIAL PROOF: Reverse arc returning to hero frontal — floating star ratings, review badges, sales counters materialize in 3D space around product`,
+    `  [13-15s] URGENCY CTA: Locked hero frame, product centered, countdown timer overlay, "한정" badge, CTA text burn-in with kinetic typography`,
     ``,
     `Maintain product as visual anchor at all times. Environment and background are fully AI-generated, not from source photos.`,
     `Depth separation: foreground product razor-sharp, midground 50% blur, background 85% bokeh blur.`,
@@ -739,7 +744,7 @@ async function updateScanWithVideo(scanId: string, videoUrl: string): Promise<vo
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({ ai_generated_video_url: videoUrl }),
+      body: JSON.stringify({ video_url: videoUrl }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

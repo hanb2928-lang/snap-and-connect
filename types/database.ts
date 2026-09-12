@@ -145,6 +145,7 @@ export interface Scan {
   tts_url?: string | null;
   analysis_job_id?: string | null;
   image_hash?: string | null;
+  video_url?: string | null;
 }
 
 export interface DetectedProduct {
