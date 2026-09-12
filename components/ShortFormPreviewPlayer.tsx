@@ -362,7 +362,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop]);
+  }, [isPlaying, currentSec, stop, bgmVolume]);
 
   const videoReady = hasGeneratedVideo && videoSrc && !videoError && !videoFallbackMode;
 
@@ -377,16 +377,15 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     if (!bgmPlayerRef.current) {
       bgmPlayerRef.current = new BgmPlayer();
     }
+    bgmPlayerRef.current.unlockAudio();
     bgmPlayerRef.current.setVolume(bgmVolume);
-    if (!videoReady) {
-      bgmPlayerRef.current.start(
-        editPlan.bgmTemplate.id,
-        editPlan.pacingBpm,
-        editPlan.bgmTemplate.highlightStartSec,
-        editPlan.bgmTemplate.highlightDurationSec,
-        editPlan.bgmTemplate.energyCurve,
-      );
-    }
+    bgmPlayerRef.current.start(
+      editPlan.bgmTemplate.id,
+      editPlan.pacingBpm,
+      editPlan.bgmTemplate.highlightStartSec,
+      editPlan.bgmTemplate.highlightDurationSec,
+      editPlan.bgmTemplate.energyCurve,
+    );
   }, [isPlaying, videoReady, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   const prevBgmIdRef = useRef<string>('');

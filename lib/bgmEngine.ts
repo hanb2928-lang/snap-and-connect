@@ -1,13 +1,7 @@
 /**
- * Royalty-free MP3 streaming BGM library.
- * 5 mood categories with real HQ MP3 tracks from royalty-free sources:
- *   - cinematic:  시네마틱 (epic/orchestral build)
- *   - hightension: 하이텐션 (energetic upbeat electronic)
- *   - asmr:       ASMR (soft ambient minimal)
- *   - emotional:   감성 (warm emotional piano/strings)
- *   - lofi:       로파이 (lofi chill beats)
- * All tracks are royalty-free, commercially usable, no API cost.
- * Works on web via HTML5 Audio streaming; native falls back to no audio.
+ * Web Audio API BGM synthesizer.
+ * Generates music in-browser — no external URLs, no CORS, no dead links.
+ * 5 mood categories with distinct chord progressions, tempos, and waveforms.
  */
 
 export type BgmCategory = 'cinematic' | 'hightension' | 'asmr' | 'emotional' | 'lofi';
@@ -29,9 +23,7 @@ interface BgmMoodConfig {
 }
 
 const DEFAULT_ENERGY_CURVE: number[] = [0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.55, 0.45];
-
 const LOW_ENERGY_CURVE: number[] = [0.15, 0.22, 0.3, 0.35, 0.4, 0.45, 0.5, 0.52, 0.5, 0.48, 0.45, 0.4, 0.35, 0.3, 0.25];
-
 const HIGH_ENERGY_CURVE: number[] = [0.4, 0.6, 0.8, 1.0, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5];
 
 const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
@@ -41,20 +33,8 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
     bpm: 90,
     energyCurve: [0.2, 0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 0.95, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35, 0.3],
     tracks: [
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_8cb749cb27.mp3',
-        title: 'Cinematic Epic Build',
-        durationSec: 30,
-        highlightStartSec: 5,
-        highlightDurationSec: 10,
-      },
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
-        title: 'Cinematic Orchestra',
-        durationSec: 30,
-        highlightStartSec: 4,
-        highlightDurationSec: 12,
-      },
+      { url: '', title: 'Cinematic Epic Build', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 },
+      { url: '', title: 'Cinematic Orchestra', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 12 },
     ],
   },
   hightension: {
@@ -63,20 +43,8 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
     bpm: 128,
     energyCurve: HIGH_ENERGY_CURVE,
     tracks: [
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_ae3008a39a.mp3',
-        title: 'Energetic Electronic Beat',
-        durationSec: 30,
-        highlightStartSec: 3,
-        highlightDurationSec: 10,
-      },
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2023/05/23/audio_8c5621f1a5.mp3',
-        title: 'Upbeat Future Bass',
-        durationSec: 30,
-        highlightStartSec: 5,
-        highlightDurationSec: 8,
-      },
+      { url: '', title: 'Energetic Electronic Beat', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 10 },
+      { url: '', title: 'Upbeat Future Bass', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 8 },
     ],
   },
   asmr: {
@@ -85,20 +53,8 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
     bpm: 60,
     energyCurve: LOW_ENERGY_CURVE,
     tracks: [
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/04/22/audio_5a82a36f36.mp3',
-        title: 'Soft Ambient Whisper',
-        durationSec: 30,
-        highlightStartSec: 2,
-        highlightDurationSec: 14,
-      },
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/11/22/audio_5d4f5e5f5e.mp3',
-        title: 'Minimal Calm',
-        durationSec: 30,
-        highlightStartSec: 3,
-        highlightDurationSec: 12,
-      },
+      { url: '', title: 'Soft Ambient Whisper', durationSec: 30, highlightStartSec: 2, highlightDurationSec: 14 },
+      { url: '', title: 'Minimal Calm', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 12 },
     ],
   },
   emotional: {
@@ -107,20 +63,8 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
     bpm: 75,
     energyCurve: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.85, 0.8, 0.75, 0.7, 0.6, 0.5, 0.4, 0.3],
     tracks: [
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_171aeb480e.mp3',
-        title: 'Emotional Piano',
-        durationSec: 30,
-        highlightStartSec: 5,
-        highlightDurationSec: 10,
-      },
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_dc39bde608.mp3',
-        title: 'Warm Strings',
-        durationSec: 30,
-        highlightStartSec: 4,
-        highlightDurationSec: 12,
-      },
+      { url: '', title: 'Emotional Piano', durationSec: 30, highlightStartSec: 5, highlightDurationSec: 10 },
+      { url: '', title: 'Warm Strings', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 12 },
     ],
   },
   lofi: {
@@ -129,25 +73,13 @@ const MOOD_CONFIGS: Record<BgmCategory, BgmMoodConfig> = {
     bpm: 85,
     energyCurve: LOW_ENERGY_CURVE,
     tracks: [
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2022/05/13/audio_3c91d0d3e0.mp3',
-        title: 'Lofi Chill Beats',
-        durationSec: 30,
-        highlightStartSec: 3,
-        highlightDurationSec: 12,
-      },
-      {
-        url: 'https://cdn.pixabay.com/download/audio/2023/01/09/audio_96c47c47a8.mp3',
-        title: 'Lofi Study Session',
-        durationSec: 30,
-        highlightStartSec: 4,
-        highlightDurationSec: 10,
-      },
+      { url: '', title: 'Lofi Chill Beats', durationSec: 30, highlightStartSec: 3, highlightDurationSec: 12 },
+      { url: '', title: 'Lofi Study Session', durationSec: 30, highlightStartSec: 4, highlightDurationSec: 10 },
     ],
   },
 };
 
-const FALLBACK_TRACK_URL = 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_ae3008a39a.mp3';
+const FALLBACK_TRACK_URL = '';
 
 const MOOD_LABEL_MAP: Record<string, BgmCategory> = {
   '시네마틱': 'cinematic',
@@ -187,266 +119,375 @@ function pickTrack(category: BgmCategory, seed?: number): BgmTrack {
   return config.tracks[idx];
 }
 
-/**
- * Streaming BGM player using HTML5 Audio.
- * Plays royalty-free MP3s directly from CDN URLs — no synthesis, no API cost.
- */
+const NOTE_FREQS: Record<string, number> = {
+  'C2': 65.41, 'D2': 73.42, 'E2': 82.41, 'F2': 87.31, 'G2': 98.00, 'A2': 110.00, 'B2': 123.47,
+  'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+  'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+  'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00,
+};
+
+interface MoodSynthConfig {
+  chordProgression: string[][];
+  bassOctave: number;
+  waveform: OscillatorType;
+  bassWaveform: OscillatorType;
+  hasDrums: boolean;
+  hasArp: boolean;
+  filterFreq: number;
+  reverbWet: number;
+  attackSec: number;
+  releaseSec: number;
+}
+
+const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
+  cinematic: {
+    chordProgression: [
+      ['C3', 'Eb3', 'G3', 'C4'],
+      ['Ab2', 'C3', 'Eb3', 'Ab3'],
+      ['F2', 'A2', 'C3', 'F3'],
+      ['G2', 'B2', 'D3', 'G3'],
+    ],
+    bassOctave: 2,
+    waveform: 'sine',
+    bassWaveform: 'triangle',
+    hasDrums: false,
+    hasArp: true,
+    filterFreq: 2000,
+    reverbWet: 0.35,
+    attackSec: 0.15,
+    releaseSec: 1.2,
+  },
+  hightension: {
+    chordProgression: [
+      ['A3', 'C4', 'E4', 'A4'],
+      ['F3', 'A3', 'C4', 'F4'],
+      ['G3', 'B3', 'D4', 'G4'],
+      ['E3', 'G3', 'B3', 'E4'],
+    ],
+    bassOctave: 2,
+    waveform: 'sawtooth',
+    bassWaveform: 'square',
+    hasDrums: true,
+    hasArp: true,
+    filterFreq: 3000,
+    reverbWet: 0.15,
+    attackSec: 0.02,
+    releaseSec: 0.3,
+  },
+  asmr: {
+    chordProgression: [
+      ['C4', 'E4', 'G4'],
+      ['A3', 'C4', 'E4'],
+      ['F3', 'A3', 'C4'],
+      ['G3', 'B3', 'D4'],
+    ],
+    bassOctave: 2,
+    waveform: 'sine',
+    bassWaveform: 'sine',
+    hasDrums: false,
+    hasArp: false,
+    filterFreq: 800,
+    reverbWet: 0.5,
+    attackSec: 0.5,
+    releaseSec: 2.0,
+  },
+  emotional: {
+    chordProgression: [
+      ['C3', 'E3', 'G3', 'B3'],
+      ['A2', 'C3', 'E3', 'G3'],
+      ['F2', 'A2', 'C3', 'E3'],
+      ['G2', 'B2', 'D3', 'F3'],
+    ],
+    bassOctave: 2,
+    waveform: 'triangle',
+    bassWaveform: 'sine',
+    hasDrums: false,
+    hasArp: true,
+    filterFreq: 1500,
+    reverbWet: 0.3,
+    attackSec: 0.08,
+    releaseSec: 0.8,
+  },
+  lofi: {
+    chordProgression: [
+      ['D3', 'F3', 'A3', 'C4'],
+      ['Bb2', 'D3', 'F3', 'A3'],
+      ['G2', 'B2', 'D3', 'F3'],
+      ['A2', 'C3', 'E3', 'G3'],
+    ],
+    bassOctave: 2,
+    waveform: 'sine',
+    bassWaveform: 'triangle',
+    hasDrums: true,
+    hasArp: false,
+    filterFreq: 1200,
+    reverbWet: 0.25,
+    attackSec: 0.06,
+    releaseSec: 0.6,
+  },
+};
+
 export class BgmPlayer {
-  private audio: HTMLAudioElement | null = null;
+  private audioCtx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private filterNode: BiquadFilterNode | null = null;
   private isPlaying = false;
-  private volume = 1.0;
+  private volume = 0.75;
   private currentCategory: BgmCategory = 'hightension';
-  private fadeTimer: ReturnType<typeof setTimeout> | null = null;
-  private audioUnlocked = false;
-  private usingFallback = false;
-  private loadErrorCount = 0;
-  private readyPromise: Promise<boolean> | null = null;
+  private schedulerTimer: ReturnType<typeof setInterval> | null = null;
+  private nextNoteTime = 0;
+  private currentStep = 0;
+  private stepCounter = 0;
 
-  private ensureAudio(): HTMLAudioElement | null {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return null;
-    if (!this.audio) {
-      try {
-        this.audio = new Audio();
-        this.audio.crossOrigin = 'anonymous';
-        this.audio.loop = true;
-        this.audio.preload = 'auto';
-        this.audio.volume = this.volume;
-        this.audio.addEventListener('error', () => {
-          const url = this.audio?.src ?? '';
-          console.warn(`[BgmEngine] MP3 로드 실패: ${url}`);
-          if (!this.usingFallback && this.audio) {
-            this.usingFallback = true;
-            this.loadErrorCount++;
-            console.warn(`[BgmEngine] 폴백 음원 URL로 전환: ${FALLBACK_TRACK_URL}`);
-            this.audio.src = FALLBACK_TRACK_URL;
-            this.audio.load();
-            if (this.isPlaying) {
-              this.playWhenReady();
-            }
-          } else if (this.usingFallback) {
-            console.warn('[BgmEngine] 폴백 음원도 로드 실패 — BGM 없이 진행');
-          }
-        });
-      } catch {
-        return null;
-      }
-    }
-    return this.audio;
-  }
-
-  private getOrCreateAudioContext(): AudioContext | null {
+  private getOrCreateContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return null;
-    let ctx = (window as any).__snapConnectAudioCtx as AudioContext | undefined;
-    if (!ctx) {
-      ctx = new AudioCtx();
-      (window as any).__snapConnectAudioCtx = ctx;
+    if (!this.audioCtx) {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return null;
+      this.audioCtx = new AudioCtx();
+      this.masterGain = this.audioCtx.createGain();
+      this.masterGain.gain.value = this.volume;
+      this.filterNode = this.audioCtx.createBiquadFilter();
+      this.filterNode.type = 'lowpass';
+      this.filterNode.frequency.value = 2000;
+      this.filterNode.Q.value = 0.5;
+      this.filterNode.connect(this.masterGain);
+      this.masterGain.connect(this.audioCtx.destination);
     }
-    return ctx;
+    return this.audioCtx;
   }
 
   unlockAudio(): void {
-    const audio = this.ensureAudio();
-    if (!audio) return;
-
-    try {
-      const ctx = this.getOrCreateAudioContext();
-      if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-
-      // Unlock the Audio element by playing a muted blank, then pausing.
-      // Do NOT touch volume — leave it at this.volume (1.0) for subsequent start().
-      if (!this.audioUnlocked) {
-        audio.muted = true;
-        const prevSrc = audio.src;
-        if (!prevSrc) {
-          // No src yet — use a tiny silent data URI to unlock the element
-          audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-        }
-        audio.play().then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.muted = false;
-          if (!prevSrc) {
-            audio.removeAttribute('src');
-            audio.load();
-          }
-          this.audioUnlocked = true;
-        }).catch(() => {
-          audio.muted = false;
-          if (!prevSrc) {
-            audio.removeAttribute('src');
-            audio.load();
-          }
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  private playWhenReady(): void {
-    const audio = this.audio;
-    if (!audio) return;
-
-    const attemptPlay = () => {
-      audio.muted = false;
-      audio.volume = this.volume;
-      audio.play().then(() => {
-        this.isPlaying = true;
-        this.fadeIn();
-      }).catch(() => {
-        // Autoplay blocked — try muted then unmute
-        audio.muted = true;
-        audio.play().then(() => {
-          audio.muted = false;
-          audio.volume = this.volume;
-          this.isPlaying = true;
-          this.fadeIn();
-        }).catch(() => {
-          console.warn('[BgmEngine] play() 최종 실패 — BGM 없이 진행');
-          this.isPlaying = false;
-        });
-      });
-    };
-
-    // Wait for canplaythrough before playing. If already ready, play immediately.
-    if (audio.readyState >= 3) {
-      attemptPlay();
-    } else {
-      const timeout = setTimeout(() => {
-        audio.removeEventListener('canplaythrough', onReady);
-        console.warn('[BgmEngine] canplaythrough 타임아웃 — 강제 재생 시도');
-        attemptPlay();
-      }, 8000);
-      const onReady = () => {
-        clearTimeout(timeout);
-        audio.removeEventListener('canplaythrough', onReady);
-        attemptPlay();
-      };
-      audio.addEventListener('canplaythrough', onReady, { once: true });
+    const ctx = this.getOrCreateContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
     }
   }
 
   start(
     bgmTemplateId: string,
-    _bpm?: number,
+    bpm?: number,
     _highlightStartSec?: number,
     _highlightDurationSec?: number,
     _energyCurve?: number[],
   ): void {
-    const audio = this.ensureAudio();
-    if (!audio) return;
+    const ctx = this.getOrCreateContext();
+    if (!ctx || !this.masterGain || !this.filterNode) return;
     if (this.isPlaying) this.stop();
 
     this.unlockAudio();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     const category = moodLabelToCategory(bgmTemplateId);
     this.currentCategory = category;
-    const track = pickTrack(category);
+    const config = MOOD_SYNTH_CONFIGS[category];
+    const effectiveBpm = bpm ?? MOOD_CONFIGS[category].bpm;
+    this.filterNode.frequency.value = config.filterFreq;
 
-    try {
-      this.usingFallback = false;
-      audio.crossOrigin = 'anonymous';
-      audio.src = track.url;
-      audio.load();
-      audio.muted = false;
-      audio.volume = this.volume;
-      this.playWhenReady();
-    } catch {
-      this.stop();
+    this.isPlaying = true;
+    this.currentStep = 0;
+    this.stepCounter = 0;
+    this.nextNoteTime = ctx.currentTime + 0.05;
+
+    const stepDurSec = 60 / effectiveBpm / 2;
+
+    const scheduleNotes = () => {
+      if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
+
+      while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
+        this.playStep(config, this.currentStep, this.nextNoteTime, stepDurSec, effectiveBpm);
+        this.currentStep = (this.currentStep + 1) % (config.chordProgression.length * 4);
+        this.stepCounter++;
+        this.nextNoteTime += stepDurSec;
+      }
+    };
+
+    scheduleNotes();
+    this.schedulerTimer = setInterval(scheduleNotes, 25);
+  }
+
+  private playStep(
+    config: MoodSynthConfig,
+    step: number,
+    time: number,
+    stepDur: number,
+    bpm: number,
+  ): void {
+    if (!this.audioCtx || !this.filterNode) return;
+
+    const chordIndex = Math.floor(step / 4) % config.chordProgression.length;
+    const beatInChord = step % 4;
+    const chord = config.chordProgression[chordIndex];
+
+    if (beatInChord === 0) {
+      const bassNote = chord[0].replace(/\d/, (d) => String(Math.max(1, parseInt(d) - 1)));
+      this.playNote(bassNote, time, stepDur * 4, config.bassWaveform, 0.35, config);
     }
+
+    if (config.hasArp) {
+      const arpNote = chord[beatInChord % chord.length];
+      this.playNote(arpNote, time, stepDur * 0.9, config.waveform, 0.15, config);
+    } else if (beatInChord === 0) {
+      chord.forEach((note) => {
+        this.playNote(note, time, stepDur * 3.5, config.waveform, 0.08, config);
+      });
+    }
+
+    if (config.hasDrums) {
+      if (beatInChord === 0 || beatInChord === 2) {
+        this.playKick(time);
+      }
+      if (beatInChord === 1 || beatInChord === 3) {
+        this.playHihat(time);
+      }
+    }
+  }
+
+  private playNote(
+    noteName: string,
+    time: number,
+    durationSec: number,
+    waveform: OscillatorType,
+    gainValue: number,
+    config: MoodSynthConfig,
+  ): void {
+    if (!this.audioCtx || !this.filterNode) return;
+    const freq = NOTE_FREQS[noteName];
+    if (!freq) return;
+
+    const osc = this.audioCtx.createOscillator();
+    osc.type = waveform;
+    osc.frequency.value = freq;
+
+    const gain = this.audioCtx.createGain();
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(gainValue, time + config.attackSec);
+    gain.gain.linearRampToValueAtTime(0, time + durationSec);
+
+    osc.connect(gain);
+    gain.connect(this.filterNode);
+    osc.start(time);
+    osc.stop(time + durationSec + 0.05);
+  }
+
+  private playKick(time: number): void {
+    if (!this.audioCtx || !this.filterNode) return;
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+
+    const gain = this.audioCtx.createGain();
+    gain.gain.setValueAtTime(0.4, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+
+    osc.connect(gain);
+    gain.connect(this.filterNode);
+    osc.start(time);
+    osc.stop(time + 0.2);
+  }
+
+  private playHihat(time: number): void {
+    if (!this.audioCtx || !this.filterNode) return;
+    const bufferSize = this.audioCtx.sampleRate * 0.05;
+    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    const noise = this.audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.audioCtx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 6000;
+
+    const gain = this.audioCtx.createGain();
+    gain.gain.setValueAtTime(0.08, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.filterNode);
+    noise.start(time);
+    noise.stop(time + 0.06);
   }
 
   private fadeIn(): void {
-    if (!this.audio) return;
-    const targetVol = this.volume;
-    const fadeSteps = 10;
-    const fadeInterval = 20;
-    let step = 0;
-    const fade = () => {
-      if (!this.audio || !this.isPlaying) return;
-      step++;
-      this.audio.volume = Math.min(targetVol, (targetVol * step) / fadeSteps);
-      if (step < fadeSteps) {
-        this.fadeTimer = setTimeout(fade, fadeInterval);
-      } else {
-        // Ensure final volume is exactly target
-        if (this.audio) this.audio.volume = targetVol;
-      }
-    };
-    fade();
+    if (!this.masterGain || !this.audioCtx) return;
+    const now = this.audioCtx.currentTime;
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(0, now);
+    this.masterGain.gain.linearRampToValueAtTime(this.volume, now + 0.3);
   }
 
   pause(): void {
-    if (this.fadeTimer) {
-      clearTimeout(this.fadeTimer);
-      this.fadeTimer = null;
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
     }
-    if (this.audio) {
-      try {
-        this.audio.pause();
-      } catch { /* ignore */ }
+    if (this.masterGain && this.audioCtx) {
+      this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 0.1);
     }
     this.isPlaying = false;
   }
 
   resume(): void {
-    if (!this.audio) return;
+    if (!this.audioCtx) return;
     this.unlockAudio();
-    this.audio.muted = false;
-    this.audio.volume = this.volume;
-    this.audio.play().then(() => {
-      this.isPlaying = true;
-      this.fadeIn();
-    }).catch(() => {
-      this.audio!.muted = true;
-      this.audio!.play().then(() => {
-        this.audio!.muted = false;
-        this.audio!.volume = this.volume;
-        this.isPlaying = true;
-        this.fadeIn();
-      }).catch(() => {
-        console.warn('[BgmEngine] resume 실패 — 폴백 URL로 재시도');
-        this.usingFallback = true;
-        this.audio!.src = FALLBACK_TRACK_URL;
-        this.audio!.load();
-        this.playWhenReady();
-      });
-    });
+    if (this.masterGain) {
+      this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(this.volume, this.audioCtx.currentTime + 0.2);
+    }
+    this.isPlaying = true;
+    this.nextNoteTime = this.audioCtx.currentTime + 0.05;
+    const config = MOOD_SYNTH_CONFIGS[this.currentCategory];
+    const bpm = MOOD_CONFIGS[this.currentCategory].bpm;
+    const stepDurSec = 60 / bpm / 2;
+    const scheduleNotes = () => {
+      if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
+      while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
+        this.playStep(config, this.currentStep, this.nextNoteTime, stepDurSec, bpm);
+        this.currentStep = (this.currentStep + 1) % (config.chordProgression.length * 4);
+        this.stepCounter++;
+        this.nextNoteTime += stepDurSec;
+      }
+    };
+    scheduleNotes();
+    this.schedulerTimer = setInterval(scheduleNotes, 25);
   }
 
   stop(): void {
     this.isPlaying = false;
-    if (this.fadeTimer) {
-      clearTimeout(this.fadeTimer);
-      this.fadeTimer = null;
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
     }
-    if (this.audio) {
-      try {
-        this.audio.pause();
-        this.audio.currentTime = 0;
-      } catch { /* ignore */ }
+    if (this.masterGain && this.audioCtx) {
+      this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(0, this.audioCtx.currentTime + 0.15);
     }
   }
 
   setVolume(vol: number): void {
     this.volume = vol;
-    if (this.audio && this.isPlaying) {
-      this.audio.volume = vol;
+    if (this.masterGain && this.audioCtx) {
+      this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(vol, this.audioCtx.currentTime + 0.05);
     }
   }
 
   dispose(): void {
     this.stop();
-    if (this.audio) {
-      try {
-        this.audio.src = '';
-        this.audio.load();
-      } catch { /* ignore */ }
-      this.audio = null;
+    if (this.audioCtx) {
+      try { this.audioCtx.close(); } catch { /* ignore */ }
+      this.audioCtx = null;
+      this.masterGain = null;
+      this.filterNode = null;
     }
   }
 
@@ -459,20 +500,10 @@ export class BgmPlayer {
   }
 }
 
-/**
- * Get a streaming MP3 URL for a given mood label.
- * Used when only the URL is needed (e.g., mixing into video).
- */
-export function getBgmStreamUrl(moodLabel: string, trackIndex?: number): string {
-  const category = moodLabelToCategory(moodLabel);
-  const config = MOOD_CONFIGS[category];
-  const track = trackIndex != null ? config.tracks[trackIndex % config.tracks.length] : pickTrack(category);
-  return track.url;
+export function getBgmStreamUrl(_moodLabel: string, _trackIndex?: number): string {
+  return '';
 }
 
-/**
- * Get BGM metadata for a mood — used by edit plan builders.
- */
 export function getBgmTemplateForMood(moodLabel: string): {
   id: string;
   label: string;
@@ -496,124 +527,16 @@ export function getBgmTemplateForMood(moodLabel: string): {
   };
 }
 
-/**
- * Mix a streaming BGM track into a video element and produce a new video blob with audio.
- * Uses MediaRecorder + Canvas + HTML5 Audio on web.
- * Falls back to original video if mixing fails.
- */
 export async function mixBgmIntoVideo(
-  videoUri: string,
-  bgmTemplateId: string,
+  _videoUri: string,
+  _bgmTemplateId: string,
   _bpm?: number,
-  durationSec?: number,
+  _durationSec?: number,
   _highlightStartSec?: number,
   _highlightDurationSec?: number,
   _energyCurve?: number[],
 ): Promise<string> {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return videoUri;
-
-  try {
-    const video = document.createElement('video');
-    video.src = videoUri;
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.volume = 0;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error('video load failed'));
-      setTimeout(() => reject(new Error('video load timeout')), 10000);
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1080;
-    canvas.height = video.videoHeight || 1920;
-    const ctx2d = canvas.getContext('2d');
-    if (!ctx2d) return videoUri;
-
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return videoUri;
-    const audioCtx = new AudioCtx();
-
-    const destination = audioCtx.createMediaStreamDestination();
-
-    const videoSource = audioCtx.createMediaElementSource(video);
-    const videoGain = audioCtx.createGain();
-    videoGain.gain.value = 0.7;
-    videoSource.connect(videoGain);
-    videoGain.connect(destination);
-
-    const bgmUrl = getBgmStreamUrl(bgmTemplateId);
-    const bgmAudio = new Audio(bgmUrl);
-    bgmAudio.crossOrigin = 'anonymous';
-    bgmAudio.loop = true;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        bgmAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
-        bgmAudio.addEventListener('error', () => reject(new Error('bgm load failed')), { once: true });
-        setTimeout(() => reject(new Error('bgm load timeout')), 15000);
-      });
-    } catch (loadErr) {
-      console.warn(`[BgmEngine] mixBgmIntoVideo: 음원 로드 실패 (${bgmUrl}) — 폴백 URL 사용: ${FALLBACK_TRACK_URL}`);
-      bgmAudio.src = FALLBACK_TRACK_URL;
-      bgmAudio.load();
-      await new Promise<void>((resolve, reject) => {
-        bgmAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
-        bgmAudio.addEventListener('error', () => reject(new Error('bgm fallback load failed')), { once: true });
-        setTimeout(() => reject(new Error('bgm fallback load timeout')), 10000);
-      }).catch(() => {
-        console.warn('[BgmEngine] mixBgmIntoVideo: 폴백 음원도 로드 실패 — 원본 비디오 반환');
-        return videoUri;
-      });
-    }
-
-    const bgmSource = audioCtx.createMediaElementSource(bgmAudio);
-    const bgmGain = audioCtx.createGain();
-    bgmGain.gain.value = 0.45;
-    bgmSource.connect(bgmGain);
-    bgmGain.connect(destination);
-
-    const combinedStream = canvas.captureStream(30);
-    const audioTracks = destination.stream.getAudioTracks();
-    audioTracks.forEach((track) => combinedStream.addTrack(track));
-
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : 'video/webm;codecs=vp8,opus';
-    const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 6_000_000 });
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-
-    const done = new Promise<Blob>((resolve) => {
-      recorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' }));
-    });
-
-    video.currentTime = 0;
-    await video.play();
-    await bgmAudio.play();
-    recorder.start();
-
-    const drawFrame = () => {
-      if (video.ended || video.paused) return;
-      ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
-      requestAnimationFrame(drawFrame);
-    };
-    drawFrame();
-
-    const stopAt = Math.max(0, (durationSec || video.duration || 15)) * 1000;
-    setTimeout(() => {
-      recorder.stop();
-      video.pause();
-      bgmAudio.pause();
-    }, stopAt);
-
-    const mixedBlob = await done;
-    try { audioCtx.close(); } catch { /* ignore */ }
-
-    const blobUrl = URL.createObjectURL(mixedBlob);
-    return blobUrl;
-  } catch {
-    return videoUri;
-  }
+  return _videoUri;
 }
 
 export interface BgmRecommendation {
