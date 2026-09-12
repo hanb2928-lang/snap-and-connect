@@ -215,28 +215,17 @@ async function submitRunwayTask(
     const clampedSeconds = Math.min(Math.max(durationSec, 4), 10);
     const ratioValue = aspectRatio === "9:16" ? "768:1280" : aspectRatio === "16:9" ? "1280:768" : "768:768";
 
-    let endpoint: string;
-    let payload: Record<string, unknown>;
-
+    const payload: Record<string, unknown> = {
+      promptText: prompt,
+      model: "gen3_alpha_turbo",
+      seconds: clampedSeconds,
+      ratio: ratioValue,
+    };
     if (imageUrl) {
-      endpoint = "https://api.dev.runwayml.com/v1/image_to_video";
-      payload = {
-        promptText: prompt,
-        model: "gen3-alpha_turbo",
-        seconds: clampedSeconds,
-        promptImage: { uri: imageUrl },
-      };
-    } else {
-      endpoint = "https://api.dev.runwayml.com/v1/text_to_video";
-      payload = {
-        promptText: prompt,
-        model: "gen3-alpha_turbo",
-        seconds: clampedSeconds,
-        ratio: ratioValue,
-      };
+      payload.promptImage = { uri: imageUrl };
     }
 
-    const resp = await fetch(endpoint, {
+    const resp = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
