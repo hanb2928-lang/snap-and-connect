@@ -184,7 +184,7 @@ export default function EditorScreen() {
   const [newLinkPlatform, setNewLinkPlatform] = useState<PlatformKey>('instagram');
 
   const maxDisplayWidth = previewArea.w > 0 ? previewArea.w - 32 : screenWidth - 32;
-  const maxDisplayHeight = previewArea.h > 0 ? previewArea.h - 32 : screenHeight * 0.5;
+  const maxDisplayHeight = previewArea.h > 0 ? Math.min(previewArea.h - 32, screenHeight * 0.35) : screenHeight * 0.35;
   const aspect = imageSize.width && imageSize.height ? imageSize.width / imageSize.height : 1;
   const rawHeight = maxDisplayWidth / aspect;
   const imageDisplayWidth = rawHeight > maxDisplayHeight ? maxDisplayHeight * aspect : maxDisplayWidth;
@@ -1118,10 +1118,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   previewWrap: {
-    flex: 1,
+    height: Math.round(Dimensions.get('window').height * 0.38),
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.md,
+    padding: theme.spacing.sm,
     overflow: 'hidden',
   },
   imageWrap: {
