@@ -322,6 +322,11 @@ export default function ResultScreen() {
   const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
+  const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
+  const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
+  const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
+  const [cameraMotion, setCameraMotion] = useState<string>('AI 자동');
+  const [bgmVolume, setBgmVolume] = useState<number>(0.75);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
   const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
   const [contentPurpose, setContentPurpose] = useState<ContentPurpose>('monetization');
@@ -2057,61 +2062,7 @@ export default function ResultScreen() {
 
         {/* === Template + Caption + BGM chips === */}
         <View style={styles.chipSection}>
-          <View style={styles.chipGroup}>
-            <View style={styles.chipGroupHeader}>
-              <FilmZoomIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.chipGroupLabel}>영상 템플릿</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
-                <TouchableOpacity
-                  key={tmpl}
-                  style={[styles.chipPill, inlineEdit.videoTemplate === tmpl && styles.chipPillActive]}
-                  onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipPillText, inlineEdit.videoTemplate === tmpl && styles.chipPillTextActive]}>
-                    {tmpl}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={styles.chipGroup}>
-            <View style={styles.chipGroupHeader}>
-              <PenLine size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.chipGroupLabel}>자막 스타일</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
-                <TouchableOpacity
-                  key={font}
-                  style={[styles.chipPill, inlineEdit.captionFont === font && styles.chipPillActive]}
-                  onPress={() => handleInlineEdit({ captionFont: font })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipPillText, inlineEdit.captionFont === font && styles.chipPillTextActive]}>
-                    {font}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
-                <TouchableOpacity
-                  key={pos}
-                  style={[styles.chipPill, inlineEdit.captionPosition === pos && styles.chipPillActive]}
-                  onPress={() => handleInlineEdit({ captionPosition: pos })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipPillText, inlineEdit.captionPosition === pos && styles.chipPillTextActive]}>
-                    {pos}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          {/* 자막 스타일 & 영상 템플릿 — 고급 설정으로 이동 (접이식) */}
 
           <View style={styles.chipGroup}>
             <View style={styles.chipGroupHeader}>
@@ -2168,7 +2119,7 @@ export default function ResultScreen() {
             videoGenProgress={videoGenProgress}
           />
 
-          {/* === 한 줄 후킹 편집 바 (미리보기 직하단) === */}
+          {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}
           <View style={styles.hookEditBar}>
             <TextInput
               style={styles.hookEditInput}
@@ -2187,7 +2138,141 @@ export default function ResultScreen() {
                 <Text style={styles.hookEditResetText}>원본</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={[styles.hookEditReset, showAdvancedCaption && { backgroundColor: theme.colors.accent[400] + '20' }]}
+              onPress={() => setShowAdvancedCaption((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <PenLine size={13} color={showAdvancedCaption ? theme.colors.accent[300] : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.hookEditResetText, showAdvancedCaption && { color: theme.colors.accent[300] }]}>자막</Text>
+            </TouchableOpacity>
           </View>
+
+          {/* === 상세 자막/폰트 편집 (접이식) === */}
+          {showAdvancedCaption && (
+            <View style={styles.advancedPanel}>
+              <Text style={styles.advancedPanelLabel}>자막 스타일</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
+                  <TouchableOpacity
+                    key={font}
+                    style={[styles.chipPill, inlineEdit.captionFont === font && styles.chipPillActive]}
+                    onPress={() => handleInlineEdit({ captionFont: font })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, inlineEdit.captionFont === font && styles.chipPillTextActive]}>
+                      {font}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={[styles.advancedPanelLabel, { marginTop: 8 }]}>자막 위치</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
+                  <TouchableOpacity
+                    key={pos}
+                    style={[styles.chipPill, inlineEdit.captionPosition === pos && styles.chipPillActive]}
+                    onPress={() => handleInlineEdit({ captionPosition: pos })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, inlineEdit.captionPosition === pos && styles.chipPillTextActive]}>
+                      {pos}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* === 고급 카메라 모션 수동 설정 (접이식) === */}
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setShowAdvancedCamera((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.detailToggleLeft}>
+              <CameraIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.advancedToggleText}>고급 카메라 모션 수동 설정</Text>
+            </View>
+            {showAdvancedCamera ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+          {showAdvancedCamera && (
+            <View style={styles.advancedPanel}>
+              <Text style={styles.advancedPanelLabel}>카메라 워킹</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['AI 자동', '돌리 인', '돌리 아웃', '오비탈', '카운터 줌', '고정 샷', '핸드헬드'].map((motion) => (
+                  <TouchableOpacity
+                    key={motion}
+                    style={[styles.chipPill, cameraMotion === motion && styles.chipPillActive]}
+                    onPress={() => setCameraMotion(motion)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, cameraMotion === motion && styles.chipPillTextActive]}>
+                      {motion}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={[styles.advancedPanelLabel, { marginTop: 8 }]}>영상 템플릿</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
+                  <TouchableOpacity
+                    key={tmpl}
+                    style={[styles.chipPill, inlineEdit.videoTemplate === tmpl && styles.chipPillActive]}
+                    onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, inlineEdit.videoTemplate === tmpl && styles.chipPillTextActive]}>
+                      {tmpl}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* === 음량/믹싱 수동 조절 (접이식) === */}
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setShowAdvancedAudio((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.detailToggleLeft}>
+              <AudioLines size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.advancedToggleText}>음량 / 믹싱 비율 수동 조절</Text>
+            </View>
+            {showAdvancedAudio ? (
+              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+          {showAdvancedAudio && (
+            <View style={styles.advancedPanel}>
+              <View style={styles.volumeSliderRow}>
+                <Text style={styles.volumeSliderLabel}>BGM 음량</Text>
+                <Text style={styles.volumeSliderValue}>{Math.round(bgmVolume * 100)}%</Text>
+              </View>
+              <View style={styles.volumeSliderTrack}>
+                <TouchableOpacity
+                  style={[styles.volumeSliderFill, { width: `${bgmVolume * 100}%` }]}
+                  activeOpacity={1}
+                />
+              </View>
+              <View style={styles.volumeSliderBtns}>
+                <TouchableOpacity onPress={() => setBgmVolume((v) => Math.max(0, v - 0.1))} activeOpacity={0.7}>
+                  <Text style={styles.volumeSliderBtnText}>−</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setBgmVolume((v) => Math.min(1, v + 0.1))} activeOpacity={0.7}>
+                  <Text style={styles.volumeSliderBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* === AI Prompt + Regenerate === */}
@@ -4071,6 +4156,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   hookEditReset: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: theme.radius.sm,
@@ -4080,6 +4168,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
+  },
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  advancedToggleText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  advancedPanel: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  advancedPanelLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  volumeSliderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  volumeSliderLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  volumeSliderValue: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
+  },
+  volumeSliderTrack: {
+    height: 6,
+    backgroundColor: theme.colors.dark.border,
+    borderRadius: 3,
+    marginVertical: 8,
+    overflow: 'hidden',
+  },
+  volumeSliderFill: {
+    height: '100%',
+    backgroundColor: theme.colors.accent[400],
+    borderRadius: 3,
+  },
+  volumeSliderBtns: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  volumeSliderBtnText: {
+    fontSize: 20,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
   },
   promptHeader: {
     flexDirection: 'row',
