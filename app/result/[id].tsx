@@ -19,7 +19,6 @@ import {
 import {
   ArrowLeft,
   Share2,
-  Trash2,
   Sparkles,
   Pencil,
   Hash,
@@ -41,7 +40,6 @@ import {
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
-import { deleteScan } from '@/lib/analysis';
 import { getUserSettings } from '@/lib/settings';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { detectAffiliatePlatform } from '@/lib/affiliateLinkSmart';
@@ -822,16 +820,6 @@ export default function ResultScreen() {
     }, 350);
   }, []);
 
-  const handleDelete = async () => {
-    if (!scan) return;
-    try {
-      await deleteScan(scan.id);
-      router.back();
-    } catch {
-      setError('삭제 중 오류가 발생했어요');
-    }
-  };
-
   const handleSaveCustomLink = async (url: string, label: string, productIndex: number): Promise<{ success: boolean; error?: string }> => {
     if (!scan) return { success: false, error: '스캔 정보를 찾을 수 없어요' };
     if (!url || !url.trim()) return { success: false, error: '링크 URL을 입력해주세요' };
@@ -1398,7 +1386,7 @@ export default function ResultScreen() {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorTitle}>{error || '문제가 발생했습니다'}</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.backButton} onPress={() => { if (router.canGoBack()) { router.back(); } else { router.replace('/(tabs)'); } }} activeOpacity={0.8}>
           <ArrowLeft size={20} color={theme.colors.dark.text} strokeWidth={2} />
           <Text style={styles.backButtonText}>돌아가기</Text>
         </TouchableOpacity>
@@ -2056,25 +2044,17 @@ export default function ResultScreen() {
             if (activePlatform !== 'shortform') {
               handlePlatformChange('shortform');
             } else {
-              router.back();
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)');
+              }
             }
           }}
           activeOpacity={0.7}
         >
           <ArrowLeft size={22} color={theme.colors.dark.text} strokeWidth={2} />
         </TouchableOpacity>
-        <View style={styles.topActions}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
-            activeOpacity={0.7}
-          >
-            <Pencil size={18} color={theme.colors.primary[400]} strokeWidth={2} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={handleDelete} activeOpacity={0.7}>
-            <Trash2 size={20} color={theme.colors.error[400]} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -3085,11 +3065,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: theme.spacing.sm,
   },
-  topActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  iconButton: {
+iconButton: {
     width: 40,
     height: 40,
     borderRadius: theme.radius.full,

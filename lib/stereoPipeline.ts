@@ -102,6 +102,29 @@ async function invokeStereoCutAuto(
   }
 }
 
+export async function createScanFromAngleShots(shots: AngleShot[]): Promise<string> {
+  const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
+  if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
+
+  const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
+  const scanId = await saveManualScan(imageUrl);
+
+  const additionalShots = sorted.slice(1);
+  const additionalUrls: string[] = [];
+  for (const shot of additionalShots) {
+    if (!shot.base64) continue;
+    try {
+      const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
+      additionalUrls.push(url);
+    } catch { /* skip failed uploads */ }
+  }
+  if (additionalUrls.length > 0) {
+    await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+  }
+
+  return scanId;
+}
+
 export async function runStereoPipeline(
   shots: AngleShot[],
   onProgress: (progress: StereoPipelineProgress) => void,

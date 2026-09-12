@@ -40,7 +40,7 @@ import { MultiAngleCaptureGuide, type AngleShot } from '@/components/MultiAngleC
 import { TriggerBanner } from '@/components/TriggerBanner';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
-import { runStereoPipeline, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
+import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
@@ -424,18 +424,23 @@ export default function CameraScreen() {
     setStereoProgress(makeInitialProgress());
     setStereoOverlayVisible(true);
 
+    let scanId: string;
     try {
-      const result = await runStereoPipeline(sorted, (prog) => {
-        if (isMountedRef.current) setStereoProgress(prog);
-      });
-      if (isMountedRef.current) {
-        setStereoOverlayVisible(false);
-        router.replace({ pathname: '/result/[id]', params: { id: result.scanId } });
-      }
+      scanId = await createScanFromAngleShots(sorted);
     } catch (err) {
       if (!isMountedRef.current) return;
-      setStereoProgress((prev) => ({ ...prev, error: friendlyError(err, '파이프라인 처리 중 오류가 발생했습니다.') }));
+      setStereoOverlayVisible(false);
+      setError(friendlyError(err, '이미지 업로드에 실패했습니다. 다시 시도해주세요.'));
+      return;
     }
+
+    if (isMountedRef.current) {
+      setStereoOverlayVisible(false);
+      router.replace({ pathname: '/result/[id]', params: { id: scanId } });
+    }
+
+    // Background: run synthesis/directing/publish pipeline without blocking UI
+    runStereoPipeline(sorted, () => {}).catch(() => {});
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
