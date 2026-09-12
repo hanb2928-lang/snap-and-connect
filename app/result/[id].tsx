@@ -340,6 +340,7 @@ export default function ResultScreen() {
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
   const [cameraMotion, setCameraMotion] = useState<string>('AI 자동');
   const [bgmVolume, setBgmVolume] = useState<number>(0.75);
+  const [narrationPlaying, setNarrationPlaying] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
   const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
   const [contentPurpose, setContentPurpose] = useState<ContentPurpose>('monetization');
@@ -2122,6 +2123,7 @@ export default function ResultScreen() {
           ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
           ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
           narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+          onPlayStateChange={setNarrationPlaying}
         />
 
         {/* === Target Platform Selector === */}
@@ -2238,6 +2240,7 @@ export default function ResultScreen() {
             videoGenProgress={videoGenProgress}
             bgmVolume={bgmVolume}
             copyOverlays={copyOverlaysForPreview}
+            narrationActive={narrationPlaying}
           />
 
           {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}

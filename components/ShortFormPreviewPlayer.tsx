@@ -43,6 +43,7 @@ interface ShortFormPreviewPlayerProps {
   videoGenProgress?: VideoGenProgress | null;
   bgmVolume?: number;
   copyOverlays?: CopyOverlayTimeline[] | null;
+  narrationActive?: boolean;
 }
 
 const TOTAL_DURATION = 15;
@@ -131,7 +132,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null, narrationActive = false }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -349,6 +350,9 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     setCurrentSec(0);
   }, [stop]);
 
+  // BGM ducking — when narration is active, BGM drops to 30% of its set volume
+  const effectiveBgmVolume = narrationActive ? bgmVolume * 0.3 : bgmVolume;
+
   const togglePlay = useCallback(() => {
     if (isPlaying) {
       stop();
@@ -361,11 +365,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
           bgmPlayerRef.current = new BgmPlayer();
         }
         bgmPlayerRef.current.unlockAudio();
-        bgmPlayerRef.current.setVolume(bgmVolume);
+        bgmPlayerRef.current.setVolume(effectiveBgmVolume);
       }
       setIsPlaying(true);
     }
-  }, [isPlaying, currentSec, stop, bgmVolume]);
+  }, [isPlaying, currentSec, stop, effectiveBgmVolume]);
 
   const videoReady = hasGeneratedVideo && videoSrc && !videoError && !videoFallbackMode;
 
@@ -381,7 +385,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       bgmPlayerRef.current = new BgmPlayer();
     }
     bgmPlayerRef.current.unlockAudio();
-    bgmPlayerRef.current.setVolume(bgmVolume);
+    bgmPlayerRef.current.setVolume(effectiveBgmVolume);
     bgmPlayerRef.current.start(
       editPlan.bgmTemplate.id,
       editPlan.pacingBpm,
@@ -389,7 +393,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       editPlan.bgmTemplate.highlightDurationSec,
       editPlan.bgmTemplate.energyCurve,
     );
-  }, [isPlaying, videoReady, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
+  }, [isPlaying, videoReady, effectiveBgmVolume, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
   const prevBgmIdRef = useRef<string>('');
   useEffect(() => {
@@ -409,22 +413,21 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
 
   useEffect(() => {
     if (!bgmPlayerRef.current) return;
-    bgmPlayerRef.current.setVolume(bgmVolume);
-  }, [bgmVolume]);
+    bgmPlayerRef.current.setVolume(effectiveBgmVolume);
+  }, [effectiveBgmVolume]);
 
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setCurrentSec((prev) => {
-          const next = prev + TICK_MS / 1000;
-          if (next >= TOTAL_DURATION) {
-            stop();
-            return TOTAL_DURATION;
-          }
-          return next;
-        });
-      }, TICK_MS);
-    }
+    if (!isPlaying) return;
+    intervalRef.current = setInterval(() => {
+      setCurrentSec((prev) => {
+        const next = prev + TICK_MS / 1000;
+        if (next >= TOTAL_DURATION) {
+          stop();
+          return TOTAL_DURATION;
+        }
+        return next;
+      });
+    }, TICK_MS);
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
