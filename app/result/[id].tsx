@@ -2144,174 +2144,24 @@ export default function ResultScreen() {
           />
         </View>
 
-        {/* === 2순위: 플랫폼 선택 === */}
-        <View style={styles.targetPlatformSection}>
-          <View style={styles.targetPlatformHeader}>
-            <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
-            {TARGET_PLATFORM_LIST.map((p) => {
-              const isActive = targetPlatform === p.key;
-              const Icon = p.icon;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                  onPress={() => handleTargetPlatformChange(p.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.targetPlatformHint}>
-            {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
-          </Text>
-        </View>
-
-        {/* === 3순위: AI 원클릭 무드 변경 프리셋 === */}
-        <View style={styles.chipSection}>
-          <View style={styles.chipGroupHeader}>
-            <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.chipGroupLabel}>AI 원클릭 무드 변경</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {MOOD_PRESETS.map((preset) => (
-              <TouchableOpacity
-                key={preset.key}
-                style={styles.moodPresetChip}
-                onPress={() => handleMoodPreset(preset)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.moodPresetEmoji}>{preset.emoji}</Text>
-                <Text style={styles.moodPresetLabel}>{preset.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* === 하단: 상세 수동 설정 (전문가용) 접이식 메뉴 === */}
-        <TouchableOpacity
-          style={styles.advancedToggle}
-          onPress={() => setShowManualSettings((v) => !v)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.detailToggleLeft}>
-            <SlidersIcon size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={styles.advancedToggleText}>⚙️ 상세 수동 설정 (전문가용)</Text>
-          </View>
-          {showManualSettings ? (
-            <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          ) : (
-            <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
-
-        {showManualSettings && (
-        <>
-        {/* 목적 선택 */}
-        <View style={styles.targetPlatformSection}>
-          <View style={styles.purposeRow}>
-            <Text style={styles.purposeLabel}>목적</Text>
-            {CONTENT_PURPOSE_LIST.map((p) => {
-              const isActive = contentPurpose === p.key;
-              const Icon = p.icon;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                  onPress={() => handleContentPurposeChange(p.key)}
-                  activeOpacity={0.7}
-                >
-                  <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                  <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <Text style={styles.strategyHint}>
-            {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
-          </Text>
-        </View>
-
-        {/* Quick-Tweak 정보 입력 */}
-        <QuickTweakPanel
-          hook={activeHook}
-          productName={activeProductName}
-          priceEstimate={activePriceEstimate}
-          shortUrl={shortUrl}
-          onHookChange={(h) => setHookOverride(h)}
-          onProductNameChange={(name) => {
-            if (scan) {
-              supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
-              setScan({ ...scan, product_name: name });
-            }
-          }}
-          onPriceChange={(price) => setPriceOverride(price)}
-        />
-
-        {/* Quick-Tweak 편집 세팅 */}
-        <View style={styles.chipSection}>
-          {/* 영상 길이 선택 */}
-          <View style={styles.durationSelectorRow}>
-            <Text style={styles.durationSelectorLabel}>영상 길이</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.durationScroll}>
-              {DURATION_PRESETS.map((p) => {
-                const isActive = selectedDurationMs === p.value;
-                return (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[styles.durationChip, isActive && styles.durationChipActive]}
-                    onPress={() => setSelectedDurationMs(p.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* BGM 분위기 */}
-          <View style={styles.chipGroup}>
-            <View style={styles.chipGroupHeader}>
-              <FilmIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.chipGroupLabel}>BGM 분위기</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이'].map((mood) => (
-                <TouchableOpacity
-                  key={mood}
-                  style={[styles.chipPill, inlineEdit.bgmMood === mood && styles.chipPillActive]}
-                  onPress={() => handleInlineEdit({ bgmMood: mood })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipPillText, inlineEdit.bgmMood === mood && styles.chipPillTextActive]}>
-                    {mood}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* AI Narration — integrated into sound settings */}
-          <NarrationPlayer
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-            ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
-            narrationText={activeHook || activeOneLiner || scan?.summary || ''}
-            onPlayStateChange={setNarrationPlaying}
+        {/* === 핵심 정보 수정 (Quick-Tweak) === */}
+        <View style={styles.tweakSection}>
+          <QuickTweakPanel
+            hook={activeHook}
+            productName={activeProductName}
+            priceEstimate={activePriceEstimate}
+            shortUrl={shortUrl}
+            onHookChange={(h) => setHookOverride(h)}
+            onProductNameChange={(name) => {
+              if (scan) {
+                supabase.from('scans').update({ product_name: name }).eq('id', scan.id).then(() => {}, () => {});
+                setScan({ ...scan, product_name: name });
+              }
+            }}
+            onPriceChange={(price) => setPriceOverride(price)}
           />
 
-          {/* 한 줄 후킹 편집 바 + 상세 자막 토글 */}
+          {/* 한 줄 후킹 편집 바 */}
           <View style={styles.hookEditBar}>
             <TextInput
               style={styles.hookEditInput}
@@ -2330,121 +2180,99 @@ export default function ResultScreen() {
                 <Text style={styles.hookEditResetText}>원본</Text>
               </TouchableOpacity>
             )}
+          </View>
+
+          {/* AI 나레이션 재생 */}
+          <NarrationPlayer
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+            ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
+            narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+            onPlayStateChange={setNarrationPlaying}
+          />
+        </View>
+
+        {/* === AI 실사 비디오 생성 === */}
+        <View style={styles.videoGenSection}>
+          {allCutImages.length < 5 && (
+            <View style={styles.photoGuardTooltip}>
+              <AlertCircleIcon size={13} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.photoGuardTooltipText}>
+                5장 각도를 모두 촬영/업로드해 주세요 ({allCutImages.length}/5)
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.videoGenDescText}>
+            AI가 분석 결과를 바탕으로 실사 비디오를 자동 생성합니다. API 크레딧이 소모됩니다.
+          </Text>
+
+          <View style={styles.videoGenDualBtnRow}>
             <TouchableOpacity
-              style={[styles.hookEditReset, showAdvancedCaption && { backgroundColor: theme.colors.accent[400] + '20' }]}
-              onPress={() => setShowAdvancedCaption((v) => !v)}
+              style={[styles.videoGenDualBtn, styles.videoGenAutoBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
+              onPress={() => { setVideoGenMode('auto'); handleAiVideoGenerate(); }}
+              disabled={isGeneratingVideo || allCutImages.length < 5}
               activeOpacity={0.7}
             >
-              <PenLine size={13} color={showAdvancedCaption ? theme.colors.accent[300] : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.hookEditResetText, showAdvancedCaption && { color: theme.colors.accent[300] }]}>자막</Text>
+              {isGeneratingVideo ? (
+                <Loader2Icon size={18} color="#fff" strokeWidth={2} />
+              ) : (
+                <ZapIcon size={18} color="#fff" strokeWidth={2} />
+              )}
+              <Text style={styles.videoGenDualBtnText}>
+                {isGeneratingVideo ? '생성 중...' : 'AI 자동 생성'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.videoGenDualBtn, styles.videoGenManualBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
+              onPress={() => setShowManualSettings((v) => !v)}
+              disabled={isGeneratingVideo || allCutImages.length < 5}
+              activeOpacity={0.7}
+            >
+              <SlidersIcon size={18} color="#fff" strokeWidth={2} />
+              <Text style={styles.videoGenDualBtnText}>
+                {showManualSettings ? '설정 닫기' : '상세 설정'}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* 상세 자막/폰트 편집 (접이식) */}
-          {showAdvancedCaption && (
+          {showManualSettings && (
             <View style={styles.advancedPanel}>
-              <Text style={styles.advancedPanelLabel}>자막 스타일</Text>
+              <Text style={styles.advancedPanelLabel}>영상 길이</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['고딕 굵게', '명조 우아', '손글씨 캐주얼', '미니멀 얇게', '스포츠 강조'].map((font) => (
-                  <TouchableOpacity
-                    key={font}
-                    style={[styles.chipPill, inlineEdit.captionFont === font && styles.chipPillActive]}
-                    onPress={() => handleInlineEdit({ captionFont: font })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipPillText, inlineEdit.captionFont === font && styles.chipPillTextActive]}>
-                      {font}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {DURATION_PRESETS.map((p) => {
+                  const isActive = selectedDurationMs === p.value;
+                  return (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={[styles.durationChip, isActive && styles.durationChipActive]}
+                      onPress={() => setSelectedDurationMs(p.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.durationChipText, isActive && styles.durationChipTextActive]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
-              <Text style={[styles.advancedPanelLabel, { marginTop: 8 }]}>자막 위치</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['하단 고정', '상단 고정', '중앙', '하단 + 상단 번갈', '좌측 세로'].map((pos) => (
-                  <TouchableOpacity
-                    key={pos}
-                    style={[styles.chipPill, inlineEdit.captionPosition === pos && styles.chipPillActive]}
-                    onPress={() => handleInlineEdit({ captionPosition: pos })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipPillText, inlineEdit.captionPosition === pos && styles.chipPillTextActive]}>
-                      {pos}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
 
-          {/* 고급 카메라 모션 수동 설정 (접이식) */}
-          <TouchableOpacity
-            style={styles.advancedToggle}
-            onPress={() => setShowAdvancedCamera((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.detailToggleLeft}>
-              <CameraIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.advancedToggleText}>고급 카메라 모션 수동 설정</Text>
-            </View>
-            {showAdvancedCamera ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-          {showAdvancedCamera && (
-            <View style={styles.advancedPanel}>
-              <Text style={styles.advancedPanelLabel}>카메라 워킹</Text>
+              <Text style={[styles.advancedPanelLabel, { marginTop: 8 }]}>BGM 분위기</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['AI 자동', '돌리 인', '돌리 아웃', '오비탈', '카운터 줌', '고정 샷', '핸드헬드'].map((motion) => (
+                {['하이텐션', '시네마틱', 'ASMR', '감성', '로파이'].map((mood) => (
                   <TouchableOpacity
-                    key={motion}
-                    style={[styles.chipPill, cameraMotion === motion && styles.chipPillActive]}
-                    onPress={() => setCameraMotion(motion)}
+                    key={mood}
+                    style={[styles.chipPill, inlineEdit.bgmMood === mood && styles.chipPillActive]}
+                    onPress={() => handleInlineEdit({ bgmMood: mood })}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.chipPillText, cameraMotion === motion && styles.chipPillTextActive]}>
-                      {motion}
+                    <Text style={[styles.chipPillText, inlineEdit.bgmMood === mood && styles.chipPillTextActive]}>
+                      {mood}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-              <Text style={[styles.advancedPanelLabel, { marginTop: 8 }]}>영상 템플릿</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['트렌디 쇼핑', '라이프스타일', '제품 집중', '스토리텔링', 'ASMR 리뷰'].map((tmpl) => (
-                  <TouchableOpacity
-                    key={tmpl}
-                    style={[styles.chipPill, inlineEdit.videoTemplate === tmpl && styles.chipPillActive]}
-                    onPress={() => handleInlineEdit({ videoTemplate: tmpl })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipPillText, inlineEdit.videoTemplate === tmpl && styles.chipPillTextActive]}>
-                      {tmpl}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
 
-          {/* 음량/믹싱 수동 조절 (접이식) */}
-          <TouchableOpacity
-            style={styles.advancedToggle}
-            onPress={() => setShowAdvancedAudio((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.detailToggleLeft}>
-              <AudioLines size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.advancedToggleText}>음량 / 믹싱 비율 수동 조절</Text>
-            </View>
-            {showAdvancedAudio ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-          {showAdvancedAudio && (
-            <View style={styles.advancedPanel}>
               <View style={styles.volumeSliderRow}>
                 <Text style={styles.volumeSliderLabel}>BGM 음량</Text>
                 <Text style={styles.volumeSliderValue}>{Math.round(bgmVolume * 100)}%</Text>
@@ -2465,167 +2293,6 @@ export default function ResultScreen() {
               </View>
             </View>
           )}
-
-          {/* AI 가상 영상 프롬프트 — 스타일 카드 내부에 통합 */}
-          <View style={styles.promptHeader}>
-            <Wand2 size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.promptTitle}>AI 가상 영상 프롬프트</Text>
-          </View>
-          <TextInput
-            style={styles.promptInput}
-            value={inlineEdit.aiPrompt}
-            onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
-            placeholder="원하는 연출 분위기나 강조 사항을 입력하세요"
-            placeholderTextColor={theme.colors.dark.textFaint}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-          {showMoodHints && (
-            <View style={styles.moodHintRow}>
-              <Text style={styles.moodHintLabel}>이런 무드가 연출됩니다</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodHintScroll}>
-                {[
-                  { label: ' neon 글로우', color: '#ff6b9d', desc: '사이버팝' },
-                  { label: ' 필름 그레인', color: '#e8a87c', desc: '레트로 무드' },
-                  { label: ' 청량 템플릿', color: '#5b9bd5', desc: '썸머 바이브' },
-                  { label: ' 미니멀 화이트', color: '#cccccc', desc: '클린 감성' },
-                  { label: ' 시네마틱 다크', color: '#8e44ad', desc: '급이 다른 무드' },
-                ].map((hint) => (
-                  <TouchableOpacity
-                    key={hint.desc}
-                    style={styles.moodHintChip}
-                    onPress={() => handleInlineEdit({ aiPrompt: (inlineEdit.aiPrompt + ' ' + hint.desc).trim() })}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.moodHintDot, { backgroundColor: hint.color }]} />
-                    <Text style={styles.moodHintChipText}>{hint.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-
-        {/* === AI 실사 비디오 생성 (플랫폼 선택 + 듀얼 모드 버튼) === */}
-        <View style={styles.videoGenSection}>
-          {allCutImages.length < 5 && (
-            <View style={styles.photoGuardTooltip}>
-              <AlertCircleIcon size={13} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.photoGuardTooltipText}>
-                5장 각도를 모두 촬영/업로드해 주세요 ({allCutImages.length}/5)
-              </Text>
-            </View>
-          )}
-
-          {/* 플랫폼 선택 */}
-          <Text style={styles.videoGenLabel}>플랫폼 선택</Text>
-          <View style={styles.videoGenPlatformRow}>
-            {([
-              { key: 'shorts', label: 'YouTube Shorts' },
-              { key: 'tiktok', label: 'TikTok' },
-              { key: 'reels', label: 'Instagram Reels' },
-            ] as const).map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={[styles.videoGenPlatformPill, targetPlatform === p.key && styles.videoGenPlatformPillActive]}
-                onPress={() => handleTargetPlatformChange(p.key)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.videoGenPlatformPillText, targetPlatform === p.key && styles.videoGenPlatformPillTextActive]}>
-                  {p.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* 모드 선택 + 수동 입력 */}
-          <Text style={styles.videoGenLabel}>생성 모드</Text>
-          <View style={styles.videoGenModeRow}>
-            <TouchableOpacity
-              style={[styles.videoGenModeTab, videoGenMode === 'auto' && styles.videoGenModeTabActive]}
-              onPress={() => setVideoGenMode('auto')}
-              activeOpacity={0.7}
-            >
-              <ZapIcon size={15} color={videoGenMode === 'auto' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={[styles.videoGenModeTabText, videoGenMode === 'auto' && styles.videoGenModeTabTextActive]}>
-                자동 생성
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.videoGenModeTab, videoGenMode === 'manual' && styles.videoGenModeTabActive]}
-              onPress={() => setVideoGenMode('manual')}
-              activeOpacity={0.7}
-            >
-              <Settings2 size={15} color={videoGenMode === 'manual' ? '#fff' : theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={[styles.videoGenModeTabText, videoGenMode === 'manual' && styles.videoGenModeTabTextActive]}>
-                수동 선택
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {videoGenMode === 'manual' && (
-            <View style={styles.videoGenManualPanel}>
-              <Text style={styles.videoGenInputLabel}>훅 문구 (후킹 멘트)</Text>
-              <TextInput
-                style={styles.videoGenTextInput}
-                value={manualHook}
-                onChangeText={setManualHook}
-                placeholder="예: 이거 몰랐다면 손해! 지금 확인하세요"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                multiline
-              />
-              <Text style={styles.videoGenInputLabel}>주요 키워드</Text>
-              <TextInput
-                style={styles.videoGenTextInput}
-                value={manualKeywords}
-                onChangeText={setManualKeywords}
-                placeholder="예: 한정판, 가성비, 베스트셀러"
-                placeholderTextColor={theme.colors.dark.textFaint}
-                multiline
-              />
-            </View>
-          )}
-
-          {videoGenMode === 'auto' && (
-            <Text style={styles.videoGenDescText}>
-              AI가 분석 결과를 바탕으로 실사 비디오를 자동 생성합니다. API 크레딧이 소모됩니다.
-            </Text>
-          )}
-
-          {/* 듀얼 생성 버튼 */}
-          <View style={styles.videoGenDualBtnRow}>
-            <TouchableOpacity
-              style={[styles.videoGenDualBtn, styles.videoGenAutoBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
-              onPress={() => { setVideoGenMode('auto'); handleAiVideoGenerate(); }}
-              disabled={isGeneratingVideo || allCutImages.length < 5}
-              activeOpacity={0.7}
-            >
-              {isGeneratingVideo && videoGenMode === 'auto' ? (
-                <Loader2Icon size={18} color="#fff" strokeWidth={2} />
-              ) : (
-                <ZapIcon size={18} color="#fff" strokeWidth={2} />
-              )}
-              <Text style={styles.videoGenDualBtnText}>
-                {isGeneratingVideo && videoGenMode === 'auto' ? '생성 중...' : 'AI 자동 생성'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.videoGenDualBtn, styles.videoGenManualBtn, (isGeneratingVideo || allCutImages.length < 5) && styles.videoGenBtnDisabled]}
-              onPress={() => { setVideoGenMode('manual'); handleAiVideoGenerate(); }}
-              disabled={isGeneratingVideo || allCutImages.length < 5}
-              activeOpacity={0.7}
-            >
-              {isGeneratingVideo && videoGenMode === 'manual' ? (
-                <Loader2Icon size={18} color="#fff" strokeWidth={2} />
-              ) : (
-                <Settings2 size={18} color="#fff" strokeWidth={2} />
-              )}
-              <Text style={styles.videoGenDualBtnText}>
-                {isGeneratingVideo && videoGenMode === 'manual' ? '생성 중...' : '수동 선택'}
-              </Text>
-            </TouchableOpacity>
-          </View>
 
           {productVision && !isGeneratingVideo && (
             <View style={styles.photoGuardTooltip}>
@@ -2726,223 +2393,16 @@ export default function ResultScreen() {
           </View>
         </Modal>
 
+        <Text style={styles.dateText}>
+          {new Date(scan.created_at).toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+        </Text>
 
-
-        {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
-          <AffiliatePromptBanner
-            productName={activeProductName}
-            autoLinks={currentAffiliateLinks}
-            hasCustomLink={hasCustomLink}
-            partnerIdsConfigured={partnerIdsConfigured}
-            onConnectLink={handleConnectLink}
-          />
-        ) : null}
-
-        <View style={styles.body}>
-          {detectedProducts.length > 1 && (
-            <View style={styles.section}>
-              <ProductSelector
-                products={detectedProducts}
-                selectedIndex={selectedProductIndex}
-                onSelect={setSelectedProductIndex}
-              />
-            </View>
-          )}
-
-          {activePlatform === 'instagram' && (
-            <View style={styles.section}>
-              <ReviewInput
-                review={scan.custom_review?.text ? scan.custom_review : null}
-                onSave={async (newReview: CustomReview) => {
-                  setReviewSaving(true);
-                  try {
-                    const { error: reviewError } = await supabase
-                      .from('scans')
-                      .update({ custom_review: newReview })
-                      .eq('id', scan.id);
-                    if (reviewError) throw reviewError;
-                    setScan({ ...scan, custom_review: newReview });
-                  } catch (err) {
-                    setError(friendlyError(err, '후기 저장에 실패했습니다. 다시 시도해주세요.'));
-                  }
-                  setReviewSaving(false);
-                }}
-                onClear={async () => {
-                  setReviewSaving(true);
-                  try {
-                    const { error: reviewError } = await supabase
-                      .from('scans')
-                      .update({ custom_review: null })
-                      .eq('id', scan.id);
-                    if (reviewError) throw reviewError;
-                    setScan({ ...scan, custom_review: null });
-                  } catch (err) {
-                    setError(friendlyError(err, '후기 삭제에 실패했습니다. 다시 시도해주세요.'));
-                  }
-                  setReviewSaving(false);
-                }}
-                productData={{
-                  productName: activeProductName,
-                  productCategory: selectedProduct?.productCategory || scan?.product_category || '',
-                  priceEstimate: activePriceEstimate,
-                  oneLiner: activeOneLiner,
-                  hook: activeHook,
-                  productAdvantages: td?.productAdvantages || [],
-                }}
-                brandPersona={settings?.brand_persona}
-              />
-            </View>
-          )}
-
-          {td?.caption ? (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.sectionLabel}>1단계 · 플랫폼 게시판 선택</Text>
-              </View>
-              <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
-              {platformSupportsBoth(activePlatform) && (
-                <BoardTabs platform={activePlatform} selected={activeBoard} onSelect={setActiveBoard} />
-              )}
-              <View style={styles.captionCard}>
-                {activeHook ? (
-                  <View style={styles.hookRow}>
-                    <Text style={styles.hookText} numberOfLines={3}>{activeHook}</Text>
-                    <TouchableOpacity style={styles.hookCopyBtn} onPress={handleCopyHook} activeOpacity={0.7}>
-                      {hookCopied ? (
-                        <Check size={13} color={theme.colors.success[400]} strokeWidth={2} />
-                      ) : (
-                        <Copy size={13} color={theme.colors.warning[400]} strokeWidth={2} />
-                      )}
-                      <Text style={[styles.hookCopyText, hookCopied && { color: theme.colors.success[400] }]}>
-                        {hookCopied ? '복사됨' : '후킹 복사'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-                <Text style={styles.captionText}>{activeCaption}</Text>
-                {td.productAdvantages && td.productAdvantages.length > 0 ? (
-                  <View style={styles.metaChips}>
-                    {td.productAdvantages.map((adv, i) => (
-                      <View key={i} style={styles.metaChip}>
-                        <Sparkles size={11} color={theme.colors.accent[300]} strokeWidth={2} />
-                        <Text style={styles.metaChipText}>{adv}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {activeHashtags.length > 0 ? (
-                  <View style={styles.hashtagRow}>
-                    <Hash size={12} color={theme.colors.primary[300]} strokeWidth={2} />
-                    <Text style={styles.hashtagText}>
-                      {activeHashtags.map((h) => `#${h}`).join(' ')}
-                    </Text>
-                  </View>
-                ) : null}
-                {addedHashtags.length > 0 ? (
-                  <View style={styles.addedHashtagRow}>
-                    {addedHashtags.map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        style={styles.addedHashtagChip}
-                        onPress={() => handleRemoveTrendingHashtag(tag)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.addedHashtagText}>#{tag}</Text>
-                        <X size={10} color={theme.colors.accent[300]} strokeWidth={2.5} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
-                {trendingSuggestions.length > 0 ? (
-                  <View style={styles.trendingHashtagSection}>
-                    <View style={styles.trendingHashtagHeader}>
-                      <TrendingUp size={12} color={theme.colors.accent[400]} strokeWidth={2} />
-                      <Text style={styles.trendingHashtagLabel}>트렌딩 해시태그 추천</Text>
-                    </View>
-                    <View style={styles.trendingHashtagChips}>
-                      {trendingSuggestions.map((tag) => (
-                        <TouchableOpacity
-                          key={tag}
-                          style={styles.trendingHashtagChip}
-                          onPress={() => handleAddTrendingHashtag(tag)}
-                          activeOpacity={0.7}
-                        >
-                          <Plus size={9} color={theme.colors.accent[300]} strokeWidth={2.5} />
-                          <Text style={styles.trendingHashtagChipText}>{tag}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-                <TouchableOpacity style={styles.copyCaptionBtn} onPress={handleCopyCaption} activeOpacity={0.7}>
-                  {captionCopied ? (
-                    <Check size={14} color={theme.colors.success[400]} strokeWidth={2} />
-                  ) : (
-                    <Copy size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-                  )}
-                  <Text style={[styles.copyCaptionText, captionCopied && { color: theme.colors.success[400] }]}>
-                    {captionCopied ? '복사됨' : '카피 복사'}
-                  </Text>
-                </TouchableOpacity>
-                {isLinkRestrictedPlatform && shortUrl ? (
-                  <View style={styles.commentLinkBox}>
-                    <View style={styles.commentLinkHint}>
-                      <MessageCircle size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-                      <Text style={styles.commentLinkHintText}>
-                        본문에 링크 직접 삽입 시 노출 제한(섀도우밴) 위험이 있어요. 댓글창에 링크를 남겨주세요.
-                      </Text>
-                    </View>
-                    <TouchableOpacity style={styles.copyLinkBtn} onPress={handleCopyCommentLink} activeOpacity={0.7}>
-                      {linkCopied ? (
-                        <Check size={13} color={theme.colors.success[400]} strokeWidth={2} />
-                      ) : (
-                        <Copy size={13} color={theme.colors.primary[300]} strokeWidth={2} />
-                      )}
-                      <Text style={[styles.copyLinkBtnText, linkCopied && { color: theme.colors.success[400] }]}>
-                        {linkCopied ? '댓글용 링크 복사됨' : '댓글용 링크 복사'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-
-          {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
-
-          {disclosureText ? (
-            <View style={styles.disclosureSection}>
-              <TouchableOpacity
-                style={styles.disclosureToggle}
-                onPress={() => setShowDisclosure((v) => !v)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.disclosureToggleText}>제휴 마케팅 고지문구</Text>
-                {showDisclosure ? (
-                  <ChevronUp size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                ) : (
-                  <ChevronDown size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-              {showDisclosure && (
-                <Text style={styles.disclosureBody}>{disclosureText}</Text>
-              )}
-            </View>
-          ) : null}
-
-          <Text style={styles.dateText}>
-            {new Date(scan.created_at).toLocaleDateString('ko-KR', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </Text>
-        </View>
-        </>
-        )}
 
         {/* === 4순위: 촬영된 5각도 입체 원본 컷 갤러리 (최하단, 접기 가능) === */}
         {allCutImages.length > 0 && (
@@ -4231,6 +3691,17 @@ iconButton: {
     borderColor: theme.colors.primary[400] + '30',
     ...theme.shadows.card,
   },
+  tweakSection: {
+    marginHorizontal: theme.spacing.md,
+    marginVertical: 6,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    ...theme.shadows.card,
+  },
   hookEditBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4421,6 +3892,16 @@ iconButton: {
     gap: 10,
     marginTop: 4,
   },
+  videoGenManualBtn: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '50',
+  },
+  videoGenManualBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
+  },
   videoGenDualBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -4433,9 +3914,6 @@ iconButton: {
   },
   videoGenAutoBtn: {
     backgroundColor: theme.colors.primary[500],
-  },
-  videoGenManualBtn: {
-    backgroundColor: theme.colors.accent[500],
   },
   videoGenBtnDisabled: {
     opacity: 0.5,
