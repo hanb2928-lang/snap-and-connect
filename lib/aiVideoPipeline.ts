@@ -33,10 +33,31 @@ interface GenerateAiVideoOptions {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionResult | null;
+  draft?: boolean;
 }
 
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 1500;
+interface PollResponse {
+  status: string;
+  videoUrl?: string;
+  progress?: string;
+  error?: string;
+  persisted?: boolean;
+}
+
+const POLL_INTERVAL_FAST_MS = 3000;
+const POLL_INTERVAL_NORMAL_MS = 5000;
+const FAST_POLL_DURATION_MS = 10000;
+const MAX_POLL_ATTEMPTS = 72;
+const SUBMIT_MAX_RETRIES = 2;
+const SUBMIT_RETRY_DELAY_MS = 2000;
+
+const STATUS_MESSAGES: Record<string, string> = {
+  THROTTLED: 'Runway 서버 대기 중 (순서 대기)...',
+  PENDING: '작업 대기 중...',
+  RUNNING: 'AI가 영상을 렌더링하고 있어요',
+  PROCESSING: 'AI가 영상을 렌더링하고 있어요',
+  QUEUED: '작업 대기 중...',
+};
 
 export async function generateAiVideo(
   prompt: string,
@@ -54,14 +75,19 @@ export async function generateAiVideo(
     });
   };
 
-  report('submitting', 0.05, 'AI 비디오 생성 요청 전송 중...');
+  const isDraft = options.draft === true;
 
-  let lastErr: Error | null = null;
+  report('submitting', 0.05, isDraft ? '빠른 미리보기 생성 요청 중...' : 'AI 비디오 생성 요청 전송 중...');
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  // Phase 1: Submit task
+  let submitData: { taskId: string; motionPrompt: string; durationSec: number; aspectRatio: string; variationSeed: number } | null = null;
+  let lastSubmitErr: Error | null = null;
+
+  for (let attempt = 0; attempt <= SUBMIT_MAX_RETRIES; attempt++) {
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
         body: {
+          mode: 'submit',
           prompt,
           durationSec: options.durationSec ?? 10,
           aspectRatio: options.aspectRatio ?? '9:16',
@@ -74,6 +100,7 @@ export async function generateAiVideo(
           hookCategory: options.hookCategory ?? 'curiosity',
           cutCount: options.cutCount,
           productVision: options.productVision ?? null,
+          draft: isDraft,
         },
       });
 
@@ -81,34 +108,102 @@ export async function generateAiVideo(
         throw await buildVideoFunctionError(error);
       }
 
-      if (!data || typeof data !== 'object' || typeof data.videoUrl !== 'string' || data.videoUrl.length === 0) {
-        throw new Error('서버가 유효한 비디오 URL을 반환하지 않았습니다. 응답을 확인해주세요.');
+      if (!data || typeof data !== 'object' || typeof data.taskId !== 'string') {
+        throw new Error('서버가 작업 ID를 반환하지 않았습니다.');
       }
 
-      report('completed', 1.0, 'AI 비디오 생성 완료');
-
-      return {
-        videoUrl: data.videoUrl as string,
-        jobId: data.jobId as string,
+      submitData = {
+        taskId: data.taskId as string,
         motionPrompt: data.motionPrompt as string,
         durationSec: data.durationSec as number,
         aspectRatio: data.aspectRatio as string,
         variationSeed: data.variationSeed as number,
-        persisted: (data.persisted as boolean) ?? false,
-        provider: (data.provider as string) ?? 'unknown',
       };
+      break;
     } catch (err) {
-      lastErr = err instanceof Error ? err : new Error(String(err));
-      if (attempt < MAX_RETRIES) {
-        report('generating', 0.1 + attempt * 0.05, `재시도 중 (${attempt + 1}/${MAX_RETRIES})...`);
-        await delay(RETRY_DELAY_MS * (attempt + 1));
+      lastSubmitErr = err instanceof Error ? err : new Error(String(err));
+      if (attempt < SUBMIT_MAX_RETRIES) {
+        report('submitting', 0.05 + attempt * 0.02, `생성 요청 재시도 중 (${attempt + 1}/${SUBMIT_MAX_RETRIES})...`);
+        await delay(SUBMIT_RETRY_DELAY_MS * (attempt + 1));
       }
     }
   }
 
-  const msg = lastErr?.message ?? '비디오 생성 중 오류 발생';
-  report('error', 0, msg);
-  throw new Error(msg);
+  if (!submitData) {
+    const msg = lastSubmitErr?.message ?? '비디오 생성 요청 실패';
+    report('error', 0, msg);
+    throw new Error(msg);
+  }
+
+  const draftLabel = isDraft ? '빠른 미리보기' : 'AI 비디오';
+  report('generating', 0.1, `${draftLabel} 작업이 접수되었습니다. 완료되면 알려드릴게요...`);
+
+  const pollStartTime = Date.now();
+
+  // Phase 2: Poll until complete (adaptive interval: 3s for first 10s, then 5s)
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    const elapsed = Date.now() - pollStartTime;
+    const interval = elapsed < FAST_POLL_DURATION_MS ? POLL_INTERVAL_FAST_MS : POLL_INTERVAL_NORMAL_MS;
+    await delay(interval);
+
+    let pollData: PollResponse | null = null;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-video', {
+        body: {
+          mode: 'poll',
+          taskId: submitData.taskId,
+          scanId: options.scanId,
+        },
+      });
+
+      if (error) {
+        throw await buildVideoFunctionError(error);
+      }
+
+      pollData = data as PollResponse;
+    } catch (err) {
+      // Network blip — keep polling
+      const msg = err instanceof Error ? err.message : '폴링 오류';
+      report('generating', 0.1 + attempt * 0.005, `연결 재시도 중: ${msg}`);
+      continue;
+    }
+
+    if (!pollData) continue;
+
+    if (pollData.status === 'SUCCESS' && pollData.videoUrl) {
+      report('completed', 1.0, 'AI 비디오 생성 완료');
+      return {
+        videoUrl: pollData.videoUrl,
+        jobId: submitData.taskId,
+        motionPrompt: submitData.motionPrompt,
+        durationSec: submitData.durationSec,
+        aspectRatio: submitData.aspectRatio,
+        variationSeed: submitData.variationSeed,
+        persisted: pollData.persisted ?? false,
+        provider: 'runway',
+      };
+    }
+
+    if (pollData.status === 'FAILED') {
+      const msg = pollData.error ?? 'Runway 비디오 생성에 실패했습니다.';
+      report('error', 0, msg);
+      throw new Error(msg);
+    }
+
+    // Map Runway progress (0.0–1.0) to our 0.1–0.95 range
+    const rawProgress = pollData.progress ? parseFloat(pollData.progress) : NaN;
+    const numericProgress = !isNaN(rawProgress)
+      ? 0.1 + rawProgress * 0.85
+      : 0.1 + (attempt / MAX_POLL_ATTEMPTS) * 0.85;
+
+    const statusMsg = STATUS_MESSAGES[pollData.status] ?? `Runway 상태: ${pollData.status}`;
+    const pctLabel = !isNaN(rawProgress) ? ` (${Math.round(rawProgress * 100)}%)` : '';
+    report('generating', Math.min(numericProgress, 0.95), `${statusMsg}${pctLabel}`);
+  }
+
+  report('error', 0, 'Runway 비디오 생성 시간이 초과되었습니다. 다시 시도해주세요.');
+  throw new Error('Runway 비디오 생성 시간이 초과되었습니다. 다시 시도해주세요.');
 }
 
 export function createVideoGenProgressTracker(

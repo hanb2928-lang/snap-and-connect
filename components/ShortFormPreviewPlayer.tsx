@@ -707,13 +707,17 @@ useEffect(() => {
             <View style={styles.videoGenOverlay}>
               <View style={styles.videoGenPulseRing} />
               <Text style={styles.videoGenPhaseText}>
-                {videoGenProgress.phase === 'submitting' ? 'AI 비디오 생성 요청 중...' : 'AI가 영상을 생성하고 있어요'}
+                {videoGenProgress.phase === 'submitting'
+                  ? 'AI 비디오 생성 요청 중...'
+                  : videoGenProgress.phase === 'error'
+                    ? '생성 실패'
+                    : 'AI가 영상을 생성하고 있어요'}
               </Text>
               <View style={styles.videoGenProgressBar}>
                 <View style={[styles.videoGenProgressFill, { width: `${Math.round(videoGenProgress.progress * 100)}%` }]} />
               </View>
-              <Text style={styles.videoGenDetailText} numberOfLines={1}>
-                {videoGenProgress.message} · {videoGenProgress.elapsedSec}s
+              <Text style={styles.videoGenDetailText} numberOfLines={2}>
+                {videoGenProgress.message} · {videoGenProgress.elapsedSec}s 경과
               </Text>
             </View>
           )}

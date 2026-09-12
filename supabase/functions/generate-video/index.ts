@@ -25,7 +25,9 @@ interface ProductVisionData {
 }
 
 interface GenerateVideoRequest {
-  prompt: string;
+  mode?: "submit" | "poll" | "webhook";
+  taskId?: string;
+  prompt?: string;
   durationSec?: number;
   aspectRatio?: "9:16" | "16:9" | "1:1";
   productName?: string;
@@ -37,12 +39,16 @@ interface GenerateVideoRequest {
   hookCategory?: string;
   cutCount?: number;
   productVision?: ProductVisionData | null;
+  draft?: boolean;
+  // webhook fields (sent by Runway callback)
+  status?: string;
+  output?: string[] | { url?: string } | string;
+  failure?: string;
+  error?: string;
 }
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 2000;
-const RUNWAY_POLL_INTERVAL_MS = 5000;
-const RUNWAY_MAX_POLL_ATTEMPTS = 72;
 const RUNWAY_SUBMIT_TIMEOUT_MS = 30000;
 const RUNWAY_POLL_TIMEOUT_MS = 15000;
 
@@ -59,24 +65,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: GenerateVideoRequest = await req.json();
-
-    console.log("[generate-video] Incoming payload:", JSON.stringify({
-      promptLength: body.prompt?.length ?? 0,
-      durationSec: body.durationSec,
-      aspectRatio: body.aspectRatio,
-      productName: body.productName,
-      scanId: body.scanId,
-      variationSeed: body.variationSeed,
-      hasProductVision: !!body.productVision,
-    }));
-
-    let effectivePrompt = body.prompt ?? "";
-    if (effectivePrompt.trim().length === 0) {
-      effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText);
-    }
+    const mode = body.mode ?? "submit";
 
     const runwayKey = await resolveRunwayKey();
-
     if (!runwayKey) {
       return new Response(
         JSON.stringify({
@@ -88,76 +79,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const durationSec = Math.min(body.durationSec ?? 10, 10);
-    const aspectRatio = body.aspectRatio ?? "9:16";
-    const variationSeed = body.variationSeed ?? 0;
-
-    const motionPrompt = buildMotionPrompt(
-      effectivePrompt,
-      body.productName,
-      aspectRatio,
-      variationSeed,
-      body.bgmMood,
-      body.captionText,
-      body.cutCount,
-      body.platform ?? "shorts",
-      body.hookCategory ?? "curiosity",
-      body.cutCount,
-      body.productVision ?? null,
-    );
-
-    const runwayPrompt = motionPrompt.slice(0, 500);
-
-    let videoUrl: string | null = null;
-    let taskId = "";
-    let provider = "runway";
-    let providerError: string | null = null;
-
-    try {
-      const result = await generateWithRunway(runwayPrompt, undefined, runwayKey, aspectRatio, durationSec);
-      videoUrl = result.videoUrl;
-      taskId = result.taskId;
-    } catch (runwayErr) {
-      providerError = runwayErr instanceof Error ? runwayErr.message : "Runway 비디오 생성 실패";
+    if (mode === "poll") {
+      return await handlePoll(body, runwayKey);
     }
 
-    if (!videoUrl) {
-      const errorDetail = providerError ?? "알 수 없는 오류";
-      return new Response(
-        JSON.stringify({
-          error: `AI 비디오 생성에 실패했습니다: ${errorDetail}`,
-          step: "runway",
-          provider,
-          motionPrompt: runwayPrompt,
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (mode === "webhook") {
+      return await handleWebhook(body);
     }
 
-    let persistedUrl: string | null = null;
-    if (body.scanId && supabaseUrl && serviceRoleKey) {
-      persistedUrl = await uploadToStorage(videoUrl, body.scanId);
-      if (persistedUrl) {
-        await updateScanWithVideo(body.scanId, persistedUrl);
-      }
-    }
-
-    const finalUrl = persistedUrl ?? videoUrl;
-
-    return new Response(
-      JSON.stringify({
-        videoUrl: finalUrl,
-        originalVideoUrl: videoUrl !== finalUrl ? videoUrl : undefined,
-        jobId: taskId,
-        provider,
-        motionPrompt: runwayPrompt,
-        durationSec,
-        aspectRatio,
-        variationSeed,
-        persisted: !!persistedUrl,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return await handleSubmit(body, runwayKey);
   } catch (err) {
     return new Response(
       JSON.stringify({
@@ -170,44 +100,330 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-// === Runway API ===
+async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Promise<Response> {
+  console.log("[generate-video] Submit payload:", JSON.stringify({
+    promptLength: body.prompt?.length ?? 0,
+    durationSec: body.durationSec,
+    aspectRatio: body.aspectRatio,
+    productName: body.productName,
+    scanId: body.scanId,
+    variationSeed: body.variationSeed,
+    hasProductVision: !!body.productVision,
+  }));
 
-async function generateWithRunway(
-  prompt: string,
-  imageUrl: string | undefined,
-  apiKey: string,
-  aspectRatio: string,
-  durationSec: number,
-): Promise<{ videoUrl: string; taskId: string }> {
-  const taskId = await submitWithRetry(
-    () => submitRunwayTask(prompt, imageUrl, apiKey, aspectRatio, durationSec),
-    MAX_RETRIES,
+  let effectivePrompt = body.prompt ?? "";
+  if (effectivePrompt.trim().length === 0) {
+    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText);
+  }
+
+  const isDraft = body.draft === true;
+  const durationSec = isDraft ? 5 : Math.min(body.durationSec ?? 10, 10);
+  const aspectRatio = body.aspectRatio ?? "9:16";
+  const variationSeed = body.variationSeed ?? 0;
+
+  const motionPrompt = buildMotionPrompt(
+    effectivePrompt,
+    body.productName,
+    aspectRatio,
+    variationSeed,
+    body.bgmMood,
+    body.captionText,
+    body.cutCount,
+    body.platform ?? "shorts",
+    body.hookCategory ?? "curiosity",
+    body.cutCount,
+    body.productVision ?? null,
   );
 
-  let videoUrl: string | null = null;
-  let lastStatus = "PENDING";
-  let lastProgress = "";
+  const runwayPrompt = motionPrompt.slice(0, 500);
 
-  for (let attempt = 0; attempt < RUNWAY_MAX_POLL_ATTEMPTS; attempt++) {
-    await delay(RUNWAY_POLL_INTERVAL_MS);
-    const status = await pollRunwayTask(taskId, apiKey);
-    lastStatus = status.status;
-    lastProgress = status.progress ?? "";
+  try {
+    const webhookUrl = body.scanId && supabaseUrl
+      ? `${supabaseUrl}/functions/v1/generate-video`
+      : undefined;
 
-    if (status.status === "SUCCESS" && status.videoUrl) {
-      videoUrl = status.videoUrl;
-      break;
+    const taskId = await submitWithRetry(
+      () => submitRunwayTask(runwayPrompt, undefined, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId),
+      MAX_RETRIES,
+    );
+
+    if (body.scanId) {
+      await saveVideoJob(body.scanId, taskId, isDraft);
     }
-    if (status.status === "FAILED") {
-      throw new Error(status.error ?? "Runway 비디오 생성에 실패했습니다.");
+
+    return new Response(
+      JSON.stringify({
+        mode: "submit",
+        taskId,
+        provider: "runway",
+        motionPrompt: runwayPrompt,
+        durationSec,
+        aspectRatio,
+        variationSeed,
+        draft: isDraft,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (err) {
+    const errorDetail = err instanceof Error ? err.message : "Runway 작업 생성 실패";
+    return new Response(
+      JSON.stringify({
+        error: `AI 비디오 생성 요청에 실패했습니다: ${errorDetail}`,
+        step: "submit",
+        provider: "runway",
+        motionPrompt: runwayPrompt,
+      }),
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+}
+
+async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promise<Response> {
+  const taskId = body.taskId;
+  if (!taskId) {
+    return new Response(
+      JSON.stringify({ error: "폴링 모드에서는 taskId가 필요합니다.", step: "poll", provider: "runway" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Check if webhook already completed the job (avoid hitting Runway API)
+  if (body.scanId) {
+    const cached = await checkWebhookResult(body.scanId);
+    if (cached) {
+      return new Response(
+        JSON.stringify({
+          mode: "poll",
+          status: "SUCCESS",
+          videoUrl: cached,
+          taskId,
+          provider: "runway",
+          persisted: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
   }
 
-  if (!videoUrl) {
-    throw new Error(`Runway 비디오 생성 시간이 초과되었습니다. (마지막 상태: ${lastStatus}${lastProgress ? `, 진행률: ${lastProgress}` : ""})`);
+  const status = await pollRunwayTask(taskId, runwayKey);
+
+  if (status.status === "SUCCESS" && status.videoUrl) {
+    let persistedUrl: string | null = null;
+    if (body.scanId && supabaseUrl && serviceRoleKey) {
+      persistedUrl = await uploadToStorage(status.videoUrl, body.scanId);
+      if (persistedUrl) {
+        await updateScanWithVideo(body.scanId, persistedUrl);
+      }
+    }
+    const finalUrl = persistedUrl ?? status.videoUrl;
+    return new Response(
+      JSON.stringify({
+        mode: "poll",
+        status: "SUCCESS",
+        videoUrl: finalUrl,
+        originalVideoUrl: status.videoUrl !== finalUrl ? status.videoUrl : undefined,
+        taskId,
+        provider: "runway",
+        persisted: !!persistedUrl,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
-  return { videoUrl, taskId };
+  if (status.status === "FAILED") {
+    return new Response(
+      JSON.stringify({
+        mode: "poll",
+        status: "FAILED",
+        error: status.error ?? "Runway 비디오 생성에 실패했습니다.",
+        taskId,
+        provider: "runway",
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  return new Response(
+    JSON.stringify({
+      mode: "poll",
+      status: status.status,
+      progress: status.progress ?? "",
+      taskId,
+      provider: "runway",
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+// === Runway API ===
+
+async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
+  const taskId = body.taskId;
+  const scanId = body.scanId;
+
+  console.log("[generate-video] Webhook received:", JSON.stringify({
+    taskId,
+    scanId,
+    status: body.status,
+  }));
+
+  if (!taskId || !scanId) {
+    return new Response(
+      JSON.stringify({ error: "webhook 처리에 taskId와 scanId가 필요합니다." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const status = body.status ?? "";
+
+  if (status === "SUCCESS" || status === "SUCCEEDED" || status === "COMPLETED") {
+    let videoUrl: string | undefined;
+    if (Array.isArray(body.output)) {
+      videoUrl = body.output[0];
+    } else if (typeof body.output === "string") {
+      videoUrl = body.output;
+    } else if (body.output && typeof body.output === "object" && body.output.url) {
+      videoUrl = body.output.url;
+    }
+
+    if (!videoUrl) {
+      console.error("[generate-video] Webhook: no videoUrl in output");
+      return new Response(
+        JSON.stringify({ error: "webhook: 비디오 URL이 없습니다." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    let persistedUrl: string | null = null;
+    if (supabaseUrl && serviceRoleKey) {
+      persistedUrl = await uploadToStorage(videoUrl, scanId);
+      if (persistedUrl) {
+        await updateScanWithVideo(scanId, persistedUrl);
+      }
+      await markVideoJobComplete(scanId, taskId, persistedUrl ?? videoUrl);
+    }
+
+    console.log("[generate-video] Webhook: video persisted for scan", scanId);
+    return new Response(
+      JSON.stringify({ mode: "webhook", status: "SUCCESS", scanId, persisted: !!persistedUrl }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (status === "FAILED" || status === "CANCELED") {
+    const errMsg = body.failure ?? body.error ?? "Runway 생성 실패";
+    if (supabaseUrl && serviceRoleKey) {
+      await markVideoJobFailed(scanId, taskId, errMsg);
+    }
+    return new Response(
+      JSON.stringify({ mode: "webhook", status: "FAILED", error: errMsg }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ mode: "webhook", status }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+async function checkWebhookResult(scanId: string): Promise<string | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/scans?select=video_url&id=eq.${scanId}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const rows = await resp.json() as Array<{ video_url: string | null }>;
+      if (rows.length > 0 && rows[0].video_url) {
+        return rows[0].video_url;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        scan_id: scanId,
+        task_id: taskId,
+        status: "PENDING",
+        is_draft: isDraft,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal
+  }
+}
+
+async function markVideoJobComplete(scanId: string, taskId: string, videoUrl: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ status: "SUCCESS", video_url: videoUrl, completed_at: new Date().toISOString() }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal
+  }
+}
+
+async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ status: "FAILED", error_message: errMsg.slice(0, 500) }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal
+  }
 }
 
 async function submitRunwayTask(
@@ -216,6 +432,9 @@ async function submitRunwayTask(
   apiKey: string,
   aspectRatio: string,
   durationSec: number,
+  isDraft: boolean,
+  webhookUrl?: string,
+  scanId?: string,
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
@@ -233,6 +452,9 @@ async function submitRunwayTask(
       payload.promptImage = imageUrl;
     } else {
       payload.ratio = ratioValue;
+    }
+    if (webhookUrl && scanId) {
+      payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
     const endpoint = imageUrl ? "image_to_video" : "text_to_video";
