@@ -346,6 +346,7 @@ export default function ResultScreen() {
   const [visionAnalyzing, setVisionAnalyzing] = useState(false);
   const [galleryModalVisible, setGalleryModalVisible] = useState(false);
   const [galleryModalIndex, setGalleryModalIndex] = useState(0);
+  const [angleGalleryExpanded, setAngleGalleryExpanded] = useState(false);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -2406,40 +2407,6 @@ export default function ResultScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        {/* === 4순위: 촬영된 5각도 입체 원본 컷 갤러리 (하단 배치) === */}
-        {allCutImages.length > 0 && (
-          <View style={styles.angleGallerySection}>
-            <View style={styles.angleGalleryHeader}>
-              <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
-              <View style={styles.angleGalleryBadge}>
-                <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
-              </View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
-              {allCutImages.map((imgUrl, idx) => {
-                const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
-                const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.angleThumbWrap}
-                    onPress={() => {
-                      setGalleryModalIndex(idx);
-                      setGalleryModalVisible(true);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
-                    <View style={styles.angleThumbLabelWrap}>
-                      <Text style={styles.angleThumbLabel}>{label}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
 
 
         {/* === AI 비디오 변환 (크레딧 소모) === */}
@@ -2818,6 +2785,52 @@ export default function ResultScreen() {
             })}
           </Text>
         </View>
+        {/* === 4순위: 촬영된 5각도 입체 원본 컷 갤러리 (최하단, 접기 가능) === */}
+        {allCutImages.length > 0 && (
+          <View style={styles.angleGallerySection}>
+            <TouchableOpacity
+              style={styles.angleGalleryHeader}
+              onPress={() => setAngleGalleryExpanded((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <CameraIcon size={15} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.angleGalleryTitle}>촬영된 5각도 입체 원본 컷</Text>
+              <View style={styles.angleGalleryBadge}>
+                <Text style={styles.angleGalleryBadgeText}>{allCutImages.length}/5</Text>
+              </View>
+              {angleGalleryExpanded ? (
+                <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              ) : (
+                <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+            {angleGalleryExpanded && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.angleGalleryScroll}>
+                {allCutImages.map((imgUrl, idx) => {
+                  const angleLabels = ['정면', '좌측', '우측', '후면', '상부'];
+                  const label = angleLabels[idx] ?? `컷 ${idx + 1}`;
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.angleThumbWrap}
+                      onPress={() => {
+                        setGalleryModalIndex(idx);
+                        setGalleryModalVisible(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
+                      <View style={styles.angleThumbLabelWrap}>
+                        <Text style={styles.angleThumbLabel}>{label}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
       </ScrollView>
       </KeyboardAvoidingView>
 
@@ -3328,7 +3341,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   angleGalleryTitle: {
     flex: 1,
