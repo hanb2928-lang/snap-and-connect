@@ -1,7 +1,8 @@
 /**
- * Web Audio API BGM synthesizer.
- * Generates music in-browser — no external URLs, no CORS, no dead links.
- * 5 mood categories with distinct chord progressions, tempos, and waveforms.
+ * Web Audio API BGM synthesizer — rich layered sound engine.
+ * 16-step sequencer with independent bass, melody, pad, and drum tracks.
+ * Dual detuned oscillators, filter LFO, algorithmic reverb, swing, humanization.
+ * No external URLs, no CORS, no dead links.
  */
 
 export type BgmCategory = 'cinematic' | 'hightension' | 'asmr' | 'emotional' | 'lofi';
@@ -119,142 +120,297 @@ function pickTrack(category: BgmCategory, seed?: number): BgmTrack {
   return config.tracks[idx];
 }
 
-const NOTE_FREQS: Record<string, number> = {
-  'C2': 65.41, 'D2': 73.42, 'E2': 82.41, 'F2': 87.31, 'G2': 98.00, 'A2': 110.00, 'B2': 123.47,
-  'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
-  'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
-  'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00,
-};
+/* ─── Note frequency computation ─── */
+
+const SEMITONE_MAP: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+function noteFreq(note: string): number {
+  const match = note.match(/^([A-G])([#b]?)(\d)$/);
+  if (!match) return 0;
+  const [, letter, accidental, octaveStr] = match;
+  let semitone = SEMITONE_MAP[letter] ?? 0;
+  if (accidental === '#') semitone += 1;
+  if (accidental === 'b') semitone -= 1;
+  const midi = (parseInt(octaveStr) + 1) * 12 + semitone;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/* ─── Synth configuration ─── */
+
+interface DrumPattern {
+  kick: number[];
+  snare: number[];
+  hh: number[];
+  hhOpen: number[];
+}
 
 interface MoodSynthConfig {
-  chordProgression: string[][];
-  bassOctave: number;
-  waveform: OscillatorType;
+  chords: string[][];
+  padWaveform: OscillatorType;
+  padGain: number;
+  padAttack: number;
+  padRelease: number;
+  padDetune: number;
+  melodyWaveform: OscillatorType;
+  melodyGain: number;
+  melodyDetune: number;
   bassWaveform: OscillatorType;
-  hasDrums: boolean;
-  hasArp: boolean;
+  bassGain: number;
+  bassDetune: number;
+  bassPattern: number[];
+  melodyPattern: number[];
+  drums: DrumPattern | null;
   filterFreq: number;
+  filterQ: number;
+  filterLfoFreq: number;
+  filterLfoDepth: number;
+  reverbDuration: number;
+  reverbDecay: number;
   reverbWet: number;
-  attackSec: number;
-  releaseSec: number;
+  swing: number;
+  humanize: number;
 }
+
+const REST = -1;
 
 const MOOD_SYNTH_CONFIGS: Record<BgmCategory, MoodSynthConfig> = {
   cinematic: {
-    chordProgression: [
-      ['C3', 'Eb3', 'G3', 'C4'],
-      ['Ab2', 'C3', 'Eb3', 'Ab3'],
-      ['F2', 'A2', 'C3', 'F3'],
-      ['G2', 'B2', 'D3', 'G3'],
+    chords: [
+      ['C3', 'Eb3', 'G3', 'Bb3'],
+      ['Ab2', 'C3', 'Eb3', 'G3'],
+      ['F2', 'Ab2', 'C3', 'Eb3'],
+      ['G2', 'B2', 'D3', 'F3'],
     ],
-    bassOctave: 2,
-    waveform: 'sine',
+    padWaveform: 'sine',
+    padGain: 0.07,
+    padAttack: 0.4,
+    padRelease: 1.8,
+    padDetune: 6,
+    melodyWaveform: 'sine',
+    melodyGain: 0.12,
+    melodyDetune: 4,
     bassWaveform: 'triangle',
-    hasDrums: false,
-    hasArp: true,
-    filterFreq: 2000,
+    bassGain: 0.2,
+    bassDetune: 3,
+    bassPattern: [0, REST, REST, REST, REST, REST, 7, REST, REST, REST, REST, REST, 5, REST, REST, REST],
+    melodyPattern: [REST, REST, REST, 12, REST, REST, 15, REST, REST, 12, REST, REST, 10, REST, 7, REST],
+    drums: null,
+    filterFreq: 1600,
+    filterQ: 0.8,
+    filterLfoFreq: 0.3,
+    filterLfoDepth: 400,
+    reverbDuration: 3.5,
+    reverbDecay: 2.5,
     reverbWet: 0.35,
-    attackSec: 0.15,
-    releaseSec: 1.2,
+    swing: 0,
+    humanize: 0.03,
   },
   hightension: {
-    chordProgression: [
-      ['A3', 'C4', 'E4', 'A4'],
-      ['F3', 'A3', 'C4', 'F4'],
-      ['G3', 'B3', 'D4', 'G4'],
-      ['E3', 'G3', 'B3', 'E4'],
+    chords: [
+      ['A3', 'C4', 'E4', 'G4'],
+      ['F3', 'A3', 'C4', 'E4'],
+      ['G3', 'B3', 'D4', 'F4'],
+      ['E3', 'G3', 'B3', 'D4'],
     ],
-    bassOctave: 2,
-    waveform: 'sawtooth',
+    padWaveform: 'sawtooth',
+    padGain: 0.05,
+    padAttack: 0.03,
+    padRelease: 0.4,
+    padDetune: 8,
+    melodyWaveform: 'sawtooth',
+    melodyGain: 0.1,
+    melodyDetune: 7,
     bassWaveform: 'square',
-    hasDrums: true,
-    hasArp: true,
-    filterFreq: 3000,
-    reverbWet: 0.15,
-    attackSec: 0.02,
-    releaseSec: 0.3,
+    bassGain: 0.18,
+    bassDetune: 5,
+    bassPattern: [0, 0, REST, 0, 7, REST, 0, 0, 0, REST, 5, REST, 0, 0, 3, REST],
+    melodyPattern: [12, REST, 15, REST, 12, 10, REST, 12, 15, REST, 12, REST, 10, 7, REST, REST],
+    drums: {
+      kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+      hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
+      hhOpen:[0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+    },
+    filterFreq: 2800,
+    filterQ: 1.2,
+    filterLfoFreq: 0.5,
+    filterLfoDepth: 700,
+    reverbDuration: 1.2,
+    reverbDecay: 3,
+    reverbWet: 0.12,
+    swing: 0,
+    humanize: 0.02,
   },
   asmr: {
-    chordProgression: [
-      ['C4', 'E4', 'G4'],
-      ['A3', 'C4', 'E4'],
-      ['F3', 'A3', 'C4'],
-      ['G3', 'B3', 'D4'],
+    chords: [
+      ['C4', 'E4', 'G4', 'D5'],
+      ['A3', 'C4', 'E4', 'B4'],
+      ['F3', 'A3', 'C4', 'E4'],
+      ['G3', 'B3', 'D4', 'F4'],
     ],
-    bassOctave: 2,
-    waveform: 'sine',
+    padWaveform: 'sine',
+    padGain: 0.06,
+    padAttack: 1.0,
+    padRelease: 3.0,
+    padDetune: 8,
+    melodyWaveform: 'sine',
+    melodyGain: 0.08,
+    melodyDetune: 5,
     bassWaveform: 'sine',
-    hasDrums: false,
-    hasArp: false,
-    filterFreq: 800,
-    reverbWet: 0.5,
-    attackSec: 0.5,
-    releaseSec: 2.0,
+    bassGain: 0.12,
+    bassDetune: 2,
+    bassPattern: [0, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST, REST],
+    melodyPattern: [REST, REST, REST, REST, 12, REST, REST, REST, REST, REST, REST, REST, REST, 10, REST, REST],
+    drums: null,
+    filterFreq: 700,
+    filterQ: 0.4,
+    filterLfoFreq: 0.08,
+    filterLfoDepth: 150,
+    reverbDuration: 5,
+    reverbDecay: 2,
+    reverbWet: 0.55,
+    swing: 0,
+    humanize: 0.04,
   },
   emotional: {
-    chordProgression: [
+    chords: [
       ['C3', 'E3', 'G3', 'B3'],
       ['A2', 'C3', 'E3', 'G3'],
       ['F2', 'A2', 'C3', 'E3'],
       ['G2', 'B2', 'D3', 'F3'],
     ],
-    bassOctave: 2,
-    waveform: 'triangle',
+    padWaveform: 'triangle',
+    padGain: 0.08,
+    padAttack: 0.15,
+    padRelease: 1.2,
+    padDetune: 5,
+    melodyWaveform: 'triangle',
+    melodyGain: 0.13,
+    melodyDetune: 4,
     bassWaveform: 'sine',
-    hasDrums: false,
-    hasArp: true,
-    filterFreq: 1500,
+    bassGain: 0.18,
+    bassDetune: 3,
+    bassPattern: [0, REST, REST, 7, REST, REST, 5, REST, REST, 3, REST, REST, 7, REST, REST, REST],
+    melodyPattern: [REST, REST, 12, REST, 10, REST, 12, REST, 15, REST, 12, REST, 10, REST, 7, REST],
+    drums: null,
+    filterFreq: 1400,
+    filterQ: 0.6,
+    filterLfoFreq: 0.2,
+    filterLfoDepth: 250,
+    reverbDuration: 2.5,
+    reverbDecay: 2.5,
     reverbWet: 0.3,
-    attackSec: 0.08,
-    releaseSec: 0.8,
+    swing: 0,
+    humanize: 0.03,
   },
   lofi: {
-    chordProgression: [
+    chords: [
       ['D3', 'F3', 'A3', 'C4'],
       ['Bb2', 'D3', 'F3', 'A3'],
-      ['G2', 'B2', 'D3', 'F3'],
+      ['G2', 'Bb2', 'D3', 'F3'],
       ['A2', 'C3', 'E3', 'G3'],
     ],
-    bassOctave: 2,
-    waveform: 'sine',
+    padWaveform: 'sine',
+    padGain: 0.07,
+    padAttack: 0.12,
+    padRelease: 0.9,
+    padDetune: 10,
+    melodyWaveform: 'sine',
+    melodyGain: 0.1,
+    melodyDetune: 6,
     bassWaveform: 'triangle',
-    hasDrums: true,
-    hasArp: false,
-    filterFreq: 1200,
-    reverbWet: 0.25,
-    attackSec: 0.06,
-    releaseSec: 0.6,
+    bassGain: 0.16,
+    bassDetune: 4,
+    bassPattern: [0, REST, REST, 3, REST, 5, REST, 3, REST, REST, 7, REST, 5, REST, 3, REST],
+    melodyPattern: [REST, REST, 15, REST, 12, REST, REST, 10, REST, 12, REST, REST, 7, REST, REST, REST],
+    drums: {
+      kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+      snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+      hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    },
+    filterFreq: 1100,
+    filterQ: 0.7,
+    filterLfoFreq: 0.12,
+    filterLfoDepth: 180,
+    reverbDuration: 1.8,
+    reverbDecay: 2.8,
+    reverbWet: 0.22,
+    swing: 0.15,
+    humanize: 0.05,
   },
 };
+
+/* ─── BgmPlayer ─── */
 
 export class BgmPlayer {
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private filterNode: BiquadFilterNode | null = null;
+  private dryGain: GainNode | null = null;
+  private reverbConvolver: ConvolverNode | null = null;
+  private reverbGain: GainNode | null = null;
+  private lfoOsc: OscillatorNode | null = null;
+  private lfoDepthGain: GainNode | null = null;
   private isPlaying = false;
   private volume = 0.75;
   private currentCategory: BgmCategory = 'hightension';
   private schedulerTimer: ReturnType<typeof setInterval> | null = null;
   private nextNoteTime = 0;
   private currentStep = 0;
-  private stepCounter = 0;
 
   private getOrCreateContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
     if (!this.audioCtx) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return null;
-      this.audioCtx = new AudioCtx();
-      this.masterGain = this.audioCtx.createGain();
-      this.masterGain.gain.value = this.volume;
-      this.filterNode = this.audioCtx.createBiquadFilter();
+      const ctx = new AudioCtx();
+
+      this.masterGain = ctx.createGain();
+      this.masterGain.gain.value = 0;
+      this.masterGain.connect(ctx.destination);
+
+      this.filterNode = ctx.createBiquadFilter();
       this.filterNode.type = 'lowpass';
       this.filterNode.frequency.value = 2000;
-      this.filterNode.Q.value = 0.5;
-      this.filterNode.connect(this.masterGain);
-      this.masterGain.connect(this.audioCtx.destination);
+      this.filterNode.Q.value = 0.7;
+
+      this.dryGain = ctx.createGain();
+      this.dryGain.gain.value = 0.7;
+      this.filterNode.connect(this.dryGain);
+      this.dryGain.connect(this.masterGain);
+
+      this.reverbGain = ctx.createGain();
+      this.reverbGain.gain.value = 0;
+      this.reverbConvolver = ctx.createConvolver();
+      this.reverbConvolver.connect(this.reverbGain);
+      this.reverbGain.connect(this.masterGain);
+
+      this.lfoDepthGain = ctx.createGain();
+      this.lfoDepthGain.gain.value = 0;
+      this.lfoOsc = ctx.createOscillator();
+      this.lfoOsc.type = 'sine';
+      this.lfoOsc.frequency.value = 0.3;
+      this.lfoOsc.connect(this.lfoDepthGain);
+      this.lfoDepthGain.connect(this.filterNode.frequency);
+      this.lfoOsc.start();
+
+      this.audioCtx = ctx;
     }
     return this.audioCtx;
+  }
+
+  private createReverbImpulse(ctx: AudioContext, durationSec: number, decay: number): AudioBuffer {
+    const sampleRate = ctx.sampleRate;
+    const length = Math.floor(sampleRate * durationSec);
+    const impulse = ctx.createBuffer(2, length, sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return impulse;
   }
 
   unlockAudio(): void {
@@ -273,7 +429,7 @@ export class BgmPlayer {
     _energyCurve?: number[],
   ): void {
     const ctx = this.getOrCreateContext();
-    if (!ctx || !this.masterGain || !this.filterNode) return;
+    if (!ctx || !this.masterGain || !this.filterNode || !this.reverbConvolver || !this.reverbGain || !this.lfoOsc || !this.lfoDepthGain) return;
     if (this.isPlaying) this.stop();
 
     this.unlockAudio();
@@ -285,28 +441,46 @@ export class BgmPlayer {
     this.currentCategory = category;
     const config = MOOD_SYNTH_CONFIGS[category];
     const effectiveBpm = bpm ?? MOOD_CONFIGS[category].bpm;
+
     this.filterNode.frequency.value = config.filterFreq;
+    this.filterNode.Q.value = config.filterQ;
+    this.lfoOsc.frequency.value = config.filterLfoFreq;
+    this.lfoDepthGain.gain.value = config.filterLfoDepth;
+    this.reverbConvolver.buffer = this.createReverbImpulse(ctx, config.reverbDuration, config.reverbDecay);
+    this.reverbGain.gain.value = config.reverbWet;
 
     this.isPlaying = true;
     this.currentStep = 0;
-    this.stepCounter = 0;
     this.nextNoteTime = ctx.currentTime + 0.05;
 
-    const stepDurSec = 60 / effectiveBpm / 2;
+    const stepDurSec = 60 / effectiveBpm / 4;
+    const totalSteps = config.chords.length * 16;
 
     const scheduleNotes = () => {
       if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
-
       while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
-        this.playStep(config, this.currentStep, this.nextNoteTime, stepDurSec, effectiveBpm);
-        this.currentStep = (this.currentStep + 1) % (config.chordProgression.length * 4);
-        this.stepCounter++;
+        const swungTime = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
+        this.playStep(config, this.currentStep, swungTime, stepDurSec, totalSteps);
+        this.currentStep = (this.currentStep + 1) % totalSteps;
         this.nextNoteTime += stepDurSec;
       }
     };
 
+    this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+    this.masterGain.gain.setValueAtTime(0, ctx.currentTime);
+    this.masterGain.gain.linearRampToValueAtTime(this.volume, ctx.currentTime + 0.4);
+
     scheduleNotes();
     this.schedulerTimer = setInterval(scheduleNotes, 25);
+  }
+
+  private applySwing(step: number, time: number, stepDur: number, swing: number): number {
+    if (swing <= 0) return time;
+    const barStep = step % 16;
+    if (barStep % 2 === 1) {
+      return time + stepDur * swing;
+    }
+    return time;
   }
 
   private playStep(
@@ -314,114 +488,175 @@ export class BgmPlayer {
     step: number,
     time: number,
     stepDur: number,
-    bpm: number,
+    totalSteps: number,
   ): void {
-    if (!this.audioCtx || !this.filterNode) return;
+    if (!this.audioCtx || !this.filterNode || !this.masterGain) return;
 
-    const chordIndex = Math.floor(step / 4) % config.chordProgression.length;
-    const beatInChord = step % 4;
-    const chord = config.chordProgression[chordIndex];
+    const barStep = step % 16;
+    const chordIndex = Math.floor(step / 16) % config.chords.length;
+    const chord = config.chords[chordIndex];
+    const rootFreq = noteFreq(chord[0]);
+    if (rootFreq <= 0) return;
 
-    if (beatInChord === 0) {
-      const bassNote = chord[0].replace(/\d/, (d) => String(Math.max(1, parseInt(d) - 1)));
-      this.playNote(bassNote, time, stepDur * 4, config.bassWaveform, 0.35, config);
+    if (barStep === 0) {
+      this.playPad(chord, time, stepDur * 16, config);
     }
 
-    if (config.hasArp) {
-      const arpNote = chord[beatInChord % chord.length];
-      this.playNote(arpNote, time, stepDur * 0.9, config.waveform, 0.15, config);
-    } else if (beatInChord === 0) {
-      chord.forEach((note) => {
-        this.playNote(note, time, stepDur * 3.5, config.waveform, 0.08, config);
-      });
+    const bassOffset = config.bassPattern[barStep];
+    if (bassOffset !== undefined && bassOffset >= 0) {
+      const freq = rootFreq * Math.pow(2, bassOffset / 12);
+      const humanizedGain = config.bassGain * (1 - config.humanize + Math.random() * config.humanize * 2);
+      this.playNoteLayered(freq, time, stepDur * 2.2, config.bassWaveform, humanizedGain, config.bassDetune, config, false);
     }
 
-    if (config.hasDrums) {
-      if (beatInChord === 0 || beatInChord === 2) {
-        this.playKick(time);
-      }
-      if (beatInChord === 1 || beatInChord === 3) {
-        this.playHihat(time);
-      }
+    const melodyOffset = config.melodyPattern[barStep];
+    if (melodyOffset !== undefined && melodyOffset >= 0) {
+      const freq = rootFreq * Math.pow(2, melodyOffset / 12);
+      const humanizedGain = config.melodyGain * (1 - config.humanize + Math.random() * config.humanize * 2);
+      this.playNoteLayered(freq, time, stepDur * 1.8, config.melodyWaveform, humanizedGain, config.melodyDetune, config, true);
+    }
+
+    if (config.drums) {
+      if (config.drums.kick[barStep]) this.playKick(time);
+      if (config.drums.snare[barStep]) this.playSnare(time);
+      if (config.drums.hh[barStep]) this.playHihat(time, config.drums.hhOpen[barStep] === 1);
     }
   }
 
-  private playNote(
-    noteName: string,
+  private playPad(chord: string[], time: number, durationSec: number, config: MoodSynthConfig): void {
+    if (!this.audioCtx || !this.filterNode) return;
+    for (const note of chord) {
+      const freq = noteFreq(note);
+      if (freq <= 0) continue;
+      this.playNoteLayered(freq, time, durationSec, config.padWaveform, config.padGain, config.padDetune, config, true);
+    }
+  }
+
+  private playNoteLayered(
+    freq: number,
     time: number,
     durationSec: number,
     waveform: OscillatorType,
     gainValue: number,
+    detuneCents: number,
     config: MoodSynthConfig,
+    useFilter: boolean,
   ): void {
-    if (!this.audioCtx || !this.filterNode) return;
-    const freq = NOTE_FREQS[noteName];
-    if (!freq) return;
-
-    const osc = this.audioCtx.createOscillator();
-    osc.type = waveform;
-    osc.frequency.value = freq;
+    if (!this.audioCtx) return;
+    const dest = useFilter && this.filterNode ? this.filterNode : this.masterGain;
+    if (!dest) return;
 
     const gain = this.audioCtx.createGain();
+    const attackSec = Math.min(config.padAttack, durationSec * 0.5);
+    const releaseSec = Math.min(config.padRelease, durationSec * 0.5);
+
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(gainValue, time + config.attackSec);
+    gain.gain.linearRampToValueAtTime(gainValue, time + attackSec);
+    gain.gain.setValueAtTime(gainValue, time + durationSec - releaseSec);
     gain.gain.linearRampToValueAtTime(0, time + durationSec);
 
-    osc.connect(gain);
-    gain.connect(this.filterNode);
-    osc.start(time);
-    osc.stop(time + durationSec + 0.05);
+    const osc1 = this.audioCtx.createOscillator();
+    osc1.type = waveform;
+    osc1.frequency.value = freq;
+    osc1.detune.value = -detuneCents / 2;
+    osc1.connect(gain);
+
+    const osc2 = this.audioCtx.createOscillator();
+    osc2.type = waveform;
+    osc2.frequency.value = freq;
+    osc2.detune.value = detuneCents / 2;
+    osc2.connect(gain);
+
+    gain.connect(dest);
+    osc1.start(time);
+    osc2.start(time);
+    osc1.stop(time + durationSec + 0.05);
+    osc2.stop(time + durationSec + 0.05);
   }
 
   private playKick(time: number): void {
-    if (!this.audioCtx || !this.filterNode) return;
+    if (!this.audioCtx || !this.masterGain) return;
     const osc = this.audioCtx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, time);
-    osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+    osc.frequency.setValueAtTime(130, time);
+    osc.frequency.exponentialRampToValueAtTime(38, time + 0.12);
 
     const gain = this.audioCtx.createGain();
-    gain.gain.setValueAtTime(0.4, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    gain.gain.setValueAtTime(0.5, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.filterNode);
+    gain.connect(this.masterGain);
     osc.start(time);
-    osc.stop(time + 0.2);
+    osc.stop(time + 0.22);
   }
 
-  private playHihat(time: number): void {
-    if (!this.audioCtx || !this.filterNode) return;
-    const bufferSize = this.audioCtx.sampleRate * 0.05;
+  private playSnare(time: number): void {
+    if (!this.audioCtx || !this.masterGain) return;
+
+    const bufferSize = Math.floor(this.audioCtx.sampleRate * 0.15);
     const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.3;
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    }
+    const noise = this.audioCtx.createBufferSource();
+    noise.buffer = buffer;
+
+    const noiseFilter = this.audioCtx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 1800;
+    noiseFilter.Q.value = 0.8;
+
+    const noiseGain = this.audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.25, time);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+
+    const toneOsc = this.audioCtx.createOscillator();
+    toneOsc.type = 'triangle';
+    toneOsc.frequency.value = 180;
+    const toneGain = this.audioCtx.createGain();
+    toneGain.gain.setValueAtTime(0.15, time);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+    toneOsc.connect(toneGain);
+    toneGain.connect(this.masterGain);
+
+    noise.start(time);
+    noise.stop(time + 0.16);
+    toneOsc.start(time);
+    toneOsc.stop(time + 0.1);
+  }
+
+  private playHihat(time: number, open: boolean): void {
+    if (!this.audioCtx || !this.masterGain) return;
+    const dur = open ? 0.12 : 0.04;
+    const bufferSize = Math.floor(this.audioCtx.sampleRate * dur);
+    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
     }
     const noise = this.audioCtx.createBufferSource();
     noise.buffer = buffer;
 
     const filter = this.audioCtx.createBiquadFilter();
     filter.type = 'highpass';
-    filter.frequency.value = 6000;
+    filter.frequency.value = 7000;
 
     const gain = this.audioCtx.createGain();
-    gain.gain.setValueAtTime(0.08, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+    const peakGain = open ? 0.06 : 0.09;
+    gain.gain.setValueAtTime(peakGain, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.filterNode);
+    gain.connect(this.masterGain);
     noise.start(time);
-    noise.stop(time + 0.06);
-  }
-
-  private fadeIn(): void {
-    if (!this.masterGain || !this.audioCtx) return;
-    const now = this.audioCtx.currentTime;
-    this.masterGain.gain.cancelScheduledValues(now);
-    this.masterGain.gain.setValueAtTime(0, now);
-    this.masterGain.gain.linearRampToValueAtTime(this.volume, now + 0.3);
+    noise.stop(time + dur + 0.02);
   }
 
   pause(): void {
@@ -437,23 +672,24 @@ export class BgmPlayer {
   }
 
   resume(): void {
-    if (!this.audioCtx) return;
+    if (!this.audioCtx || !this.masterGain) return;
     this.unlockAudio();
-    if (this.masterGain) {
-      this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
-      this.masterGain.gain.linearRampToValueAtTime(this.volume, this.audioCtx.currentTime + 0.2);
-    }
+    this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
+    this.masterGain.gain.linearRampToValueAtTime(this.volume, this.audioCtx.currentTime + 0.2);
     this.isPlaying = true;
     this.nextNoteTime = this.audioCtx.currentTime + 0.05;
+
     const config = MOOD_SYNTH_CONFIGS[this.currentCategory];
     const bpm = MOOD_CONFIGS[this.currentCategory].bpm;
-    const stepDurSec = 60 / bpm / 2;
+    const stepDurSec = 60 / bpm / 4;
+    const totalSteps = config.chords.length * 16;
+
     const scheduleNotes = () => {
       if (!this.isPlaying || !this.audioCtx || !this.filterNode) return;
       while (this.nextNoteTime < this.audioCtx.currentTime + 0.15) {
-        this.playStep(config, this.currentStep, this.nextNoteTime, stepDurSec, bpm);
-        this.currentStep = (this.currentStep + 1) % (config.chordProgression.length * 4);
-        this.stepCounter++;
+        const swungTime = this.applySwing(this.currentStep, this.nextNoteTime, stepDurSec, config.swing);
+        this.playStep(config, this.currentStep, swungTime, stepDurSec, totalSteps);
+        this.currentStep = (this.currentStep + 1) % totalSteps;
         this.nextNoteTime += stepDurSec;
       }
     };
@@ -475,7 +711,7 @@ export class BgmPlayer {
 
   setVolume(vol: number): void {
     this.volume = vol;
-    if (this.masterGain && this.audioCtx) {
+    if (this.masterGain && this.audioCtx && this.isPlaying) {
       this.masterGain.gain.cancelScheduledValues(this.audioCtx.currentTime);
       this.masterGain.gain.linearRampToValueAtTime(vol, this.audioCtx.currentTime + 0.05);
     }
@@ -483,11 +719,19 @@ export class BgmPlayer {
 
   dispose(): void {
     this.stop();
+    if (this.lfoOsc) {
+      try { this.lfoOsc.stop(); } catch { /* ignore */ }
+      this.lfoOsc = null;
+    }
     if (this.audioCtx) {
       try { this.audioCtx.close(); } catch { /* ignore */ }
       this.audioCtx = null;
       this.masterGain = null;
       this.filterNode = null;
+      this.dryGain = null;
+      this.reverbConvolver = null;
+      this.reverbGain = null;
+      this.lfoDepthGain = null;
     }
   }
 
@@ -499,6 +743,8 @@ export class BgmPlayer {
     return this.currentCategory;
   }
 }
+
+/* ─── Utility exports ─── */
 
 export function getBgmStreamUrl(_moodLabel: string, _trackIndex?: number): string {
   return '';
