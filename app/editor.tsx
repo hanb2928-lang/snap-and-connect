@@ -922,7 +922,7 @@ export default function EditorScreen() {
           activeOpacity={0.8}
         >
           <Check size={22} color="#fff" strokeWidth={2.5} />
-          <Text style={styles.stickyCtaText}>갤러리에 저장</Text>
+          <Text style={styles.stickyCtaText}>클라우드로 저장</Text>
         </TouchableOpacity>
       </View>
 

@@ -2712,6 +2712,45 @@ export default function ResultScreen() {
 
           <FeatureTileGrid categories={featureCategories} scanMode={scan.scan_source ?? undefined} focusTileKey={focusTileKey} onFocusConsumed={() => setFocusTileKey(null)} mediaFilter={activeBoard as MediaType} />
 
+          {/* Cloud save — final step after platform selection */}
+          <View style={styles.cloudSaveSection}>
+            <TouchableOpacity
+              style={[styles.cloudSaveBtn, uploadProgress !== null && { opacity: 0.5 }]}
+              onPress={handleSaveAndShare}
+              activeOpacity={0.7}
+              disabled={uploadProgress !== null}
+            >
+              {uploadDone ? (
+                <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
+              ) : uploadProgress !== null ? (
+                <ActivityIndicator size="small" color={theme.colors.dark.text} />
+              ) : (
+                <Download size={18} color={theme.colors.dark.text} strokeWidth={2} />
+              )}
+              <Text style={styles.cloudSaveBtnText}>
+                {uploadDone ? '저장됨' : uploadProgress !== null ? '저장 중...' : '클라우드로 저장'}
+              </Text>
+            </TouchableOpacity>
+            {uploadProgress !== null && (
+              <View style={styles.uploadProgressWrap}>
+                <View style={styles.uploadProgressTrack}>
+                  <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
+                </View>
+                <Text style={styles.uploadProgressText}>
+                  {uploadDone ? '클라우드 저장 완료!' : uploadProgress < 100 ? `클라우드 업로드 중... ${uploadProgress}%` : '저장 처리 중...'}
+                </Text>
+              </View>
+            )}
+            {uploadError && (
+              <View style={styles.uploadErrorWrap}>
+                <Text style={styles.uploadErrorText}>{uploadError}</Text>
+                <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
+                  <X size={16} color={theme.colors.error[400]} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
           {disclosureText ? (
             <View style={styles.disclosureSection}>
               <TouchableOpacity
@@ -2746,44 +2785,9 @@ export default function ResultScreen() {
       </KeyboardAvoidingView>
 
       <View style={[styles.floatingBar, { paddingBottom: insets.bottom }]}>
-        {uploadProgress !== null && (
-          <View style={styles.uploadProgressWrap}>
-            <View style={styles.uploadProgressTrack}>
-              <View style={[styles.uploadProgressFill, { width: `${uploadProgress}%` }]} />
-            </View>
-            <Text style={styles.uploadProgressText}>
-              {uploadDone ? '클라우드 저장 완료!' : uploadProgress < 100 ? `클라우드 업로드 중... ${uploadProgress}%` : '저장 처리 중...'}
-            </Text>
-          </View>
-        )}
-        {uploadError && (
-          <View style={styles.uploadErrorWrap}>
-            <Text style={styles.uploadErrorText}>{uploadError}</Text>
-            <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
-              <X size={16} color={theme.colors.error[400]} strokeWidth={2} />
-            </TouchableOpacity>
-          </View>
-        )}
         <View style={styles.floatingBarRow}>
         <TouchableOpacity
-          style={[styles.floatingBarBtn, uploadProgress !== null && { opacity: 0.5 }]}
-          onPress={handleSaveAndShare}
-          activeOpacity={0.7}
-          disabled={uploadProgress !== null}
-        >
-          {uploadDone ? (
-            <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
-          ) : uploadProgress !== null ? (
-            <ActivityIndicator size="small" color={theme.colors.dark.text} />
-          ) : (
-            <Download size={18} color={theme.colors.dark.text} strokeWidth={2} />
-          )}
-          <Text style={styles.floatingBarBtnText}>
-            {uploadDone ? '저장됨' : uploadProgress !== null ? '저장 중...' : '갤러리에 저장'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.floatingBarBtn, styles.floatingBarBtnPrimary]}
+          style={[styles.floatingBarBtn, styles.floatingBarBtnPrimary, { flex: 1 }]}
           onPress={async () => {
             try {
               if (Platform.OS === 'web' && navigator.clipboard) {
@@ -3319,6 +3323,26 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.dark.border,
     ...theme.shadows.elevated,
+  },
+  cloudSaveSection: {
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  cloudSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  cloudSaveBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
   },
   uploadProgressWrap: {
     flexDirection: 'column',
