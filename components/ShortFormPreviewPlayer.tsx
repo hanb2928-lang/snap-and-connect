@@ -135,6 +135,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const [displayedSegIndex, setDisplayedSegIndex] = useState(0);
   const [videoError, setVideoError] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoBuffering, setVideoBuffering] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -226,10 +227,30 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         bgmPlayerRef.current.stop();
       }
     };
+    const handleWaiting = () => {
+      setVideoBuffering(true);
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.stop();
+      }
+    };
+    const handleCanPlayAfterBuffer = () => {
+      setVideoBuffering(false);
+      if (isPlaying && bgmPlayerRef.current && !bgmPlayerRef.current.playing) {
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
+      }
+    };
     v.addEventListener('canplay', handleCanPlay);
     v.addEventListener('loadeddata', handleCanPlay);
     v.addEventListener('playing', handlePlaying);
     v.addEventListener('pause', handlePause);
+    v.addEventListener('waiting', handleWaiting);
+    v.addEventListener('canplaythrough', handleCanPlayAfterBuffer);
     if (isPlaying) {
       v.play().catch(() => {
         setVideoError(true);
@@ -242,6 +263,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       v.removeEventListener('loadeddata', handleCanPlay);
       v.removeEventListener('playing', handlePlaying);
       v.removeEventListener('pause', handlePause);
+      v.removeEventListener('waiting', handleWaiting);
+      v.removeEventListener('canplaythrough', handleCanPlayAfterBuffer);
     };
   }, [isPlaying, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
@@ -284,6 +307,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
     if (bgmPlayerRef.current) {
       bgmPlayerRef.current.stop();
     }
+    setVideoBuffering(false);
     setIsPlaying(false);
   }, []);
 
@@ -545,6 +569,14 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
             <View style={styles.videoLoadingOverlay} pointerEvents="none">
               <Loader2 size={24} color={theme.colors.primary[400]} strokeWidth={2.5} />
               <Text style={styles.videoLoadingText}>영상 로딩 중...</Text>
+            </View>
+          ) : null}
+
+          {/* Buffering overlay — video paused for network buffering, BGM also paused */}
+          {videoBuffering && !showVideoLoadingSpinner ? (
+            <View style={styles.videoLoadingOverlay} pointerEvents="none">
+              <Loader2 size={20} color={theme.colors.primary[400]} strokeWidth={2.5} />
+              <Text style={styles.videoLoadingText}>버퍼링 중...</Text>
             </View>
           ) : null}
 
