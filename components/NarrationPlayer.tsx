@@ -16,10 +16,13 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
   const [isLoading, setIsLoading] = useState(false);
   const [playError, setPlayError] = useState<string | null>(null);
   const [needsTouchRetry, setNeedsTouchRetry] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const fallbackUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const onEndedCallbackRef = useRef<(() => void) | null>(null);
 
   const notifyPlayState = useCallback((playing: boolean) => {
     setIsPlaying(playing);
@@ -44,8 +47,39 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
         try { audioCtxRef.current.close(); } catch { /* ignore */ }
         audioCtxRef.current = null;
       }
+      if (fallbackUtterRef.current && typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        fallbackUtterRef.current = null;
+      }
     };
   }, []);
+
+  const speakWithWebSpeech = useCallback((text: string): boolean => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.speechSynthesis) {
+      console.error('Narration generation failed: Web Speech API not available');
+      return false;
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'ko-KR';
+    utter.rate = 1.0;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
+    utter.onend = () => {
+      notifyPlayState(false);
+      onEndedCallbackRef.current?.();
+    };
+    utter.onerror = (e) => {
+      console.error('Narration generation failed: Web Speech synthesis error', e);
+      notifyPlayState(false);
+      setPlayError('폴백 음성 재생에 실패했습니다');
+    };
+    fallbackUtterRef.current = utter;
+    window.speechSynthesis.speak(utter);
+    setUsingFallback(true);
+    notifyPlayState(true);
+    return true;
+  }, [notifyPlayState]);
 
   /**
    * User Gesture Unlock — 재생 버튼 클릭 시 즉시 AudioContext를 생성/resume하고
@@ -125,8 +159,13 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
     }
 
     // 일시정지 요청
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
+    if (isPlaying) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (usingFallback && typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
       notifyPlayState(false);
       return;
     }
@@ -137,14 +176,22 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       audioRef.current.currentTime = 0;
     }
 
+    setUsingFallback(false);
     setIsLoading(true);
 
     try {
+      if (!ttsUrl) {
+        throw new Error('No TTS URL provided');
+      }
+
       // 1. User Gesture Unlock — 즉시 AudioContext resume + 무음 펄스
       const ctx = unlockAudioContext();
 
-      // 2. 새 오디오 엘리먼트 생성
+      // 2. 새 오디오 엘리먼트 생성 — src 할당 후 null check
       const audio = new Audio();
+      if (!audio) {
+        throw new Error('Failed to create Audio element');
+      }
       audio.src = ttsUrl;
       audio.volume = 1.0;
       audio.muted = false;
@@ -152,6 +199,12 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       audio.crossOrigin = 'anonymous';
       audio.preload = 'auto';
       audioRef.current = audio;
+
+      // src 할당 검증
+      if (!audio.src) {
+        console.error('Narration generation failed: audio.src is empty after assignment', { ttsUrl });
+        throw new Error('audio.src assignment failed');
+      }
 
       audio.onended = () => notifyPlayState(false);
       audio.onpause = () => {
@@ -186,10 +239,21 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
       setIsLoading(false);
       notifyPlayState(true);
     } catch (err) {
+      console.error('Narration generation failed:', err);
       setIsLoading(false);
       notifyPlayState(false);
 
       const errMsg = err instanceof Error ? err.message : String(err);
+
+      // Web Speech API 폴백 — TTS URL 로드/재생 실패 시 즉시 전환
+      if (narrationText && narrationText.trim().length > 0) {
+        const fallbackOk = speakWithWebSpeech(narrationText);
+        if (fallbackOk) {
+          setPlayError(null);
+          setNeedsTouchRetry(false);
+          return;
+        }
+      }
 
       // 브라우저 자동재생 차단 — muted 재생 후 터치 재시도 안내
       if (errMsg.includes('NotAllowed') || errMsg.includes('not allowed') || errMsg.includes('user gesture') || errMsg.includes('NotAllowedError')) {
@@ -210,7 +274,7 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
         setPlayError('재생을 시작할 수 없습니다');
       }
     }
-  }, [ttsUrl, isPlaying, notifyPlayState, unlockAudioContext, playWhenReady]);
+  }, [ttsUrl, isPlaying, usingFallback, narrationText, notifyPlayState, unlockAudioContext, playWhenReady, speakWithWebSpeech]);
 
   /**
    * 무음 재생 상태에서 사용자가 다시 터치하면 muted 해제 후 정상 재생.

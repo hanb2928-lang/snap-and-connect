@@ -57,7 +57,7 @@ import { readUriAsBase64 } from '@/lib/imageEdit';
 import { cleanBase64 } from '@/lib/base64';
 import { Share as RNShare } from 'react-native';
 import type { Scan, UserSettings, AffiliateLink, CustomAffiliateLink, DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
-import { TemplateCard, STICKER_POSITIONS, TEXT_POSITIONS } from '@/components/TemplateCard';
+import { STICKER_POSITIONS, TEXT_POSITIONS } from '@/components/TemplateCard';
 import type { StickerPosition, TextPosition } from '@/components/TemplateCard';
 import { StickerLinkControls } from '@/components/StickerLink';
 import type { StickerStyle } from '@/components/StickerLink';
@@ -106,7 +106,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -115,7 +115,6 @@ import { CreatorPersonaCard } from '@/components/CreatorPersonaCard';
 import { SnapMixTuner } from '@/components/SnapMixTuner';
 import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
-import { ShortLinkCopyBar } from '@/components/ShortLinkCopyBar';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
@@ -333,7 +332,6 @@ export default function ResultScreen() {
   const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
-  const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [showMoodHints, setShowMoodHints] = useState(true);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
@@ -2053,22 +2051,6 @@ export default function ResultScreen() {
         {/* === 9:16 Immersive Preview === */}
         <View style={styles.previewFrame}>
           <View style={styles.previewInner}>
-            <TemplateCard
-              ref={cardRef}
-              imageUrl={captureImageUrl || scan.edited_image_url || scan.image_url}
-              templateData={activeTemplateData}
-              title={activeProductName || scan.title || 'Product'}
-              affiliatePlatforms={affiliatePlatforms}
-              platform={activePlatform}
-              customReview={scan.custom_review?.text ? scan.custom_review : null}
-              shortUrl={shortUrl || ''}
-              stickerPosition={stickerPosition}
-              stickerStyle={stickerStyle}
-              stickerSize={stickerSize}
-              overlayOpacity={overlayOpacity ?? undefined}
-              textPosition={textPosition}
-              cleanMode={cleanMode}
-            />
             {isRegenerating && (
               <View style={styles.previewLoadingOverlay}>
                 <View style={styles.regenPulseRing} />
@@ -2241,6 +2223,7 @@ export default function ResultScreen() {
             bgmVolume={bgmVolume}
             copyOverlays={copyOverlaysForPreview}
             narrationActive={narrationPlaying}
+            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
           />
 
           {/* === 한 줄 후킹 편집 바 + 상세 자막 토글 (미리보기 직하단) === */}
@@ -2571,118 +2554,6 @@ export default function ResultScreen() {
           onSaveAndShare={handleSaveAndShare}
         />
 
-        {/* === Collapsible Detail Cards === */}
-        <View style={styles.detailSection}>
-          <TouchableOpacity
-            style={styles.detailToggle}
-            onPress={() => setDetailsExpanded((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.detailToggleLeft}>
-              <Pencil size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.detailToggleText}>제목 · 설명 · 해시태그 상세 편집</Text>
-            </View>
-            {detailsExpanded ? (
-              <ChevronUp size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            ) : (
-              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-
-          {detailsExpanded && (
-            <>
-              <View style={styles.detailBox}>
-                <Text style={styles.detailLabel}>타이틀 (유튜브/릴스용)</Text>
-                <TextInput
-                  style={styles.detailInputSingle}
-                  value={inlineEdit.titleText}
-                  onChangeText={(text) => handleInlineEdit({ titleText: text })}
-                  placeholder="AI가 생성한 타이틀을 여기서 바로 수정하세요"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  numberOfLines={1}
-                />
-              </View>
-              <View style={styles.detailBox}>
-                <Text style={styles.detailLabel}>설명 문구 직접 수정</Text>
-                <TextInput
-                  style={styles.detailInput}
-                  value={inlineEdit.captionText || activeCaption || activeOneLiner || scan?.summary || ''}
-                  onChangeText={(text) => handleInlineEdit({ captionText: text })}
-                  placeholder="AI가 생성한 설명을 여기서 바로 수정하세요"
-                  placeholderTextColor={theme.colors.dark.textFaint}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-              </View>
-              {allDisplayHashtags.length > 0 && (
-                <View style={styles.detailBox}>
-                  <Text style={styles.detailLabel}>해시태그 (탭하여 삭제)</Text>
-                  <View style={styles.detailHashtagWrap}>
-                    {allDisplayHashtags.map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        style={styles.detailHashtagChip}
-                        onPress={() => handleInlineRemoveHashtag(tag)}
-                        activeOpacity={0.6}
-                      >
-                        <Text style={styles.detailHashtagChipText}>#{tag}</Text>
-                        <Text style={styles.detailHashtagRemoveX}> x</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </>
-          )}
-
-          {trendingSuggestions.length > 0 && (
-            <View style={styles.trendNudgeCard}>
-              <View style={styles.trendNudgeHeader}>
-                <Flame size={14} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.trendNudgeTitle}>지금 터지는 해시태그 콤보</Text>
-              </View>
-              <View style={styles.trendNudgeChips}>
-                {trendingSuggestions.slice(0, 6).map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={styles.trendNudgeChip}
-                    onPress={() => handleAddTrendingHashtag(tag)}
-                    activeOpacity={0.7}
-                  >
-                    <Plus size={9} color={theme.colors.warning[400]} strokeWidth={2.5} />
-                    <Text style={styles.trendNudgeChipText}>{tag}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {activeHook && (
-            <View style={styles.hookNudgeCard}>
-              <View style={styles.hookNudgeHeader}>
-                <ZapIcon size={14} color={theme.colors.accent[400]} strokeWidth={2} />
-                <Text style={styles.hookNudgeTitle}>주목도 200% 후킹 멘트 추천</Text>
-              </View>
-              <Text style={styles.hookNudgeText} numberOfLines={2}>{activeHook}</Text>
-              <TouchableOpacity
-                style={styles.hookNudgeCopyBtn}
-                onPress={handleCopyHook}
-                activeOpacity={0.7}
-              >
-                {hookCopied ? (
-                  <Check size={12} color={theme.colors.success[400]} strokeWidth={2} />
-                ) : (
-                  <Copy size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                )}
-                <Text style={[styles.hookNudgeCopyText, hookCopied && { color: theme.colors.success[400] }]}>
-                  {hookCopied ? '복사됨' : '이 멘트 복사'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
         {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
           <AffiliatePromptBanner
             productName={activeProductName}
@@ -2913,23 +2784,6 @@ export default function ResultScreen() {
             </View>
           ) : null}
 
-          <View style={styles.section}>
-            <View style={styles.publishTileHeader}>
-              <UploadIcon size={18} color={theme.colors.warning[400]} strokeWidth={2} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.publishTileTitle}>발행 · 공유</Text>
-                <Text style={styles.publishTileDesc}>단축 URL 복사 후 선택한 플랫폼에 업로드</Text>
-              </View>
-            </View>
-            {shortUrl ? (
-              <ShortLinkCopyBar url={shortUrl} scanId={scan.id} label="제휴 단축 URL" />
-            ) : (
-              <View style={styles.publishHintBox}>
-                <Text style={styles.publishHintText}>단축 URL이 아직 생성되지 않았습니다. 제휴 링크를 설정하면 자동 생성됩니다.</Text>
-              </View>
-            )}
-          </View>
-
           {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
 
           {/* === Bottom action bar (scroll-end, no floating bar) === */}
@@ -3129,37 +2983,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: theme.spacing.xl,
-  },
-  publishTileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.sm,
-  },
-  publishTileTitle: {
-    fontSize: theme.typography.heading,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  publishTileDesc: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    marginTop: 2,
-  },
-  publishHintBox: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
-  publishHintText: {
-    fontSize: theme.typography.caption,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 19,
   },
   safetyTileBtn: {
     flexDirection: 'row',
@@ -4581,183 +4404,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },
-  detailSection: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    gap: 10,
-  },
-  detailToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-  },
   detailToggleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  detailToggleText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  detailBox: {
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    padding: 12,
-    gap: 8,
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  detailInputSingle: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-  },
-  detailInput: {
-    backgroundColor: theme.colors.dark.surfaceLight,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    minHeight: 72,
-  },
-  detailHashtagWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  detailHashtagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.warning[400] + '18',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  detailHashtagChipText: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.warning[400],
-  },
-  detailHashtagRemoveX: {
-    fontSize: 10,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-  },
-  trendNudgeCard: {
-    backgroundColor: theme.colors.warning[500] + '10',
-    borderRadius: theme.radius.md,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.warning[400] + '25',
-  },
-  trendNudgeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  trendNudgeTitle: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.warning[400],
-  },
-  trendNudgeChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  trendNudgeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: theme.colors.warning[400] + '30',
-  },
-  trendNudgeChipText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  hookNudgeCard: {
-    backgroundColor: theme.colors.accent[500] + '10',
-    borderRadius: theme.radius.md,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.accent[400] + '25',
-  },
-  hookNudgeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hookNudgeTitle: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[400],
-  },
-  hookNudgeText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-    lineHeight: 19,
-  },
-  hookNudgeCopyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.dark.surface,
-    alignSelf: 'flex-start',
-  },
-  hookNudgeCopyText: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.accent[300],
-  },
-  templateMovedNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.colors.primary[500] + '12',
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.primary[400] + '20',
-  },
-  templateMovedNoteText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 18,
   },
 });

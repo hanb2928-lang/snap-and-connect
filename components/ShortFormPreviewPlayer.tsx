@@ -44,6 +44,7 @@ interface ShortFormPreviewPlayerProps {
   bgmVolume?: number;
   copyOverlays?: CopyOverlayTimeline[] | null;
   narrationActive?: boolean;
+  ttsUrl?: string | null;
 }
 
 const TOTAL_DURATION = 15;
@@ -132,7 +133,7 @@ function getImageForSegment(
   return { src: images[seg.index % images.length], index: seg.index % images.length };
 }
 
-export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null, narrationActive = false }: ShortFormPreviewPlayerProps) {
+export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshowImages, narrativePlan, videoGenProgress, bgmVolume = 0.75, copyOverlays = null, narrationActive = false, ttsUrl = null }: ShortFormPreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
@@ -149,6 +150,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const bufferingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgmPlayerRef = useRef<BgmPlayer | null>(null);
+  const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const narrationDuckedRef = useRef(false);
 
   const { width: screenWidth } = useWindowDimensions();
 
@@ -353,9 +356,42 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   // BGM ducking — when narration is active, BGM drops to 30% of its set volume
   const effectiveBgmVolume = narrationActive ? bgmVolume * 0.3 : bgmVolume;
 
+  // Narration audio setup — load TTS URL into an Audio element for synced playback
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!ttsUrl) {
+      if (narrationAudioRef.current) {
+        narrationAudioRef.current.pause();
+        narrationAudioRef.current = null;
+      }
+      return;
+    }
+    if (narrationAudioRef.current && narrationAudioRef.current.src === ttsUrl) return;
+    if (narrationAudioRef.current) {
+      narrationAudioRef.current.pause();
+      narrationAudioRef.current = null;
+    }
+    const audio = new Audio();
+    audio.src = ttsUrl;
+    audio.volume = 1.0;
+    audio.muted = false;
+    audio.preload = 'auto';
+    audio.onended = () => {
+      narrationDuckedRef.current = false;
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.setVolume(effectiveBgmVolume);
+      }
+    };
+    narrationAudioRef.current = audio;
+  }, [ttsUrl, effectiveBgmVolume]);
+
   const togglePlay = useCallback(() => {
     if (isPlaying) {
       stop();
+      if (narrationAudioRef.current) {
+        narrationAudioRef.current.pause();
+        narrationDuckedRef.current = false;
+      }
     } else {
       if (currentSec >= TOTAL_DURATION) {
         setCurrentSec(0);
@@ -366,10 +402,59 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         }
         bgmPlayerRef.current.unlockAudio();
         bgmPlayerRef.current.setVolume(effectiveBgmVolume);
+
+        // Narration audio unlock — 무음 펄스로 Audio Context 잠금 해제
+        if (narrationAudioRef.current) {
+          const narrAudio = narrationAudioRef.current;
+          narrAudio.muted = true;
+          narrAudio.currentTime = 0;
+          narrAudio.play().then(() => {
+            narrAudio.pause();
+            narrAudio.muted = false;
+            narrAudio.volume = 1.0;
+            narrAudio.currentTime = 0;
+          }).catch((e) => {
+            console.error('Narration audio unlock failed:', e);
+            narrAudio.muted = false;
+            narrAudio.volume = 1.0;
+          });
+        }
       }
       setIsPlaying(true);
     }
   }, [isPlaying, currentSec, stop, effectiveBgmVolume]);
+
+  // Sync narration audio with video playback — start/stop narration when isPlaying changes
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!narrationAudioRef.current) return;
+    const narrAudio = narrationAudioRef.current;
+    if (isPlaying) {
+      narrAudio.currentTime = 0;
+      narrAudio.volume = 1.0;
+      narrAudio.muted = false;
+      narrAudio.play().catch((e) => {
+        console.error('Narration playback sync failed:', e);
+      });
+      // BGM ducking — 나레이션 재생 중 BGM 볼륨을 30%로 자동 낮춤
+      if (bgmPlayerRef.current && !narrationDuckedRef.current) {
+        narrationDuckedRef.current = true;
+        bgmPlayerRef.current.setVolume(bgmVolume * 0.3);
+      }
+    } else {
+      narrAudio.pause();
+      narrAudio.currentTime = 0;
+      narrationDuckedRef.current = false;
+    }
+  }, [isPlaying, bgmVolume]);
+
+  // BGM volume restore when narration ends
+  useEffect(() => {
+    if (!narrationActive && narrationDuckedRef.current && bgmPlayerRef.current) {
+      narrationDuckedRef.current = false;
+      bgmPlayerRef.current.setVolume(bgmVolume);
+    }
+  }, [narrationActive, bgmVolume]);
 
   const videoReady = hasGeneratedVideo && videoSrc && !videoError && !videoFallbackMode;
 
@@ -460,6 +545,10 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
       if (bgmPlayerRef.current) {
         bgmPlayerRef.current.dispose();
         bgmPlayerRef.current = null;
+      }
+      if (narrationAudioRef.current) {
+        narrationAudioRef.current.pause();
+        narrationAudioRef.current = null;
       }
       if (bufferingTimeoutRef.current) {
         clearTimeout(bufferingTimeoutRef.current);
