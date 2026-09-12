@@ -2049,6 +2049,61 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
+        {/* === 0순위: 플랫폼 선택 (최상단) === */}
+        <View style={styles.targetPlatformSection}>
+          <View style={styles.targetPlatformHeader}>
+            <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
+            {TARGET_PLATFORM_LIST.map((p) => {
+              const isActive = targetPlatform === p.key;
+              const Icon = p.icon;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                  onPress={() => handleTargetPlatformChange(p.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.targetPlatformHint}>
+            {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
+          </Text>
+
+          {/* 목적 선택 */}
+          <View style={styles.purposeRow}>
+            <Text style={styles.purposeLabel}>목적</Text>
+            {CONTENT_PURPOSE_LIST.map((p) => {
+              const isActive = contentPurpose === p.key;
+              const Icon = p.icon;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
+                  onPress={() => handleContentPurposeChange(p.key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
+                  <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.strategyHint}>
+            {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
+          </Text>
+        </View>
+
         {/* === 실시간 15초 미리보기 (단일 플레이어) === */}
         <View style={styles.previewSection}>
           {isRegenerating && (
@@ -2122,63 +2177,8 @@ export default function ResultScreen() {
           onPriceChange={(price) => setPriceOverride(price)}
         />
 
-        {/* === 4순위: BGM / AI 나레이션 스타일 설정 (플랫폼, 목적, BGM 분위기, 나레이션 통합) === */}
+        {/* === 4순위: BGM / AI 나레이션 스타일 설정 (영상 길이, BGM 분위기, 나레이션 통합) === */}
         <View style={styles.chipSection}>
-          {/* 플랫폼 선택 */}
-          <View style={styles.targetPlatformSection}>
-            <View style={styles.targetPlatformHeader}>
-              <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
-              {TARGET_PLATFORM_LIST.map((p) => {
-                const isActive = targetPlatform === p.key;
-                const Icon = p.icon;
-                return (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={[styles.targetPlatformChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                    onPress={() => handleTargetPlatformChange(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    <Icon size={15} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                    <Text style={[styles.targetPlatformChipText, isActive && { color: p.color }]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <Text style={styles.targetPlatformHint}>
-              {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
-            </Text>
-
-            {/* 목적 선택 */}
-            <View style={styles.purposeRow}>
-              <Text style={styles.purposeLabel}>목적</Text>
-              {CONTENT_PURPOSE_LIST.map((p) => {
-                const isActive = contentPurpose === p.key;
-                const Icon = p.icon;
-                return (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={[styles.purposeChip, isActive && { backgroundColor: p.color + '20', borderColor: p.color }]}
-                    onPress={() => handleContentPurposeChange(p.key)}
-                    activeOpacity={0.7}
-                  >
-                    <Icon size={12} color={isActive ? p.color : theme.colors.dark.textDim} strokeWidth={2} />
-                    <Text style={[styles.purposeChipText, isActive && { color: p.color }]}>
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Text style={styles.strategyHint}>
-              {CONTENT_PURPOSE_PRESETS[contentPurpose].strategyLabel}
-            </Text>
-          </View>
-
           {/* 영상 길이 선택 */}
           <View style={styles.durationSelectorRow}>
             <Text style={styles.durationSelectorLabel}>영상 길이</Text>
