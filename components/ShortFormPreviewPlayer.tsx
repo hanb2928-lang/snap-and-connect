@@ -50,8 +50,6 @@ interface ShortFormPreviewPlayerProps {
 const TOTAL_DURATION = 15;
 const TICK_MS = 50;
 const LUMINANCE_SAMPLE_MS = 500;
-const PREVIEW_FRAME_WIDTH = 108;
-const PREVIEW_FRAME_HEIGHT = 160;
 const VIDEO_LOAD_TIMEOUT_MS = 5000;
 const BUFFERING_TIMEOUT_MS = 5000;
 
@@ -153,7 +151,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationDuckedRef = useRef(false);
 
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const hasImage = !!imageUri;
   const hasSlideshow = !!slideshowImages && slideshowImages.length > 1;
@@ -579,15 +577,16 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
   const progressPercent = (currentSec / TOTAL_DURATION) * 100;
   const isBgmActive = currentSec > 0 && currentSec < TOTAL_DURATION;
 
-  const responsiveWidth = Math.min(PREVIEW_FRAME_WIDTH, screenWidth * 0.4);
+  const responsiveHeight = Math.min(screenHeight * 0.45, screenWidth * 0.55 * (16 / 9));
+  const responsiveWidth = responsiveHeight * (9 / 16);
   const captionStyle: CaptionStyle = useMemo(
     () => getCaptionStyle(luminanceLevel, activeSegment?.position ?? 'center', responsiveWidth),
     [luminanceLevel, activeSegment, responsiveWidth],
   );
 
   const safeZonePadding = useMemo(
-    () => getSafeZonePadding(editPlan.safeZone, editPlan.spec, PREVIEW_FRAME_HEIGHT),
-    [editPlan.safeZone, editPlan.spec],
+    () => getSafeZonePadding(editPlan.safeZone, editPlan.spec, responsiveHeight),
+    [editPlan.safeZone, editPlan.spec, responsiveHeight],
   );
 
   const segmentPositionStyle: ViewStyle = useMemo(() => {
@@ -636,7 +635,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, imageUri, slideshow
         <Text style={styles.labelText}>실시간 미리보기 (15초)</Text>
       </View>
 
-      <View style={styles.previewFrame}>
+      <View style={[styles.previewFrame, { width: responsiveWidth, height: responsiveHeight }]}>
         <View style={styles.videoArea}>
           {/* Cinematic fallback layer — visible BEHIND video while loading */}
           {showCinematicFallback && cinematicFallbackSrc ? (
@@ -917,8 +916,6 @@ const styles = StyleSheet.create({
   },
   previewFrame: {
     alignSelf: 'center',
-    width: PREVIEW_FRAME_WIDTH,
-    height: PREVIEW_FRAME_HEIGHT,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#000',
