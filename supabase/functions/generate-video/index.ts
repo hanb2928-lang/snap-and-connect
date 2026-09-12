@@ -232,23 +232,18 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const useImageToVideo = !!imageUrl;
-    const endpoint = useImageToVideo
-      ? "https://api.runwayml.com/v1/image_to_video"
-      : "https://api.runwayml.com/v1/text_to_video";
-
     const payload: Record<string, unknown> = {
       promptText: prompt,
-      model: "gen3-alpha",
-      seconds: Math.min(Math.max(durationSec, 4), 16),
+      model: "gen3-alpha_turbo",
+      seconds: Math.min(Math.max(durationSec, 4), 10),
       ratio: aspectRatio === "9:16" ? "720:1280" : aspectRatio === "16:9" ? "1280:720" : "1080:1080",
     };
 
     if (imageUrl) {
-      payload.image = imageUrl;
+      payload.promptImage = imageUrl;
     }
 
-    const resp = await fetch(endpoint, {
+    const resp = await fetch("https://api.runwayml.com/v1/image_to_video", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -261,14 +256,9 @@ async function submitRunwayTask(
 
     clearTimeout(timeoutId);
 
-    if (resp.status === 404 || resp.status === 401) {
-      // Runway endpoint not available or key invalid — fall back
-      return `sim_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    }
-
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Runway 생성 요청 실패: ${resp.status} ${errText.slice(0, 200)}`);
+      throw new Error(`Runway 생성 요청 실패: ${resp.status} ${errText.slice(0, 300)}`);
     }
 
     const result = await resp.json();
@@ -285,18 +275,6 @@ async function submitRunwayTask(
 }
 
 async function pollRunwayTask(taskId: string, apiKey: string): Promise<{ status: string; videoUrl?: string; error?: string }> {
-  if (taskId.startsWith("sim_")) {
-    const hash = taskId.split("_")[1];
-    const elapsed = Date.now() - parseInt(hash, 10);
-    if (elapsed > 6000) {
-      return {
-        status: "SUCCESS",
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-      };
-    }
-    return { status: "PROCESSING" };
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -404,13 +382,9 @@ async function submitOpenAIJob(
 
     clearTimeout(timeoutId);
 
-    if (resp.status === 404) {
-      return `sim_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    }
-
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`OpenAI 비디오 생성 요청 실패: ${resp.status} ${errText.slice(0, 200)}`);
+      throw new Error(`OpenAI 비디오 생성 요청 실패: ${resp.status} ${errText.slice(0, 300)}`);
     }
 
     const result = await resp.json();
@@ -427,19 +401,6 @@ async function submitOpenAIJob(
 }
 
 async function pollOpenAIJob(jobId: string, apiKey: string): Promise<VideoJobResponse> {
-  if (jobId.startsWith("sim_")) {
-    const hash = jobId.split("_")[1];
-    const elapsed = Date.now() - parseInt(hash, 10);
-    if (elapsed > 6000) {
-      return {
-        id: jobId,
-        status: "completed",
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-      };
-    }
-    return { id: jobId, status: "generating" };
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
