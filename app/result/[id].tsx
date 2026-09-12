@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Upload as UploadIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -314,6 +314,9 @@ export default function ResultScreen() {
     titleText: '',
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [showVideoConfirm, setShowVideoConfirm] = useState(false);
+  const [videoGenError, setVideoGenError] = useState<string | null>(null);
   const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
@@ -363,33 +366,6 @@ export default function ResultScreen() {
     if (!scan || isRegenerating) return;
     setIsRegenerating(true);
     setNarrativeVariation((v) => v + 1);
-    setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 비디오 생성 요청 전송 중...', elapsedSec: 0 });
-
-    // Kick off AI video generation in parallel with copy regeneration
-    const gazeImageUrl = scan.edited_image_url || scan.image_url || undefined;
-    const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
-    const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
-    const videoGenPromise = generateAiVideo(
-      videoPromptText,
-      {
-        imageUrl: gazeImageUrl,
-        cutImages: videoCutImages,
-        durationSec: Math.round(selectedDurationMs / 1000),
-        aspectRatio: '9:16',
-        productName: scan.product_name || undefined,
-        scanId: scan.id,
-        variationSeed: narrativeVariation + 1,
-        bgmMood: inlineEdit.bgmMood,
-        captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
-      },
-      (progress) => {
-        if (mountedRef.current) setVideoGenProgress(progress);
-      },
-    ).then((result) => {
-      if (mountedRef.current) setGeneratedVideoUrl(result.videoUrl);
-    }).catch(() => {
-      // Video gen failure is non-fatal — slideshow fallback remains active
-    });
 
     try {
       const preset = TARGET_PLATFORM_PRESETS[targetPlatform];
@@ -440,13 +416,55 @@ export default function ResultScreen() {
       // copy regeneration failed — keep current content
     }
 
-    // Wait for video generation to finish before clearing loading state
-    await videoGenPromise;
     if (mountedRef.current) {
       setIsRegenerating(false);
+    }
+  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs]);
+
+  const handleAiVideoGenerate = useCallback(async () => {
+    if (!scan || isGeneratingVideo) return;
+    setShowVideoConfirm(false);
+    setIsGeneratingVideo(true);
+    setVideoGenError(null);
+    setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
+
+    const gazeImageUrl = scan.edited_image_url || scan.image_url || undefined;
+    const videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || '';
+    const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
+
+    try {
+      const result = await generateAiVideo(
+        videoPromptText,
+        {
+          imageUrl: gazeImageUrl,
+          cutImages: videoCutImages,
+          durationSec: 5,
+          aspectRatio: '9:16',
+          productName: scan.product_name || undefined,
+          scanId: scan.id,
+          variationSeed: narrativeVariation + 1,
+          bgmMood: inlineEdit.bgmMood,
+          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
+        },
+        (progress) => {
+          if (mountedRef.current) setVideoGenProgress(progress);
+        },
+      );
+      if (mountedRef.current) {
+        setGeneratedVideoUrl(result.videoUrl);
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        const msg = err instanceof Error ? err.message : 'AI 영상 생성 오류: 기본 시네마틱 모드로 유지합니다';
+        setVideoGenError(msg);
+      }
+    }
+
+    if (mountedRef.current) {
+      setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs, narrativeVariation]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, narrativeVariation]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2233,7 +2251,69 @@ export default function ResultScreen() {
               {isRegenerating ? 'AI 재생성 중...' : 'AI 재생성'}
             </Text>
           </TouchableOpacity>
+
+          {/* AI Video Generation — explicit trigger (costs API credits) */}
+          <TouchableOpacity
+            style={[styles.aiVideoBtn, isGeneratingVideo && styles.aiVideoBtnDisabled]}
+            onPress={() => setShowVideoConfirm(true)}
+            disabled={isGeneratingVideo || !!generatedVideoUrl}
+            activeOpacity={0.7}
+          >
+            {isGeneratingVideo ? (
+              <Loader2Icon size={16} color="#fff" strokeWidth={2} />
+            ) : (
+              <VideoIcon size={16} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.aiVideoBtnText}>
+              {isGeneratingVideo
+                ? 'AI 실사 비디오 생성 중...'
+                : generatedVideoUrl
+                  ? 'AI 영상 생성됨'
+                  : 'AI 비디오 변환 (크레딧 소모)'}
+            </Text>
+          </TouchableOpacity>
+
+          {videoGenError && (
+            <View style={styles.videoErrorToast}>
+              <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.videoErrorToastText}>AI 영상 생성 오류: 기본 시네마틱 모드로 유지합니다</Text>
+              <TouchableOpacity onPress={() => setVideoGenError(null)} activeOpacity={0.7}>
+                <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+
+        {/* AI Video Generation Confirmation Modal */}
+        {showVideoConfirm && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.confirmModal}>
+              <View style={styles.confirmModalHeader}>
+                <VideoIcon size={20} color={theme.colors.primary[300]} strokeWidth={2} />
+                <Text style={styles.confirmModalTitle}>AI 실사 비디오 생성</Text>
+              </View>
+              <Text style={styles.confirmModalDesc}>
+                Runway AI를 사용해 5초 실사 비디오를 생성합니다. API 크레딧이 소모됩니다. 진행하시겠습니까?
+              </Text>
+              <View style={styles.confirmModalBtns}>
+                <TouchableOpacity
+                  style={styles.confirmCancelBtn}
+                  onPress={() => setShowVideoConfirm(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.confirmCancelBtnText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.confirmOkBtn}
+                  onPress={handleAiVideoGenerate}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.confirmOkBtnText}>생성 시작</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         <InteractivePreviewSimulator
           promptText={inlineEdit.aiPrompt}
@@ -4039,6 +4119,109 @@ const styles = StyleSheet.create({
   regenBtnText: {
     fontSize: 16,
     fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  aiVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingVertical: 13,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary[400] + '40',
+  },
+  aiVideoBtnDisabled: {
+    opacity: 0.5,
+  },
+  aiVideoBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
+  },
+  videoErrorToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.error[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.error[400] + '30',
+  },
+  videoErrorToastText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.error[400],
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  confirmModal: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 20,
+    width: '85%',
+    maxWidth: 320,
+    gap: 14,
+    ...theme.shadows.card,
+  },
+  confirmModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  confirmModalTitle: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  confirmModalDesc: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 19,
+  },
+  confirmModalBtns: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  confirmCancelBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  confirmOkBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+  },
+  confirmOkBtnText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
   },
   detailSection: {
