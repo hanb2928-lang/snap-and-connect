@@ -253,24 +253,6 @@ const CONTENT_PURPOSE_PRESETS: Record<ContentPurpose, ContentPurposePreset> = {
 
 const CONTENT_PURPOSE_LIST = Object.values(CONTENT_PURPOSE_PRESETS);
 
-// === One-Click Mood Preset Chips ===
-interface MoodPreset {
-  key: string;
-  label: string;
-  emoji: string;
-  hookCategory: string;
-  bgmMood: string;
-  promptSuffix: string;
-}
-
-const MOOD_PRESETS: MoodPreset[] = [
-  { key: 'strong_hook', label: '더 강한 훅', emoji: '🔥', hookCategory: 'curiosity', bgmMood: '하이텐션', promptSuffix: 'Maximum loss-aversion hook, dramatic reveal, intense urgency in first 2 seconds' },
-  { key: 'urgency', label: '긴박감 유발', emoji: '⚡', hookCategory: 'fomo', bgmMood: '하이텐션', promptSuffix: 'Extreme scarcity and FOMO, countdown timer, limited stock urgency, fast cuts' },
-  { key: 'emotional', label: '감성 자극', emoji: '💧', hookCategory: 'transformation', bgmMood: '감성', promptSuffix: 'Emotional before/after transformation, storytelling, warm cinematic mood' },
-  { key: 'social_proof', label: '사회적 증명', emoji: '⭐', hookCategory: 'social_proof', bgmMood: '시네마틱', promptSuffix: 'Heavy social proof, review badges, star ratings, sales counters, trust-building' },
-  { key: 'problem_solve', label: '문제 해결', emoji: '🔧', hookCategory: 'problem', bgmMood: 'ASMR', promptSuffix: 'Clear problem-solution structure, cognitive friction resolution, practical demonstration' },
-];
-
 const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = {
   shorts: 'monetization',
   tiktok: 'monetization',
@@ -392,16 +374,6 @@ export default function ResultScreen() {
     setContentPurpose(key);
     applyCombinedPreset(targetPlatform, key);
   }, [targetPlatform, applyCombinedPreset]);
-
-  const handleMoodPreset = useCallback((preset: MoodPreset) => {
-    setInlineEdit((prev) => ({
-      ...prev,
-      hookEffect: preset.hookCategory as HookEffectType,
-      bgmMood: preset.bgmMood,
-      aiPrompt: prev.aiPrompt ? `${prev.aiPrompt} | ${preset.promptSuffix}` : preset.promptSuffix,
-    }));
-    setNarrativeVariation((v) => v + 1);
-  }, []);
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
@@ -2171,27 +2143,6 @@ export default function ResultScreen() {
           <Text style={styles.targetPlatformHint}>
             {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
           </Text>
-        </View>
-
-        {/* === 3순위: AI 원클릭 무드 변경 프리셋 === */}
-        <View style={styles.chipSection}>
-          <View style={styles.chipGroupHeader}>
-            <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-            <Text style={styles.chipGroupLabel}>AI 원클릭 무드 변경</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {MOOD_PRESETS.map((preset) => (
-              <TouchableOpacity
-                key={preset.key}
-                style={styles.moodPresetChip}
-                onPress={() => handleMoodPreset(preset)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.moodPresetEmoji}>{preset.emoji}</Text>
-                <Text style={styles.moodPresetLabel}>{preset.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
         {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
@@ -4034,26 +3985,6 @@ iconButton: {
   chipPillTextActive: {
     color: '#fff',
     fontFamily: theme.typography.fontFamily.semiBold,
-  },
-  moodPresetChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.primary[500] + '15',
-    borderRadius: theme.radius.full,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginRight: 8,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary[400] + '40',
-  },
-  moodPresetEmoji: {
-    fontSize: 16,
-  },
-  moodPresetLabel: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.primary[300],
   },
   promptSection: {
     marginHorizontal: theme.spacing.md,
