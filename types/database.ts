@@ -5,6 +5,25 @@ export interface ContactInfo {
   action?: string;
 }
 
+export interface ProductVisionResult {
+  productName: string;
+  productCategory: string;
+  visualFeatures: string[];
+  marketingPoints: string[];
+  textureDescription: string;
+  colorPalette: string[];
+  shapeDescription: string;
+  materialGuess: string;
+  keyAngles: { angle: string; description: string }[];
+  orbitalFocusPoint: string;
+  parallaxDepthLayers: string[];
+  suggestedCopyLayers: {
+    primary: string;
+    secondary: string;
+    tertiary: string;
+  };
+}
+
 export interface ShoppingMatch {
   platform: string;
   productName: string;
@@ -146,6 +165,7 @@ export interface Scan {
   analysis_job_id?: string | null;
   image_hash?: string | null;
   video_url?: string | null;
+  product_vision?: ProductVisionResult | null;
 }
 
 export interface DetectedProduct {

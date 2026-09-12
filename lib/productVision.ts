@@ -22,9 +22,10 @@ export interface ProductVisionResult {
 export async function analyzeProductVision(
   images: string[],
   productName?: string,
+  scanId?: string,
 ): Promise<ProductVisionResult> {
   const { data, error } = await supabase.functions.invoke('analyze-product-vision', {
-    body: { images, productName },
+    body: { images, productName, scanId },
   });
 
   if (error) {

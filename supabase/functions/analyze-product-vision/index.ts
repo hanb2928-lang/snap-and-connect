@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { images, productName } = body as { images: string[]; productName?: string };
+    const { images, productName, scanId } = body as { images: string[]; productName?: string; scanId?: string };
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return new Response(
@@ -59,6 +59,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const result = await analyzeProductVision(images.slice(0, 5), openaiKey, productName);
+
+    // Persist vision result to scan row for caching
+    if (scanId) {
+      await persistVisionResult(scanId, result);
+    }
 
     return new Response(
       JSON.stringify(result),
@@ -171,6 +176,27 @@ Respond in Korean for all text fields except colorPalette and materialGuess.`;
     };
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+async function persistVisionResult(scanId: string, vision: ProductVisionResult): Promise<void> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/scans?id=eq.${scanId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ product_vision: vision }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal — caching is best-effort
   }
 }
 

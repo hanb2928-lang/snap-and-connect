@@ -483,11 +483,15 @@ export default function ResultScreen() {
     const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
 
     let visionData: ProductVisionResult | null = productVision;
+    if (!visionData && scan.product_vision) {
+      visionData = scan.product_vision;
+      if (mountedRef.current) setProductVision(visionData);
+    }
     if (!visionData && videoCutImages.length >= 5) {
       setVisionAnalyzing(true);
       setVideoGenProgress({ phase: 'submitting', progress: 0.02, message: 'Vision AI 사물 분석 중...', elapsedSec: 0 });
       try {
-        visionData = await analyzeProductVision(videoCutImages.slice(0, 5), scan.product_name || undefined);
+        visionData = await analyzeProductVision(videoCutImages.slice(0, 5), scan.product_name || undefined, scan.id);
         if (mountedRef.current) setProductVision(visionData);
       } catch {
         // Vision analysis failed — proceed without it
