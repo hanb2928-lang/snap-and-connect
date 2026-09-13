@@ -103,7 +103,7 @@ import { getItem } from '@/lib/storage';
 import { FeatureTileGrid } from '@/components/FeatureTileGrid';
 import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureTileGrid';
 import { subscribeToJob } from '@/lib/jobQueue';
-import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
+import { finalizeAnalysisFromJob, triggerTTS } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
 import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
@@ -473,6 +473,25 @@ export default function ResultScreen() {
     }
   }, [scan, isRegenerating, inlineEdit.videoTemplate, inlineEdit.captionFont, inlineEdit.captionPosition, inlineEdit.bgmMood, inlineEdit.hookEffect, inlineEdit.aiPrompt, inlineEdit.captionText, activePlatform, targetPlatform, contentPurpose, selectedDurationMs]);
 
+  const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const safeTop = useSafeTop();
+  const cardRef = useRef<View>(null);
+  const mountedRef = useRef(true);
+  const activeHookRef = useRef('');
+  const styleApplyCounter = useRef(0);
+  const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
+
+  const triggerTtsGeneration = useCallback(async (scanId: string) => {
+    const hookText = activeHookRef.current || scan?.summary || scan?.one_liner || '';
+    if (!hookText) return;
+    try {
+      await triggerTTS(scanId, hookText);
+    } catch {
+      // TTS generation failed — non-fatal
+    }
+  }, [scan?.summary, scan?.one_liner]);
+
   const handleAiVideoGenerate = useCallback(async () => {
     if (!scan || isGeneratingVideo) return;
     setIsGeneratingVideo(true);
@@ -567,6 +586,9 @@ export default function ResultScreen() {
       );
       if (mountedRef.current) {
         setGeneratedVideoUrl(result.videoUrl);
+        if (!isCleanVideoMode && !scan?.tts_url && !ttsUrl) {
+          triggerTtsGeneration(scan.id);
+        }
       }
     } catch (err) {
       if (mountedRef.current) {
@@ -579,16 +601,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode]);
-
-  const insets = useSafeAreaInsets();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const safeTop = useSafeTop();
-  const cardRef = useRef<View>(null);
-  const mountedRef = useRef(true);
-  const activeHookRef = useRef('');
-  const styleApplyCounter = useRef(0);
-  const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, triggerTtsGeneration, ttsUrl]);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -1505,15 +1518,28 @@ export default function ResultScreen() {
   }, [narrativePlan, allCutImages]);
 
   const copyOverlaysForPreview: CopyOverlayTimeline[] | null = useMemo(() => {
-    if (!productVision) return null;
+    if (isCleanVideoMode) return null;
+    if (productVision) {
+      return buildCopyOverlayTimeline({
+        title: productVision.suggestedCopyLayers.primary,
+        hookCopy: productVision.suggestedCopyLayers.primary,
+        featureCopy: productVision.visualFeatures.slice(0, 3).join(' · '),
+        ctaCopy: productVision.suggestedCopyLayers.tertiary,
+        subtitleCopy: productVision.suggestedCopyLayers.secondary,
+      });
+    }
+    const hookText = activeHook || activeOneLiner || scan?.summary || '';
+    const ctaText = shortUrl ? `자세히 보기 ${shortUrl}` : '지금 확인하세요';
+    const featureText = activeCaption || inlineEdit.captionText || '';
+    if (!hookText && !featureText) return null;
     return buildCopyOverlayTimeline({
-      title: productVision.suggestedCopyLayers.primary,
-      hookCopy: productVision.suggestedCopyLayers.primary,
-      featureCopy: productVision.visualFeatures.slice(0, 3).join(' · '),
-      ctaCopy: productVision.suggestedCopyLayers.tertiary,
-      subtitleCopy: productVision.suggestedCopyLayers.secondary,
+      title: hookText,
+      hookCopy: hookText,
+      featureCopy: featureText,
+      ctaCopy: ctaText,
+      subtitleCopy: featureText,
     });
-  }, [productVision]);
+  }, [productVision, isCleanVideoMode, activeHook, activeOneLiner, scan?.summary, activeCaption, inlineEdit.captionText, shortUrl]);
 
   const trendingSuggestions = getTrendingSuggestions(trendingHashtags, [...activeHashtags, ...addedHashtags]);
 
@@ -3108,7 +3134,7 @@ export default function ResultScreen() {
         <View style={styles.stickyBtnRow}>
           <TouchableOpacity
             style={styles.stickySaveBtn}
-            onPress={handleSaveAndShare}
+            onPress={generatedVideoUrl ? handleSaveVideo : handleSaveAndShare}
             disabled={uploadProgress !== null}
             activeOpacity={0.8}
           >
@@ -3118,7 +3144,7 @@ export default function ResultScreen() {
               <Download size={18} color="#fff" strokeWidth={2.5} />
             )}
             <Text style={styles.stickySaveBtnText}>
-              {uploadProgress !== null ? '저장 중...' : '저장'}
+              {uploadProgress !== null ? '저장 중...' : generatedVideoUrl ? '영상 저장' : '저장'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

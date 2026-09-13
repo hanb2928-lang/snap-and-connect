@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Share as RNShare, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Share as RNShare, ViewStyle, Alert } from 'react-native';
 import { Check, Instagram, Youtube, Music2, Download, ExternalLink } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface DirectShareBridgeProps {
   videoUrl?: string | null;
@@ -59,22 +61,41 @@ export function DirectShareBridge({
 
   const handleSaveToGallery = useCallback(async () => {
     if (savedState === 'saving') return;
+    if (!videoUrl) {
+      Alert.alert('알림', '저장할 영상이 없습니다.');
+      return;
+    }
     setSavedState('saving');
     try {
       if (Platform.OS === 'web') {
-        if (videoUrl) {
-          const a = document.createElement('a');
-          a.href = videoUrl;
-          a.download = `${fileName}.mp4`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        const a = document.createElement('a');
+        a.href = videoUrl;
+        a.download = `${fileName}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('권한 필요', '갤러리 접근 권한이 필요합니다.');
+          setSavedState('idle');
+          return;
         }
+        const dir = FileSystem.cacheDirectory;
+        if (!dir) throw new Error('임시 저장 공간을 사용할 수 없습니다.');
+        const fileUri = `${dir}${fileName}-${Date.now()}.mp4`;
+        const downloadResult = await FileSystem.downloadAsync(videoUrl, fileUri);
+        if (downloadResult.status !== 200) {
+          throw new Error(`영상 다운로드 실패 (${downloadResult.status})`);
+        }
+        await MediaLibrary.createAssetAsync(downloadResult.uri);
       }
       setSavedState('saved');
       onSavedToGallery?.();
       setTimeout(() => setSavedState('idle'), 2500);
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '영상 저장에 실패했습니다.';
+      Alert.alert('저장 실패', msg);
       setSavedState('idle');
     }
   }, [savedState, videoUrl, fileName, onSavedToGallery]);

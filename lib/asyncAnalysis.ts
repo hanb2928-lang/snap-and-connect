@@ -236,7 +236,7 @@ async function createScanWithAnalysis(
   return data.id;
 }
 
-async function triggerTTS(scanId: string, text: string): Promise<void> {
+export async function triggerTTS(scanId: string, text: string): Promise<void> {
   const { TTS_FUNCTION_URL, supabaseAnonKey } = await import('@/lib/supabase');
   const { base64ToUint8Array } = await import('@/lib/base64');
   let voice = 'alloy';
