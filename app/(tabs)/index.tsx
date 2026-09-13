@@ -531,6 +531,11 @@ export default function CameraScreen() {
                 스튜디오 프리미엄
               </Text>
             </TouchableOpacity>
+            {contentTone === 'studio' && (
+              <Text style={styles.toneHintText}>
+                화장품 · 주얼리 · 패션 · 전자기기 · 홈데코 · 럭셔리 식품
+              </Text>
+            )}
             <TouchableOpacity
               style={[styles.toneSegment, contentTone === 'raw' && styles.toneSegmentActiveRaw]}
               onPress={() => handleContentToneChange('raw')}
@@ -547,6 +552,11 @@ export default function CameraScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+          {contentTone === 'raw' && (
+            <Text style={styles.toneHintText}>
+              생활용품 · 식품 · 가성비 전자기기 · 패션 액세서리 · 다이어트
+            </Text>
+          )}
         </View>
 
         <View style={styles.modeCardsWrap}>
@@ -1263,6 +1273,13 @@ const styles = StyleSheet.create({
   },
   toneSegmentTextActive: {
     color: '#fff',
+  },
+  toneHintText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: theme.spacing.sm,
+    letterSpacing: 0.3,
   },
   modeCard: {
     flexDirection: 'row',

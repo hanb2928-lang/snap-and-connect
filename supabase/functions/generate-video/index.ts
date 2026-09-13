@@ -704,7 +704,7 @@ function buildAutoPrompt(
   const name = productName || vision?.productName || "제품";
 
   if (isCleanVideoMode) {
-    parts.push(`Cinematic 3D product showcase for ${name}, pure visual focus`);
+    parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
     if (vision) {
       if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
       if (vision.visualFeatures.length > 0) parts.push(`key features: ${vision.visualFeatures.slice(0, 4).join(", ")}`);
@@ -714,7 +714,7 @@ function buildAutoPrompt(
       if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
       if (vision.orbitalFocusPoint) parts.push(`focal point: ${vision.orbitalFocusPoint}`);
     }
-    parts.push("smooth gentle camera pan, soft studio lighting, macro detail of surface texture, no text overlays, no captions, no marketing elements, pure product cinematography");
+    parts.push("professional 3-point studio lighting with softboxes, rim light for edge definition, macro detail of surface texture, smooth gimbal camera movement, shallow depth of field, color-graded filmic look, no text overlays, no captions, no marketing elements, pure luxury product cinematography");
     return parts.join(". ");
   }
 
@@ -786,17 +786,18 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   if (p.isCleanVideoMode) {
     const v = p.productVision;
     const tokens: string[] = [
-      `showcase ${name} ${orientation}`,
-      "cam=smooth dolly + gentle orbit",
-      "light=soft studio + natural rim",
-      "grade=clean natural, minimal grading",
+      `luxury showcase ${name} ${orientation}`,
+      "cam=smooth gimbal dolly + gentle orbit + macro push-in",
+      "light=professional 3-point studio + softbox + rim light",
+      "grade=filmic luxury, shallow DOF, color-graded, premium look",
+      "quality=top 1% commercial, ultra-premium, high-end brand film",
     ];
     if (v) {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
       if (v.textureDescription) tokens.push(`texture=${v.textureDescription}`);
     }
-    tokens.push("no text, no captions, no hooks, no CTA, pure product cinematography");
+    tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
     return tokens.join(" ").slice(0, 500);
   }
 
