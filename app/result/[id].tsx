@@ -2734,6 +2734,21 @@ export default function ResultScreen() {
             numberOfLines={3}
             textAlignVertical="top"
           />
+          <TouchableOpacity
+            style={[styles.promptGenBtn, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
+            onPress={() => handleAiVideoGenerate()}
+            disabled={isGeneratingVideo || !scan}
+            activeOpacity={0.7}
+          >
+            {isGeneratingVideo ? (
+              <RotatingLoader size={18} color="#fff" />
+            ) : (
+              <SparklesIcon size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.promptGenBtnText} numberOfLines={1}>
+              {isGeneratingVideo ? 'AI 영상 생성 중...' : 'AI 자동 생성'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         </>
@@ -4511,6 +4526,22 @@ iconButton: {
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     minHeight: 80,
+  },
+  promptGenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[500],
+    ...theme.shadows.card,
+  },
+  promptGenBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   regenBtnLarge: {
     flexDirection: 'row',
