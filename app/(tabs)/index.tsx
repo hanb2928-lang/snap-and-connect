@@ -452,6 +452,80 @@ export default function CameraScreen() {
     }
   }, []);
 
+  // ─── Camera capture for fitting steps ───
+  const captureFittingPhoto = useCallback(async (target: 'product' | 'model') => {
+    if (isWebPlatform()) {
+      if (webCameraRef.current?.isReady()) {
+        try {
+          const result = await withTimeout(
+            webCameraRef.current.captureFrame(),
+            CAPTURE_TIMEOUT_MS,
+            '카메라 캡처',
+          );
+          if (result?.base64) {
+            const compressed = await withTimeout(
+              prepareImageForApi(buildDataUrl(cleanBase64(result.base64), result.mimeType), 1024, 0.8, 'none' as MoodFilterType),
+              PICK_TIMEOUT_MS,
+              '이미지 압축',
+            );
+            const b64 = cleanBase64(compressed);
+            if (target === 'product') setFittingProductBase64(b64);
+            else setFittingModelBase64(b64);
+            return;
+          }
+        } catch {
+          // Fall through to gallery
+        }
+      }
+      const b64 = await pickImageForFitting();
+      if (b64) {
+        if (target === 'product') setFittingProductBase64(b64);
+        else setFittingModelBase64(b64);
+      }
+      return;
+    }
+
+    if (!cameraRef.current || !cameraReady) return;
+    try {
+      const photo = await withTimeout(
+        cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.8,
+          shutterSound: false,
+          ...({ mute: true } as Record<string, unknown>),
+        }) as Promise<{ base64?: string; uri: string }>,
+        CAPTURE_TIMEOUT_MS,
+        '촬영',
+      );
+      if (!photo?.base64) return;
+      const cleanB64 = cleanBase64(photo.base64);
+      const compressedDataUrl = await withTimeout(
+        prepareImageForApi(buildDataUrl(cleanB64, 'image/jpeg'), 1024, 0.8, 'none' as MoodFilterType),
+        PICK_TIMEOUT_MS,
+        '이미지 압축',
+      );
+      const b64 = cleanBase64(compressedDataUrl);
+      if (target === 'product') setFittingProductBase64(b64);
+      else setFittingModelBase64(b64);
+    } catch (err) {
+      setError(friendlyError(err, '촬영에 실패했습니다. 다시 시도해주세요.'));
+    }
+  }, [cameraReady, pickImageForFitting]);
+
+  const handleFittingWebCapture = useCallback((payload: string, mimeType: string) => {
+    if (mimeType.startsWith('video/')) return;
+    const b64 = cleanBase64(payload);
+    if (screenPhase === 'fitting_product') setFittingProductBase64(b64);
+    else if (screenPhase === 'fitting_model') setFittingModelBase64(b64);
+  }, [screenPhase]);
+
+  const handleFittingWebPick = useCallback(async () => {
+    const b64 = await pickImageForFitting();
+    if (!b64) return;
+    if (screenPhase === 'fitting_product') setFittingProductBase64(b64);
+    else if (screenPhase === 'fitting_model') setFittingModelBase64(b64);
+  }, [pickImageForFitting, screenPhase]);
+
   // ─── Virtual fitting: run edge function ───
   const runVirtualFitting = useCallback(async () => {
     const productB64 = fittingProductBase64;
@@ -491,6 +565,7 @@ export default function CameraScreen() {
       setFittingProductBase64(null);
       setFittingModelBase64(null);
       setFittingResultBase64(null);
+      setCameraReady(false);
       setScreenPhase('fitting_product');
     }
   }, []);
@@ -540,6 +615,134 @@ export default function CameraScreen() {
 
   // ─── Virtual Fitting: Product Photo Step ───
   if (screenPhase === 'fitting_product') {
+    if (!fittingProductBase64) {
+      if (isWebPlatform()) {
+        return (
+          <View style={styles.container}>
+            <FittingStepHeader
+              stepNum={1}
+              title="1/2 제품 사진"
+              onBack={() => { setScreenPhase('mode_select'); setError(null); }}
+              onFlip={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+              safeTop={safeTop}
+            />
+            <View style={styles.cameraPreviewWrap}>
+              <WebCameraView
+                ref={webCameraRef}
+                onCapture={handleFittingWebCapture}
+                onPickImage={handleFittingWebPick}
+                isActive={isActive}
+                safeTop={safeTop}
+                tabBarHeight={tabBarHeight}
+                bottomInset={bottomInset}
+                captureMode="single"
+                onCaptureModeChange={() => {}}
+                autoSaving={false}
+                autoSaveToast={null}
+                autoSaveStep={1}
+                onMultiAnglePress={() => {}}
+                simplified
+              />
+            </View>
+            {error && (
+              <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      }
+
+      if (!permission) {
+        return (
+          <View style={styles.permissionContainer}>
+            <Text style={styles.permissionText}>카메라 로딩 중...</Text>
+          </View>
+        );
+      }
+
+      if (!permission.granted) {
+        return (
+          <View style={styles.permissionContainer}>
+            <Text style={styles.permissionText}>카메라 권한이 필요합니다</Text>
+            <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.8}>
+              <Text style={styles.permissionBtnText}>권한 허용</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backToModeBtn}
+              onPress={async () => {
+                const b64 = await pickImageForFitting();
+                if (b64) setFittingProductBase64(b64);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backToModeText}>갤러리에서 선택</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return (
+        <View style={styles.container}>
+          <FittingStepHeader
+            stepNum={1}
+            title="1/2 제품 사진"
+            onBack={() => { setScreenPhase('mode_select'); setError(null); setCameraReady(false); }}
+            onFlip={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+            safeTop={safeTop}
+          />
+          <View style={styles.cameraPreviewWrap}>
+            {isActive ? (
+              <CameraView
+                ref={cameraRef}
+                style={styles.cameraPreview}
+                facing={facing}
+                onCameraReady={() => setCameraReady(true)}
+                mode="video"
+              />
+            ) : (
+              <View style={[styles.cameraPreview, styles.cameraPlaceholder]}>
+                <Camera size={36} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+              </View>
+            )}
+          </View>
+          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+            {error && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+            <View style={styles.shutterRow}>
+              <TouchableOpacity
+                style={styles.fittingGalleryBtn}
+                onPress={async () => {
+                  const b64 = await pickImageForFitting();
+                  if (b64) setFittingProductBase64(b64);
+                }}
+                activeOpacity={0.8}
+              >
+                <ImageIcon size={24} color="#fff" strokeWidth={2} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled]}
+                onPress={() => captureFittingPhoto('product')}
+                disabled={!cameraReady}
+                activeOpacity={0.85}
+              >
+                <Camera size={30} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+              <View style={{ width: 52 }} />
+            </View>
+            <Text style={styles.shutterHintText}>
+              제품 사진을 촬영하거나 갤러리에서 선택하세요
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container}>
         <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
@@ -560,51 +763,33 @@ export default function CameraScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.fittingDesc}>
-            합성할 제품 사진을 선택해주세요. 가구, IT 가전, 패션, 뷰티, 인테리어 소품 등 모든 카테고리의 제품을 자연스럽게 배경이나 모델에 투영할 수 있습니다.
+            합성할 제품 사진입니다. 가구, IT 가전, 패션, 뷰티, 인테리어 소품 등 모든 카테고리의 제품을 자연스럽게 배경이나 모델에 투영할 수 있습니다.
           </Text>
 
-          {fittingProductBase64 ? (
-            <View style={styles.fittingPreviewWrap}>
-              <Image
-                source={{ uri: buildDataUrl(fittingProductBase64, 'image/jpeg') }}
-                style={styles.fittingPreviewImg}
-                resizeMode="contain"
-              />
-              <View style={styles.fittingPreviewActions}>
-                <TouchableOpacity
-                  style={styles.fittingRetakeBtn}
-                  onPress={async () => {
-                    const b64 = await pickImageForFitting();
-                    if (b64) setFittingProductBase64(b64);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.fittingRetakeText}>다시 선택</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.fittingNextBtn}
-                  onPress={() => setScreenPhase('fitting_model')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.fittingNextText}>다음</Text>
-                  <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
-                </TouchableOpacity>
-              </View>
+          <View style={styles.fittingPreviewWrap}>
+            <Image
+              source={{ uri: buildDataUrl(fittingProductBase64, 'image/jpeg') }}
+              style={styles.fittingPreviewImg}
+              resizeMode="contain"
+            />
+            <View style={styles.fittingPreviewActions}>
+              <TouchableOpacity
+                style={styles.fittingRetakeBtn}
+                onPress={() => { setFittingProductBase64(null); setCameraReady(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fittingRetakeText}>다시 촬영</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.fittingNextBtn}
+                onPress={() => { setFittingModelBase64(null); setCameraReady(false); setScreenPhase('fitting_model'); }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.fittingNextText}>다음</Text>
+                <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
             </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.fittingUploadBtn}
-              onPress={async () => {
-                const b64 = await pickImageForFitting();
-                if (b64) setFittingProductBase64(b64);
-              }}
-              activeOpacity={0.8}
-            >
-              <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.fittingUploadText}>제품 사진 선택</Text>
-              <Text style={styles.fittingUploadHint}>갤러리에서 제품 사진을 불러옵니다</Text>
-            </TouchableOpacity>
-          )}
+          </View>
 
           {error && (
             <View style={styles.fittingErrorBanner}>
@@ -618,6 +803,134 @@ export default function CameraScreen() {
 
   // ─── Virtual Fitting: Model Photo Step ───
   if (screenPhase === 'fitting_model') {
+    if (!fittingModelBase64) {
+      if (isWebPlatform()) {
+        return (
+          <View style={styles.container}>
+            <FittingStepHeader
+              stepNum={2}
+              title="2/2 배경/모델 사진"
+              onBack={() => { setScreenPhase('fitting_product'); setError(null); }}
+              onFlip={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+              safeTop={safeTop}
+            />
+            <View style={styles.cameraPreviewWrap}>
+              <WebCameraView
+                ref={webCameraRef}
+                onCapture={handleFittingWebCapture}
+                onPickImage={handleFittingWebPick}
+                isActive={isActive}
+                safeTop={safeTop}
+                tabBarHeight={tabBarHeight}
+                bottomInset={bottomInset}
+                captureMode="single"
+                onCaptureModeChange={() => {}}
+                autoSaving={false}
+                autoSaveToast={null}
+                autoSaveStep={1}
+                onMultiAnglePress={() => {}}
+                simplified
+              />
+            </View>
+            {error && (
+              <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        );
+      }
+
+      if (!permission) {
+        return (
+          <View style={styles.permissionContainer}>
+            <Text style={styles.permissionText}>카메라 로딩 중...</Text>
+          </View>
+        );
+      }
+
+      if (!permission.granted) {
+        return (
+          <View style={styles.permissionContainer}>
+            <Text style={styles.permissionText}>카메라 권한이 필요합니다</Text>
+            <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.8}>
+              <Text style={styles.permissionBtnText}>권한 허용</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.backToModeBtn}
+              onPress={async () => {
+                const b64 = await pickImageForFitting();
+                if (b64) setFittingModelBase64(b64);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backToModeText}>갤러리에서 선택</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return (
+        <View style={styles.container}>
+          <FittingStepHeader
+            stepNum={2}
+            title="2/2 배경/모델 사진"
+            onBack={() => { setScreenPhase('fitting_product'); setError(null); setCameraReady(false); }}
+            onFlip={() => { setCameraReady(false); setFacing((f) => (f === 'back' ? 'front' : 'back')); }}
+            safeTop={safeTop}
+          />
+          <View style={styles.cameraPreviewWrap}>
+            {isActive ? (
+              <CameraView
+                ref={cameraRef}
+                style={styles.cameraPreview}
+                facing={facing}
+                onCameraReady={() => setCameraReady(true)}
+                mode="video"
+              />
+            ) : (
+              <View style={[styles.cameraPreview, styles.cameraPlaceholder]}>
+                <Camera size={36} color={theme.colors.dark.textDim} strokeWidth={1.5} />
+              </View>
+            )}
+          </View>
+          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+            {error && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+            <View style={styles.shutterRow}>
+              <TouchableOpacity
+                style={styles.fittingGalleryBtn}
+                onPress={async () => {
+                  const b64 = await pickImageForFitting();
+                  if (b64) setFittingModelBase64(b64);
+                }}
+                activeOpacity={0.8}
+              >
+                <ImageIcon size={24} color="#fff" strokeWidth={2} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled]}
+                onPress={() => captureFittingPhoto('model')}
+                disabled={!cameraReady}
+                activeOpacity={0.85}
+              >
+                <Camera size={30} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+              <View style={{ width: 52 }} />
+            </View>
+            <Text style={styles.shutterHintText}>
+              배경/모델 사진을 촬영하거나 갤러리에서 선택하세요
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container}>
         <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
@@ -628,7 +941,7 @@ export default function CameraScreen() {
           >
             <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={styles.fittingStepTitle}>2/2 모델 사진</Text>
+          <Text style={styles.fittingStepTitle}>2/2 배경/모델 사진</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -638,58 +951,40 @@ export default function CameraScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.fittingDesc}>
-            제품을 합성할 배경이나 모델 사진을 선택해주세요. 인테리어 공간, 실내 환경, 사람 모델 등 어떤 이미지든 가능합니다.
+            제품을 합성할 배경이나 모델 사진입니다. 인테리어 공간, 실내 환경, 사람 모델 등 어떤 이미지든 가능합니다.
           </Text>
 
-          {fittingModelBase64 ? (
-            <View style={styles.fittingPreviewWrap}>
-              <Image
-                source={{ uri: buildDataUrl(fittingModelBase64, 'image/jpeg') }}
-                style={styles.fittingPreviewImg}
-                resizeMode="contain"
-              />
-              <View style={styles.fittingPreviewActions}>
-                <TouchableOpacity
-                  style={styles.fittingRetakeBtn}
-                  onPress={async () => {
-                    const b64 = await pickImageForFitting();
-                    if (b64) setFittingModelBase64(b64);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.fittingRetakeText}>다시 선택</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.fittingNextBtn, fittingLoading && styles.fittingNextBtnDisabled]}
-                  onPress={runVirtualFitting}
-                  disabled={fittingLoading}
-                  activeOpacity={0.85}
-                >
-                  {fittingLoading ? (
-                    <Text style={styles.fittingNextText}>생성 중...</Text>
-                  ) : (
-                    <>
-                      <Sparkles size={18} color="#fff" strokeWidth={2.5} />
-                      <Text style={styles.fittingNextText}>AI 합성 생성</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+          <View style={styles.fittingPreviewWrap}>
+            <Image
+              source={{ uri: buildDataUrl(fittingModelBase64, 'image/jpeg') }}
+              style={styles.fittingPreviewImg}
+              resizeMode="contain"
+            />
+            <View style={styles.fittingPreviewActions}>
+              <TouchableOpacity
+                style={styles.fittingRetakeBtn}
+                onPress={() => { setFittingModelBase64(null); setCameraReady(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.fittingRetakeText}>다시 촬영</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fittingNextBtn, fittingLoading && styles.fittingNextBtnDisabled]}
+                onPress={runVirtualFitting}
+                disabled={fittingLoading}
+                activeOpacity={0.85}
+              >
+                {fittingLoading ? (
+                  <Text style={styles.fittingNextText}>생성 중...</Text>
+                ) : (
+                  <>
+                    <Sparkles size={18} color="#fff" strokeWidth={2.5} />
+                    <Text style={styles.fittingNextText}>AI 합성 생성</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.fittingUploadBtn}
-              onPress={async () => {
-                const b64 = await pickImageForFitting();
-                if (b64) setFittingModelBase64(b64);
-              }}
-              activeOpacity={0.8}
-            >
-              <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.fittingUploadText}>배경/모델 사진 선택</Text>
-              <Text style={styles.fittingUploadHint}>갤러리에서 배경 또는 모델 사진을 불러옵니다</Text>
-            </TouchableOpacity>
-          )}
+          </View>
 
           {fittingLoading && (
             <View style={styles.fittingLoadingCard}>
@@ -1094,6 +1389,40 @@ function ModeCard({ icon, title, desc, color, onPress }: ModeCardProps) {
       </View>
       <ArrowRight size={22} color={theme.colors.dark.textDim} strokeWidth={2} />
     </TouchableOpacity>
+  );
+}
+
+function FittingStepHeader({
+  stepNum,
+  title,
+  onBack,
+  onFlip,
+  safeTop,
+}: {
+  stepNum: 1 | 2;
+  title: string;
+  onBack: () => void;
+  onFlip: () => void;
+  safeTop: number;
+}) {
+  return (
+    <>
+      <View style={[styles.topBar, { top: safeTop + 8 }]}>
+        <TouchableOpacity style={styles.topBarBtn} onPress={onBack} activeOpacity={0.7}>
+          <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.topBarBtn} onPress={onFlip} activeOpacity={0.7}>
+          <RotateCcw size={20} color="#fff" strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
+      <View style={[styles.fittingStepBar, { top: safeTop + 56 }]}>
+        <Text style={styles.fittingStepBarTitle}>{title}</Text>
+        <View style={styles.fittingStepBarDots}>
+          <View style={[styles.fittingStepBarDot, stepNum >= 1 && styles.fittingStepBarDotActive]} />
+          <View style={[styles.fittingStepBarDot, stepNum >= 2 && styles.fittingStepBarDotActive]} />
+        </View>
+      </View>
+    </>
   );
 }
 
@@ -1506,6 +1835,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',
+  },
+  // Fitting camera step styles
+  fittingStepBar: {
+    position: 'absolute',
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    zIndex: 15,
+  },
+  fittingStepBarTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+    backgroundColor: 'rgba(5, 8, 18, 0.65)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    overflow: 'hidden',
+  },
+  fittingStepBarDots: {
+    flexDirection: 'row',
+    gap: 5,
+    backgroundColor: 'rgba(5, 8, 18, 0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.full,
+  },
+  fittingStepBarDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  fittingStepBarDotActive: {
+    backgroundColor: theme.colors.accent[400],
+  },
+  fittingGalleryBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   // Stereo progress
   stereoLightOverlay: {
