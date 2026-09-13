@@ -476,7 +476,7 @@ export default function ResultScreen() {
       parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
       videoPromptText = parts.join('. ');
     } else {
-      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || scan.product_name || '';
+      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '';
     }
     if (!videoPromptText.trim()) {
       if (visionData) {
@@ -511,7 +511,7 @@ export default function ResultScreen() {
           scanId: scan.id,
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
-          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '',
+          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '',
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
@@ -570,6 +570,9 @@ export default function ResultScreen() {
         setLocalStoreInfo(scanData.local_store_info ?? null);
         if (scanData.video_url) {
           setGeneratedVideoUrl(scanData.video_url);
+        }
+        if (scanData.product_vision) {
+          setProductVision(scanData.product_vision);
         }
       }
       if (mountedRef.current) setSettings(settingsResult);
@@ -945,9 +948,9 @@ export default function ResultScreen() {
 
   const td = activeTemplateData;
   const platformVariant = td?.platformVariants?.[activePlatform];
-  const activeHook = hookOverride || platformVariant?.hook || td?.hook || '';
+  const activeHook = hookOverride || platformVariant?.hook || td?.hook || productVision?.suggestedCopyLayers.primary || '';
   useEffect(() => { activeHookRef.current = activeHook; }, [activeHook]);
-  const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || '');
+  const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || productVision?.suggestedCopyLayers.secondary || '');
   const activeHashtags = platformVariant?.hashtags || td?.hashtags || [];
   const allDisplayHashtags = [...activeHashtags, ...addedHashtags];
 
@@ -2612,6 +2615,8 @@ export default function ResultScreen() {
             textAlignVertical="top"
           />
         </View>
+        </>
+        )}
 
         {/* === 5각도 원본 컷 풀스크린 뷰어 === */}
         <Modal visible={galleryModalVisible} transparent animationType="fade" onRequestClose={() => setGalleryModalVisible(false)}>
@@ -2896,8 +2901,6 @@ export default function ResultScreen() {
             })}
           </Text>
         </View>
-        </>
-        )}
 
 
 
