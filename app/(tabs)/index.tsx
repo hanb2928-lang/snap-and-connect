@@ -43,7 +43,7 @@ import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
-async function runFittingPipeline(shots: AngleShot[], scanId: string): Promise<void> {
+async function runFittingPipeline(shots: AngleShot[], scanId: string, customPrompt?: string): Promise<void> {
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
   const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
@@ -54,6 +54,7 @@ async function runFittingPipeline(shots: AngleShot[], scanId: string): Promise<v
       body: {
         productImage: buildDataUrl(productShot.base64, productShot.mimeType || 'image/jpeg'),
         modelImage: buildDataUrl(bgShot.base64, bgShot.mimeType || 'image/jpeg'),
+        customPrompt: customPrompt?.trim() || undefined,
       },
     });
     if (error || !data?.image) return;
@@ -225,7 +226,7 @@ export default function CameraScreen() {
     }
   }, [router, startAutoSaveAnimation, stopAutoSaveAnimation]);
 
-  const handlePostCaptureProceed = useCallback(async (_customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
+  const handlePostCaptureProceed = useCallback(async (customPrompt: string, _platform: string, _editPlan: ShortFormEditPlan) => {
     setPostCaptureVisible(false);
 
     const base64 = postCaptureBase64Ref.current;
@@ -242,12 +243,12 @@ export default function CameraScreen() {
         );
         const imageUrl = await uploadImage(frame.base64, frame.mimeType);
         const scanId = await saveManualScan(imageUrl);
-        router.push({ pathname: '/editor', params: { id: scanId } });
+        router.push({ pathname: '/editor', params: { id: scanId, customPrompt: customPrompt || undefined } });
         return;
       }
       const imageUrl = await uploadImage(base64, mimeType);
       const scanId = await saveManualScan(imageUrl);
-      router.push({ pathname: '/editor', params: { id: scanId } });
+      router.push({ pathname: '/editor', params: { id: scanId, customPrompt: customPrompt || undefined } });
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, '편집 화면을 여는 중 오류가 발생했습니다. 다시 시도해주세요.'));

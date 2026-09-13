@@ -2988,24 +2988,6 @@ export default function ResultScreen() {
           </View>
         </Modal>
 
-        <View style={styles.gallerySaveRow}>
-          <TouchableOpacity
-            style={[styles.gallerySaveBtn, uploadProgress !== null && styles.dualActionDisabled]}
-            onPress={handleSaveVideo}
-            disabled={uploadProgress !== null}
-            activeOpacity={0.7}
-          >
-            {uploadProgress !== null ? (
-              <Loader2Icon size={20} color="#fff" strokeWidth={2} />
-            ) : (
-              <Download size={20} color="#fff" strokeWidth={2} />
-            )}
-            <Text style={styles.gallerySaveBtnText}>
-              {uploadProgress !== null ? '저장 중...' : '갤러리에 저장하기'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.body}>
           {detectedProducts.length > 1 && (
             <View style={styles.section}>
@@ -4576,25 +4558,6 @@ iconButton: {
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     minHeight: 48,
-  },
-  gallerySaveRow: {
-    marginTop: 12,
-    marginHorizontal: theme.spacing.md,
-  },
-  gallerySaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: theme.colors.success[500],
-    borderRadius: theme.radius.md,
-    paddingVertical: 16,
-    ...theme.shadows.card,
-  },
-  gallerySaveBtnText: {
-    fontSize: 15,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
   },
   dualActionRow: {
     flexDirection: 'row',
