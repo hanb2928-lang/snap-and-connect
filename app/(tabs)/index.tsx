@@ -43,10 +43,32 @@ import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
+async function runFittingPipeline(shots: AngleShot[]): Promise<void> {
+  const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
+  const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
+  const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
+  if (!productShot?.base64 || !bgShot?.base64) return;
+
+  try {
+    const { data, error } = await supabase.functions.invoke('virtual-fitting', {
+      body: {
+        productImage: buildDataUrl(productShot.base64, productShot.mimeType || 'image/jpeg'),
+        modelImage: buildDataUrl(bgShot.base64, bgShot.mimeType || 'image/jpeg'),
+      },
+    });
+    if (error || !data?.image) return;
+
+    const imageUrl = await uploadImage(data.image as string, 'image/png');
+    const scanId = await saveManualScan(imageUrl);
+    void scanId;
+  } catch {
+    // Background pipeline — errors are silently ignored; user already has the scan
+  }
+}
+
 const CAPTURE_TIMEOUT_MS = 15000;
 const PICK_TIMEOUT_MS = 20000;
 const ANALYSIS_TIMEOUT_MS = 45000;
-const FITTING_TIMEOUT_MS = 120000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -103,7 +125,6 @@ export default function CameraScreen() {
   const [contentTone, setContentTone] = useState<ContentTone>('raw');
 
   // Virtual fitting state
-  const [fittingShots, setFittingShots] = useState<AngleShot[]>([]);
   const [fittingLoading, setFittingLoading] = useState(false);
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
 
@@ -447,42 +468,24 @@ export default function CameraScreen() {
   const handleFittingGuideComplete = useCallback(async (shots: AngleShot[]) => {
     const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
     setFittingGuideVisible(false);
-    setFittingShots(sorted);
     if (sorted.length < 2) return;
-
-    const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
-    const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
-    if (!productShot?.base64 || !bgShot?.base64) return;
 
     setFittingLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await withTimeout(
-        supabase.functions.invoke('virtual-fitting', {
-          body: {
-            productImage: buildDataUrl(productShot.base64, productShot.mimeType || 'image/jpeg'),
-            modelImage: buildDataUrl(bgShot.base64, bgShot.mimeType || 'image/jpeg'),
-          },
-        }),
-        FITTING_TIMEOUT_MS,
-        'AI 합성',
-      );
-
-      if (fnError) throw fnError;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.image) throw new Error('AI 합성 이미지를 생성하지 못했습니다.');
-
-      const imageUrl = await uploadImage(data.image as string, 'image/png');
-      const scanId = await saveManualScan(imageUrl);
+      const scanId = await createScanFromAngleShots(sorted);
+      if (!isMountedRef.current) return;
       setScreenPhase('mode_select');
-      router.push({ pathname: '/editor', params: { id: scanId } });
+      router.replace({ pathname: '/result/[id]', params: { id: scanId } });
+
+      runFittingPipeline(sorted).catch(() => {});
     } catch (err) {
       if (!isMountedRef.current) return;
-      setError(friendlyError(err, 'AI 합성 생성 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      setError(friendlyError(err, '이미지 업로드에 실패했습니다. 다시 시도해주세요.'));
     } finally {
       if (isMountedRef.current) setFittingLoading(false);
     }
-  }, []);
+  }, [router]);
 
   const handleModeSelect = useCallback((mode: CaptureMode) => {
     setCaptureMode(mode);
@@ -490,7 +493,6 @@ export default function CameraScreen() {
     if (mode === 'single') {
       setScreenPhase('camera');
     } else if (mode === 'fitting') {
-      setFittingShots([]);
       setCameraReady(false);
       setScreenPhase('fitting_capture');
     }
