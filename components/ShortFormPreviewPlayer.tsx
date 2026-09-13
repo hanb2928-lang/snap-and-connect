@@ -77,7 +77,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoBuffering, setVideoBuffering] = useState(false);
   const [videoFallbackMode, setVideoFallbackMode] = useState(false);
-  const [loopKey, setLoopKey] = useState(0);
   const [videoVisible, setVideoVisible] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const luminanceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -100,6 +99,8 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
     }
     setVideoError(false);
     setVideoLoaded(false);
+    setVideoFallbackMode(false);
+    setVideoVisible(true);
     if (Platform.OS === 'web') {
       setVideoSrc(videoUri);
       return;
@@ -481,7 +482,6 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
   useEffect(() => {
     if (!isPlaying) return;
     if (prevSecRef.current > currentSec && currentSec === 0) {
-      setLoopKey((k) => k + 1);
       if (narrationAudioRef.current) {
         const narrAudio = narrationAudioRef.current;
         narrAudio.pause();
@@ -585,7 +585,6 @@ useEffect(() => {
             Platform.OS === 'web' ? (
               // @ts-ignore web-only video element
               <video
-                key={loopKey}
                 ref={webVideoRef}
                 src={videoSrc}
                 autoPlay
