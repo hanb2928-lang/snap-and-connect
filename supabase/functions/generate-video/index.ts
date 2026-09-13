@@ -505,11 +505,13 @@ async function submitRunwayTask(
 
   try {
     const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 5);
-    const ratioValue = aspectRatio === "9:16" ? "540:960" : aspectRatio === "16:9" ? "960:540" : "720:720";
+    const ratioValue = aspectRatio === "9:16" ? "9:16" : aspectRatio === "16:9" ? "16:9" : "1:1";
+    const safePrompt = prompt.slice(0, 500);
 
     const payload: Record<string, unknown> = {
-      promptText: prompt,
+      taskType: "text_to_video",
       model: "gen3a_turbo",
+      promptText: safePrompt,
       duration: clampedDuration,
       ratio: ratioValue,
     };
