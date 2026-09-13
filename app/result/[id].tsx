@@ -377,6 +377,7 @@ export default function ResultScreen() {
   const [videoGenMode, setVideoGenMode] = useState<'auto' | 'manual'>('auto');
   const [manualHook, setManualHook] = useState('');
   const [manualKeywords, setManualKeywords] = useState('');
+  const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -499,7 +500,20 @@ export default function ResultScreen() {
 
     // Build prompt: manual mode uses user-edited hook + keywords; auto mode uses AI-generated content
     let videoPromptText: string;
-    if (videoGenMode === 'manual' && (manualHook.trim() || manualKeywords.trim())) {
+    if (isCleanVideoMode) {
+      const cleanParts: string[] = [];
+      const name = scan.product_name || visionData?.productName || '제품';
+      cleanParts.push(`Cinematic 3D product showcase for ${name}, pure visual focus`);
+      if (visionData) {
+        if (visionData.visualFeatures.length > 0) cleanParts.push(`key features: ${visionData.visualFeatures.slice(0, 4).join(', ')}`);
+        if (visionData.shapeDescription) cleanParts.push(`shape: ${visionData.shapeDescription}`);
+        if (visionData.materialGuess) cleanParts.push(`material: ${visionData.materialGuess}`);
+        if (visionData.textureDescription) cleanParts.push(`texture: ${visionData.textureDescription}`);
+        if (visionData.orbitalFocusPoint) cleanParts.push(`focal point: ${visionData.orbitalFocusPoint}`);
+      }
+      cleanParts.push('smooth gentle camera pan, soft studio lighting, macro detail of surface texture, no text overlays, no captions, no marketing elements, pure product cinematography');
+      videoPromptText = cleanParts.join('. ');
+    } else if (videoGenMode === 'manual' && (manualHook.trim() || manualKeywords.trim())) {
       const parts: string[] = [];
       if (manualHook.trim()) parts.push(manualHook.trim());
       if (manualKeywords.trim()) parts.push(`Keywords: ${manualKeywords.trim()}`);
@@ -545,6 +559,7 @@ export default function ResultScreen() {
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
+          isCleanVideoMode,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
@@ -564,7 +579,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2474,7 +2489,28 @@ export default function ResultScreen() {
             </ScrollView>
           </View>
 
-          {/* BGM 분위기 */}
+          {/* Clean Video Mode Toggle */}
+          <View style={styles.cleanVideoToggleRow}>
+            <View style={styles.cleanVideoToggleLeft}>
+              <SparklesIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <View style={styles.cleanVideoToggleTextWrap}>
+                <Text style={styles.cleanVideoToggleLabel}>마케팅 텍스트/효과 제외 (Clean Video)</Text>
+                <Text style={styles.cleanVideoToggleDesc}>
+                  후킹 문구, 자막, 나레이션, BGM 추천 없이 순수 비주얼만 생성
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.cleanVideoSwitch, isCleanVideoMode && styles.cleanVideoSwitchActive]}
+              onPress={() => setIsCleanVideoMode((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.cleanVideoSwitchKnob, isCleanVideoMode && styles.cleanVideoSwitchKnobActive]} />
+            </TouchableOpacity>
+          </View>
+
+          {/* BGM 분위기 — hidden in Clean Video mode */}
+          {!isCleanVideoMode && (
           <View style={styles.chipGroup}>
             <View style={styles.chipGroupHeader}>
               <FilmIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
@@ -2495,8 +2531,11 @@ export default function ResultScreen() {
               ))}
             </ScrollView>
           </View>
+          )}
 
-          {/* AI Narration — integrated into sound settings */}
+          {/* AI Narration — hidden in Clean Video mode */}
+          {!isCleanVideoMode && (
+          <>
           <NarrationPlayer
             ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
             ttsLoading={!scan?.tts_url && !ttsUrl && !!scan?.analysis_job_id}
@@ -2518,8 +2557,12 @@ export default function ResultScreen() {
             customPrompt={inlineEdit.aiPrompt}
             narrationText={activeHook || activeOneLiner || scan?.summary || ''}
           />
+          </>
+          )}
 
-          {/* 한 줄 후킹 편집 바 + 상세 자막 토글 */}
+          {/* 한 줄 후킹 편집 바 + 상세 자막 토글 — hidden in Clean Video mode */}
+          {!isCleanVideoMode && (
+          <>
           <View style={styles.hookEditBar}>
             <TextInput
               style={styles.hookEditInput}
@@ -2582,6 +2625,8 @@ export default function ResultScreen() {
                 ))}
               </ScrollView>
             </View>
+          )}
+          </>
           )}
 
           {/* 고급 카메라 모션 수동 설정 (접이식) */}
@@ -4195,6 +4240,60 @@ iconButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  cleanVideoToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent[400] + '30',
+  },
+  cleanVideoToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cleanVideoToggleTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  cleanVideoToggleLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  cleanVideoToggleDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 15,
+  },
+  cleanVideoSwitch: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  cleanVideoSwitchActive: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  cleanVideoSwitchKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    transform: [{ translateX: 0 }],
+  },
+  cleanVideoSwitchKnobActive: {
+    transform: [{ translateX: 18 }],
   },
   chipGroupLabel: {
     fontSize: 12,

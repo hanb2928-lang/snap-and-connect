@@ -40,6 +40,7 @@ interface GenerateVideoRequest {
   cutCount?: number;
   productVision?: ProductVisionData | null;
   draft?: boolean;
+  isCleanVideoMode?: boolean;
   // webhook fields (sent by Runway callback)
   status?: string;
   output?: string[] | { url?: string } | string;
@@ -135,7 +136,7 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
 
   let effectivePrompt = body.prompt ?? "";
   if (effectivePrompt.trim().length === 0) {
-    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText);
+    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText, body.isCleanVideoMode === true);
   }
 
   const isDraft = body.draft === true;
@@ -153,6 +154,7 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     platform: body.platform ?? "shorts",
     hookCategory: body.hookCategory ?? "curiosity",
     productVision: body.productVision ?? null,
+    isCleanVideoMode: body.isCleanVideoMode === true,
   });
 
   try {
@@ -617,10 +619,27 @@ function buildAutoPrompt(
   productName: string | undefined,
   vision: ProductVisionData | null,
   captionText: string | undefined,
+  isCleanVideoMode: boolean,
 ): string {
   const parts: string[] = [];
 
   const name = productName || vision?.productName || "제품";
+
+  if (isCleanVideoMode) {
+    parts.push(`Cinematic 3D product showcase for ${name}, pure visual focus`);
+    if (vision) {
+      if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
+      if (vision.visualFeatures.length > 0) parts.push(`key features: ${vision.visualFeatures.slice(0, 4).join(", ")}`);
+      if (vision.shapeDescription) parts.push(`shape: ${vision.shapeDescription}`);
+      if (vision.materialGuess) parts.push(`material: ${vision.materialGuess}`);
+      if (vision.textureDescription) parts.push(`texture: ${vision.textureDescription}`);
+      if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
+      if (vision.orbitalFocusPoint) parts.push(`focal point: ${vision.orbitalFocusPoint}`);
+    }
+    parts.push("smooth gentle camera pan, soft studio lighting, macro detail of surface texture, no text overlays, no captions, no marketing elements, pure product cinematography");
+    return parts.join(". ");
+  }
+
   parts.push(`Cinematic 3D commercial for ${name}`);
 
   if (vision) {
@@ -657,6 +676,7 @@ type CompactPromptParams = {
   platform: string;
   hookCategory: string;
   productVision?: ProductVisionData | null;
+  isCleanVideoMode: boolean;
 };
 
 const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
@@ -685,6 +705,24 @@ const HOOK_TEXTS: Record<string, string[]> = {
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
+
+  if (p.isCleanVideoMode) {
+    const v = p.productVision;
+    const tokens: string[] = [
+      `showcase ${name} ${orientation}`,
+      "cam=smooth dolly + gentle orbit",
+      "light=soft studio + natural rim",
+      "grade=clean natural, minimal grading",
+    ];
+    if (v) {
+      const feats = v.visualFeatures.slice(0, 2).join(",");
+      tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
+      if (v.textureDescription) tokens.push(`texture=${v.textureDescription}`);
+    }
+    tokens.push("no text, no captions, no hooks, no CTA, pure product cinematography");
+    return tokens.join(" ").slice(0, 500);
+  }
+
   const style = PLATFORM_STYLE[p.platform] ?? PLATFORM_STYLE.shorts;
   const mood = MOOD_GRADE[p.bgmMood ?? ""] ?? MOOD_GRADE["하이텐션"];
   const hooks = HOOK_TEXTS[p.hookCategory] ?? HOOK_TEXTS.curiosity;

@@ -34,6 +34,7 @@ interface GenerateAiVideoOptions {
   cutCount?: number;
   productVision?: ProductVisionResult | null;
   draft?: boolean;
+  isCleanVideoMode?: boolean;
 }
 
 interface PollResponse {
@@ -104,6 +105,7 @@ export async function generateAiVideo(
           cutCount: options.cutCount,
           productVision: options.productVision ?? null,
           draft: isDraft,
+          isCleanVideoMode: options.isCleanVideoMode ?? false,
         },
       });
 
