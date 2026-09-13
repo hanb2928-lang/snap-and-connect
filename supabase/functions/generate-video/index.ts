@@ -718,7 +718,7 @@ function buildAutoPrompt(
     return parts.join(". ");
   }
 
-  parts.push(`Cinematic 3D commercial for ${name}`);
+  parts.push(`Raw smartphone-style unboxing review for ${name}, shot on phone, handheld shaky cam, natural lighting`);
 
   if (vision) {
     if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
@@ -728,7 +728,6 @@ function buildAutoPrompt(
     if (vision.materialGuess) parts.push(`material: ${vision.materialGuess}`);
     if (vision.textureDescription) parts.push(`texture: ${vision.textureDescription}`);
     if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
-    if (vision.orbitalFocusPoint) parts.push(`focal point: ${vision.orbitalFocusPoint}`);
     const copy = vision.suggestedCopyLayers;
     if (copy.primary || copy.secondary || copy.tertiary) {
       parts.push(`copy layers — hook: "${copy.primary}", benefit: "${copy.secondary}", CTA: "${copy.tertiary}"`);
@@ -739,7 +738,7 @@ function buildAutoPrompt(
     parts.push(`caption context: "${captionText.slice(0, 100)}"`);
   }
 
-  parts.push("10-second vertical short-form commercial with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA");
+  parts.push("10-second vertical short-form, raw unboxing aesthetic, handheld phone camera, imperfect framing, natural room lighting, no studio setup, loss-aversion hook, before/after problem-solution contrast, social-proof urgency CTA");
 
   return parts.join(". ");
 }
@@ -758,26 +757,26 @@ type CompactPromptParams = {
 };
 
 const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
-  shorts: { camera: "dolly-in + 3D rotation", lighting: "studio 3-point + rim light", grade: "warm, crushed blacks, +15% sat" },
-  tiktok: { camera: "zoom-punch + jump cuts", lighting: "high-key bright + neon", grade: "vibrant pop, +25% sat, teal shadows" },
-  reels: { camera: "orbital arc + speed ramps", lighting: "golden hour + volumetric", grade: "filmic teal-orange, deep blacks" },
-  naverclip: { camera: "hero rotation + info overlay", lighting: "clean bright studio", grade: "neutral natural, slight warmth" },
+  shorts: { camera: "handheld phone + shaky zoom-in", lighting: "natural room light, no studio", grade: "raw, slight grain, minimal grading" },
+  tiktok: { camera: "handheld + jump cuts + quick pans", lighting: "available light only, window light", grade: "unfiltered, phone-camera look, slight warmth" },
+  reels: { camera: "handheld selfie-style + slow pan", lighting: "natural golden hour, no setup", grade: "raw filmic, light grain, muted tones" },
+  naverclip: { camera: "handheld + casual product close-up", lighting: "natural indoor, no studio", grade: "neutral raw, minimal correction" },
 };
 
 const MOOD_GRADE: Record<string, string> = {
-  "하이텐션": "high-energy, motion blur, neon glow",
-  "시네마틱": "cinematic teal-orange, film grain, lens flare",
-  "ASMR": "soft intimate, warm muted, shallow DOF",
-  "감성": "emotional golden, soft bloom, gentle vignette",
-  "로파이": "lofi desaturated, warm tint, vintage grain",
+  "하이텐션": "urgent handheld, slight shake, raw energy",
+  "시네마틱": "natural filmic, light grain, minimal grading",
+  "ASMR": "close-up intimate, soft natural light, shallow DOF",
+  "감성": "warm natural, gentle handheld, soft window light",
+  "로파이": "lofi raw, phone-camera aesthetic, vintage grain",
 };
 
 const HOOK_TEXTS: Record<string, string[]> = {
-  curiosity: ["이거 진짜였어?", "다들 놀라는 중", "왜 이제야 알았지"],
-  problem: ["이거 때문에 스트레스", "다들 이걸로 고생함", "해결책 찾았어"],
-  transformation: ["before 이랬는데 after 이렇게", "사용 전후 비교 충격", "이거 쓰고 달라졌어"],
-  social_proof: ["이 동네 1위", "다들 이거 사감", "리뷰 1만 개"],
-  fomo: ["품절 전에 확인", "선찹순 마감 임박", "놓치면 다시 없어"],
+  curiosity: ["이거 진짜였음?", "나만 빼고 다 알더라", "왜 이제야 알았지 진짜"],
+  problem: ["이거 모르면 호구 되는 거", "이거 때문에 돈 날릴 뻔", "다들 이걸로 고생함"],
+  transformation: ["이랬는데 → 이렇게 됨", "사용 전후 비교 충격", "이거 쓰고 다른 거 다 버렸음"],
+  social_proof: ["실시간 품절 캡처 봄", "다들 이거 사느라 난리", "리뷰 수 폭발 중"],
+  fomo: ["품절 전에 확인하셈", "선착순 마감 임박", "이거 모르면 손해인데"],
 };
 
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
@@ -807,11 +806,12 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const hook = hooks[p.variationSeed % hooks.length];
 
   const tokens: string[] = [
-    `commercial ${name} ${orientation}`,
+    `raw smartphone review ${name} ${orientation}`,
     `cam=${style.camera}`,
     `light=${style.lighting}`,
     `grade=${style.grade},${mood}`,
     `hook="${hook}"`,
+    `aesthetic=raw,imperfect,handheld,no-studio`,
   ];
 
   if (p.productVision) {
@@ -824,7 +824,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     tokens.push(`ctx="${p.captionText.slice(0, 40)}"`);
   }
 
-  tokens.push("3phase:hook→contrast→cta");
+  tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production")
 
   return tokens.join(" ").slice(0, 500);
 }

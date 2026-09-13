@@ -129,11 +129,12 @@ async function generateWithOpenAI(
   const guideChannelSpecific =
     "## 숏폼 가이드 전용 지시사항\n" +
     "너는 숏폼 콘텐츠 제작 전문가야. 상품 정보를 받으면 그 상품에 맞는 숏폼 제작 가이드를 만들어.\n" +
-    "후킹 문구는 역심리, 역설, 충격적 고백을 활용하라. 절대 제품 피치로 시작하지 마라.\n" +
-    "팁은 실제 숏폼 크리에이터가 쓸 법한 거칠고 진짜 같은 조언으로. 기업형 조언 금지.\n" +
-    "결과는 JSON만 반환: { \"concept\": \"이 상품에 어울리는 숏폼 콘셉트 한 줄\", \"tips\": [{ \"title\": \"팁 제목(10자 이내)\", \"description\": \"구체적인 제작 팁(30-60자)\" }], \"hooks\": [{ \"text\": \"후킹 문구(10-25자)\", \"angle\": \"이 문구가 왜 효과적인지 한 줄 설명\" }] }\n" +
-    "tips는 3개, hooks는 3개를 만들어. 각각 서로 다른 각도(예: 호기심 유발, 가격 어필, 감정 자극, 사용 후기형 등)로.\n" +
-    "한국어로 자연스럽게 작성하고, 실제 숏폼 크리에이터가 쓸 법한 표현을 사용해.";
+    "완벽한 스튜디오 퀄리티는 과감히 버려. 스마트폰으로 대충 찍은 듯한 날것의 비주얼이 핵심이야.\n" +
+    "후킹 문구는 손실 회피, 공포 자극, FOMO를 활용하라. \"이거 모르면 돈 날린다\", \"이거 모르면 호구 된다\" 식으로.\n" +
+    "팁은 실제 숏폼 크리에이터가 쓸 법한 거칠고 진짜 같은 조언으로. 기업형 조언, 스튜디오 연출 금지.\n" +
+    "결과는 JSON만 반환: { \"concept\": \"이 상품에 어울리는 날것 숏폼 콘셉트 한 줄\", \"tips\": [{ \"title\": \"팁 제목(10자 이내)\", \"description\": \"구체적인 제작 팁(30-60자)\" }], \"hooks\": [{ \"text\": \"후킹 문구(10-25자)\", \"angle\": \"이 문구가 왜 효과적인지 한 줄 설명\" }] }\n" +
+    "tips는 3개, hooks는 3개를 만들어. 각각 서로 다른 각도(예: 손실 회피, FOMO 자극, 귀찮음 해결, 찐 후기형 등)로.\n" +
+    "한국어로 자연스럽게 작성하고, 친구에게 카톡으로 팩폭을 던지듯 거칠고 직관적인 구어체를 사용해.";
 
   const conversionPrompt = buildConversionPrompt(data.platform || "shortform", "video", data.customLinks);
 
@@ -215,10 +216,10 @@ function generateLocalGuide(data: GuideRequest): ShortFormGuide {
   const category = (data.productCategory || "").toLowerCase();
 
   const conceptByCategory: Record<string, string> = {
-    sneakers: "신발의 핏과 디테일을 클로즈업으로 보여주는 언박싱 숏폼",
-    clothing: "착용 전후 비교로 코디 완성도를 보여주는 스타일링 숏폼",
+    sneakers: "스마트폰으로 대충 찍은 신발 언박싱, 거친 텍스처 클로즈업 숏폼",
+    clothing: "착용 전후 비교로 코디 완성도를 보여주는 날것 스타일링 숏폼",
     lighting: "조명 켜기 전후로 분위기 변화를 극대화하는 비포애프터 숏폼",
-    electronics: "기능을 실사용 장면으로 보여주는 리뷰형 숏폼",
+    electronics: "기능을 실사용 장면으로 보여주는 날것 리뷰형 숏폼",
     beauty: "사용 전후 피부 변화를 클로즈업하는 뷰티 숏폼",
     food: "먹는 순간의 반응을 담는 먹방형 숏폼",
     furniture: "배치 전후 공간 변화를 보여주는 인테리어 숏폼",
@@ -226,42 +227,42 @@ function generateLocalGuide(data: GuideRequest): ShortFormGuide {
 
   const tipsByCategory: Record<string, GuideTip[]> = {
     sneakers: [
-      { title: "클로즈업", description: "신발의 텍스처와 디테일을 3초간 클로즈업으로 보여주세요" },
-      { title: "착용샷", description: "실제 신었을 때의 핏을 풀샷으로 2초간 담아주세요" },
-      { title: "사운드", description: "바닥에 닿는 소리나 박스 여는 소리를 ASMR처럼 살려주세요" },
+      { title: "언박싱", description: "박스 열 때 손 떨림까지 그대로, 스마트폰으로 대충 찍어라" },
+      { title: "착용샷", description: "실제 신었을 때의 핏을 셀카 모드로 거칠게 담아라" },
+      { title: "사운드", description: "바닥에 닿는 소리, 박스 여는 소리 ASMR로 살려라" },
     ],
     clothing: [
-      { title: "전후비교", description: "코디 전 평범한 착장과 후를 분할화면으로 비교해보세요" },
-      { title: "소재클로즈", description: "원단의 질감을 손으로 만지며 클로즈업으로 보여주세요" },
-      { title: "회전샷", description: "착용 후 360도 천천히 돌아 핏을 전체적으로 보여주세요" },
+      { title: "전후비교", description: "코디 전 평범한 착장과 후를 분할화면으로 비교해라" },
+      { title: "소재클로즈", description: "원단 질감을 손으로 만지며 스마트폰 클로즈업으로" },
+      { title: "회전샷", description: "착용 후 360도 천천히 돌아 핏을 전체적으로 보여라" },
     ],
     lighting: [
-      { title: "비포애프터", description: "조명 OFF 상태와 ON 상태를 1초 컷으로 전환해보세요" },
-      { title: "어분위기", description: "조명이 켜진 공간 전체를 어두운 배경에서 촬영하세요" },
-      { title: "디테일", description: "조명의 스위치나 디자인 디테일을 2초간 보여주세요" },
+      { title: "비포애프터", description: "조명 OFF 상태와 ON 상태를 1초 컷으로 전환해라" },
+      { title: "어분위기", description: "조명 켜진 공간 전체를 어두운 배경에서 촬영해라" },
+      { title: "디테일", description: "조명 스위치나 디자인 디테일을 2초간 보여라" },
     ],
   };
 
   const defaultTips: GuideTip[] = [
-    { title: "오프닝", description: "첫 1초에 가장 시선을 끄는 장면을 배치하세요" },
-    { title: "클로즈업", description: "제품의 핵심 특징을 2-3초 클로즈업으로 보여주세요" },
-    { title: "사용장면", description: "실제 사용하는 장면을 자연스럽게 3초간 담아주세요" },
+    { title: "오프닝", description: "첫 1초에 가장 시선 끄는 장면을 대충 찍은 듯이 배치해라" },
+    { title: "클로즈업", description: "제품 핵심 특징을 2-3초 스마트폰 클로즈업으로 보여라" },
+    { title: "사용장면", description: "실제 사용하는 장면을 자연스럽게 3초간 담아라" },
   ];
 
   const tips = tipsByCategory[category] || defaultTips;
 
   const hookPool: GuideHook[] = [
-    { text: `이거 모르면 손해인 ${nameShort}`, angle: "호기심 유발 — 정보 부재에 대한 불안 자극" },
+    { text: `이거 모르면 호구 되는 ${nameShort}`, angle: "손실 회피 — 정보 부재에 대한 공포 자극" },
     { text: price ? `${price}라서 바로 담은 ${nameShort}` : `다들 이거 사느라 난리남`, angle: "가격 어필 — 비용 대비 가치 강조" },
     { text: `${advantages[0]} 인정? ${nameShort} 실화인가`, angle: "감정 자극 — 공감과 반응 유도" },
-    { text: `${nameShort} 쓰고 나서 삶이 바뀜`, angle: "사용 후기형 — 경험담으로 신뢰 구축" },
-    { text: `이거 왜 이제 알았지 ${nameShort}`, angle: "뒤늦은 발견 — 자연스러운 추천 톤" },
+    { text: `${nameShort} 쓰고 다른 거 다 버렸음`, angle: "사용 후기형 — 경험담으로 신뢰 구축" },
+    { text: `나만 빼고 다 아는 ${nameShort}`, angle: "FOMO 자극 — 소외 공포로 시선 강제" },
   ];
 
   const hooks = hookPool.slice(0, 3);
 
   return {
-    concept: conceptByCategory[category] || `${nameShort}의 핵심 장점을 15초에 담는 숏폼`,
+    concept: conceptByCategory[category] || `${nameShort}의 핵심 장점을 15초 날것으로 담는 숏폼`,
     tips,
     hooks,
   };
