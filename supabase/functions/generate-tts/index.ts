@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Use processedText (with silence markers) if provided, otherwise raw text
-    const rawText = body.text.slice(0, 500);
+    const rawText = body.text.slice(0, 800);
     const text = (body.processedText?.trim() || rawText).slice(0, 800);
     const voice = body.voice || "alloy";
     const baseSpeed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);

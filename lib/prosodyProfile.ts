@@ -391,17 +391,20 @@ export function insertBreathMarkers(text: string, frequency: number): string {
   return result.join(' ');
 }
 
-export function insertMicroPauses(text: string, frequency: number, _durationSec: number): string {
+export function insertMicroPauses(text: string, frequency: number, durationSec: number): string {
   if (frequency <= 0) return text;
   const clauses = text.split(/,\s*/);
   if (clauses.length <= 1) return text;
+  const marker = ` <silence:${Math.round(durationSec * 1000)}ms> `;
   const result: string[] = [];
   for (let i = 0; i < clauses.length; i++) {
     result.push(clauses[i]);
-    if (i < clauses.length - 1 && Math.random() < frequency) {
-      result.push(', ');
-    } else if (i < clauses.length - 1) {
-      result.push(', ');
+    if (i < clauses.length - 1) {
+      if (Math.random() < frequency) {
+        result.push(marker);
+      } else {
+        result.push(', ');
+      }
     }
   }
   return result.join('');

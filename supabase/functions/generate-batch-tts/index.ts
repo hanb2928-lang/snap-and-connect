@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
               const baseSpeed = Math.min(Math.max(item.speed || 1.0, 0.5), 2.0);
 
               // Check content cache first
-              const cacheKey = `generate-tts:${contentHashTts(`${text}|${item.voice}|${baseSpeed}`)}`;
+              const cacheKey = `generate-tts:${contentHashTts(`${text}|${item.voice}|${baseSpeed}|${item.instructions ?? ''}`)}`;
               const cached = await checkTtsCache(cacheKey);
               if (cached) {
                 return {
