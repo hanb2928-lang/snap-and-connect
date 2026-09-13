@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Layers, Flame, Gem } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Flame, Gem } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -572,7 +572,7 @@ export default function CameraScreen() {
             onPress={() => handleModeSelect('single')}
           />
           <ModeCard
-            icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
+            icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
             title="AI 범용 합성"
             desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
             color={theme.colors.accent[500]}
@@ -656,7 +656,7 @@ export default function CameraScreen() {
                 disabled={fittingLoading}
                 activeOpacity={0.85}
               >
-                <Layers size={28} color="#fff" strokeWidth={2.5} />
+                <Camera size={28} color="#fff" strokeWidth={2.5} />
               </TouchableOpacity>
               <View style={{ width: 52 }} />
             </View>
@@ -785,7 +785,7 @@ export default function CameraScreen() {
               disabled={processing || fittingLoading || !cameraReady}
               activeOpacity={0.85}
             >
-              <Layers size={28} color="#fff" strokeWidth={2.5} />
+              <Camera size={28} color="#fff" strokeWidth={2.5} />
             </TouchableOpacity>
             <View style={{ width: 52 }} />
           </View>
