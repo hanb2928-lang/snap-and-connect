@@ -520,7 +520,7 @@ async function submitRunwayTask(
     }
 
     console.log("[generate-video] Runway request:", JSON.stringify({
-      endpoint: "https://api.dev.runwayml.com/v1/tasks",
+      endpoint: "https://api.runwayml.com/v1/tasks",
       method: "POST",
       model: payload.model,
       duration: payload.duration,
@@ -530,7 +530,7 @@ async function submitRunwayTask(
       fullBody: JSON.stringify(payload),
     }));
 
-    const resp = await fetch("https://api.dev.runwayml.com/v1/tasks", {
+    const resp = await fetch("https://api.runwayml.com/v1/tasks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -585,7 +585,7 @@ async function pollRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
 
   try {
-    const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
+    const resp = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "X-Runway-Version": "2024-11-06",
@@ -596,10 +596,21 @@ async function pollRunwayTask(
 
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
-      return { status: "FAILED", error: `Runway 폴링 실패 (HTTP ${resp.status}): ${errText.slice(0, 200)}` };
+      return { status: "FAILED", error: `Runway 폴링 실패 (HTTP ${resp.status}): ${parseRunwayError(errText)}` };
     }
 
-    const result = await resp.json();
+    const respText = await resp.text();
+    const trimmed = respText.trim();
+    if (trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<HTML")) {
+      return { status: "FAILED", error: "Runway API 서버가 HTML 페이지를 반환했습니다. API 엔드포인트 경로가 잘못되었거나 서버가 일시적으로 사용 불가능합니다." };
+    }
+
+    let result: Record<string, unknown>;
+    try {
+      result = JSON.parse(trimmed);
+    } catch {
+      return { status: "FAILED", error: `Runway 폴링 실패: 유효하지 않은 응답 형식 (HTTP ${resp.status})` };
+    }
     const status = (result.status as string) ?? "PROCESSING";
     const progress = result.progress != null ? String(result.progress) : "";
 
@@ -763,8 +774,12 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
 }
 
 function parseRunwayError(errText: string): string {
+  const trimmed = errText.trim();
+  if (trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<HTML")) {
+    return "Runway API 서버가 HTML 페이지를 반환했습니다. API 엔드포인트 경로가 잘못되었거나 서버가 일시적으로 사용 불가능합니다.";
+  }
   try {
-    const errJson = JSON.parse(errText);
+    const errJson = JSON.parse(trimmed);
     if (errJson?.error) {
       if (typeof errJson.error === "string") return errJson.error.slice(0, 500);
       if (typeof errJson.error === "object") {
@@ -777,7 +792,7 @@ function parseRunwayError(errText: string): string {
     if (errJson?.message) return String(errJson.message).slice(0, 500);
     if (Array.isArray(errJson?.details)) return errJson.details.map((d: unknown) => String(d)).join("; ").slice(0, 500);
   } catch { /* not JSON */ }
-  return errText.slice(0, 500);
+  return trimmed.slice(0, 500);
 }
 
 async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): Promise<string> {

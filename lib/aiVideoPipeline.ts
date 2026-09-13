@@ -258,19 +258,24 @@ async function buildVideoFunctionError(error: unknown): Promise<Error> {
     try {
       const cloned = (response as Response).clone();
       const contentType = cloned.headers.get('content-type') ?? '';
-      const payload = contentType.includes('application/json')
-        ? await cloned.json() as { error?: unknown; message?: unknown; step?: unknown; provider?: unknown }
-        : { error: await cloned.text() };
-      const message = typeof payload.error === 'string'
-        ? payload.error
-        : typeof payload.message === 'string'
-          ? payload.message
-          : fallback;
-      const details = [
-        typeof payload.step === 'string' ? `단계: ${payload.step}` : '',
-        typeof payload.provider === 'string' ? `프로바이더: ${payload.provider}` : '',
-      ].filter(Boolean).join(' · ');
-      return new Error(details ? `${message} (${details})` : message);
+      const text = await cloned.text();
+      if (contentType.includes('application/json') || text.trim().startsWith('{')) {
+        const payload = JSON.parse(text) as { error?: unknown; message?: unknown; step?: unknown; provider?: unknown };
+        const message = typeof payload.error === 'string'
+          ? payload.error
+          : typeof payload.message === 'string'
+            ? payload.message
+            : fallback;
+        const details = [
+          typeof payload.step === 'string' ? `단계: ${payload.step}` : '',
+          typeof payload.provider === 'string' ? `프로바이더: ${payload.provider}` : '',
+        ].filter(Boolean).join(' · ');
+        return new Error(details ? `${message} (${details})` : message);
+      }
+      if (text.trim().startsWith('<!') || text.trim().startsWith('<html') || contentType.includes('text/html')) {
+        return new Error('AI 비디오 서버가 올바른 응답을 반환하지 않았습니다. 잠시 후 다시 시도해주세요.');
+      }
+      return new Error(fallback);
     } catch {
       return new Error(fallback);
     }
