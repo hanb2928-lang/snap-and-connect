@@ -631,7 +631,7 @@ export default function CameraScreen() {
             />
           </View>
 
-          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+          <View style={[styles.bottomBar, { paddingBottom: theme.spacing.sm }]}>
             {error && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{error}</Text>
@@ -751,7 +751,7 @@ export default function CameraScreen() {
           )}
         </View>
 
-        <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+        <View style={[styles.bottomBar, { paddingBottom: theme.spacing.sm }]}>
           {error && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{error}</Text>
@@ -851,7 +851,7 @@ export default function CameraScreen() {
           />
         </View>
 
-        <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+        <View style={[styles.bottomBar, { paddingBottom: theme.spacing.sm }]}>
           {error && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{error}</Text>
@@ -963,7 +963,7 @@ export default function CameraScreen() {
         )}
       </View>
 
-      <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+      <View style={[styles.bottomBar, { paddingBottom: theme.spacing.sm }]}>
         {error && (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
