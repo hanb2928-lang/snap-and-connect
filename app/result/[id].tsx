@@ -134,6 +134,9 @@ import { getDeepLink } from '@/lib/platformUpload';
 import { NarrationPlayer } from '@/components/NarrationPlayer';
 import { HumanTtsProfileCard } from '@/components/HumanTtsProfileCard';
 import { ViralFormulaCard } from '@/components/ViralFormulaCard';
+import { AutoHookSubtitleCard } from '@/components/AutoHookSubtitleCard';
+import { VirtualFittingLoadingOverlay } from '@/components/VirtualFittingLoadingOverlay';
+import { DirectShareBridge } from '@/components/DirectShareBridge';
 import { buildCopyOverlayTimeline } from '@/lib/promptBuilder';
 import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
 
@@ -360,6 +363,7 @@ export default function ResultScreen() {
   const [cameraMotion, setCameraMotion] = useState<string>('AI 자동');
   const [bgmVolume, setBgmVolume] = useState<number>(0.75);
   const [narrationPlaying, setNarrationPlaying] = useState(false);
+  const [fittingOverlayVisible, setFittingOverlayVisible] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
   const [targetPlatform, setTargetPlatform] = useState<TargetPlatformKey>('shorts');
   const [contentPurpose, setContentPurpose] = useState<ContentPurpose>('monetization');
@@ -1955,6 +1959,22 @@ export default function ResultScreen() {
           ),
         },
         {
+          key: 'directShare',
+          label: '원탭 공유 & 갤러리 저장',
+          description: '영상을 갤러리에 저장하거나 릴스·쇼츠·틱톡으로 바로 내보내기',
+          category: 'export',
+          modes: ['single', 'multi'] as ScanMode[],
+          icon: <Download size={16} color={theme.colors.accent[400]} strokeWidth={2} />,
+          mediaType: 'video',
+          render: () => (
+            <DirectShareBridge
+              videoUrl={generatedVideoUrl}
+              shareText={shareText}
+              fileName={activeProductName || 'ai-shortform'}
+            />
+          ),
+        },
+        {
           key: 'accountSafety',
           label: '계정 안전 헬스체커',
           description: '발행 간격 쿨다운 타이머 + 안전 점수로 섀도우반 방지',
@@ -2491,6 +2511,13 @@ export default function ResultScreen() {
           />
 
           <ViralFormulaCard totalDurationSec={15} />
+
+          <AutoHookSubtitleCard
+            productName={activeProductName}
+            productCategory={scan?.detected_products?.[selectedProductIndex]?.productCategory}
+            customPrompt={inlineEdit.aiPrompt}
+            narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+          />
 
           {/* 한 줄 후킹 편집 바 + 상세 자막 토글 */}
           <View style={styles.hookEditBar}>
@@ -3049,6 +3076,8 @@ export default function ResultScreen() {
         visible={safetyCheckerVisible}
         onClose={() => setSafetyCheckerVisible(false)}
       />
+
+      <VirtualFittingLoadingOverlay visible={fittingOverlayVisible} />
     </View>
   );
 }

@@ -12,6 +12,8 @@ import {
 } from './viralAudioSyncEngine';
 import { mapVoiceKeyToProsody } from './prosodyProfile';
 import { DEFAULT_DURATION } from './durationPresets';
+import { autoSelectHook, type AutoHookResult } from './autoHookEngine';
+import { autoStyleSubtitle, type DynamicSubtitleResult } from './dynamicSubtitleEngine';
 
 export interface SoloDirectorInput {
   productName: string;
@@ -65,6 +67,8 @@ export interface SoloDirectorResult {
   syncAccuracyLabel: string;
   estimatedConversionBoost: number;
   fusionScenes: PsychScene[];
+  autoHook: AutoHookResult;
+  dynamicSubtitle: DynamicSubtitleResult;
   message: string;
 }
 
@@ -156,10 +160,17 @@ export async function runSoloDirector(input: SoloDirectorInput): Promise<SoloDir
     scanId = null,
   } = input;
 
+  const autoHook = autoSelectHook({
+    productName,
+    productCategory,
+    priceEstimate,
+    customPrompt,
+  });
+
   const editPlan = buildShortFormEditPlan(
     platform,
     customPrompt,
-    null,
+    autoHook.selected.text,
     productName,
     affiliatePlatforms,
     true,
@@ -184,16 +195,21 @@ export async function runSoloDirector(input: SoloDirectorInput): Promise<SoloDir
   const hookResult = generateHook(
     hookType,
     productName,
-    editPlan.selectedHook ?? oneLiner,
+    autoHook.selected.text,
     [],
   );
 
   const script = buildScript(hookResult, editPlan, nanoAnalysis.fusedScenes, productName);
   const captionPlan = buildCaptionPlan(editPlan, directingPlan, nanoAnalysis.fusedScenes);
 
+  const dynamicSubtitle = autoStyleSubtitle(
+    script.fullScript,
+    editPlan.segments.map((s) => ({ text: s.textOverlay, position: s.position })),
+  );
+
   const syncKey = mapPlatformToSyncKey(platform);
   const purpose: ContentPurpose = 'monetization';
-  const prosodyProfile = mapVoiceKeyToProsody('viral_female_1');
+  const prosodyProfile = mapVoiceKeyToProsody('m2_trendy_hype');
   const scriptText = script.fullScript;
   const syncProfile = buildViralAudioSyncProfile(
     syncKey,
@@ -221,6 +237,8 @@ export async function runSoloDirector(input: SoloDirectorInput): Promise<SoloDir
     syncAccuracyLabel: getSyncAccuracyLabel(syncProfile),
     estimatedConversionBoost: nanoAnalysis.analysisReport.estimatedConversionBoost,
     fusionScenes: nanoAnalysis.fusedScenes,
+    autoHook,
+    dynamicSubtitle,
     message: `AI 1인 연출가 완료: ${productName} · ${platform} · ${getDirectingSummary(directingPlan)}`,
   };
 }
