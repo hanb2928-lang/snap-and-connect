@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob, triggerTTS } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, Image as ImageIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -378,6 +378,7 @@ export default function ResultScreen() {
   const [manualHook, setManualHook] = useState('');
   const [manualKeywords, setManualKeywords] = useState('');
   const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
+  const [targetMediaType, setTargetMediaType] = useState<'video' | 'image'>('video');
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -2395,6 +2396,28 @@ export default function ResultScreen() {
           <Text style={styles.targetPlatformHint}>
             {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
           </Text>
+          <View style={styles.mediaTypeRow}>
+            <TouchableOpacity
+              style={[styles.mediaTypeBtn, targetMediaType === 'video' && styles.mediaTypeBtnActive]}
+              onPress={() => setTargetMediaType('video')}
+              activeOpacity={0.7}
+            >
+              <VideoIcon size={15} color={targetMediaType === 'video' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'video' && styles.mediaTypeBtnTextActive]}>
+                동영상
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mediaTypeBtn, targetMediaType === 'image' && styles.mediaTypeBtnActive]}
+              onPress={() => setTargetMediaType('image')}
+              activeOpacity={0.7}
+            >
+              <ImageIcon size={15} color={targetMediaType === 'image' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'image' && styles.mediaTypeBtnTextActive]}>
+                이미지
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
@@ -4105,6 +4128,37 @@ iconButton: {
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.primary[300],
     paddingLeft: 2,
+  },
+  mediaTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  mediaTypeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surface,
+    borderWidth: 1.5,
+    borderColor: theme.colors.dark.border,
+  },
+  mediaTypeBtnActive: {
+    backgroundColor: theme.colors.primary[500] + '15',
+    borderColor: theme.colors.primary[400] + '60',
+  },
+  mediaTypeBtnText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  mediaTypeBtnTextActive: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.primary[300],
   },
   syncStatusSection: {
     backgroundColor: theme.colors.dark.surface,
