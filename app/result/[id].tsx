@@ -2323,21 +2323,23 @@ export default function ResultScreen() {
         </View>
 
         {generatedVideoUrl && (
-          <TouchableOpacity
-            style={styles.aiVideoBtn}
-            onPress={handleSaveVideo}
-            disabled={uploadProgress !== null}
-            activeOpacity={0.7}
-          >
-            {uploadProgress !== null ? (
-              <Loader2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-            ) : (
-              <Download size={16} color={theme.colors.primary[300]} strokeWidth={2} />
-            )}
-            <Text style={styles.aiVideoBtnText}>
-              {uploadProgress !== null ? '영상 저장 중...' : 'AI 영상 갤러리에 저장'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.dualActionRow}>
+            <TouchableOpacity
+              style={[styles.dualActionBtn, styles.aiVideoBtn]}
+              onPress={handleSaveVideo}
+              disabled={uploadProgress !== null}
+              activeOpacity={0.7}
+            >
+              {uploadProgress !== null ? (
+                <Loader2Icon size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+              ) : (
+                <Download size={18} color={theme.colors.primary[300]} strokeWidth={2} />
+              )}
+              <Text style={styles.aiVideoBtnText} numberOfLines={1}>
+                {uploadProgress !== null ? '영상 저장 중...' : 'AI 영상 갤러리에 저장'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {showManualSettings && (
@@ -4349,6 +4351,7 @@ iconButton: {
     color: '#fff',
   },
   aiVideoBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4356,8 +4359,6 @@ iconButton: {
     backgroundColor: theme.colors.dark.surfaceLight,
     borderRadius: theme.radius.md,
     paddingVertical: 14,
-    marginTop: 10,
-    marginHorizontal: theme.spacing.md,
     borderWidth: 1.5,
     borderColor: theme.colors.primary[400] + '40',
   },
