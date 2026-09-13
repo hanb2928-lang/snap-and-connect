@@ -327,7 +327,7 @@ export default function CameraScreen() {
 
     if (isMountedRef.current) {
       setStereoOverlayVisible(false);
-      router.replace({ pathname: '/editor', params: { id: scanId } });
+      router.replace({ pathname: '/result/[id]', params: { id: scanId } });
     }
 
     // Background: run synthesis/directing/publish pipeline without blocking UI
@@ -940,7 +940,6 @@ export default function CameraScreen() {
             autoSaveToast={autoSaveToast}
             autoSaveStep={autoSaveStep}
             onMultiAnglePress={() => setMultiAngleVisible(true)}
-            showShutter
             simplified
           />
         </View>
@@ -1044,34 +1043,13 @@ export default function CameraScreen() {
         )}
       </View>
 
-      <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}> 
-        {error && (
+      {error && (
+        <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
-        )}
-
-        <View style={styles.shutterRow}>
-          <View style={{ width: 52 }} />
-          <TouchableOpacity
-            style={[
-              styles.shutterBtn,
-              !cameraReady && styles.shutterBtnDisabled,
-              (autoSaving || processing) && styles.shutterBtnCapturing,
-            ]}
-            onPress={handleCapture}
-            disabled={processing || autoSaving || !cameraReady}
-            activeOpacity={0.85}
-          >
-            <Camera size={30} color="#fff" strokeWidth={2.5} />
-          </TouchableOpacity>
-          <View style={{ width: 52 }} />
         </View>
-
-        <Text style={styles.shutterHintText}>
-          {autoSaving ? 'AI 자동 분석 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
-        </Text>
-      </View>
+      )}
 
       {/* Multi-Angle Capture Guide */}
       <MultiAngleCaptureGuide
