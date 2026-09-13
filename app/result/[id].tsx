@@ -2508,7 +2508,23 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
+        {/* === 프롬프트 입력 + AI 자동 생성 + 상세 수동 설정 === */}
+        <View style={styles.quickPromptSection}>
+          <View style={styles.quickPromptHeader}>
+            <Wand2 size={14} color={theme.colors.primary[300]} strokeWidth={2} />
+            <Text style={styles.quickPromptLabel}>연출 프롬프트</Text>
+          </View>
+          <TextInput
+            style={styles.quickPromptInput}
+            value={inlineEdit.aiPrompt}
+            onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
+            placeholder="예: 캐주얼한 스트릿 패션, 밝고 화사한 스튜디오 배경"
+            placeholderTextColor={theme.colors.dark.textFaint}
+            multiline
+            numberOfLines={2}
+            textAlignVertical="top"
+          />
+        </View>
         <View style={styles.dualActionRow}>
           <TouchableOpacity
             style={[styles.dualActionBtn, styles.dualActionPrimary, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
@@ -4520,6 +4536,39 @@ iconButton: {
     marginTop: 8,
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
+  },
+  quickPromptSection: {
+    marginTop: 10,
+    marginHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  quickPromptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  quickPromptLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  quickPromptInput: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 48,
   },
   dualActionRow: {
     flexDirection: 'row',
