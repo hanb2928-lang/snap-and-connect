@@ -162,8 +162,14 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
       ? `${supabaseUrl}/functions/v1/generate-video`
       : undefined;
 
+    let promptImage: string | null = null;
+    if (body.scanId) {
+      promptImage = await fetchScanImageUrl(body.scanId);
+      console.log("[generate-video] Fetched scan image for promptImage:", promptImage ? "found" : "not found");
+    }
+
     const taskId = await submitWithRetry(
-      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId),
+      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId, promptImage),
       MAX_RETRIES,
     );
 
@@ -491,6 +497,34 @@ async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string
   }
 }
 
+async function fetchScanImageUrl(scanId: string): Promise<string | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/scans?select=edited_image_url,image_url&id=eq.${scanId}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const rows = await resp.json() as Array<{ edited_image_url: string | null; image_url: string | null }>;
+      if (rows.length > 0) {
+        return rows[0].edited_image_url ?? rows[0].image_url ?? null;
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+  return null;
+}
+
 async function submitRunwayTask(
   prompt: string,
   apiKey: string,
@@ -499,6 +533,7 @@ async function submitRunwayTask(
   isDraft: boolean,
   webhookUrl?: string,
   scanId?: string,
+  promptImage?: string | null,
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
@@ -508,29 +543,37 @@ async function submitRunwayTask(
     const ratioValue = aspectRatio === "9:16" ? "9:16" : aspectRatio === "16:9" ? "16:9" : "1:1";
     const safePrompt = prompt.slice(0, 500);
 
+    const hasImage = !!promptImage;
+    const endpoint = hasImage ? "image_to_video" : "text_to_video";
+    const model = hasImage ? "gen4_turbo" : "gen3a_turbo";
+
     const payload: Record<string, unknown> = {
-      model: "gen3a_turbo",
+      model,
       promptText: safePrompt,
       duration: clampedDuration,
       ratio: ratioValue,
       watermark: false,
     };
+    if (hasImage && promptImage) {
+      payload.promptImage = promptImage;
+    }
     if (webhookUrl && scanId) {
       payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
     console.log("[generate-video] Runway request:", JSON.stringify({
-      endpoint: "https://api.dev.runwayml.com/v1/text_to_video",
+      endpoint: `https://api.dev.runwayml.com/v1/${endpoint}`,
       method: "POST",
       model: payload.model,
       duration: payload.duration,
       ratio: payload.ratio,
+      hasPromptImage: hasImage,
       promptLength: prompt.length,
       promptPreview: prompt.slice(0, 120),
       fullBody: JSON.stringify(payload),
     }));
 
-    const resp = await fetch("https://api.dev.runwayml.com/v1/text_to_video", {
+    const resp = await fetch(`https://api.dev.runwayml.com/v1/${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
