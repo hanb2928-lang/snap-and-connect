@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Layers } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Layers, Flame, Gem } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -58,6 +58,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 type ScreenPhase = 'mode_select' | 'camera' | 'fitting_capture' | 'fitting_result';
 type CaptureMode = 'single' | 'fitting';
+type ContentTone = 'studio' | 'raw';
 
 const FITTING_GUIDES: AngleGuide[] = [
   { id: 'product_front', label: '제품 정면', hint: '합성할 제품의 정면 사진을 촬영하거나 선택하세요', emoji: '📸' },
@@ -99,6 +100,7 @@ export default function CameraScreen() {
   const [stereoOverlayVisible, setStereoOverlayVisible] = useState(false);
   const [screenPhase, setScreenPhase] = useState<ScreenPhase>('mode_select');
   const [captureMode, setCaptureMode] = useState<CaptureMode>('single');
+  const [contentTone, setContentTone] = useState<ContentTone>('raw');
 
   // Virtual fitting state
   const [fittingShots, setFittingShots] = useState<AngleShot[]>([]);
@@ -109,6 +111,17 @@ export default function CameraScreen() {
   const postCaptureBase64Ref = useRef<string | null>(null);
   const postCaptureMimeRef = useRef<string>('video/webm');
   const postCaptureVideoUriRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    getItem('content_tone').then((saved) => {
+      if (saved === 'studio' || saved === 'raw') setContentTone(saved as ContentTone);
+    });
+  }, []);
+
+  const handleContentToneChange = useCallback((tone: ContentTone) => {
+    setContentTone(tone);
+    setItem('content_tone', tone);
+  }, []);
 
   const startAutoSaveAnimation = useCallback(() => {
     setAutoSaveStep(1);
@@ -166,7 +179,7 @@ export default function CameraScreen() {
     startAutoSaveAnimation();
     try {
       const { scanId } = await withTimeout(
-        startAsyncAnalysis(base64, mimeType, additionalB64s.length > 0 ? 'multi' : 'single', additionalB64s),
+        startAsyncAnalysis(base64, mimeType, additionalB64s.length > 0 ? 'multi' : 'single', additionalB64s, contentTone),
         ANALYSIS_TIMEOUT_MS,
         'AI 자동 분석',
       );
@@ -499,6 +512,42 @@ export default function CameraScreen() {
         </View>
 
         <TriggerBanner />
+
+        <View style={styles.toneSelectorWrap}>
+          <Text style={styles.toneSelectorLabel}>콘텐츠 톤앤매너</Text>
+          <View style={styles.toneSegmented}>
+            <TouchableOpacity
+              style={[styles.toneSegment, contentTone === 'studio' && styles.toneSegmentActive]}
+              onPress={() => handleContentToneChange('studio')}
+              activeOpacity={0.8}
+            >
+              <Gem size={16} color={contentTone === 'studio' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text
+                style={[
+                  styles.toneSegmentText,
+                  contentTone === 'studio' && styles.toneSegmentTextActive,
+                ]}
+              >
+                스튜디오 프리미엄
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toneSegment, contentTone === 'raw' && styles.toneSegmentActiveRaw]}
+              onPress={() => handleContentToneChange('raw')}
+              activeOpacity={0.8}
+            >
+              <Flame size={16} color={contentTone === 'raw' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text
+                style={[
+                  styles.toneSegmentText,
+                  contentTone === 'raw' && styles.toneSegmentTextActive,
+                ]}
+              >
+                날것의 심리자극
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.modeCardsWrap}>
           <ModeCard
@@ -1173,6 +1222,47 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  toneSelectorWrap: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  toneSelectorLabel: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: theme.spacing.sm,
+    letterSpacing: 0.5,
+  },
+  toneSegmented: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: 4,
+    gap: 4,
+  },
+  toneSegment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+  },
+  toneSegmentActive: {
+    backgroundColor: theme.colors.primary[600],
+  },
+  toneSegmentActiveRaw: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  toneSegmentText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  toneSegmentTextActive: {
+    color: '#fff',
   },
   modeCard: {
     flexDirection: 'row',

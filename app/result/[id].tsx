@@ -882,6 +882,8 @@ export default function ResultScreen() {
         setActivePlatform(saved as PlatformKey);
         setActiveBoard(getPlatformMediaType(saved as PlatformKey));
       }
+      const savedTone = await getItem('content_tone');
+      if (savedTone === 'studio') setIsCleanVideoMode(true);
     })();
   }, []);
 
