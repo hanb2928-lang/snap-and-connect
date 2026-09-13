@@ -1,5 +1,14 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag, Video } from 'lucide-react-native';
+import {
+  FileText,
+  Smartphone,
+  Send,
+  Instagram,
+  MessageCircle,
+  ImageIcon,
+  ShoppingBag,
+  VideoIcon,
+} from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
 
@@ -69,9 +78,9 @@ const PLATFORM_BOARDS: Partial<Record<PlatformKey, MediaType[]>> = {
   smartstore: ['image'],
 };
 
-const BOARD_LABELS: Record<MediaType, { label: string; icon: typeof Video }> = {
+const BOARD_LABELS: Record<MediaType, { label: string; icon: typeof FileText }> = {
   image: { label: '이미지', icon: ImageIcon },
-  video: { label: '동영상', icon: Video },
+  video: { label: '동영상', icon: VideoIcon },
 };
 
 export function BoardTabs({ platform, selected, onSelect }: BoardTabsProps) {
@@ -92,7 +101,7 @@ export function BoardTabs({ platform, selected, onSelect }: BoardTabsProps) {
             activeOpacity={0.7}
           >
             <Icon
-              size={14}
+              size={16}
               color={isActive ? theme.colors.primary[300] : theme.colors.dark.textDim}
               strokeWidth={2}
             />
@@ -160,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
@@ -172,7 +181,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary[400] + '60',
   },
   boardTabText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: theme.typography.fontFamily.medium,
     color: theme.colors.dark.textDim,
   },
