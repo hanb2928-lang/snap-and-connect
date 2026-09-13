@@ -440,19 +440,6 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                 <View style={{ width: 52 }} />
               )}
 
-              <TouchableOpacity
-                style={[
-                  styles.shutterBtn,
-                  !cameraReady && styles.shutterBtnDisabled,
-                  (capturing || autoSaving) && styles.shutterBtnCapturing,
-                ]}
-                onPress={handleCapture}
-                disabled={!cameraReady || capturing || autoSaving}
-                activeOpacity={0.85}
-              >
-                <Camera size={30} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
-
               {!simplified ? (
                 <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
                   {gridVisible ? (
@@ -465,13 +452,6 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                 <View style={{ width: 52 }} />
               )}
             </View>
-
-            <Text style={styles.shutterHint}>
-              {autoSaving ? 'AI 자동 분석 중...' :
-               capturing ? '촬영 중...' :
-               captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
-               '전면, 측면, 디테일을 연달아 촬영'}
-            </Text>
           </View>
         </>
       )}
