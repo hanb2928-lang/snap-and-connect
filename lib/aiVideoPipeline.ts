@@ -44,12 +44,13 @@ interface PollResponse {
   persisted?: boolean;
 }
 
-const POLL_INTERVAL_FAST_MS = 3000;
-const POLL_INTERVAL_NORMAL_MS = 5000;
-const FAST_POLL_DURATION_MS = 10000;
-const MAX_POLL_ATTEMPTS = 72;
+const POLL_INTERVAL_ULTRA_MS = 500;
+const POLL_INTERVAL_NORMAL_MS = 1000;
+const ULTRA_POLL_DURATION_MS = 5000;
+const MAX_POLL_ATTEMPTS = 360;
 const SUBMIT_MAX_RETRIES = 2;
 const SUBMIT_RETRY_DELAY_MS = 2000;
+const MAX_BACKOFF_MS = 8000;
 
 const STATUS_MESSAGES: Record<string, string> = {
   THROTTLED: 'Runway 서버 대기 중 (순서 대기)...',
@@ -89,7 +90,7 @@ export async function generateAiVideo(
         body: {
           mode: 'submit',
           prompt,
-          durationSec: options.durationSec ?? 10,
+          durationSec: options.durationSec ?? 5,
           aspectRatio: options.aspectRatio ?? '9:16',
           productName: options.productName,
           scanId: options.scanId,
@@ -140,11 +141,13 @@ export async function generateAiVideo(
 
   const pollStartTime = Date.now();
 
-  // Phase 2: Poll until complete (adaptive interval: 3s for first 10s, then 5s)
+  // Phase 2: Poll until complete (ultra-fast 0.5s for first 5s, then 1s with exponential backoff on errors)
+  let consecutiveErrors = 0;
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     const elapsed = Date.now() - pollStartTime;
-    const interval = elapsed < FAST_POLL_DURATION_MS ? POLL_INTERVAL_FAST_MS : POLL_INTERVAL_NORMAL_MS;
-    await delay(interval);
+    const baseInterval = elapsed < ULTRA_POLL_DURATION_MS ? POLL_INTERVAL_ULTRA_MS : POLL_INTERVAL_NORMAL_MS;
+    const backoffMultiplier = consecutiveErrors > 0 ? Math.min(Math.pow(2, consecutiveErrors), MAX_BACKOFF_MS / baseInterval) : 1;
+    await delay(Math.round(baseInterval * backoffMultiplier));
 
     let pollData: PollResponse | null = null;
 
@@ -163,12 +166,14 @@ export async function generateAiVideo(
 
       pollData = data as PollResponse;
     } catch (err) {
-      // Network blip — keep polling
+      // Network blip — keep polling with exponential backoff
+      consecutiveErrors++;
       const msg = err instanceof Error ? err.message : '폴링 오류';
       report('generating', 0.1 + attempt * 0.005, `연결 재시도 중: ${msg}`);
       continue;
     }
 
+    consecutiveErrors = 0;
     if (!pollData) continue;
 
     if (pollData.status === 'SUCCESS' && pollData.videoUrl) {

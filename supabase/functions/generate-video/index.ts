@@ -47,10 +47,11 @@ interface GenerateVideoRequest {
   error?: string;
 }
 
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 2000;
-const RUNWAY_SUBMIT_TIMEOUT_MS = 30000;
-const RUNWAY_POLL_TIMEOUT_MS = 15000;
+const MAX_RETRIES = 1;
+const RETRY_DELAY_MS = 1500;
+const RUNWAY_SUBMIT_TIMEOUT_MS = 20000;
+const RUNWAY_POLL_TIMEOUT_MS = 10000;
+const EDGE_WALL_CLOCK_BUDGET_MS = 120000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -138,25 +139,21 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
   }
 
   const isDraft = body.draft === true;
-  const durationSec = isDraft ? 5 : Math.min(body.durationSec ?? 10, 10);
+  const durationSec = isDraft ? 3 : Math.min(body.durationSec ?? 5, 5);
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
 
-  const motionPrompt = buildMotionPrompt(
-    effectivePrompt,
-    body.productName,
+  const runwayPrompt = buildCompactRunwayPrompt({
+    userPrompt: effectivePrompt,
+    productName: body.productName,
     aspectRatio,
     variationSeed,
-    body.bgmMood,
-    body.captionText,
-    body.cutCount,
-    body.platform ?? "shorts",
-    body.hookCategory ?? "curiosity",
-    body.cutCount,
-    body.productVision ?? null,
-  );
-
-  const runwayPrompt = motionPrompt.slice(0, 500);
+    bgmMood: body.bgmMood,
+    captionText: body.captionText,
+    platform: body.platform ?? "shorts",
+    hookCategory: body.hookCategory ?? "curiosity",
+    productVision: body.productVision ?? null,
+  });
 
   try {
     const webhookUrl = body.scanId && supabaseUrl
@@ -506,12 +503,12 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
-    const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 10);
-    const ratioValue = aspectRatio === "9:16" ? "720:1280" : aspectRatio === "16:9" ? "1280:720" : "960:960";
+    const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 5);
+    const ratioValue = aspectRatio === "9:16" ? "540:960" : aspectRatio === "16:9" ? "960:540" : "720:720";
 
     const payload: Record<string, unknown> = {
       promptText: prompt,
-      model: "gen4.5",
+      model: "gen3-alpha-turbo",
       duration: clampedDuration,
     };
     if (imageUrl) {
@@ -662,232 +659,83 @@ function buildAutoPrompt(
   return parts.join(". ");
 }
 
-function buildMotionPrompt(
-  userPrompt: string,
-  productName: string | undefined,
-  aspectRatio: string,
-  variationSeed: number,
-  bgmMood: string | undefined,
-  captionText: string | undefined,
-  _cutCount: number,
-  platform: string = "shorts",
-  hookCategory: string = "curiosity",
-  explicitCutCount?: number,
-  productVision?: ProductVisionData | null,
-): string {
-  const orientation = aspectRatio === "9:16" ? "vertical portrait 9:16" : aspectRatio === "16:9" ? "horizontal landscape 16:9" : "square 1:1";
-  const effectiveCutCount = explicitCutCount ?? 3;
+type CompactPromptParams = {
+  userPrompt: string;
+  productName?: string;
+  aspectRatio: string;
+  variationSeed: number;
+  bgmMood?: string;
+  captionText?: string;
+  platform: string;
+  hookCategory: string;
+  productVision?: ProductVisionData | null;
+};
 
-  const platformBenchmarks: Record<string, {
-    composition: string; gaze: string; lighting: string; transition: string; colorGrade: string; cutInterval: number; hookSec: number;
-  }> = {
-    shorts: {
-      composition: "Rule of thirds, subject upper-third, negative space lower third for captions",
-      gaze: "Dynamic 3D product rotation with particle effects, no human subject needed",
-      lighting: "Studio 3-point lighting with animated color shifts, rim light for depth",
-      transition: "Seamless 3D morph transitions, camera whoosh between scenes, zero cross-dissolves",
-      colorGrade: "Warm highlights +200K, crushed blacks, saturation +15%",
-      cutInterval: 1.8,
-      hookSec: 2.0,
-    },
-    tiktok: {
-      composition: "Center-weighted, product fills 70-80% frame, high contrast against dynamic background",
-      gaze: "Fast 3D zoom-punch on product, kinetic energy, trending visual effects",
-      lighting: "High-key bright, neon accent lighting, ambient fill, energetic atmosphere",
-      transition: "Jump cuts with 3D zoom-punch on beat drops, particle burst transitions",
-      colorGrade: "Vibrant pop, saturation +25%, warm skin tones, teal shadows",
-      cutInterval: 1.5,
-      hookSec: 0.5,
-    },
-    reels: {
-      composition: "Cinematic asymmetry, product in left/right third, shallow depth of field with bokeh",
-      gaze: "Smooth orbital camera around product, emotional atmospheric build",
-      lighting: "Golden hour warmth, volumetric light rays, soft diffusion, backlight halo",
-      transition: "Smooth speed-ramp transitions, seamless 3D match-action, minimal hard cuts",
-      colorGrade: "Filmic teal-orange, muted mid-tones, warm highlights, deep blacks",
-      cutInterval: 2.0,
-      hookSec: 2.5,
-    },
-    naverclip: {
-      composition: "Product-centric center, clean uncluttered background, info-dense framing",
-      gaze: "Product hero shot with clean 3D rotation, info-graphic overlay style",
-      lighting: "Clean bright studio, even key+fill ratio, minimal shadows for clarity",
-      transition: "Information cuts, 3D text overlay transitions, clean wipe synced to VO",
-      colorGrade: "Neutral natural colors, accurate product representation, slight warmth",
-      cutInterval: 2.5,
-      hookSec: 3.0,
-    },
-  };
-  const benchmark = platformBenchmarks[platform] ?? platformBenchmarks.shorts;
+const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
+  shorts: { camera: "dolly-in + 3D rotation", lighting: "studio 3-point + rim light", grade: "warm, crushed blacks, +15% sat" },
+  tiktok: { camera: "zoom-punch + jump cuts", lighting: "high-key bright + neon", grade: "vibrant pop, +25% sat, teal shadows" },
+  reels: { camera: "orbital arc + speed ramps", lighting: "golden hour + volumetric", grade: "filmic teal-orange, deep blacks" },
+  naverclip: { camera: "hero rotation + info overlay", lighting: "clean bright studio", grade: "neutral natural, slight warmth" },
+};
 
-  const scenePhases = [
-    {
-      phase: "LOSS_AVERSION_HOOK",
-      scene: `Cinematic 3D product reveal — ${productName ?? "product"} emerges from darkness with particle dispersion, volumetric light shafts, and dramatic slow-motion materialization. Visual metaphor: product appears as the ONE thing the viewer is about to miss. Dark crimson rim lighting creates sense of urgency and danger-of-missing-out.`,
-      camera: `Dolly-in from black 1.05x→1.3x over ${benchmark.hookSec}s, shallow DOF, bokeh particles drifting through foreground. Camera pushes toward product as if viewer is being pulled in by curiosity.`,
-      lighting: `Single motivated key light 45° camera-left, crimson rim light revealing product silhouette, ambient glow buildup. Shadow-heavy to create tension and loss-aversion feeling.`,
-    },
-    {
-      phase: "PROBLEM_SOLUTION",
-      scene: `Dynamic AI art showcase — ${productName ?? "product"} floating in 3D space with animated graphic elements. Split-screen before/after visual: left side shows problem state (desaturated, chaotic), right side shows solution state (vibrant, ordered with product). Cognitive friction resolved through clear visual contrast. Feature callout text materializes in air pointing to key product benefits.`,
-      camera: `Orbital arc 90° clockwise around product, radius 1.5x product width, ease-in-out cubic, parallax background drift. Camera pauses at 45° to emphasize before/after split, then continues to full product reveal.`,
-      lighting: `Color-shifting key light: starts cool/blue (problem state) transitions to warm/golden (solution state), simulating the transformation the product provides. Studio practicals pulsing to beat.`,
-    },
-    {
-      phase: "SOCIAL_PROOF_URGENCY",
-      scene: `Cinematic commercial sequence — ${productName ?? "product"} in aspirational lifestyle context with floating social proof elements (animated star ratings, review count badges, "1만+ 판매" counters materializing in 3D space). 3D environment morph into lifestyle context. Urgency elements: countdown timer overlay, "한정" badge pulsing, stock bar depleting. CTA text burns in with kinetic typography.`,
-      camera: `Tilt reveal +8° on Y-axis, ascending crane move revealing full lifestyle context. Depth layers separating foreground product from social proof badges in midground. Final 2s: camera locks to hero frame for CTA text overlay.`,
-      lighting: `Motivated lighting shift: warm key → bright approachable, simulating time-of-day passage from problem to solution. Lens flare accents at transition peaks. Final CTA frame: even key+fill, bright approachable, no dramatic shadows for CTA clarity, soft bloom on product edges.`,
-    },
+const MOOD_GRADE: Record<string, string> = {
+  "하이텐션": "high-energy, motion blur, neon glow",
+  "시네마틱": "cinematic teal-orange, film grain, lens flare",
+  "ASMR": "soft intimate, warm muted, shallow DOF",
+  "감성": "emotional golden, soft bloom, gentle vignette",
+  "로파이": "lofi desaturated, warm tint, vintage grain",
+};
+
+const HOOK_TEXTS: Record<string, string[]> = {
+  curiosity: ["이거 진짜였어?", "다들 놀라는 중", "왜 이제야 알았지"],
+  problem: ["이거 때문에 스트레스", "다들 이걸로 고생함", "해결책 찾았어"],
+  transformation: ["before 이랬는데 after 이렇게", "사용 전후 비교 충격", "이거 쓰고 달라졌어"],
+  social_proof: ["이 동네 1위", "다들 이거 사감", "리뷰 1만 개"],
+  fomo: ["품절 전에 확인", "선찹순 마감 임박", "놓치면 다시 없어"],
+};
+
+function buildCompactRunwayPrompt(p: CompactPromptParams): string {
+  const name = p.productName || p.productVision?.productName || "the product";
+  const orientation = p.aspectRatio === "9:16" ? "vertical 9:16" : p.aspectRatio === "16:9" ? "horizontal 16:9" : "square 1:1";
+  const style = PLATFORM_STYLE[p.platform] ?? PLATFORM_STYLE.shorts;
+  const mood = MOOD_GRADE[p.bgmMood ?? ""] ?? MOOD_GRADE["하이텐션"];
+  const hooks = HOOK_TEXTS[p.hookCategory] ?? HOOK_TEXTS.curiosity;
+  const hook = hooks[p.variationSeed % hooks.length];
+
+  const parts: string[] = [
+    `Cinematic 3D commercial for ${name}, ${orientation}.`,
+    `Camera: ${style.camera}. Lighting: ${style.lighting}. Color: ${style.grade}, ${mood}.`,
+    `Hook: "${hook}" kinetic typography at 0.3s.`,
   ];
 
-  const moodGrades: Record<string, string> = {
-    "하이텐션": "High-energy: saturation +25%, contrast +20%, punchy highlights, motion blur on fast cuts, neon accent glow",
-    "시네마틱": "Cinematic: teal-orange split tone, film grain 15%, anamorphic lens flare, letterbox safe, volumetric atmosphere",
-    "ASMR": "Soft intimate: warm muted tones, f/1.4 shallow DOF, gentle glow on highlights, slow ethereal motion",
-    "감성": "Emotional: warm golden tones, soft contrast, bloom on highlights, gentle vignette, dreamy particle drift",
-    "로파이": "Lofi: desaturated -10%, warm tint, slight grain, vintage film emulation, retro color palette",
-  };
-  const moodGrade = bgmMood ? (moodGrades[bgmMood] ?? moodGrades["하이텐션"]) : moodGrades["하이텐션"];
-
-  const hookPatterns: Record<string, string[]> = {
-    curiosity: ["이거 진짜였어?", "다들 놀라는 중", "왜 이제야 알았지"],
-    problem: ["이거 때문에 스트레스", "다들 이걸로 고생함", "해결책 찾았어"],
-    transformation: ["before 이랬는데 after 이렇게", "사용 전후 비교 충격", "이거 쓰고 달라졌어"],
-    social_proof: ["이 동네 1위", "다들 이거 사감", "리뷰 1만 개"],
-    fomo: ["품절 전에 확인", "선찹순 마감 임박", "놓치면 다시 없어"],
-  };
-  const hookTexts = hookPatterns[hookCategory] ?? hookPatterns.curiosity;
-  const hookText = hookTexts[variationSeed % hookTexts.length];
-
-  const segmentDirectives = scenePhases.slice(0, Math.min(effectiveCutCount, scenePhases.length)).map((spec, i) => {
-    const phaseRanges = ["0-2s", "3-9s", "10-15s"];
-    const timeRange = phaseRanges[i] ?? `${i * 5}-${(i + 1) * 5}s`;
-    return `[${timeRange}] ${spec.phase}: ${spec.scene}. Camera: ${spec.camera}. Lighting: ${spec.lighting}.`;
-  }).join("\n");
-
-  const hookDirective =
-    `HOOK (0-2s): LOSS AVERSION + CURIOSITY. Cinematic 3D product materialization from darkness. ` +
-    `Motion: Slow dolly-in with particle dispersion and volumetric light reveal. ` +
-    `Psychology: Create immediate sense that viewer is about to miss something important. Dark crimson rim lighting = danger/urgency. ` +
-    `Text: "${hookText}" materializes at 0.3s with kinetic 3D typography, 120% pop-in, depth shadow. ` +
-    `ZERO scene changes in first ${benchmark.hookSec}s — escalating visual intensity only.`;
-
-  const retentionDirective =
-    `PSYCHOLOGY TIMELINE: [0-2s] Loss Aversion Hook → [3-9s] Problem/Solution Before-After → [10-15s] Social Proof + Urgency CTA. ` +
-    `Cut interval ${benchmark.cutInterval}s accelerating. 3D scene morphs every 3-4s. ` +
-    `Kinetic captions 0.3s before audio peaks. Last 3s: locked hero frame for CTA with urgency text. ` +
-    `Audio-visual sync: 0.1s max desync.`;
-
-  const captionHint = captionText ? `\nCaption context: "${captionText.slice(0, 80)}".` : "";
-
-  const visionSection = productVision ? buildVisionPromptSection(productVision) : "";
-
-  const promptParts = [
-    `### PURCHASE-CONVERSION PSYCHOLOGY COMMERCIAL — TOP-1% AI-GENERATED VIDEO (no source photos)`,
-    ``,
-    `Create a completely new 10-second AI-generated commercial video featuring ${productName ?? "the product"}.`,
-    `Do NOT use any input photographs as video frames. The 5 captured product photos were used ONLY for Vision AI metadata extraction.`,
-    `All visual content must be freshly generated as dynamic AI artwork and cinematic 3D commercial scenes.`,
-    ``,
-    `### CONVERSION PSYCHOLOGY FRAMEWORK (3-Phase Timeline)`,
-    `Phase 1 [0-2s] VISUAL HOOK: Loss Aversion + Curiosity — make viewer feel they're about to miss something critical`,
-    `Phase 2 [3-9s] PROBLEM & SOLUTION: Cognitive Friction Resolution — before/after contrast, product as the clear solution`,
-    `Phase 3 [10-15s] SOCIAL PROOF & URGENCY: Scarcity + Immediate Action CTA — social proof badges, countdown, stock urgency`,
-    ``,
-    `Subject: ${userPrompt}${productName ? ` featuring ${productName}` : ""}.`,
-    `Format: ${orientation}.`,
-    ``,
-    `### HOOK STRUCTURE (0-2s) — LOSS AVERSION`,
-    hookDirective,
-    ``,
-    `### CINEMATIC SCENE SEQUENCE — PSYCHOLOGY-DRIVEN 3D COMMERCIAL SCENES`,
-    segmentDirectives,
-    ``,
-    `### PLATFORM OPTIMIZATION — ${platform.toUpperCase()}`,
-    `Composition: ${benchmark.composition}. Visual style: ${benchmark.gaze}. Transition: ${benchmark.transition}.`,
-    ``,
-    `### COLOR GRADING & MOOD`,
-    `${moodGrade}. Base: ${benchmark.colorGrade}.`,
-    ``,
-    `### RETENTION ENGINE — CONVERSION OPTIMIZED`,
-    retentionDirective,
-  ];
-
-  if (visionSection) {
-    promptParts.push(``, visionSection);
+  if (p.productVision) {
+    const v = p.productVision;
+    const feats = v.visualFeatures.slice(0, 3).join(", ");
+    if (feats) parts.push(`Product: ${v.shapeDescription}, ${v.materialGuess}, ${feats}.`);
+    else parts.push(`Product: ${v.shapeDescription}, ${v.materialGuess}.`);
   }
 
-  promptParts.push(
-    ``,
-    `### QUALITY LOCK`,
-    `Fully AI-generated 3D cinematic visuals, 4K quality, professional commercial-grade rendering, no source photo frames, no slideshow, no image-to-image transitions. All scenes must be newly created digital artwork with product-accurate appearance derived from Vision AI metadata. Psychology framework: loss aversion → problem/solution → social proof/urgency must be visually evident throughout.${captionHint}`,
-  );
+  if (p.captionText && p.captionText.trim()) {
+    parts.push(`Context: "${p.captionText.slice(0, 60)}".`);
+  }
 
-  return promptParts.join("\n");
-}
+  parts.push("3-phase: loss-aversion hook → problem/solution contrast → social-proof urgency CTA. Fully AI-generated, no source photos.");
 
-function buildVisionPromptSection(vision: ProductVisionData): string {
-  const features = vision.visualFeatures.slice(0, 5).join(", ");
-  const marketingPoints = vision.marketingPoints.slice(0, 3).join(" / ");
-  const depthLayers = vision.parallaxDepthLayers.length > 0
-    ? vision.parallaxDepthLayers.join(" → ")
-    : "foreground product → midground context → background bokeh";
-  const copyLayers = vision.suggestedCopyLayers;
-
-  return [
-    `### VISION AI PRODUCT METADATA — AI ART CREATION REFERENCE (no source photos in output)`,
-    ``,
-    `The following product metadata was extracted from 5 reference photos via Vision AI analysis.`,
-    `These photos are NOT used as video frames. Use this metadata to generate entirely new AI artwork depicting the product accurately.`,
-    ``,
-    `Product: ${vision.productName}`,
-    `Category: ${vision.productCategory}`,
-    `Visual Features: ${features}`,
-    `Marketing Points: ${marketingPoints}`,
-    `Texture: ${vision.textureDescription}`,
-    `Material: ${vision.materialGuess}`,
-    `Color Palette: ${vision.colorPalette.join(", ")}`,
-    `Shape: ${vision.shapeDescription}`,
-    ``,
-    `### AI ART SCENE GENERATION — PRODUCT-ACCURATE CINEMATIC COMMERCIAL`,
-    `Generate all visual scenes as original 3D-rendered AI artwork that accurately depicts the product using the metadata above.`,
-    `Product appearance must match: shape (${vision.shapeDescription}), material (${vision.materialGuess}), color palette, and texture.`,
-    `Do NOT reproduce the reference photographs. Create new cinematic commercial scenes from imagination guided by product metadata.`,
-    ``,
-    `### 3D ORBITAL CAMERA TRAJECTORY — PSYCHOLOGY-DRIVEN (15s timeline)`,
-    `  [0-2s] LOSS AVERSION HOOK: Product materializes from darkness — particle dispersion reveals product shape, dark crimson rim lighting, tension buildup`,
-    `  [3-5s] PROBLEM STATE: Orbital arc clockwise 45° — desaturated cool tones, chaotic background elements suggesting the problem. Parallax depth layers: ${depthLayers}`,
-    `  [5-9s] SOLUTION REVEAL: Arc continues to 90° — lighting shifts warm/golden, background orders itself, product becomes hero. Before/after visual contrast resolved.`,
-    `  [10-13s] SOCIAL PROOF: Reverse arc returning to hero frontal — floating star ratings, review badges, sales counters materialize in 3D space around product`,
-    `  [13-15s] URGENCY CTA: Locked hero frame, product centered, countdown timer overlay, "한정" badge, CTA text burn-in with kinetic typography`,
-    ``,
-    `Maintain product as visual anchor at all times. Environment and background are fully AI-generated, not from source photos.`,
-    `Depth separation: foreground product razor-sharp, midground 50% blur, background 85% bokeh blur.`,
-    ``,
-    `### DYNAMIC COMMERCIAL LIGHTING & PARTICLE EFFECTS`,
-    `  • Studio key light: 3-point setup — soft key 45° camera-left, rim light 135° camera-right, fill 1:3 ratio`,
-    `  • Product-matched color temperature: warm key (3200K) for lifestyle products, cool key (5600K) for tech products`,
-    `  • Motivated lighting shift: key light rotates with orbital camera, simulating real studio arc`,
-    `  • Particle effects: subtle dust motes in background bokeh (8-12 particles, 2-4px, drifting upward 0.5px/frame)`,
-    `  • Lens flare: anamorphic horizontal flare on rim light peaks at 4s and 10s, 15% opacity, 2px height`,
-    `  • Specular highlights: controlled highlights on product surfaces following material properties (${vision.materialGuess})`,
-    ``,
-    `### KINETIC COPYWRITING LAYERS (3D Z-AXIS TEXT)`,
-    `Primary (z=0, foreground): "${copyLayers.primary}" — kinetic typography, 120% pop, drop shadow depth 4px`,
-    `Secondary (z=0.5, midground): "${copyLayers.secondary}" — fades in at 4s, 80% opacity, parallax drift -8px`,
-    `Tertiary (z=1.0, background): "${copyLayers.tertiary}" — subtle ambient text, 40% opacity, static placement`,
-  ].join("\n");
+  return parts.join(" ").slice(0, 480);
 }
 
 async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): Promise<string> {
+  const deadline = Date.now() + EDGE_WALL_CLOCK_BUDGET_MS;
   let lastErr: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (Date.now() >= deadline) {
+      throw lastErr ?? new Error("비디오 생성 요청 시간 초과 (엣지 함수 제한)");
+    }
     try {
       return await fn();
     } catch (err) {
       lastErr = err instanceof Error ? err : new Error(String(err));
-      if (attempt < maxRetries) {
+      if (attempt < maxRetries && Date.now() + RETRY_DELAY_MS < deadline) {
         await delay(RETRY_DELAY_MS * (attempt + 1));
       }
     }
@@ -898,7 +746,7 @@ async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): P
 async function uploadToStorage(videoUrl: string, scanId: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     const resp = await fetch(videoUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (!resp.ok) return null;
@@ -907,6 +755,8 @@ async function uploadToStorage(videoUrl: string, scanId: string): Promise<string
     const fileName = `${scanId}/${Date.now()}_ai_video.mp4`;
     const uploadUrl = `${supabaseUrl}/storage/v1/object/videos/${fileName}`;
 
+    const uploadController = new AbortController();
+    const uploadTimeoutId = setTimeout(() => uploadController.abort(), 20000);
     const uploadResp = await fetch(uploadUrl, {
       method: "POST",
       headers: {
@@ -916,7 +766,9 @@ async function uploadToStorage(videoUrl: string, scanId: string): Promise<string
         "x-upsert": "true",
       },
       body: videoBlob,
+      signal: uploadController.signal,
     });
+    clearTimeout(uploadTimeoutId);
 
     if (!uploadResp.ok) return null;
     return `${supabaseUrl}/storage/v1/object/public/videos/${fileName}`;

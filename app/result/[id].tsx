@@ -15,6 +15,8 @@ import {
   Linking,
   Modal,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -130,6 +132,8 @@ import { mapVoiceKeyToProsody } from '@/lib/prosodyProfile';
 import { DEFAULT_DURATION, DURATION_PRESETS } from '@/lib/durationPresets';
 import { getDeepLink } from '@/lib/platformUpload';
 import { NarrationPlayer } from '@/components/NarrationPlayer';
+import { HumanTtsProfileCard } from '@/components/HumanTtsProfileCard';
+import { ViralFormulaCard } from '@/components/ViralFormulaCard';
 import { buildCopyOverlayTimeline } from '@/lib/promptBuilder';
 import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
 
@@ -267,6 +271,28 @@ const TARGET_TO_UPLOAD_PLATFORM: Record<TargetPlatformKey, 'youtube' | 'tiktok' 
   naverclip: 'naver_clip',
 };
 
+
+function RotatingLoader({ size, color, strokeWidth = 2 }: { size: number; color: string; strokeWidth?: number }) {
+  const rotate = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [rotate]);
+  const spin = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+      <Loader2Icon size={size} color={color} strokeWidth={strokeWidth} />
+    </Animated.View>
+  );
+}
 
 export default function ResultScreen() {
   const router = useRouter();
@@ -505,7 +531,7 @@ export default function ResultScreen() {
       const result = await generateAiVideo(
         videoPromptText,
         {
-          durationSec: 10,
+          durationSec: 5,
           aspectRatio: '9:16',
           productName: scan.product_name || undefined,
           scanId: scan.id,
@@ -636,7 +662,7 @@ export default function ResultScreen() {
   useEffect(() => {
     if (!scan || generatedVideoUrl) return;
     let cancelled = false;
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let intervalId: ReturnType<typeof setTimeout> | null = null;
 
     (async () => {
       try {
@@ -656,7 +682,9 @@ export default function ResultScreen() {
           setVideoGenProgress({ phase: 'generating', progress: 0.1, message: '이전 영상 생성 작업을 이어받는 중...', elapsedSec: 0 });
 
           const startTime = Date.now();
-          intervalId = setInterval(async () => {
+          let consecutiveErrors = 0;
+
+          const pollOnce = async () => {
             if (cancelled) return;
             try {
               const { data: pollData } = await supabase.functions.invoke('generate-video', {
@@ -669,20 +697,21 @@ export default function ResultScreen() {
               const elapsed = Math.round((Date.now() - startTime) / 1000);
 
               if (status === 'SUCCESS' && pollData.videoUrl) {
-                if (intervalId) clearInterval(intervalId);
                 if (mountedRef.current) {
                   setGeneratedVideoUrl(pollData.videoUrl as string);
                   setIsGeneratingVideo(false);
                   setVideoGenProgress(null);
                 }
+                return; // stop polling
               } else if (status === 'FAILED') {
-                if (intervalId) clearInterval(intervalId);
                 if (mountedRef.current) {
                   setVideoGenError(pollData.error as string ?? '영상 생성에 실패했습니다.');
                   setIsGeneratingVideo(false);
                   setVideoGenProgress(null);
                 }
+                return; // stop polling
               } else {
+                consecutiveErrors = 0;
                 const rawProgress = pollData.progress ? parseFloat(pollData.progress) : NaN;
                 const numericProgress = !isNaN(rawProgress) ? 0.1 + rawProgress * 0.85 : 0.1;
                 const pctLabel = !isNaN(rawProgress) ? ` (${Math.round(rawProgress * 100)}%)` : '';
@@ -696,9 +725,17 @@ export default function ResultScreen() {
                 }
               }
             } catch {
-              // network blip — keep polling
+              consecutiveErrors++;
+              // network blip — keep polling with backoff
             }
-          }, 5000);
+            // Schedule next poll with adaptive interval
+            const elapsedMs = Date.now() - startTime;
+            const baseInterval = elapsedMs < 5000 ? 500 : 1000;
+            const backoffMultiplier = consecutiveErrors > 0 ? Math.min(Math.pow(2, consecutiveErrors), 8) : 1;
+            intervalId = setTimeout(pollOnce, Math.round(baseInterval * backoffMultiplier));
+          };
+
+          intervalId = setTimeout(pollOnce, 500);
         }
       } catch {
         // video_jobs table read failed — non-fatal
@@ -707,7 +744,7 @@ export default function ResultScreen() {
 
     return () => {
       cancelled = true;
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) clearTimeout(intervalId);
     };
   }, [scan, generatedVideoUrl]);
 
@@ -2222,8 +2259,11 @@ export default function ResultScreen() {
           )}
           {isGeneratingVideo && (
             <View style={styles.regenBanner}>
-              <Loader2Icon size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>AI 영상 생성 중... 잠시만 기다려주세요</Text>
+              <RotatingLoader size={14} color={theme.colors.primary[300]} />
+              <Text style={styles.regenBannerText}>
+                {videoGenProgress?.message ?? 'AI 영상 생성 중...'}
+                {videoGenProgress?.elapsedSec ? ` (${videoGenProgress.elapsedSec}초)` : ''}
+              </Text>
             </View>
           )}
           {visionAnalyzing && (
@@ -2297,12 +2337,12 @@ export default function ResultScreen() {
             activeOpacity={0.7}
           >
             {isGeneratingVideo ? (
-              <Loader2Icon size={18} color="#fff" strokeWidth={2} />
+              <RotatingLoader size={18} color="#fff" />
             ) : (
               <ZapIcon size={18} color="#fff" strokeWidth={2} />
             )}
             <Text style={styles.dualActionBtnText} numberOfLines={1}>
-              {isGeneratingVideo ? '생성 중...' : 'AI 자동 생성'}
+              {isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2443,6 +2483,14 @@ export default function ResultScreen() {
             narrationText={activeHook || activeOneLiner || scan?.summary || ''}
             onPlayStateChange={setNarrationPlaying}
           />
+
+          <HumanTtsProfileCard
+            narrationText={activeHook || activeOneLiner || scan?.summary || ''}
+            moodLabel={inlineEdit.bgmMood || '트렌디'}
+            totalDurationSec={15}
+          />
+
+          <ViralFormulaCard totalDurationSec={15} />
 
           {/* 한 줄 후킹 편집 바 + 상세 자막 토글 */}
           <View style={styles.hookEditBar}>

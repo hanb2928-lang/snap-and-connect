@@ -24,7 +24,9 @@ import {
   Shuffle,
   Volume2,
   Zap,
+  Activity,
 } from 'lucide-react-native';
+import { buildBeatSync, formatBeatSyncSummary, getBeatSyncAccuracyLabel } from '@/lib/audioSyncEngine';
 import * as Clipboard from 'expo-clipboard';
 import { theme } from '@/lib/theme';
 import {
@@ -295,6 +297,119 @@ export function VideoEditPlanCard({
               <View style={[styles.duckKnob, audioDucking && styles.duckKnobOn]} />
             </TouchableOpacity>
           </View>
+
+          {/* Beat sync card */}
+          {(() => {
+            const bpmMap: Record<string, number> = {
+              '하이텐션': 128, '시네마틱': 90, 'ASMR': 60, '감성': 75, '로파이': 82,
+            };
+            const effectiveBpm = bpmMap[plan.musicMood] ?? 120;
+            const sync = buildBeatSync(
+              effectiveBpm,
+              plan.duration,
+              plan.segments.map((s, i) => ({
+                index: i,
+                startSec: s.startSec,
+                endSec: s.endSec,
+                label: s.label,
+                purpose: s.purpose,
+                textOverlay: '',
+                position: 'center' as const,
+                storyPhase: 'gaze_hook' as const,
+                narrationCue: s.purpose,
+              })),
+              plan.musicMood ?? '하이텐션',
+            );
+            const accuracy = getBeatSyncAccuracyLabel(sync);
+            const downbeats = sync.beats.filter((b) => b.isDownbeat);
+            return (
+              <View style={styles.beatSyncCard}>
+                <View style={styles.beatSyncHeader}>
+                  <Activity size={14} color={theme.colors.accent[400]} strokeWidth={2} />
+                  <Text style={styles.beatSyncTitle}>비트 컷 싱크 + 오디오 덕킹</Text>
+                  <View style={styles.accuracyBadge}>
+                    <Text style={styles.accuracyText}>{accuracy}</Text>
+                  </View>
+                </View>
+
+                {/* Beat timeline visualization */}
+                <View style={styles.beatTimeline}>
+                  {sync.beats.map((beat, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.beatDot,
+                        beat.isDownbeat && styles.beatDotDownbeat,
+                        beat.snappedCutIndex !== null && styles.beatDotSnapped,
+                      ]}
+                    />
+                  ))}
+                </View>
+
+                {/* Beat stats */}
+                <View style={styles.beatStatsRow}>
+                  <Text style={styles.beatStatLabel}>BPM</Text>
+                  <Text style={styles.beatStatValue}>{sync.bpm}</Text>
+                  <Text style={styles.beatStatDivider}>|</Text>
+                  <Text style={styles.beatStatLabel}>비트</Text>
+                  <Text style={styles.beatStatValue}>{sync.beats.length}</Text>
+                  <Text style={styles.beatStatDivider}>|</Text>
+                  <Text style={styles.beatStatLabel}>다운비트</Text>
+                  <Text style={styles.beatStatValue}>{downbeats.length}</Text>
+                  <Text style={styles.beatStatDivider}>|</Text>
+                  <Text style={styles.beatStatLabel}>스냅된 컷</Text>
+                  <Text style={styles.beatStatValue}>
+                    {sync.cutOffsets.filter((c) => c.offsetMs !== 0).length}/{sync.cutOffsets.length}
+                  </Text>
+                </View>
+
+                {/* Ducking timeline */}
+                {audioDucking && (
+                  <View style={styles.duckingSection}>
+                    <Text style={styles.duckingLabel}>오디오 덕킹 타임라인</Text>
+                    <View style={styles.duckingBar}>
+                      {sync.duckingCurve.map((seg, i) => {
+                        const widthPct = ((seg.endSec - seg.startSec) / plan.duration) * 100;
+                        const isDucked = seg.levelDb < 0;
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.duckingSegment,
+                              { width: `${Math.max(widthPct, 2)}%` },
+                              isDucked ? styles.duckingSegmentLow : styles.duckingSegmentFull,
+                              (seg.fadeType === 'fadeOut' || seg.fadeType === 'fadeIn') && styles.duckingSegmentFade,
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                    <View style={styles.duckingLegend}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, styles.duckingSegmentFull]} />
+                        <Text style={styles.legendText}>BGM 0dB</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, styles.duckingSegmentLow]} />
+                        <Text style={styles.legendText}>나레이션 시 -18dB</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* BGM track selection */}
+                {sync.selectedTrack && (
+                  <View style={styles.trackInfoRow}>
+                    <Music size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+                    <Text style={styles.trackInfoText}>
+                      {sync.selectedTrack.title} ({sync.selectedTrack.bpm}BPM)
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.trackReasonText}>{sync.selectionReason}</Text>
+              </View>
+            );
+          })()}
 
           {/* Collapsible detail guide */}
           <TouchableOpacity
@@ -801,5 +916,148 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  beatSyncCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '30',
+  },
+  beatSyncHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  beatSyncTitle: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  accuracyBadge: {
+    backgroundColor: theme.colors.accent[400] + '20',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  accuracyText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[400],
+  },
+  beatTimeline: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  beatDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.dark.border,
+  },
+  beatDotDownbeat: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.accent[400],
+  },
+  beatDotSnapped: {
+    backgroundColor: theme.colors.warning[400],
+    transform: [{ scale: 1.3 }],
+  },
+  beatStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  beatStatLabel: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  beatStatValue: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  beatStatDivider: {
+    fontSize: 9,
+    color: theme.colors.dark.border,
+    marginHorizontal: 2,
+  },
+  duckingSection: {
+    marginBottom: 8,
+  },
+  duckingLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 4,
+  },
+  duckingBar: {
+    flexDirection: 'row',
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.dark.surfaceLight,
+    gap: 1,
+  },
+  duckingSegment: {
+    height: '100%',
+  },
+  duckingSegmentFull: {
+    backgroundColor: theme.colors.success[400],
+  },
+  duckingSegmentLow: {
+    backgroundColor: theme.colors.error[400] + '70',
+  },
+  duckingSegmentFade: {
+    opacity: 0.6,
+  },
+  duckingLegend: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+  },
+  legendText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+  },
+  trackInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  trackInfoText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  trackReasonText: {
+    fontSize: 9,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
+    lineHeight: 13,
   },
 });

@@ -19,6 +19,18 @@ interface TTSRequest {
   viralProsodyInstructions?: string;
   targetDurationSec?: number;
   phaseSpeedOverrides?: Array<{ startSec: number; endSec: number; speed: number }>;
+  // Human-level TTS parameters
+  processedText?: string;
+  sampleRateHz?: number;
+  bitDepth?: number;
+  silenceMarkers?: Array<{ position: number; durationMs: number; type: string }>;
+  tempoCurvePoints?: Array<{ timeSec: number; speedMultiplier: number }>;
+  audioPostProcessing?: {
+    compressor?: { thresholdDb: number; ratio: number; attackMs: number; releaseMs: number; makeupGainDb: number };
+    exciter?: { frequencyHz: number; driveDb: number; mix: number };
+    highpassFilterHz?: number;
+    deEsser?: { frequencyHz: number; thresholdDb: number; reductionDb: number };
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,23 +53,37 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const text = body.text.slice(0, 500);
+    // Use processedText (with silence markers) if provided, otherwise raw text
+    const rawText = body.text.slice(0, 500);
+    const text = (body.processedText?.trim() || rawText).slice(0, 800);
     const voice = body.voice || "alloy";
     const baseSpeed = Math.min(Math.max(body.speed || 1.0, 0.5), 2.0);
 
     // Merge viral prosody instructions with base instructions
     const viralInstructions = body.viralProsodyInstructions?.trim() || undefined;
     const baseInstructions = body.instructions?.trim() || undefined;
-    const instructions = [viralInstructions, baseInstructions].filter(Boolean).join('\n\n') || undefined;
+    
+    // Build human-level audio spec note for the model
+    const hifiNote = body.sampleRateHz && body.bitDepth
+      ? `Output audio at ${body.sampleRateHz / 1000}kHz / ${body.bitDepth}-bit fidelity. Ensure crystal-clear pronunciation with no sibilance or metallic artifacts.`
+      : undefined;
+    
+    const instructions = [viralInstructions, baseInstructions, hifiNote].filter(Boolean).join('\n\n') || undefined;
 
     // Apply phase-specific speed overrides for time-boxing sync
     let effectiveSpeed = baseSpeed;
     if (body.targetDurationSec && body.phaseSpeedOverrides && body.phaseSpeedOverrides.length > 0) {
-      const estimatedDurationSec = estimateDuration(text, baseSpeed);
+      const estimatedDurationSec = estimateDuration(rawText, baseSpeed);
       if (estimatedDurationSec > 0) {
         const speedAdjustment = body.targetDurationSec / estimatedDurationSec;
         effectiveSpeed = Math.min(Math.max(baseSpeed * speedAdjustment, 0.5), 2.0);
       }
+    }
+
+    // Apply tempo curve multiplier if provided (accelerando/ritardando)
+    if (body.tempoCurvePoints && body.tempoCurvePoints.length > 0) {
+      const avgMultiplier = body.tempoCurvePoints.reduce((sum, p) => sum + p.speedMultiplier, 0) / body.tempoCurvePoints.length;
+      effectiveSpeed = Math.min(Math.max(effectiveSpeed * avgMultiplier, 0.5), 2.0);
     }
 
     // Human-like TTS variation: apply subtle speed jitter (±0.08)
@@ -78,7 +104,9 @@ Deno.serve(async (req: Request) => {
     // TTS for the same text+voice+speed produces identical audio — no need
     // to call OpenAI again. 30-day TTL. Speed jitter is excluded from the
     // cache key so the same baseSpeed reuses cached audio.
-    const ttsCacheKey = `generate-tts:${contentHashTts(`${text}|${voice}|${baseSpeed}|${body.pitch ?? 0}|${instructions ?? ''}`)}`;
+    // Cache key uses processedText + instructions (includes silence markers)
+    const cacheText = body.processedText?.trim() || rawText;
+    const ttsCacheKey = `generate-tts:${contentHashTts(`${cacheText}|${voice}|${baseSpeed}|${body.pitch ?? 0}|${instructions ?? ''}`)}`;
     const cachedTts = await checkTtsCache(ttsCacheKey);
     if (cachedTts) {
       return new Response(
@@ -134,11 +162,19 @@ Deno.serve(async (req: Request) => {
     // Store in cache for future hits (fire-and-forget)
     storeTtsCache(ttsCacheKey, base64Audio).catch(() => {});
 
+    // Include audio post-processing metadata in response for client-side rendering
+    const audioMeta = body.audioPostProcessing || undefined;
     return new Response(
       JSON.stringify({
         audioBase64: base64Audio,
         mimeType: "audio/mpeg",
-        duration: estimateDuration(text, baseSpeed),
+        duration: estimateDuration(rawText, baseSpeed),
+        sampleRateHz: body.sampleRateHz ?? 44100,
+        bitDepth: body.bitDepth ?? 24,
+        silenceMarkers: body.silenceMarkers ?? [],
+        tempoCurvePoints: body.tempoCurvePoints ?? [],
+        audioPostProcessing: audioMeta,
+        humanLevel: !!(body.processedText || body.silenceMarkers?.length),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
