@@ -509,7 +509,7 @@ async function submitRunwayTask(
 
     const payload: Record<string, unknown> = {
       promptText: prompt,
-      model: "gen3-alpha-turbo",
+      model: "gen3a_turbo",
       duration: clampedDuration,
       ratio: ratioValue,
     };
@@ -517,16 +517,18 @@ async function submitRunwayTask(
       payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
-    console.log("[generate-video] Runway payload:", JSON.stringify({
-      endpoint: "text_to_video",
+    console.log("[generate-video] Runway request:", JSON.stringify({
+      endpoint: "https://api.dev.runwayml.com/v1/tasks",
+      method: "POST",
       model: payload.model,
       duration: payload.duration,
       ratio: payload.ratio,
       promptLength: prompt.length,
-      promptPreview: prompt.slice(0, 100),
+      promptPreview: prompt.slice(0, 120),
+      fullBody: JSON.stringify(payload),
     }));
 
-    const resp = await fetch("https://api.dev.runwayml.com/v1/text_to_video", {
+    const resp = await fetch("https://api.dev.runwayml.com/v1/tasks", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -539,20 +541,27 @@ async function submitRunwayTask(
 
     clearTimeout(timeoutId);
 
+    const respStatus = resp.status;
+    const respText = await resp.text();
+
+    console.log("[generate-video] Runway response:", JSON.stringify({
+      status: respStatus,
+      bodyPreview: respText.slice(0, 500),
+    }));
+
     if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("[generate-video] Runway error:", resp.status, errText.slice(0, 800));
-      const errDetail = parseRunwayError(errText);
-      if (resp.status === 401) {
+      console.error("[generate-video] Runway error:", respStatus, respText.slice(0, 800));
+      const errDetail = parseRunwayError(respText);
+      if (respStatus === 401) {
         throw new Error(`Runway API 키가 유효하지 않거나 비활성화되었습니다. 설정에서 활성화된 Runway API 키를 다시 등록해주세요. (HTTP 401): ${errDetail}`);
       }
-      if (resp.status === 400) {
+      if (respStatus === 400) {
         throw new Error(`Runway 요청 형식 오류 (HTTP 400): ${errDetail}`);
       }
-      throw new Error(`Runway 생성 요청 실패 (HTTP ${resp.status}): ${errDetail}`);
+      throw new Error(`Runway 생성 요청 실패 (HTTP ${respStatus}): ${errDetail}`);
     }
 
-    const result = await resp.json();
+    const result = JSON.parse(respText) as { taskId?: string; id?: string; status?: string };
     const taskId = result.taskId ?? result.id;
     console.log("[generate-video] Runway task created:", taskId, "status:", result.status);
     if (!taskId) throw new Error("Runway 작업 ID를 받지 못했습니다.");
