@@ -56,7 +56,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-type ScreenPhase = 'mode_select' | 'camera' | 'fitting_capture' | 'fitting_result';
+type ScreenPhase = 'mode_select' | 'camera' | 'fitting_capture';
 type CaptureMode = 'single' | 'fitting';
 type ContentTone = 'studio' | 'raw';
 
@@ -104,7 +104,6 @@ export default function CameraScreen() {
 
   // Virtual fitting state
   const [fittingShots, setFittingShots] = useState<AngleShot[]>([]);
-  const [fittingResultBase64, setFittingResultBase64] = useState<string | null>(null);
   const [fittingLoading, setFittingLoading] = useState(false);
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
 
@@ -473,8 +472,10 @@ export default function CameraScreen() {
       if (data?.error) throw new Error(data.error);
       if (!data?.image) throw new Error('AI 합성 이미지를 생성하지 못했습니다.');
 
-      setFittingResultBase64(data.image as string);
-      setScreenPhase('fitting_result');
+      const imageUrl = await uploadImage(data.image as string, 'image/png');
+      const scanId = await saveManualScan(imageUrl);
+      setScreenPhase('mode_select');
+      router.push({ pathname: '/editor', params: { id: scanId } });
     } catch (err) {
       if (!isMountedRef.current) return;
       setError(friendlyError(err, 'AI 합성 생성 중 오류가 발생했습니다. 다시 시도해주세요.'));
@@ -490,7 +491,6 @@ export default function CameraScreen() {
       setScreenPhase('camera');
     } else if (mode === 'fitting') {
       setFittingShots([]);
-      setFittingResultBase64(null);
       setCameraReady(false);
       setScreenPhase('fitting_capture');
     }
@@ -636,7 +636,7 @@ export default function CameraScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-            <View style={styles.fittingGalleryRow}>
+            <View style={styles.shutterRow}>
               <TouchableOpacity
                 style={styles.fittingGalleryBtn}
                 onPress={handleFittingPickImage}
@@ -645,7 +645,19 @@ export default function CameraScreen() {
               >
                 <ImageIcon size={24} color="#fff" strokeWidth={2} />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
+                onPress={() => setFittingGuideVisible(true)}
+                disabled={fittingLoading || !cameraReady}
+                activeOpacity={0.85}
+              >
+                <Camera size={28} color="#fff" strokeWidth={2.5} />
+              </TouchableOpacity>
+              <View style={{ width: 52 }} />
             </View>
+            <Text style={styles.shutterHintText}>
+              {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
+            </Text>
           </View>
 
           <MultiAngleCaptureGuide
@@ -753,7 +765,7 @@ export default function CameraScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
-          <View style={styles.fittingGalleryRow}>
+          <View style={styles.shutterRow}>
             <TouchableOpacity
               style={styles.fittingGalleryBtn}
               onPress={handleFittingPickImage}
@@ -762,7 +774,19 @@ export default function CameraScreen() {
             >
               <ImageIcon size={24} color="#fff" strokeWidth={2} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
+              onPress={() => setFittingGuideVisible(true)}
+              disabled={fittingLoading || !cameraReady}
+              activeOpacity={0.85}
+            >
+              <Camera size={28} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <View style={{ width: 52 }} />
           </View>
+          <Text style={styles.shutterHintText}>
+            {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
+          </Text>
         </View>
 
         <MultiAngleCaptureGuide
@@ -799,78 +823,6 @@ export default function CameraScreen() {
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
         />
-      </View>
-    );
-  }
-
-  // ─── Virtual Fitting: Result Step ───
-  if (screenPhase === 'fitting_result' && fittingResultBase64) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.topBar, { top: safeTop + 8, justifyContent: 'space-between' }]}>
-          <TouchableOpacity
-            style={styles.topBarBtn}
-            onPress={() => {
-              setFittingShots([]);
-              setFittingResultBase64(null);
-              setScreenPhase('mode_select');
-            }}
-            activeOpacity={0.7}
-          >
-            <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
-          </TouchableOpacity>
-          <Text style={styles.fittingStepTitle}>합성 결과</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView
-          style={styles.fittingScroll}
-          contentContainerStyle={{ paddingTop: safeTop + 60, paddingHorizontal: theme.spacing.lg, paddingBottom: tabBarHeight + bottomInset + 40 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.fittingResultWrap}>
-            <Image
-              source={{ uri: buildDataUrl(fittingResultBase64, 'image/png') }}
-              style={styles.fittingResultImg}
-              resizeMode="contain"
-            />
-
-            <View style={styles.fittingResultActions}>
-              <TouchableOpacity
-                style={styles.fittingRetryBtn}
-                onPress={() => {
-                  setFittingResultBase64(null);
-                  setScreenPhase('fitting_capture');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.fittingRetryText}>다시 생성</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.fittingSaveBtn}
-                onPress={async () => {
-                  try {
-                    const imageUrl = await uploadImage(fittingResultBase64, 'image/png');
-                    const scanId = await saveManualScan(imageUrl);
-                    router.push({ pathname: '/editor', params: { id: scanId } });
-                  } catch (err) {
-                    setError(friendlyError(err, '저장 중 오류가 발생했습니다. 다시 시도해주세요.'));
-                  }
-                }}
-                activeOpacity={0.85}
-              >
-                <Check size={18} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.fittingSaveText}>편집으로 이동</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {error && (
-            <View style={styles.fittingErrorBanner}>
-              <Text style={styles.fittingErrorText}>{error}</Text>
-            </View>
-          )}
-        </ScrollView>
       </View>
     );
   }
@@ -1516,67 +1468,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary[400],
   },
   // Virtual fitting styles
-  fittingScroll: {
-    flex: 1,
-  },
-  fittingStepTitle: {
-    fontSize: 16,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
-  },
-  fittingErrorBanner: {
-    backgroundColor: theme.colors.error[500] + '18',
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: theme.spacing.md,
-  },
-  fittingErrorText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.error[400],
-    textAlign: 'center',
-  },
-  fittingResultWrap: {
-    gap: theme.spacing.md,
-  },
-  fittingResultImg: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.dark.surface,
-  },
-  fittingResultActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  fittingRetryBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-  },
-  fittingRetryText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
-  },
-  fittingSaveBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[600],
-  },
-  fittingSaveText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: '#fff',
-  },
   fittingGalleryBtn: {
     width: 52,
     height: 52,
@@ -1584,12 +1475,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  fittingGalleryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.xs,
   },
   // Stereo progress
   stereoLightOverlay: {
