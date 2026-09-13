@@ -2906,6 +2906,9 @@ export default function ResultScreen() {
             <View style={styles.synthManualHeader}>
               <SlidersIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
               <Text style={styles.synthManualTitle}>AI 범용 합성 상세 설정</Text>
+              <View style={[styles.synthModeBadge, targetMediaType === 'video' ? styles.synthModeBadgeVideo : styles.synthModeBadgeImage]}>
+                <Text style={styles.synthModeBadgeText}>{targetMediaType === 'video' ? '동영상' : '이미지'}</Text>
+              </View>
             </View>
 
             {/* 프롬프트 가중치 (Prompt Strength) */}
@@ -2989,6 +2992,9 @@ export default function ResultScreen() {
               </Text>
             </View>
 
+            {/* 카메라 무빙 및 연출 효과 — 동영상 모드 전용 */}
+            {targetMediaType === 'video' && (
+            <>
             {/* 카메라 무빙: 줌 속도 */}
             <View style={styles.synthInputGroup}>
               <View style={styles.synthSliderHeader}>
@@ -3049,6 +3055,8 @@ export default function ResultScreen() {
                 ))}
               </ScrollView>
             </View>
+            </>
+            )}
           </View>
 
           {/* AI 가상 영상 프롬프트 — 스타일 카드 내부에 통합 */}
@@ -5042,6 +5050,23 @@ iconButton: {
   },
   synthManualTitle: {
     fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+    flex: 1,
+  },
+  synthModeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.full,
+  },
+  synthModeBadgeVideo: {
+    backgroundColor: theme.colors.primary[500] + '20',
+  },
+  synthModeBadgeImage: {
+    backgroundColor: theme.colors.accent[400] + '20',
+  },
+  synthModeBadgeText: {
+    fontSize: 10,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.accent[300],
   },
