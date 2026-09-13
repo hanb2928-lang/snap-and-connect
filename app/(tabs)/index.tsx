@@ -1325,7 +1325,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cameraPreviewWrap: {
-    flex: 3,
+    flex: 2,
     position: 'relative',
   },
   cameraPreview: {
@@ -1338,7 +1338,7 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
     paddingHorizontal: theme.spacing.xl,
