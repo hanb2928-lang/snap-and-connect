@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, Film as FilmZoomIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -378,13 +378,6 @@ export default function ResultScreen() {
   const [manualHook, setManualHook] = useState('');
   const [manualKeywords, setManualKeywords] = useState('');
   const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
-  const [cameraTrajectory, setCameraTrajectory] = useState<string>('Orbit');
-  const [cameraAcceleration, setCameraAcceleration] = useState<string>('Ease-in-out');
-  const [lensFocalLength, setLensFocalLength] = useState<string>('50mm 표준');
-  const [depthOfField, setDepthOfField] = useState<number>(0.6);
-  const [colorTempK, setColorTempK] = useState<number>(5500);
-  const [shadowIntensity, setShadowIntensity] = useState<number>(0.4);
-  const [masterPrompt, setMasterPrompt] = useState<string>('');
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -520,17 +513,10 @@ export default function ResultScreen() {
       }
       cleanParts.push('smooth gentle camera pan, soft studio lighting, macro detail of surface texture, no text overlays, no captions, no marketing elements, pure product cinematography');
       videoPromptText = cleanParts.join('. ');
-    } else if (videoGenMode === 'manual') {
+    } else if (videoGenMode === 'manual' && (manualHook.trim() || manualKeywords.trim())) {
       const parts: string[] = [];
-      if (masterPrompt.trim()) {
-        parts.push(masterPrompt.trim());
-      } else {
-        if (manualHook.trim()) parts.push(manualHook.trim());
-        if (manualKeywords.trim()) parts.push(`Keywords: ${manualKeywords.trim()}`);
-      }
-      parts.push(`camera: ${cameraTrajectory}, ${cameraAcceleration}`);
-      parts.push(`lens: ${lensFocalLength}, DoF ${depthOfField.toFixed(1)}`);
-      parts.push(`lighting: ${colorTempK}K, shadow ${Math.round(shadowIntensity * 100)}%`);
+      if (manualHook.trim()) parts.push(manualHook.trim());
+      if (manualKeywords.trim()) parts.push(`Keywords: ${manualKeywords.trim()}`);
       parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
       videoPromptText = parts.join('. ');
     } else {
@@ -593,7 +579,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, cameraTrajectory, cameraAcceleration, lensFocalLength, depthOfField, colorTempK, shadowIntensity, masterPrompt]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode]);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -2377,85 +2363,42 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* === 모드 전환 세그먼트 토글 === */}
-        <View style={styles.modeToggleContainer}>
+        {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
+        <View style={styles.dualActionRow}>
           <TouchableOpacity
-            style={[styles.modeToggleBtn, videoGenMode === 'auto' && styles.modeToggleBtnActive]}
-            onPress={() => { setVideoGenMode('auto'); setShowManualSettings(false); }}
+            style={[styles.dualActionBtn, styles.dualActionPrimary, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
+            onPress={() => handleAiVideoGenerate()}
+            disabled={isGeneratingVideo || !scan}
             activeOpacity={0.7}
           >
-            <SparklesIcon size={16} color={videoGenMode === 'auto' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={[styles.modeToggleBtnText, videoGenMode === 'auto' && styles.modeToggleBtnTextActive]}>AI 탑티어 오토</Text>
+            {isGeneratingVideo ? (
+              <RotatingLoader size={18} color="#fff" />
+            ) : (
+              <ZapIcon size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.dualActionBtnText} numberOfLines={1}>
+              {isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.modeToggleBtn, videoGenMode === 'manual' && styles.modeToggleBtnActive]}
-            onPress={() => { setVideoGenMode('manual'); setShowManualSettings(true); }}
+            style={[styles.dualActionBtn, styles.dualActionSecondary, showManualSettings && styles.dualActionSecondaryActive]}
+            onPress={() => setShowManualSettings((v) => !v)}
             activeOpacity={0.7}
           >
-            <SlidersIcon size={16} color={videoGenMode === 'manual' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-            <Text style={[styles.modeToggleBtnText, videoGenMode === 'manual' && styles.modeToggleBtnTextActive]}>프로페셔널 수동</Text>
+            <SlidersIcon size={18} color={showManualSettings ? theme.colors.accent[300] : theme.colors.dark.textDim} strokeWidth={2} />
+            <Text
+              style={[styles.dualActionBtnTextSecondary, showManualSettings && { color: theme.colors.accent[300] }]}
+              numberOfLines={1}
+            >
+              상세 수동 설정
+            </Text>
+            {showManualSettings ? (
+              <ChevronUp size={16} color={theme.colors.accent[300]} strokeWidth={2} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
+            )}
           </TouchableOpacity>
         </View>
-
-        {videoGenMode === 'auto' && (
-          <View style={styles.autoModeSection}>
-            {/* 소재 및 조광 자동 분석 배지 */}
-            <View style={styles.autoBadgeRow}>
-              {productVision?.materialGuess ? (
-                <View style={styles.autoBadge}>
-                  <SunIcon size={12} color={theme.colors.warning[400]} strokeWidth={2} />
-                  <Text style={styles.autoBadgeText}>[{productVision.materialGuess}] 3점 조명 및 림 라이트 적용 완료</Text>
-                </View>
-              ) : (
-                <View style={styles.autoBadge}>
-                  <SparklesIcon size={12} color={theme.colors.accent[300]} strokeWidth={2} />
-                  <Text style={styles.autoBadgeText}>AI 소재 분석 및 자동 조명 적용 중</Text>
-                </View>
-              )}
-            </View>
-            {/* 가드레일 상태 표시 */}
-            <View style={styles.guardrailBar}>
-              <ShieldIcon size={12} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={styles.guardrailText}>네거티브 프롬프트 가드레일 작동 중 (손가락 왜곡 · 배경 붕괴 차단)</Text>
-            </View>
-            {/* 무드/스타일 프리셋 칩 */}
-            <View style={styles.chipGroup}>
-              <View style={styles.chipGroupHeader}>
-                <FilmIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-                <Text style={styles.chipGroupLabel}>무드 / 스타일 프리셋</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {['감성 자극', '문제 해결', '긴박감 유발', '고급스러움', '친근함', '트렌디'].map((mood) => (
-                  <TouchableOpacity
-                    key={mood}
-                    style={[styles.chipPill, inlineEdit.bgmMood === mood && styles.chipPillActive]}
-                    onPress={() => handleInlineEdit({ bgmMood: mood })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipPillText, inlineEdit.bgmMood === mood && styles.chipPillTextActive]}>{mood}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        )}
-
-        {/* === AI 생성 버튼 === */}
-        <TouchableOpacity
-          style={[styles.dualActionBtn, styles.dualActionPrimary, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
-          onPress={() => handleAiVideoGenerate()}
-          disabled={isGeneratingVideo || !scan}
-          activeOpacity={0.7}
-        >
-          {isGeneratingVideo ? (
-            <RotatingLoader size={18} color="#fff" />
-          ) : (
-            <ZapIcon size={18} color="#fff" strokeWidth={2} />
-          )}
-          <Text style={styles.dualActionBtnText} numberOfLines={1}>
-            {isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성'}
-          </Text>
-        </TouchableOpacity>
 
         {generatedVideoUrl && (
           <View style={styles.dualActionRow}>
@@ -2477,112 +2420,8 @@ export default function ResultScreen() {
           </View>
         )}
 
-        {videoGenMode === 'manual' && showManualSettings && (
+        {showManualSettings && (
         <>
-        {/* 카메라 무빙 및 속도 커스텀 */}
-        <View style={styles.proPanel}>
-          <View style={styles.proPanelHeader}>
-            <CameraIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-            <Text style={styles.proPanelTitle}>카메라 무빙 및 속도</Text>
-          </View>
-          <Text style={styles.proPanelLabel}>궤적 선택</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {['Pan', 'Tilt', 'Roll', 'Orbit', 'Macro Slider'].map((traj) => (
-              <TouchableOpacity
-                key={traj}
-                style={[styles.chipPill, cameraTrajectory === traj && styles.chipPillActive]}
-                onPress={() => setCameraTrajectory(traj)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.chipPillText, cameraTrajectory === traj && styles.chipPillTextActive]}>{traj}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <Text style={[styles.proPanelLabel, { marginTop: 10 }]}>가속도 조절</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {['Ease-in', 'Ease-out', 'Constant', 'Ease-in-out'].map((acc) => (
-              <TouchableOpacity
-                key={acc}
-                style={[styles.chipPill, cameraAcceleration === acc && styles.chipPillActive]}
-                onPress={() => setCameraAcceleration(acc)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.chipPillText, cameraAcceleration === acc && styles.chipPillTextActive]}>{acc}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* 렌즈 및 조명 디테일 설정 */}
-        <View style={styles.proPanel}>
-          <View style={styles.proPanelHeader}>
-            <FilmZoomIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-            <Text style={styles.proPanelTitle}>렌즈 및 조명 디테일</Text>
-          </View>
-          <Text style={styles.proPanelLabel}>렌즈 화각</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {['24mm 광각', '50mm 표준', '85mm 망원'].map((lens) => (
-              <TouchableOpacity
-                key={lens}
-                style={[styles.chipPill, lensFocalLength === lens && styles.chipPillActive]}
-                onPress={() => { setLensFocalLength(lens); setDepthOfField(lens === '24mm 광각' ? 0.3 : lens === '50mm 표준' ? 0.6 : 0.9); }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.chipPillText, lensFocalLength === lens && styles.chipPillTextActive]}>{lens}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <Text style={[styles.proPanelLabel, { marginTop: 10 }]}>심도 (DoF): {depthOfField.toFixed(1)}</Text>
-          <View style={styles.sliderRow}>
-            <TouchableOpacity style={styles.sliderTrack} activeOpacity={1} onPress={(e) => {
-              const { locationX } = e.nativeEvent;
-              const w = (e.currentTarget as any).clientWidth || 200;
-              setDepthOfField(Math.max(0, Math.min(1, locationX / w)));
-            }}>
-              <View style={[styles.sliderFill, { width: `${depthOfField * 100}%` }]} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.proPanelLabel, { marginTop: 10 }]}>색온도: {colorTempK}K</Text>
-          <View style={styles.sliderRow}>
-            <TouchableOpacity style={styles.sliderTrack} activeOpacity={1} onPress={(e) => {
-              const { locationX } = e.nativeEvent;
-              const w = (e.currentTarget as any).clientWidth || 200;
-              const ratio = Math.max(0, Math.min(1, locationX / w));
-              setColorTempK(Math.round(3000 + ratio * 3500));
-            }}>
-              <View style={[styles.sliderFill, { width: `${((colorTempK - 3000) / 3500) * 100}%` }]} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.proPanelLabel, { marginTop: 10 }]}>그림자 강도: {Math.round(shadowIntensity * 100)}%</Text>
-          <View style={styles.sliderRow}>
-            <TouchableOpacity style={styles.sliderTrack} activeOpacity={1} onPress={(e) => {
-              const { locationX } = e.nativeEvent;
-              const w = (e.currentTarget as any).clientWidth || 200;
-              setShadowIntensity(Math.max(0, Math.min(1, locationX / w)));
-            }}>
-              <View style={[styles.sliderFill, { width: `${shadowIntensity * 100}%` }]} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 마스터 프롬프트 직접 제어 */}
-        <View style={styles.proPanel}>
-          <View style={styles.proPanelHeader}>
-            <PenLine size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-            <Text style={styles.proPanelTitle}>마스터 프롬프트 직접 제어</Text>
-          </View>
-          <TextInput
-            style={styles.masterPromptInput}
-            value={masterPrompt}
-            onChangeText={setMasterPrompt}
-            placeholder="AI가 자동 생성한 프롬프트에 전문 키워드나 연출 의도를 추가하세요"
-            placeholderTextColor={theme.colors.dark.textFaint}
-            multiline
-            numberOfLines={5}
-            textAlignVertical="top"
-          />
-        </View>
-
         {/* 목적 선택 */}
         <View style={styles.targetPlatformSection}>
           <View style={styles.purposeRow}>
@@ -2897,22 +2736,6 @@ export default function ResultScreen() {
           />
         </View>
 
-        {/* 하단 듀얼 렌더링 액션 */}
-        <TouchableOpacity
-          style={[styles.dualExportBtn, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
-          onPress={() => handleAiVideoGenerate()}
-          disabled={isGeneratingVideo || !scan}
-          activeOpacity={0.7}
-        >
-          {isGeneratingVideo ? (
-            <RotatingLoader size={18} color="#fff" />
-          ) : (
-            <FilmIcon size={18} color="#fff" strokeWidth={2} />
-          )}
-          <Text style={styles.dualExportBtnText} numberOfLines={2}>
-            숏폼 동영상 &amp; 상세페이지 배너{'\n'}동시 추출
-          </Text>
-        </TouchableOpacity>
         </>
         )}
 
@@ -4850,152 +4673,5 @@ iconButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  modeToggleContainer: {
-    flexDirection: 'row',
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.dark.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    overflow: 'hidden',
-  },
-  modeToggleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    paddingHorizontal: 8,
-  },
-  modeToggleBtnActive: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  modeToggleBtnText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-  },
-  modeToggleBtnTextActive: {
-    color: '#fff',
-  },
-  autoModeSection: {
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    gap: 10,
-  },
-  autoBadgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  autoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.warning[500] + '15',
-    borderWidth: 1,
-    borderColor: theme.colors.warning[400] + '30',
-  },
-  autoBadgeText: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.warning[400],
-  },
-  guardrailBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.success[500] + '10',
-    borderWidth: 1,
-    borderColor: theme.colors.success[400] + '25',
-  },
-  guardrailText: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.success[400],
-    lineHeight: 15,
-  },
-  proPanel: {
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.dark.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    gap: 4,
-  },
-  proPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  proPanelTitle: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
-  },
-  proPanelLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-    marginBottom: 6,
-  },
-  sliderRow: {
-    marginBottom: 4,
-  },
-  sliderTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.dark.border,
-    overflow: 'hidden',
-  },
-  sliderFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: theme.colors.accent[400],
-  },
-  masterPromptInput: {
-    minHeight: 100,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.bg,
-    borderWidth: 1,
-    borderColor: theme.colors.dark.border,
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.text,
-    lineHeight: 20,
-  },
-  dualExportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.lg,
-    paddingVertical: 18,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[500],
-  },
-  dualExportBtnText: {
-    fontSize: 14,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 18,
   },
 });
