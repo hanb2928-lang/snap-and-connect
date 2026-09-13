@@ -43,7 +43,7 @@ import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
-async function runFittingPipeline(shots: AngleShot[]): Promise<void> {
+async function runFittingPipeline(shots: AngleShot[], scanId: string): Promise<void> {
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
   const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
@@ -59,8 +59,7 @@ async function runFittingPipeline(shots: AngleShot[]): Promise<void> {
     if (error || !data?.image) return;
 
     const imageUrl = await uploadImage(data.image as string, 'image/png');
-    const scanId = await saveManualScan(imageUrl);
-    void scanId;
+    await supabase.from('scans').update({ edited_image_url: imageUrl }).eq('id', scanId);
   } catch {
     // Background pipeline — errors are silently ignored; user already has the scan
   }
@@ -125,7 +124,6 @@ export default function CameraScreen() {
   const [contentTone, setContentTone] = useState<ContentTone>('raw');
 
   // Virtual fitting state
-  const [fittingLoading, setFittingLoading] = useState(false);
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
 
   const postCaptureBase64Ref = useRef<string | null>(null);
@@ -455,7 +453,7 @@ export default function CameraScreen() {
 
   // ─── Fitting multi-angle capture (reuses stereo-cut handlers) ───
   const handleFittingPickImage = async () => {
-    if (fittingLoading) return;
+    if (stereoOverlayVisible) return;
     setFittingGuideVisible(true);
   };
 
@@ -464,27 +462,33 @@ export default function CameraScreen() {
     setFittingGuideVisible(true);
   }, []);
 
-  // ─── Virtual fitting: complete multi-angle guide ───
+  // ─── Virtual fitting: complete multi-angle guide (async, same pattern as 입체컷 오토) ───
   const handleFittingGuideComplete = useCallback(async (shots: AngleShot[]) => {
     const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
     setFittingGuideVisible(false);
     if (sorted.length < 2) return;
 
-    setFittingLoading(true);
+    setStereoProgress(makeInitialProgress());
+    setStereoOverlayVisible(true);
     setError(null);
-    try {
-      const scanId = await createScanFromAngleShots(sorted);
-      if (!isMountedRef.current) return;
-      setScreenPhase('mode_select');
-      router.replace({ pathname: '/result/[id]', params: { id: scanId } });
 
-      runFittingPipeline(sorted).catch(() => {});
+    let scanId: string;
+    try {
+      scanId = await createScanFromAngleShots(sorted);
     } catch (err) {
       if (!isMountedRef.current) return;
+      setStereoOverlayVisible(false);
       setError(friendlyError(err, '이미지 업로드에 실패했습니다. 다시 시도해주세요.'));
-    } finally {
-      if (isMountedRef.current) setFittingLoading(false);
+      return;
     }
+
+    if (isMountedRef.current) {
+      setStereoOverlayVisible(false);
+      router.replace({ pathname: '/result/[id]', params: { id: scanId } });
+    }
+
+    // Background: run virtual fitting pipeline without blocking UI
+    runFittingPipeline(sorted, scanId).catch(() => {});
   }, [router]);
 
   const handleModeSelect = useCallback((mode: CaptureMode) => {
@@ -624,7 +628,7 @@ export default function CameraScreen() {
               bottomInset={bottomInset}
               captureMode="single"
               onCaptureModeChange={() => {}}
-              autoSaving={fittingLoading}
+              autoSaving={stereoOverlayVisible}
               autoSaveToast={null}
               autoSaveStep={1}
               onMultiAnglePress={() => setFittingGuideVisible(true)}
@@ -641,16 +645,16 @@ export default function CameraScreen() {
             )}
             <View style={styles.shutterRow}>
               <TouchableOpacity
-                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
+                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, stereoOverlayVisible && styles.shutterBtnCapturing]}
                 onPress={() => setFittingGuideVisible(true)}
-                disabled={fittingLoading || !cameraReady}
+                disabled={stereoOverlayVisible || !cameraReady}
                 activeOpacity={0.85}
               >
                 <Camera size={28} color="#fff" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
             <Text style={styles.shutterHintText}>
-              {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
+              {stereoOverlayVisible ? '이미지 업로드 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
             </Text>
           </View>
 
@@ -670,19 +674,11 @@ export default function CameraScreen() {
             completeLabelEarly="여기까지 완료 (합성하기)"
           />
 
-          {fittingLoading && (
-            <View style={styles.autoSavingOverlay}>
-              <View style={styles.autoSavingCard}>
-                <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
-                  <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={2} />
-                </Animated.View>
-                <Text style={styles.autoSavingTitle}>AI 범용 합성 생성 중</Text>
-                <Text style={styles.autoSavingSub}>
-                  제품을 배경과 자연스럽게 합성하는 중입니다. 잠시만 기다려주세요.
-                </Text>
-              </View>
-            </View>
-          )}
+          <StereoProgressLightweight
+            visible={stereoOverlayVisible}
+            progress={stereoProgress}
+            onDismiss={() => setStereoOverlayVisible(false)}
+          />
 
           <CreditPurchaseModal
             visible={creditModalVisible}
@@ -761,16 +757,16 @@ export default function CameraScreen() {
           )}
           <View style={styles.shutterRow}>
             <TouchableOpacity
-              style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
+              style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, stereoOverlayVisible && styles.shutterBtnCapturing]}
               onPress={() => setFittingGuideVisible(true)}
-              disabled={fittingLoading || !cameraReady}
+              disabled={stereoOverlayVisible || !cameraReady}
               activeOpacity={0.85}
             >
               <Camera size={28} color="#fff" strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
           <Text style={styles.shutterHintText}>
-            {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
+            {stereoOverlayVisible ? '이미지 업로드 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
           </Text>
         </View>
 
@@ -790,19 +786,11 @@ export default function CameraScreen() {
           completeLabelEarly="여기까지 완료 (합성하기)"
         />
 
-        {fittingLoading && (
-          <View style={styles.autoSavingOverlay}>
-            <View style={styles.autoSavingCard}>
-              <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
-                <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={2} />
-              </Animated.View>
-              <Text style={styles.autoSavingTitle}>AI 범용 합성 생성 중</Text>
-              <Text style={styles.autoSavingSub}>
-                제품을 배경과 자연스럽게 합성하는 중입니다. 잠시만 기다려주세요.
-              </Text>
-            </View>
-          </View>
-        )}
+        <StereoProgressLightweight
+          visible={stereoOverlayVisible}
+          progress={stereoProgress}
+          onDismiss={() => setStereoOverlayVisible(false)}
+        />
 
         <CreditPurchaseModal
           visible={creditModalVisible}
