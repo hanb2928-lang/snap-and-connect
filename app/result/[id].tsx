@@ -277,7 +277,7 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
 const TARGET_PLATFORM_LIST = Object.values(TARGET_PLATFORM_PRESETS);
 
 const VIDEO_PLATFORM_LIST = TARGET_PLATFORM_LIST.filter((p) => p.mediaType === 'video');
-const IMAGE_PLATFORM_LIST = TARGET_PLATFORM_LIST.filter((p) => p.mediaType === 'image');
+const IMAGE_PLATFORM_LIST = TARGET_PLATFORM_LIST.filter((p) => p.mediaType === 'image' && (p.key === 'instagramFeed' || p.key === 'pinterest'));
 
 type ContentPurpose = 'monetization' | 'adConversion';
 
