@@ -394,15 +394,15 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
             </View>
           )}
 
-          {/* Bottom bar */}
-          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.lg }]}>
-            {error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>{error}</Text>
-              </View>
-            )}
+          {/* Bottom bar — only shown when not simplified (parent provides its own) */}
+          {!simplified && (
+            <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.lg }]}>
+              {error && (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{error}</Text>
+                </View>
+              )}
 
-            {!simplified && (
               <View style={styles.modeToggleWrap}>
                 {MODE_META(cameraRole).map((mode, idx) => {
                   const Icon = mode.icon;
@@ -429,31 +429,25 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                   );
                 })}
               </View>
-            )}
 
-            <View style={styles.bottomControlsRow}>
-              {!simplified ? (
+              <View style={styles.bottomControlsRow}>
                 <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
                   <ImageIcon size={22} color="#fff" strokeWidth={2} />
                 </TouchableOpacity>
-              ) : (
-                <View style={{ width: 52 }} />
-              )}
 
-              <TouchableOpacity
-                style={[
-                  styles.shutterBtn,
-                  !cameraReady && styles.shutterBtnDisabled,
-                  (capturing || autoSaving) && styles.shutterBtnCapturing,
-                ]}
-                onPress={handleCapture}
-                disabled={!cameraReady || capturing || autoSaving}
-                activeOpacity={0.85}
-              >
-                <Camera size={30} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.shutterBtn,
+                    !cameraReady && styles.shutterBtnDisabled,
+                    (capturing || autoSaving) && styles.shutterBtnCapturing,
+                  ]}
+                  onPress={handleCapture}
+                  disabled={!cameraReady || capturing || autoSaving}
+                  activeOpacity={0.85}
+                >
+                  <Camera size={30} color="#fff" strokeWidth={2.5} />
+                </TouchableOpacity>
 
-              {!simplified ? (
                 <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
                   {gridVisible ? (
                     <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
@@ -461,18 +455,16 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                     <Grid3x3 size={24} color="#fff" strokeWidth={2} />
                   )}
                 </TouchableOpacity>
-              ) : (
-                <View style={{ width: 52 }} />
-              )}
-            </View>
+              </View>
 
-            <Text style={styles.shutterHint}>
-              {autoSaving ? 'AI 자동 분석 중...' :
-               capturing ? '촬영 중...' :
-               captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
-               '촬영 버튼을 눌러주세요'}
-            </Text>
-          </View>
+              <Text style={styles.shutterHint}>
+                {autoSaving ? 'AI 자동 분석 중...' :
+                 capturing ? '촬영 중...' :
+                 captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
+                 '촬영 버튼을 눌러주세요'}
+              </Text>
+            </View>
+          )}
         </>
       )}
     </View>

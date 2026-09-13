@@ -867,13 +867,35 @@ export default function CameraScreen() {
           />
         </View>
 
-        {error && (
-          <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.sm }]}>
+        <View style={[styles.bottomBar, { paddingBottom: tabBarHeight + bottomInset + theme.spacing.md }]}>
+          {error && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
+          )}
+          <View style={styles.shutterRow}>
+            <TouchableOpacity
+              style={styles.fittingGalleryBtn}
+              onPress={handlePickImage}
+              disabled={autoSaving}
+              activeOpacity={0.8}
+            >
+              <ImageIcon size={24} color="#fff" strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, (processing || autoSaving) && styles.shutterBtnCapturing]}
+              onPress={() => setMultiAngleVisible(true)}
+              disabled={processing || autoSaving || !cameraReady}
+              activeOpacity={0.85}
+            >
+              <Camera size={28} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+            <View style={{ width: 52 }} />
           </View>
-        )}
+          <Text style={styles.shutterHintText}>
+            {autoSaving ? 'AI 자동 분석 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
+          </Text>
+        </View>
 
         <MultiAngleCaptureGuide
           visible={multiAngleVisible}
