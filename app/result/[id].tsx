@@ -629,6 +629,85 @@ export default function ResultScreen() {
     return () => subscription.remove();
   }, [scan, ttsUrl]);
 
+  // Resume polling for in-progress video generation jobs on mount
+  useEffect(() => {
+    if (!scan || generatedVideoUrl) return;
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    (async () => {
+      try {
+        const { data: jobRow } = await supabase
+          .from('video_jobs')
+          .select('task_id, status, is_draft')
+          .eq('scan_id', scan.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (cancelled || !jobRow) return;
+
+        if (jobRow.status === 'PENDING' || jobRow.status === 'RUNNING' || jobRow.status === 'THROTTLED') {
+          const taskId = jobRow.task_id as string;
+          setIsGeneratingVideo(true);
+          setVideoGenProgress({ phase: 'generating', progress: 0.1, message: '이전 영상 생성 작업을 이어받는 중...', elapsedSec: 0 });
+
+          const startTime = Date.now();
+          intervalId = setInterval(async () => {
+            if (cancelled) return;
+            try {
+              const { data: pollData } = await supabase.functions.invoke('generate-video', {
+                body: { mode: 'poll', taskId, scanId: scan.id },
+              });
+
+              if (!pollData || typeof pollData !== 'object') return;
+
+              const status = pollData.status as string;
+              const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+              if (status === 'SUCCESS' && pollData.videoUrl) {
+                if (intervalId) clearInterval(intervalId);
+                if (mountedRef.current) {
+                  setGeneratedVideoUrl(pollData.videoUrl as string);
+                  setIsGeneratingVideo(false);
+                  setVideoGenProgress(null);
+                }
+              } else if (status === 'FAILED') {
+                if (intervalId) clearInterval(intervalId);
+                if (mountedRef.current) {
+                  setVideoGenError(pollData.error as string ?? '영상 생성에 실패했습니다.');
+                  setIsGeneratingVideo(false);
+                  setVideoGenProgress(null);
+                }
+              } else {
+                const rawProgress = pollData.progress ? parseFloat(pollData.progress) : NaN;
+                const numericProgress = !isNaN(rawProgress) ? 0.1 + rawProgress * 0.85 : 0.1;
+                const pctLabel = !isNaN(rawProgress) ? ` (${Math.round(rawProgress * 100)}%)` : '';
+                if (mountedRef.current) {
+                  setVideoGenProgress({
+                    phase: 'generating',
+                    progress: Math.min(numericProgress, 0.95),
+                    message: `AI가 영상을 렌더링하고 있어요${pctLabel}`,
+                    elapsedSec: elapsed,
+                  });
+                }
+              }
+            } catch {
+              // network blip — keep polling
+            }
+          }, 5000);
+        }
+      } catch {
+        // video_jobs table read failed — non-fatal
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [scan, generatedVideoUrl]);
+
   // Realtime subscription for async analysis job completion
   useEffect(() => {
     if (!scan?.analysis_job_id) {
@@ -915,6 +994,63 @@ export default function ResultScreen() {
       }
     } catch {
       // clipboard copy failed silently
+    }
+  };
+
+  const handleSaveVideo = async () => {
+    if (!generatedVideoUrl) return;
+    setUploadError(null);
+    setUploadProgress(0);
+
+    let fallbackObjectUrl: string | null = null;
+    try {
+      const fileName = `snap-connect-video-${scan?.id ?? 'card'}-${Date.now()}.mp4`;
+
+      if (Platform.OS === 'web') {
+        let fetchRes: Response;
+        try {
+          fetchRes = await fetch(generatedVideoUrl);
+        } catch {
+          throw new Error('영상을 불러올 수 없습니다. 네트워크 연결을 확인해주세요.');
+        }
+        if (!fetchRes.ok) throw new Error(`영상 서버 응답 오류 (${fetchRes.status})`);
+        const blob = await fetchRes.blob();
+        fallbackObjectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = fallbackObjectUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        const permission = await MediaLibrary.requestPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error('갤러리 접근 권한이 필요합니다.');
+        }
+        const dir = FileSystem.cacheDirectory;
+        if (!dir) throw new Error('임시 저장 공간을 사용할 수 없습니다.');
+        const fileUri = `${dir}${fileName}`;
+        const downloadResult = await FileSystem.downloadAsync(generatedVideoUrl, fileUri);
+        if (downloadResult.status !== 200) {
+          throw new Error(`영상 다운로드 실패 (${downloadResult.status})`);
+        }
+        await MediaLibrary.createAssetAsync(downloadResult.uri);
+      }
+
+      setUploadProgress(100);
+      setUploadDone(true);
+      setTimeout(() => {
+        setUploadProgress(null);
+        setUploadDone(false);
+      }, 2500);
+    } catch (saveError) {
+      setUploadProgress(null);
+      const message = saveError instanceof Error ? saveError.message : '영상 저장에 실패했습니다. 다시 시도해주세요.';
+      setUploadError(message);
+    } finally {
+      if (fallbackObjectUrl && Platform.OS === 'web') {
+        URL.revokeObjectURL(fallbackObjectUrl);
+      }
     }
   };
 

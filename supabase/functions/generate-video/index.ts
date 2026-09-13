@@ -64,7 +64,32 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body: GenerateVideoRequest = await req.json();
+    const url = new URL(req.url);
+    const queryMode = url.searchParams.get("mode");
+
+    let body: GenerateVideoRequest;
+    if (queryMode === "webhook") {
+      body = {
+        mode: "webhook",
+        taskId: url.searchParams.get("taskId") ?? undefined,
+        scanId: url.searchParams.get("scanId") ?? undefined,
+      };
+      const contentType = req.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          const jsonBody = await req.json();
+          body.status = jsonBody.status;
+          body.output = jsonBody.output;
+          body.failure = jsonBody.failure;
+          body.error = jsonBody.error;
+        } catch {
+          // Runway may send form-encoded or empty body
+        }
+      }
+      return await handleWebhook(body);
+    }
+
+    body = await req.json();
     const mode = body.mode ?? "submit";
 
     const runwayKey = await resolveRunwayKey();
@@ -81,10 +106,6 @@ Deno.serve(async (req: Request) => {
 
     if (mode === "poll") {
       return await handlePoll(body, runwayKey);
-    }
-
-    if (mode === "webhook") {
-      return await handleWebhook(body);
     }
 
     return await handleSubmit(body, runwayKey);
@@ -187,7 +208,6 @@ async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promis
     );
   }
 
-  // Check if webhook already completed the job (avoid hitting Runway API)
   if (body.scanId) {
     const cached = await checkWebhookResult(body.scanId);
     if (cached) {
@@ -199,6 +219,20 @@ async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promis
           taskId,
           provider: "runway",
           persisted: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const jobStatus = await checkVideoJobStatus(body.scanId, taskId);
+    if (jobStatus?.status === "FAILED") {
+      return new Response(
+        JSON.stringify({
+          mode: "poll",
+          status: "FAILED",
+          error: jobStatus.error ?? "Runway 비디오 생성에 실패했습니다.",
+          taskId,
+          provider: "runway",
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -325,6 +359,38 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
     JSON.stringify({ mode: "webhook", status }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
+}
+
+async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ status: string; error?: string; videoUrl?: string } | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&select=status,error_message,video_url`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null }>;
+      if (rows.length > 0) {
+        return {
+          status: rows[0].status,
+          error: rows[0].error_message ?? undefined,
+          videoUrl: rows[0].video_url ?? undefined,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 async function checkWebhookResult(scanId: string): Promise<string | null> {
