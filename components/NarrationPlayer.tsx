@@ -131,7 +131,7 @@ export function NarrationPlayer({ ttsUrl, ttsLoading, narrationText, onRegenerat
     if (!ttsUrl) return;
     setPlayError(null);
     setNeedsTouchRetry(false);
-    if (Platform.OS !== 'web') { setPlayError('웹에서만 재생할 수 있습니다'); return; }
+    if (Platform.OS !== 'web') { setIsLoading(false); return; }
     if (isPlaying) {
       if (audioRef.current) audioRef.current.pause();
       if (usingFallback && typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();

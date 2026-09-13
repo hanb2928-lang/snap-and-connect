@@ -705,6 +705,8 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
     priceLabel: priceEstimate,
     oneLiner,
     category: productCategory,
+    hook: String(raw.hook || raw.hook || ""),
+    caption: String(raw.caption || raw.caption || ""),
   });
 
   const rawProducts = Array.isArray(raw.detectedProducts) ? raw.detectedProducts as Record<string, unknown>[] : [];

@@ -44,8 +44,8 @@ interface ShortFormPreviewPlayerProps {
 }
 
 const TOTAL_DURATION = 15;
-const TICK_MS = 50;
-const LUMINANCE_SAMPLE_MS = 500;
+const TICK_MS = 250;
+const LUMINANCE_SAMPLE_MS = 1000;
 const VIDEO_LOAD_TIMEOUT_MS = 5000;
 const BUFFERING_TIMEOUT_MS = 5000;
 
@@ -170,28 +170,16 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
       }
     };
     const handleEnded = () => {
+      // With loop attribute, ended should not fire. But if it does, just restart BGM.
       if (bgmPlayerRef.current) {
-        bgmPlayerRef.current.stop();
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
       }
-      // Manual loop: briefly hide video to clear residual frame, then restart
-      setVideoVisible(false);
-      v.pause();
-      v.currentTime = 0;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setVideoVisible(true);
-          v.play().catch(() => {});
-          if (bgmPlayerRef.current) {
-            bgmPlayerRef.current.start(
-              editPlan.bgmTemplate.id,
-              editPlan.pacingBpm,
-              editPlan.bgmTemplate.highlightStartSec,
-              editPlan.bgmTemplate.highlightDurationSec,
-              editPlan.bgmTemplate.energyCurve,
-            );
-          }
-        });
-      });
     };
     const handleWaiting = () => {
       setVideoBuffering(true);
@@ -262,13 +250,11 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
     };
   }, [isPlaying, videoSrc, editPlan.bgmTemplate.id, editPlan.pacingBpm, editPlan.bgmTemplate.highlightStartSec, editPlan.bgmTemplate.highlightDurationSec, editPlan.bgmTemplate.energyCurve]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !webVideoRef.current || !videoSrc) return;
-    const targetTime = currentSec;
-    if (Math.abs(webVideoRef.current.currentTime - targetTime) > 0.5) {
-      webVideoRef.current.currentTime = targetTime;
-    }
-  }, [currentSec, videoSrc]);
+  // Video-native playback handles its own timing via the loop attribute.
+  // The 250ms timer only drives overlay switching — no seek sync needed.
+
+  const currentSecRef = useRef(0);
+  useEffect(() => { currentSecRef.current = currentSec; }, [currentSec]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !videoSrc) {
@@ -278,7 +264,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
     const sampleLuminance = () => {
       const video = webVideoRef.current;
       if (!video || video.readyState < 2) return;
-      const activeSeg = getActiveSegment(editPlan.segments, currentSec);
+      const activeSeg = getActiveSegment(editPlan.segments, currentSecRef.current);
       const region = activeSeg?.position ?? 'center';
       const lum = sampleVideoLuminance(video, region);
       setLuminanceLevel(classifyLuminance(lum));
@@ -291,7 +277,7 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
         luminanceIntervalRef.current = null;
       }
     };
-  }, [videoSrc, currentSec, editPlan.segments]);
+  }, [videoSrc, editPlan.segments]);
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
@@ -488,6 +474,16 @@ export function ShortFormPreviewPlayer({ editPlan, videoUri, narrativePlan, vide
         narrAudio.currentTime = 0;
         narrAudio.play().catch(() => {});
       }
+      if (bgmPlayerRef.current) {
+        bgmPlayerRef.current.stop();
+        bgmPlayerRef.current.start(
+          editPlan.bgmTemplate.id,
+          editPlan.pacingBpm,
+          editPlan.bgmTemplate.highlightStartSec,
+          editPlan.bgmTemplate.highlightDurationSec,
+          editPlan.bgmTemplate.energyCurve,
+        );
+      }
     }
     prevSecRef.current = currentSec;
   }, [currentSec, isPlaying]);
@@ -557,9 +553,8 @@ useEffect(() => {
 
   const videoHtml = useMemo(() => {
     if (!videoSrc) return '';
-    const playCmd = isPlaying ? 'play()' : 'pause()';
-    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" autoplay muted playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.getElementById('v');v.${playCmd};v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});v.addEventListener('canplay',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});v.addEventListener('loadeddata',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});v.addEventListener('ended',function(){v.style.opacity='0';v.pause();v.currentTime=0;requestAnimationFrame(function(){requestAnimationFrame(function(){v.style.opacity='1';v.play().catch(function(){});});});});setTimeout(function(){if(v.readyState===0){window.ReactNativeWebView.postMessage('video_error');}},8000);</script></body></html>`;
-  }, [videoSrc, isPlaying]);
+    return `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;}body{background:#000;overflow:hidden;}video{width:100%;height:100%;object-fit:cover;}</style></head><body><video id="v" src="${videoSrc}" autoplay muted loop playsinline webkit-playsinline onerror="window.ReactNativeWebView.postMessage('video_error')"></video><script>var v=document.getElementById('v');v.addEventListener('error',function(){window.ReactNativeWebView.postMessage('video_error');},{once:true});v.addEventListener('canplay',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});v.addEventListener('loadeddata',function(){window.ReactNativeWebView.postMessage('video_loaded');},{once:true});setTimeout(function(){if(v.readyState===0){window.ReactNativeWebView.postMessage('video_error');}},8000);</script></body></html>`;
+  }, [videoSrc]);
 
   const webviewSource = useMemo(() => ({ html: videoHtml }), [videoHtml]);
 
@@ -589,6 +584,7 @@ useEffect(() => {
                 src={videoSrc}
                 autoPlay
                 muted
+                loop
                 playsInline
                 preload="auto"
                 onError={handleVideoError}
@@ -665,7 +661,7 @@ useEffect(() => {
             </View>
           ) : null}
 
-          {hasGeneratedVideo && activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
+          {activeSegment && !isDisclosureActive && activeSegment.textOverlay.trim().length > 0 && (
             <View style={[styles.captionOverlay, segmentPositionStyle, { paddingHorizontal: safeZonePadding.paddingHorizontal }]}>
               <Text
                 style={{
@@ -686,7 +682,7 @@ useEffect(() => {
           )}
 
           {/* === Vision AI 입체 자막 카피라이팅 레이어 === */}
-          {hasGeneratedVideo && activeCopyOverlay && isPlaying && !isDisclosureActive && (
+          {activeCopyOverlay && !isDisclosureActive && (
             <View
               style={[
                 styles.copyOverlayBase,
@@ -723,7 +719,7 @@ useEffect(() => {
             </View>
           )}
 
-          {hasGeneratedVideo && activeSegment && isPlaying && (
+          {activeSegment && isPlaying && (
             <View style={styles.sceneBadge}>
               <View style={[styles.sceneDot, { backgroundColor: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} />
               <Text style={[styles.sceneBadgeText, { color: STORY_PHASE_COLORS[activeSegment.storyPhase] }]} numberOfLines={1}>
@@ -871,6 +867,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     alignItems: 'center',
+    zIndex: 4,
   },
   disclosureOverlay: {
     position: 'absolute',

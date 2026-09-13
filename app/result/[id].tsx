@@ -483,14 +483,17 @@ export default function ResultScreen() {
   const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
 
   const triggerTtsGeneration = useCallback(async (scanId: string) => {
-    const hookText = activeHookRef.current || scan?.summary || scan?.one_liner || '';
+    // Use scan data directly to avoid race with activeHookRef (which updates after render)
+    const tdDirect = scan?.template_data as { hook?: string; platformVariants?: Record<string, { hook?: string }> } | undefined;
+    const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
+    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || '';
     if (!hookText) return;
     try {
       await triggerTTS(scanId, hookText);
     } catch {
       // TTS generation failed — non-fatal
     }
-  }, [scan?.summary, scan?.one_liner]);
+  }, [scan, activePlatform]);
 
   const handleAiVideoGenerate = useCallback(async () => {
     if (!scan || isGeneratingVideo) return;
@@ -883,7 +886,8 @@ export default function ResultScreen() {
         setActiveBoard(getPlatformMediaType(saved as PlatformKey));
       }
       const savedTone = await getItem('content_tone');
-      if (savedTone === 'studio') setIsCleanVideoMode(true);
+      // Studio tone no longer auto-enables clean video mode — overlays should be visible
+      // Users can still manually toggle clean mode via the UI switch
     })();
   }, []);
 
@@ -1027,8 +1031,11 @@ export default function ResultScreen() {
 
   useEffect(() => {
     if (!scan) return;
-    const baseCaption = platformVariant?.caption || td?.caption || scan?.one_liner || scan?.summary || '';
-    if (!inlineEdit.captionText && baseCaption) {
+    const aiCaption = platformVariant?.caption || td?.caption || '';
+    const baseCaption = aiCaption || scan?.one_liner || scan?.summary || '';
+    // Only auto-set if user hasn't manually edited AND AI caption is now available
+    const userEdited = inlineEdit.captionText && !autoMarketingCopy && inlineEdit.captionText !== (scan?.one_liner || scan?.summary || '');
+    if (!userEdited && baseCaption) {
       setInlineEdit((prev) => ({ ...prev, captionText: baseCaption }));
     }
     if (!inlineEdit.titleText) {

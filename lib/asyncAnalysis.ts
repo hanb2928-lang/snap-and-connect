@@ -267,19 +267,24 @@ export async function triggerTTS(scanId: string, text: string): Promise<void> {
     signal: controller.signal,
   });
   clearTimeout(timeoutId);
-  if (!response.ok) return;
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(`TTS 생성 실패 (${response.status}): ${errorBody || response.statusText}`);
+  }
   const data = await response.json();
-  if (!data.audioBase64) return;
+  if (!data.audioBase64) {
+    throw new Error('TTS 응답에 오디오 데이터가 없습니다');
+  }
 
   const audioBytes = base64ToUint8Array(data.audioBase64);
   const audioFileName = `tts-${scanId}-${Date.now()}.mp3`;
   const { error: uploadError } = await supabase.storage
     .from('scans')
     .upload(audioFileName, audioBytes, { contentType: 'audio/mpeg' });
-  if (uploadError) return;
+  if (uploadError) throw new Error(`TTS 오디오 업로드 실패: ${uploadError.message}`);
 
   const { data: urlData } = supabase.storage.from('scans').getPublicUrl(audioFileName);
-  if (!urlData.publicUrl) return;
+  if (!urlData.publicUrl) throw new Error('TTS 공개 URL 생성 실패');
 
   await supabase.from('scans').update({ tts_url: urlData.publicUrl }).eq('id', scanId);
 }
