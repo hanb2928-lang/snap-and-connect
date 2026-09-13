@@ -2811,7 +2811,8 @@ export default function ResultScreen() {
           </>
           )}
 
-          {/* 고급 카메라 모션 수동 설정 (접이식) */}
+          {/* 고급 카메라 모션 수동 설정 (접이식) — 동영상 모드 전용 */}
+          {targetMediaType === 'video' && (
           <TouchableOpacity
             style={styles.advancedToggle}
             onPress={() => setShowAdvancedCamera((v) => !v)}
@@ -2827,7 +2828,8 @@ export default function ResultScreen() {
               <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
             )}
           </TouchableOpacity>
-          {showAdvancedCamera && (
+          )}
+          {showAdvancedCamera && targetMediaType === 'video' && (
             <View style={styles.advancedPanel}>
               <Text style={styles.advancedPanelLabel}>카메라 워킹</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
@@ -2862,7 +2864,8 @@ export default function ResultScreen() {
             </View>
           )}
 
-          {/* 음량/믹싱 수동 조절 (접이식) */}
+          {/* 음량/믹싱 수동 조절 (접이식) — 동영상 모드 전용 */}
+          {targetMediaType === 'video' && (
           <TouchableOpacity
             style={styles.advancedToggle}
             onPress={() => setShowAdvancedAudio((v) => !v)}
@@ -2878,7 +2881,8 @@ export default function ResultScreen() {
               <ChevronDown size={16} color={theme.colors.dark.textDim} strokeWidth={2} />
             )}
           </TouchableOpacity>
-          {showAdvancedAudio && (
+          )}
+          {showAdvancedAudio && targetMediaType === 'video' && (
             <View style={styles.advancedPanel}>
               <View style={styles.volumeSliderRow}>
                 <Text style={styles.volumeSliderLabel}>BGM 음량</Text>
@@ -3059,7 +3063,9 @@ export default function ResultScreen() {
             )}
           </View>
 
-          {/* AI 가상 영상 프롬프트 — 스타일 카드 내부에 통합 */}
+          {/* AI 가상 영상 프롬프트 — 동영상 모드 전용 */}
+          {targetMediaType === 'video' && (
+          <>
           <View style={styles.promptHeader}>
             <Wand2 size={16} color={theme.colors.primary[300]} strokeWidth={2} />
             <Text style={styles.promptTitle}>AI 가상 영상 프롬프트</Text>
@@ -3089,6 +3095,8 @@ export default function ResultScreen() {
               {isGeneratingVideo ? 'AI 영상 생성 중...' : 'AI 자동 생성'}
             </Text>
           </TouchableOpacity>
+          </>
+          )}
         </View>
 
         </>
