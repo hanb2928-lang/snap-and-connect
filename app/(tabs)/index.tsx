@@ -638,14 +638,6 @@ export default function CameraScreen() {
             )}
             <View style={styles.shutterRow}>
               <TouchableOpacity
-                style={styles.fittingGalleryBtn}
-                onPress={handleFittingPickImage}
-                disabled={fittingLoading}
-                activeOpacity={0.8}
-              >
-                <ImageIcon size={24} color="#fff" strokeWidth={2} />
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
                 onPress={() => setFittingGuideVisible(true)}
                 disabled={fittingLoading || !cameraReady}
@@ -653,7 +645,6 @@ export default function CameraScreen() {
               >
                 <Camera size={28} color="#fff" strokeWidth={2.5} />
               </TouchableOpacity>
-              <View style={{ width: 52 }} />
             </View>
             <Text style={styles.shutterHintText}>
               {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
@@ -767,14 +758,6 @@ export default function CameraScreen() {
           )}
           <View style={styles.shutterRow}>
             <TouchableOpacity
-              style={styles.fittingGalleryBtn}
-              onPress={handleFittingPickImage}
-              disabled={fittingLoading}
-              activeOpacity={0.8}
-            >
-              <ImageIcon size={24} color="#fff" strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, fittingLoading && styles.shutterBtnCapturing]}
               onPress={() => setFittingGuideVisible(true)}
               disabled={fittingLoading || !cameraReady}
@@ -782,7 +765,6 @@ export default function CameraScreen() {
             >
               <Camera size={28} color="#fff" strokeWidth={2.5} />
             </TouchableOpacity>
-            <View style={{ width: 52 }} />
           </View>
           <Text style={styles.shutterHintText}>
             {fittingLoading ? 'AI 합성 생성 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
@@ -875,14 +857,6 @@ export default function CameraScreen() {
           )}
           <View style={styles.shutterRow}>
             <TouchableOpacity
-              style={styles.fittingGalleryBtn}
-              onPress={handlePickImage}
-              disabled={autoSaving}
-              activeOpacity={0.8}
-            >
-              <ImageIcon size={24} color="#fff" strokeWidth={2} />
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, (processing || autoSaving) && styles.shutterBtnCapturing]}
               onPress={() => setMultiAngleVisible(true)}
               disabled={processing || autoSaving || !cameraReady}
@@ -890,7 +864,6 @@ export default function CameraScreen() {
             >
               <Camera size={28} color="#fff" strokeWidth={2.5} />
             </TouchableOpacity>
-            <View style={{ width: 52 }} />
           </View>
           <Text style={styles.shutterHintText}>
             {autoSaving ? 'AI 자동 분석 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
@@ -996,14 +969,6 @@ export default function CameraScreen() {
         )}
         <View style={styles.shutterRow}>
           <TouchableOpacity
-            style={styles.fittingGalleryBtn}
-            onPress={handlePickImage}
-            disabled={autoSaving}
-            activeOpacity={0.8}
-          >
-            <ImageIcon size={24} color="#fff" strokeWidth={2} />
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, (processing || autoSaving) && styles.shutterBtnCapturing]}
             onPress={() => setMultiAngleVisible(true)}
             disabled={processing || autoSaving || !cameraReady}
@@ -1011,7 +976,6 @@ export default function CameraScreen() {
           >
             <Camera size={28} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
-          <View style={{ width: 52 }} />
         </View>
         <Text style={styles.shutterHintText}>
           {autoSaving ? 'AI 자동 분석 중...' : '정면·좌측·우측·후면·상부 순차 촬영'}
@@ -1359,7 +1323,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cameraPreviewWrap: {
-    flex: 1,
+    flex: 3,
     position: 'relative',
   },
   cameraPreview: {
@@ -1371,9 +1335,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomBar: {
-    backgroundColor: 'rgba(5, 8, 18, 0.85)',
-    paddingTop: theme.spacing.xs,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
     paddingHorizontal: theme.spacing.xl,
+    gap: theme.spacing.sm,
   },
   errorBanner: {
     backgroundColor: theme.colors.error[500] + '18',
@@ -1389,10 +1356,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   shutterRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.xs,
+    justifyContent: 'center',
   },
   shutterBtn: {
     width: 72,
@@ -1416,7 +1381,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.textDim,
     textAlign: 'center',
-    marginTop: 4,
   },
   // Auto-save toast
   autoSaveToastWrap: {
@@ -1488,15 +1452,6 @@ const styles = StyleSheet.create({
   },
   autoSavingStepDotActive: {
     backgroundColor: theme.colors.primary[400],
-  },
-  // Virtual fitting styles
-  fittingGalleryBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   // Stereo progress
   stereoLightOverlay: {

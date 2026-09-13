@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHand
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert } from 'lucide-react-native';
+import { Camera, RotateCcw, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
@@ -431,10 +431,6 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
               </View>
 
               <View style={styles.bottomControlsRow}>
-                <TouchableOpacity style={styles.galleryThumb} onPress={onPickImage} activeOpacity={0.8}>
-                  <ImageIcon size={22} color="#fff" strokeWidth={2} />
-                </TouchableOpacity>
-
                 <TouchableOpacity
                   style={[
                     styles.shutterBtn,
@@ -446,14 +442,6 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                   activeOpacity={0.85}
                 >
                   <Camera size={30} color="#fff" strokeWidth={2.5} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.gridToggleBtn} onPress={() => setGridVisible((g) => !g)} activeOpacity={0.7}>
-                  {gridVisible ? (
-                    <Grid3x3 size={24} color={theme.colors.primary[400]} strokeWidth={2} />
-                  ) : (
-                    <Grid3x3 size={24} color="#fff" strokeWidth={2} />
-                  )}
                 </TouchableOpacity>
               </View>
 
@@ -690,18 +678,9 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   bottomControlsRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.md,
-  },
-  galleryThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(10, 15, 30, 0.5)',
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
   },
   shutterBtn: {
     width: 72,
@@ -719,14 +698,6 @@ const styles = StyleSheet.create({
   },
   shutterBtnCapturing: {
     opacity: 0.6,
-  },
-  gridToggleBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: theme.radius.lg,
-    backgroundColor: 'rgba(10, 15, 30, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   shutterHint: {
     fontSize: 12,
