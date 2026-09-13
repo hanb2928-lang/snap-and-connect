@@ -630,7 +630,10 @@ export default function ResultScreen() {
       parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
       videoPromptText = parts.join('. ');
     } else {
-      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '프리미엄 추천 상품. 15-second vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA.';
+      const baseFallback = activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '프리미엄 추천 상품. 15-second vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA.';
+      videoPromptText = inlineEdit.aiPrompt.trim()
+        ? `${inlineEdit.aiPrompt.trim()}. ${baseFallback}`
+        : baseFallback;
     }
     if (!videoPromptText.trim()) {
       if (visionData) {
