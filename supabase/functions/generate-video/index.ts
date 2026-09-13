@@ -509,18 +509,18 @@ async function submitRunwayTask(
     const safePrompt = prompt.slice(0, 500);
 
     const payload: Record<string, unknown> = {
-      taskType: "text_to_video",
       model: "gen3a_turbo",
       promptText: safePrompt,
       duration: clampedDuration,
       ratio: ratioValue,
+      watermark: false,
     };
     if (webhookUrl && scanId) {
       payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
     console.log("[generate-video] Runway request:", JSON.stringify({
-      endpoint: "https://api.runwayml.com/v1/tasks",
+      endpoint: "https://api.dev.runwayml.com/v1/text_to_video",
       method: "POST",
       model: payload.model,
       duration: payload.duration,
@@ -530,7 +530,7 @@ async function submitRunwayTask(
       fullBody: JSON.stringify(payload),
     }));
 
-    const resp = await fetch("https://api.runwayml.com/v1/tasks", {
+    const resp = await fetch("https://api.dev.runwayml.com/v1/text_to_video", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -560,6 +560,12 @@ async function submitRunwayTask(
       if (respStatus === 400) {
         throw new Error(`Runway 요청 형식 오류 (HTTP 400): ${errDetail}`);
       }
+      if (respStatus === 404) {
+        throw new Error(`Runway API 엔드포인트를 찾을 수 없습니다 (HTTP 404). API 주소나 모델명이 잘못되었을 수 있습니다: ${errDetail}`);
+      }
+      if (respStatus === 429) {
+        throw new Error(`Runway API 요청 한도를 초과했습니다 (HTTP 429). 잠시 후 다시 시도해주세요: ${errDetail}`);
+      }
       throw new Error(`Runway 생성 요청 실패 (HTTP ${respStatus}): ${errDetail}`);
     }
 
@@ -585,7 +591,7 @@ async function pollRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
 
   try {
-    const resp = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
+    const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "X-Runway-Version": "2024-11-06",
@@ -615,7 +621,10 @@ async function pollRunwayTask(
     const progress = result.progress != null ? String(result.progress) : "";
 
     if (status === "SUCCESS" || status === "SUCCEEDED" || status === "COMPLETED") {
-      const videoUrl = result.output?.[0] ?? result.output?.url ?? result.artifacts?.[0]?.url ?? result.url;
+      const output = result.output;
+      const videoUrl = typeof output === "string"
+        ? output
+        : Array.isArray(output) ? output[0] : output?.url ?? result.artifacts?.[0]?.url ?? result.url;
       if (!videoUrl) return { status: "FAILED", error: "Runway 비디오 URL이 없습니다." };
       return { status: "SUCCESS", videoUrl, progress };
     }
