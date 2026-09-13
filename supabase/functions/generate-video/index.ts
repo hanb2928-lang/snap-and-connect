@@ -540,12 +540,17 @@ async function submitRunwayTask(
 
   try {
     const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 5);
-    const ratioValue = aspectRatio === "9:16" ? "9:16" : aspectRatio === "16:9" ? "16:9" : "1:1";
+    const ratioMap: Record<string, string> = {
+      "9:16": "768:1280",
+      "16:9": "1280:768",
+      "1:1": "1280:1280",
+    };
+    const ratioValue = ratioMap[aspectRatio] ?? "768:1280";
     const safePrompt = prompt.slice(0, 500);
 
     const hasImage = !!promptImage;
-    const endpoint = hasImage ? "image_to_video" : "text_to_video";
-    const model = hasImage ? "gen4_turbo" : "gen3a_turbo";
+    const endpoint = "image_to_video";
+    const model = hasImage ? "gen4_turbo" : "gen4.5";
 
     const payload: Record<string, unknown> = {
       model,
