@@ -521,42 +521,46 @@ export default function CameraScreen() {
               onPress={() => handleContentToneChange('studio')}
               activeOpacity={0.8}
             >
-              <Gem size={16} color={contentTone === 'studio' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text
-                style={[
-                  styles.toneSegmentText,
-                  contentTone === 'studio' && styles.toneSegmentTextActive,
-                ]}
-              >
-                스튜디오 프리미엄
-              </Text>
-            </TouchableOpacity>
-            {contentTone === 'studio' && (
-              <Text style={styles.toneHintText}>
+              <View style={styles.toneSegmentHeader}>
+                <View style={[styles.toneIconBadge, contentTone === 'studio' && styles.toneIconBadgeActive]}>
+                  <Gem size={18} color={contentTone === 'studio' ? '#fff' : theme.colors.primary[400]} strokeWidth={2.2} />
+                </View>
+                <Text
+                  style={[
+                    styles.toneSegmentText,
+                    contentTone === 'studio' && styles.toneSegmentTextActive,
+                  ]}
+                >
+                  스튜디오 프리미엄
+                </Text>
+              </View>
+              <Text style={[styles.toneHintText, contentTone === 'studio' && styles.toneHintTextActive]}>
                 화장품 · 주얼리 · 패션 · 전자기기 · 홈데코 · 럭셔리 식품
               </Text>
-            )}
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toneSegment, contentTone === 'raw' && styles.toneSegmentActiveRaw]}
               onPress={() => handleContentToneChange('raw')}
               activeOpacity={0.8}
             >
-              <Flame size={16} color={contentTone === 'raw' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text
-                style={[
-                  styles.toneSegmentText,
-                  contentTone === 'raw' && styles.toneSegmentTextActive,
-                ]}
-              >
-                날것의 심리자극
+              <View style={styles.toneSegmentHeader}>
+                <View style={[styles.toneIconBadge, contentTone === 'raw' && styles.toneIconBadgeActiveRaw]}>
+                  <Flame size={18} color={contentTone === 'raw' ? '#fff' : theme.colors.accent[400]} strokeWidth={2.2} />
+                </View>
+                <Text
+                  style={[
+                    styles.toneSegmentText,
+                    contentTone === 'raw' && styles.toneSegmentTextActive,
+                  ]}
+                >
+                  날것의 심리자극
+                </Text>
+              </View>
+              <Text style={[styles.toneHintText, contentTone === 'raw' && styles.toneHintTextActive]}>
+                생활용품 · 식품 · 가성비 전자기기 · 패션 액세서리 · 다이어트
               </Text>
             </TouchableOpacity>
           </View>
-          {contentTone === 'raw' && (
-            <Text style={styles.toneHintText}>
-              생활용품 · 식품 · 가성비 전자기기 · 패션 액세서리 · 다이어트
-            </Text>
-          )}
         </View>
 
         <View style={styles.modeCardsWrap}>
@@ -1238,27 +1242,46 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   toneSelectorLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    marginBottom: theme.spacing.sm,
-    letterSpacing: 0.5,
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    marginBottom: theme.spacing.md,
+    letterSpacing: -0.4,
   },
   toneSegmented: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.lg,
-    padding: 4,
-    gap: 4,
+    gap: theme.spacing.sm,
   },
   toneSegment: {
     flex: 1,
-    flexDirection: 'row',
+    minHeight: 106,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
+  },
+  toneSegmentHeader: {
+    width: '100%',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  toneIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary[600] + '22',
+  },
+  toneIconBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  toneIconBadgeActiveRaw: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   toneSegmentActive: {
     backgroundColor: theme.colors.primary[600],
@@ -1267,19 +1290,27 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent[500],
   },
   toneSegmentText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
   },
   toneSegmentTextActive: {
     color: '#fff',
   },
   toneHintText: {
-    fontSize: 11,
+    width: '100%',
+    fontSize: 10,
+    lineHeight: 15,
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textDim,
-    marginTop: theme.spacing.sm,
-    letterSpacing: 0.3,
+    textAlign: 'center',
+    letterSpacing: 0.1,
+  },
+  toneHintTextActive: {
+    color: 'rgba(255, 255, 255, 0.78)',
   },
   modeCard: {
     flexDirection: 'row',
