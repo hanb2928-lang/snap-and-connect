@@ -539,31 +539,30 @@ async function submitRunwayTask(
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
-    const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 5);
+    const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 10);
     const ratioMap: Record<string, string> = {
-      "9:16": "768:1280",
-      "16:9": "1280:768",
-      "1:1": "1280:1280",
+      "9:16": "720:1280",
+      "16:9": "1280:720",
+      "1:1": "960:960",
+      "4:3": "1104:832",
+      "3:4": "832:1104",
+      "21:9": "1584:672",
     };
-    const ratioValue = ratioMap[aspectRatio] ?? "768:1280";
-    const safePrompt = prompt.slice(0, 500);
 
-    const hasImage = !!promptImage;
-    const endpoint = "image_to_video";
-    const model = hasImage ? "gen4_turbo" : "gen4.5";
+    const hasImage = typeof promptImage === "string" && promptImage.length > 0;
+    const endpoint = hasImage ? "image_to_video" : "text_to_video";
+    const model = "gen4.5";
+    const ratioValue = ratioMap[aspectRatio] ?? "720:1280";
+    const safePrompt = prompt.trim().slice(0, 500);
 
     const payload: Record<string, unknown> = {
       model,
       promptText: safePrompt,
       duration: clampedDuration,
       ratio: ratioValue,
-      watermark: false,
     };
     if (hasImage && promptImage) {
       payload.promptImage = promptImage;
-    }
-    if (webhookUrl && scanId) {
-      payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
     console.log("[generate-video] Runway request:", JSON.stringify({
