@@ -2985,15 +2985,23 @@ export default function ResultScreen() {
           </View>
         </Modal>
 
-        {analysisStatus !== 'processing' && !hasCustomLink && activeProductName ? (
-          <AffiliatePromptBanner
-            productName={activeProductName}
-            autoLinks={currentAffiliateLinks}
-            hasCustomLink={hasCustomLink}
-            partnerIdsConfigured={partnerIdsConfigured}
-            onConnectLink={handleConnectLink}
-          />
-        ) : null}
+        <View style={styles.gallerySaveRow}>
+          <TouchableOpacity
+            style={[styles.gallerySaveBtn, uploadProgress !== null && styles.dualActionDisabled]}
+            onPress={handleSaveVideo}
+            disabled={uploadProgress !== null}
+            activeOpacity={0.7}
+          >
+            {uploadProgress !== null ? (
+              <Loader2Icon size={20} color="#fff" strokeWidth={2} />
+            ) : (
+              <Download size={20} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.gallerySaveBtnText}>
+              {uploadProgress !== null ? '저장 중...' : '갤러리에 저장하기'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.body}>
           {detectedProducts.length > 1 && (
@@ -3054,12 +3062,8 @@ export default function ResultScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={styles.sectionLabel}>1단계 · 플랫폼 게시판 선택</Text>
+              <Text style={styles.sectionLabel}>AI 생성 결과</Text>
             </View>
-            <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
-            {platformSupportsBoth(activePlatform) && (
-              <BoardTabs platform={activePlatform} selected={activeBoard} onSelect={setActiveBoard} />
-            )}
             {td?.caption ? (
               <View style={styles.captionCard}>
                 {activeHook ? (
@@ -4569,6 +4573,25 @@ iconButton: {
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     minHeight: 48,
+  },
+  gallerySaveRow: {
+    marginTop: 12,
+    marginHorizontal: theme.spacing.md,
+  },
+  gallerySaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.success[500],
+    borderRadius: theme.radius.md,
+    paddingVertical: 16,
+    ...theme.shadows.card,
+  },
+  gallerySaveBtnText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   dualActionRow: {
     flexDirection: 'row',
