@@ -140,7 +140,7 @@ async function saveImageToGallery(base64: string, mimeType: string, fileName: st
 
 export default function EditorScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, customPrompt } = useLocalSearchParams<{ id: string; customPrompt?: string }>();
   const insets = useSafeAreaInsets();
   const safeTop = useSafeTop();
   const [scan, setScan] = useState<Scan | null>(null);
@@ -615,12 +615,12 @@ export default function EditorScreen() {
         // Gallery export is the primary save action.
       }
       setProcessing(false);
-      router.replace({ pathname: '/result/[id]', params: { id: scan.id } });
+      router.replace({ pathname: '/result/[id]', params: { id: scan.id, customPrompt: customPrompt || undefined } });
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장 실패');
       setProcessing(false);
     }
-  }, [scan, imageUri, processing, router, textOverlays, stickers, linkEntries]);
+  }, [scan, imageUri, processing, router, textOverlays, stickers, linkEntries, customPrompt]);
 
   if (error && !scan && !loading) {
     return (

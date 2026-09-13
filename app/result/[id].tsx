@@ -373,7 +373,8 @@ function RotatingLoader({ size, color, strokeWidth = 2 }: { size: number; color:
 
 export default function ResultScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, customPrompt: routeCustomPrompt } = useLocalSearchParams<{ id: string; customPrompt?: string }>();
+  const userCustomPrompt = useRef<string>(routeCustomPrompt || '');
   const [scan, setScan] = useState<Scan | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -422,7 +423,7 @@ export default function ResultScreen() {
     captionFont: '고딕 굵게',
     captionPosition: '하단 고정',
     bgmMood: '하이텐션',
-    aiPrompt: '',
+    aiPrompt: routeCustomPrompt || '',
     titleText: '',
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -459,7 +460,7 @@ export default function ResultScreen() {
     const cp = CONTENT_PURPOSE_PRESETS[purpose];
     setInlineEdit((prev) => ({
       ...prev,
-      aiPrompt: cp.defaultPrompt || pp.defaultPrompt,
+      aiPrompt: userCustomPrompt.current.trim() || cp.defaultPrompt || pp.defaultPrompt,
       captionFont: cp.captionFontOverride || pp.captionFont,
       captionPosition: pp.captionPosition,
       bgmMood: cp.bgmMoodOverride || pp.bgmMood,
@@ -496,6 +497,9 @@ export default function ResultScreen() {
 
   const handleInlineEdit = useCallback((patch: Partial<InlineEditState>) => {
     setInlineEdit((prev) => ({ ...prev, ...patch }));
+    if (patch.aiPrompt !== undefined) {
+      userCustomPrompt.current = patch.aiPrompt;
+    }
   }, []);
 
   const handleInlineRemoveHashtag = useCallback((tag: string) => {
