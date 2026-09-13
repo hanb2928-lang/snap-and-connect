@@ -437,6 +437,13 @@ export default function ResultScreen() {
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
   const [cameraMotion, setCameraMotion] = useState<string>('AI 자동');
   const [bgmVolume, setBgmVolume] = useState<number>(0.75);
+  const [promptStrength, setPromptStrength] = useState<number>(7);
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [bgStyle, setBgStyle] = useState<string>('자동');
+  const [outfitIntensity, setOutfitIntensity] = useState<number>(3);
+  const [zoomSpeed, setZoomSpeed] = useState<number>(2);
+  const [cameraRotation, setCameraRotation] = useState<number>(0);
+  const [transitionEffect, setTransitionEffect] = useState<string>('컷 전환');
   const [narrationPlaying, setNarrationPlaying] = useState(false);
   const [fittingOverlayVisible, setFittingOverlayVisible] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -677,6 +684,13 @@ export default function ResultScreen() {
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
           isCleanVideoMode,
+          promptStrength,
+          negativePrompt: negativePrompt.trim() || undefined,
+          bgStyle: bgStyle === '자동' ? undefined : bgStyle,
+          outfitIntensity: outfitIntensity === 3 ? undefined : outfitIntensity,
+          zoomSpeed: zoomSpeed === 2 ? undefined : zoomSpeed,
+          cameraRotation,
+          transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
@@ -699,7 +713,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, triggerTtsGeneration, ttsUrl]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, triggerTtsGeneration, ttsUrl]);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -2887,6 +2901,156 @@ export default function ResultScreen() {
             </View>
           )}
 
+          {/* AI 범용 합성 전용 수동 설정 */}
+          <View style={styles.synthManualSection}>
+            <View style={styles.synthManualHeader}>
+              <SlidersIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.synthManualTitle}>AI 범용 합성 상세 설정</Text>
+            </View>
+
+            {/* 프롬프트 가중치 (Prompt Strength) */}
+            <View style={styles.synthInputGroup}>
+              <View style={styles.synthSliderHeader}>
+                <Text style={styles.synthInputLabel}>프롬프트 반영 강도</Text>
+                <Text style={styles.synthSliderValue}>{promptStrength}/10</Text>
+              </View>
+              <View style={styles.synthSliderTrack}>
+                <View style={[styles.synthSliderFill, { width: `${(promptStrength / 10) * 100}%` }]} />
+                {[1, 3, 5, 7, 10].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.synthSliderTick, promptStrength === val && styles.synthSliderTickActive]}
+                    onPress={() => setPromptStrength(val)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.synthSliderTickLabel}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.synthHint}>
+                {promptStrength >= 8 ? '입력한 프롬프트를 최대한 그대로 반영' : promptStrength <= 4 ? 'AI가 창의적으로 자유롭게 해석' : '프롬프트와 창의성의 균형'}
+              </Text>
+            </View>
+
+            {/* 네거티브 프롬프트 */}
+            <View style={styles.synthInputGroup}>
+              <Text style={styles.synthInputLabel}>제외할 요소 (네거티브 프롬프트)</Text>
+              <TextInput
+                style={styles.synthNegInput}
+                value={negativePrompt}
+                onChangeText={setNegativePrompt}
+                placeholder="예: 흐림, 로고, 텍스트, 특정 색상 등 제외할 요소"
+                placeholderTextColor={theme.colors.dark.textFaint}
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+
+            {/* 배경 스타일 칩 */}
+            <View style={styles.synthInputGroup}>
+              <Text style={styles.synthInputLabel}>배경 스타일</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['자동', '스튜디오', '야외', '빈티지', '미니멀', '카페', '도시'].map((bg) => (
+                  <TouchableOpacity
+                    key={bg}
+                    style={[styles.chipPill, bgStyle === bg && styles.chipPillActive]}
+                    onPress={() => setBgStyle(bg)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, bgStyle === bg && styles.chipPillTextActive]}>
+                      {bg}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 의상/스타일 변환 강도 */}
+            <View style={styles.synthInputGroup}>
+              <View style={styles.synthSliderHeader}>
+                <Text style={styles.synthInputLabel}>의상/스타일 변환 강도</Text>
+                <Text style={styles.synthSliderValue}>{outfitIntensity}/5</Text>
+              </View>
+              <View style={styles.synthSliderTrack}>
+                <View style={[styles.synthSliderFill, { width: `${(outfitIntensity / 5) * 100}%` }]} />
+                {[1, 2, 3, 4, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.synthSliderTick, outfitIntensity === val && styles.synthSliderTickActive]}
+                    onPress={() => setOutfitIntensity(val)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.synthSliderTickLabel}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.synthHint}>
+                {outfitIntensity >= 4 ? '드라마틱한 스타일 변화' : outfitIntensity <= 2 ? '자연스러운 미묘한 변화' : '중간 수준의 스타일 조정'}
+              </Text>
+            </View>
+
+            {/* 카메라 무빙: 줌 속도 */}
+            <View style={styles.synthInputGroup}>
+              <View style={styles.synthSliderHeader}>
+                <Text style={styles.synthInputLabel}>줌인/줌아웃 속도</Text>
+                <Text style={styles.synthSliderValue}>{zoomSpeed.toFixed(1)}x</Text>
+              </View>
+              <View style={styles.synthSliderTrack}>
+                <View style={[styles.synthSliderFill, { width: `${((zoomSpeed - 0.5) / 4.5) * 100}%` }]} />
+                {[0.5, 1, 2, 3, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.synthSliderTick, zoomSpeed === val && styles.synthSliderTickActive]}
+                    onPress={() => setZoomSpeed(val)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.synthSliderTickLabel}>{val.toFixed(1)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* 카메라 회전 각도 */}
+            <View style={styles.synthInputGroup}>
+              <View style={styles.synthSliderHeader}>
+                <Text style={styles.synthInputLabel}>카메라 회전 각도</Text>
+                <Text style={styles.synthSliderValue}>{cameraRotation > 0 ? `+${cameraRotation}°` : `${cameraRotation}°`}</Text>
+              </View>
+              <View style={styles.synthSliderTrack}>
+                <View style={[styles.synthSliderFill, { width: `${((cameraRotation + 30) / 60) * 100}%` }]} />
+                {[-30, -15, 0, 15, 30].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.synthSliderTick, cameraRotation === val && styles.synthSliderTickActive]}
+                    onPress={() => setCameraRotation(val)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.synthSliderTickLabel}>{val > 0 ? `+${val}` : val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* 전환 효과 */}
+            <View style={styles.synthInputGroup}>
+              <Text style={styles.synthInputLabel}>전환 효과 (숏폼 전용)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {['컷 전환', '크로스페이드', '와이프', '줌 전환', '플래시', '슬로우 모션'].map((eff) => (
+                  <TouchableOpacity
+                    key={eff}
+                    style={[styles.chipPill, transitionEffect === eff && styles.chipPillActive]}
+                    onPress={() => setTransitionEffect(eff)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, transitionEffect === eff && styles.chipPillTextActive]}>
+                      {eff}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+
           {/* AI 가상 영상 프롬프트 — 스타일 카드 내부에 통합 */}
           <View style={styles.promptHeader}>
             <Wand2 size={16} color={theme.colors.primary[300]} strokeWidth={2} />
@@ -4860,5 +5024,92 @@ iconButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  synthManualSection: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 6,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '20',
+  },
+  synthManualHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  synthManualTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+  },
+  synthInputGroup: {
+    gap: 4,
+  },
+  synthInputLabel: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  synthSliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  synthSliderValue: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+  },
+  synthSliderTrack: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 32,
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 4,
+    position: 'relative',
+  },
+  synthSliderFill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    backgroundColor: theme.colors.accent[400] + '22',
+    borderRadius: theme.radius.sm,
+  },
+  synthSliderTick: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+    zIndex: 1,
+  },
+  synthSliderTickActive: {
+    backgroundColor: theme.colors.accent[400],
+  },
+  synthSliderTickLabel: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+  },
+  synthHint: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  synthNegInput: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.text,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.border,
   },
 });

@@ -35,6 +35,13 @@ interface GenerateAiVideoOptions {
   productVision?: ProductVisionResult | null;
   draft?: boolean;
   isCleanVideoMode?: boolean;
+  promptStrength?: number;
+  negativePrompt?: string;
+  bgStyle?: string;
+  outfitIntensity?: number;
+  zoomSpeed?: number;
+  cameraRotation?: number;
+  transitionEffect?: string;
 }
 
 interface PollResponse {
@@ -106,6 +113,13 @@ export async function generateAiVideo(
           productVision: options.productVision ?? null,
           draft: isDraft,
           isCleanVideoMode: options.isCleanVideoMode ?? false,
+          promptStrength: options.promptStrength,
+          negativePrompt: options.negativePrompt,
+          bgStyle: options.bgStyle,
+          outfitIntensity: options.outfitIntensity,
+          zoomSpeed: options.zoomSpeed,
+          cameraRotation: options.cameraRotation,
+          transitionEffect: options.transitionEffect,
         },
       });
 

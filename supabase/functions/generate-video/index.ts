@@ -41,6 +41,13 @@ interface GenerateVideoRequest {
   productVision?: ProductVisionData | null;
   draft?: boolean;
   isCleanVideoMode?: boolean;
+  promptStrength?: number;
+  negativePrompt?: string;
+  bgStyle?: string;
+  outfitIntensity?: number;
+  zoomSpeed?: number;
+  cameraRotation?: number;
+  transitionEffect?: string;
   // webhook fields (sent by Runway callback)
   status?: string;
   output?: string[] | { url?: string } | string;
@@ -155,6 +162,13 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     hookCategory: body.hookCategory ?? "curiosity",
     productVision: body.productVision ?? null,
     isCleanVideoMode: body.isCleanVideoMode === true,
+    promptStrength: body.promptStrength,
+    negativePrompt: body.negativePrompt,
+    bgStyle: body.bgStyle,
+    outfitIntensity: body.outfitIntensity,
+    zoomSpeed: body.zoomSpeed,
+    cameraRotation: body.cameraRotation,
+    transitionEffect: body.transitionEffect,
   });
 
   try {
@@ -754,6 +768,13 @@ type CompactPromptParams = {
   hookCategory: string;
   productVision?: ProductVisionData | null;
   isCleanVideoMode: boolean;
+  promptStrength?: number;
+  negativePrompt?: string;
+  bgStyle?: string;
+  outfitIntensity?: number;
+  zoomSpeed?: number;
+  cameraRotation?: number;
+  transitionEffect?: string;
 };
 
 const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
@@ -779,9 +800,53 @@ const HOOK_TEXTS: Record<string, string[]> = {
   fomo: ["품절 전에 확인하셈", "선착순 마감 임박", "이거 모르면 손해인데"],
 };
 
+const BG_STYLE_MAP: Record<string, string> = {
+  "스튜디오": "studio backdrop, controlled lighting, seamless background",
+  "야외": "outdoor natural environment, golden hour, natural surroundings",
+  "빈티지": "vintage retro setting, warm faded tones, nostalgic atmosphere",
+  "미니멀": "minimalist clean background, white space, simple setting",
+  "카페": "cozy cafe interior, warm ambient lighting, lifestyle setting",
+  "도시": "urban city backdrop, street style, modern architecture",
+};
+
+const TRANSITION_MAP: Record<string, string> = {
+  "컷 전환": "quick cut transitions",
+  "크로스페이드": "crossfade dissolves",
+  "와이프": "wipe transitions",
+  "줌 전환": "zoom-through transitions",
+  "플래시": "flash-cut transitions",
+  "슬로우 모션": "slow-motion ramps",
+};
+
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
+
+  // Prompt strength: 1-10 scale, default 7. Higher = more literal prompt adherence.
+  const strength = p.promptStrength ?? 7;
+  const strengthTag = strength >= 8 ? "strict prompt adherence, literal interpretation" : strength <= 4 ? "creative interpretation, loose prompt guidance, artistic freedom" : "balanced prompt adherence";
+
+  // Negative prompt: user-specified elements to exclude
+  const negTag = p.negativePrompt && p.negativePrompt.trim() ? `neg=[${p.negativePrompt.trim().slice(0, 80)}]` : "";
+
+  // Background style
+  const bgTag = p.bgStyle && BG_STYLE_MAP[p.bgStyle] ? `bg=${BG_STYLE_MAP[p.bgStyle]}` : "";
+
+  // Outfit/style intensity: 1-5 scale, default 3
+  const outfitTag = p.outfitIntensity != null && p.outfitIntensity !== 3
+    ? p.outfitIntensity >= 4 ? "strong style transformation, dramatic outfit change" : "subtle style enhancement, minimal outfit change"
+    : "";
+
+  // Camera motion controls
+  const zoomTag = p.zoomSpeed != null && p.zoomSpeed !== 2
+    ? p.zoomSpeed >= 3 ? "fast aggressive zoom-in" : p.zoomSpeed <= 1 ? "slow gentle zoom-in" : ""
+    : "";
+  const rotTag = p.cameraRotation != null && p.cameraRotation !== 0
+    ? `camera rotation ${p.cameraRotation > 0 ? "right" : "left"} ${Math.abs(p.cameraRotation)}deg`
+    : "";
+
+  // Transition effect
+  const transTag = p.transitionEffect && TRANSITION_MAP[p.transitionEffect] ? `transitions=${TRANSITION_MAP[p.transitionEffect]}` : "";
 
   if (p.isCleanVideoMode) {
     const v = p.productVision;
@@ -791,13 +856,20 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       "light=professional 3-point studio + softbox + rim light",
       "grade=filmic luxury, shallow DOF, color-graded, premium look",
       "quality=top 1% commercial, ultra-premium, high-end brand film",
+      `prompt_strength=${strength}/10, ${strengthTag}`,
     ];
     if (v) {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
       if (v.textureDescription) tokens.push(`texture=${v.textureDescription}`);
     }
+    if (bgTag) tokens.push(bgTag);
+    if (outfitTag) tokens.push(outfitTag);
+    if (zoomTag) tokens.push(zoomTag);
+    if (rotTag) tokens.push(rotTag);
+    if (transTag) tokens.push(transTag);
     tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
+    if (negTag) tokens.push(negTag);
     return tokens.join(" ").slice(0, 500);
   }
 
@@ -813,6 +885,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     `grade=${style.grade},${mood}`,
     `hook="${hook}"`,
     `aesthetic=raw,imperfect,handheld,no-studio`,
+    `prompt_strength=${strength}/10, ${strengthTag}`,
   ];
 
   if (p.productVision) {
@@ -824,6 +897,13 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   if (p.captionText && p.captionText.trim()) {
     tokens.push(`ctx="${p.captionText.slice(0, 40)}"`);
   }
+
+  if (bgTag) tokens.push(bgTag);
+  if (outfitTag) tokens.push(outfitTag);
+  if (zoomTag) tokens.push(zoomTag);
+  if (rotTag) tokens.push(rotTag);
+  if (transTag) tokens.push(transTag);
+  if (negTag) tokens.push(negTag);
 
   tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production")
 
