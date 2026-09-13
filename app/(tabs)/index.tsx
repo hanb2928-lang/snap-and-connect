@@ -626,6 +626,7 @@ export default function CameraScreen() {
               autoSaveToast={null}
               autoSaveStep={1}
               onMultiAnglePress={() => setFittingGuideVisible(true)}
+              onCameraReady={setCameraReady}
               simplified
             />
           </View>
@@ -845,6 +846,7 @@ export default function CameraScreen() {
             autoSaveToast={autoSaveToast}
             autoSaveStep={autoSaveStep}
             onMultiAnglePress={() => setMultiAngleVisible(true)}
+            onCameraReady={setCameraReady}
             simplified
           />
         </View>
@@ -1336,7 +1338,7 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     backgroundColor: 'transparent',
     paddingHorizontal: theme.spacing.xl,

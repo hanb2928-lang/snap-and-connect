@@ -26,6 +26,7 @@ interface WebCameraViewProps {
   autoSaveToast: string | null;
   autoSaveStep: number;
   onMultiAnglePress: () => void;
+  onCameraReady?: (ready: boolean) => void;
   cameraRole?: 'template' | 'video';
   simplified?: boolean;
 }
@@ -52,6 +53,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   autoSaveToast,
   autoSaveStep,
   onMultiAnglePress,
+  onCameraReady,
   cameraRole = 'template',
   simplified = false,
 }, ref) {
@@ -75,7 +77,8 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       streamRef.current = null;
     }
     setCameraReady(false);
-  }, []);
+    onCameraReady?.(false);
+  }, [onCameraReady]);
 
   const startStream = useCallback(async (face: Facing) => {
     if (Platform.OS !== 'web') return;
@@ -100,7 +103,10 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        if (mountedRef.current) setCameraReady(true);
+        if (mountedRef.current) {
+          setCameraReady(true);
+          onCameraReady?.(true);
+        }
       }
     } catch (err) {
       if (!mountedRef.current) return;
