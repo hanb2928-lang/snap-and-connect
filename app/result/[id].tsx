@@ -2924,16 +2924,16 @@ export default function ResultScreen() {
             </View>
           )}
 
-          {td?.caption ? (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
-                <Text style={styles.sectionLabel}>1단계 · 플랫폼 게시판 선택</Text>
-              </View>
-              <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
-              {platformSupportsBoth(activePlatform) && (
-                <BoardTabs platform={activePlatform} selected={activeBoard} onSelect={setActiveBoard} />
-              )}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Flame size={16} color={theme.colors.warning[400]} strokeWidth={2} />
+              <Text style={styles.sectionLabel}>1단계 · 플랫폼 게시판 선택</Text>
+            </View>
+            <PlatformTabs selected={activePlatform} onSelect={handlePlatformChange} />
+            {platformSupportsBoth(activePlatform) && (
+              <BoardTabs platform={activePlatform} selected={activeBoard} onSelect={setActiveBoard} />
+            )}
+            {td?.caption ? (
               <View style={styles.captionCard}>
                 {activeHook ? (
                   <View style={styles.hookRow}>
@@ -3036,8 +3036,8 @@ export default function ResultScreen() {
                   </View>
                 ) : null}
               </View>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
 
           {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
 
