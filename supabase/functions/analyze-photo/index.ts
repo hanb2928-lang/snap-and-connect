@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { PSYCHO_ENGINE_CORE } from "../_shared/psycho-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -173,7 +174,7 @@ Deno.serve(async (req: Request) => {
         );
       }
       if (openaiKey) {
-        result = await analyzeMultiShotWithOpenAI(sanitizedImages, openaiKey, productContext);
+        result = await analyzeMultiShotWithOpenAI(sanitizedImages, openaiKey, preferredStyle, productContext);
       } else {
         result = generateContextualAnalysis(fileName || "snapshot");
       }
@@ -255,6 +256,12 @@ async function analyzeWithOpenAI(
   const productInstruction = isSingle
     ? "Identify the SINGLE primary/main product visible in the photo. Focus on the most prominent item. Return a detectedProducts array with exactly ONE element."
     : "Identify ALL distinct products visible in the photo. Return a detectedProducts array with one element per product found. Maximum 4 products — if more than 4 are visible, pick the 4 most prominent and distinct ones. Each product must be genuinely different (not the same item from a different angle).";
+
+  const toneDirective = preferredStyle === 'raw'
+    ? `\n\n${PSYCHO_ENGINE_CORE}\n\n위 날것 심리 원칙을 모든 훅, 캡션, 심리 분석에 절대적으로 적용하라. 손실 공포와 FOMO를 첫 2초 훅으로 사용하고, 스튜디오 연출이나 긍정적 이익 강조는 절대 금지한다.`
+    : preferredStyle === 'studio'
+    ? `\n\n## 스튜디오 프리미엄 원칙\n최상위 1% 수준의 럭셔리 상업 영상에 걸맞은 고품격 톤으로 마케팅 문구를 생성하라. 우아하고 세련된 언어, 프리미엄 브랜드의 톤앤매너, 품질과 가치를 강조하는 고급스러운 표현을 사용하라. 대중적이나 투박한 표현, 손실 공포, FOMO 자극은 금지. 예: '경험을 바꾸는 단 하나의 선택', '완벽함을 경험하다'\n`
+    : "";
 
   const styleHint = preferredStyle
     ? `\nThe user has selected the "${preferredStyle}" platform style as their preferred template. After generating all variants, populate the top-level hook, hashtags, productAdvantages, and caption with the ${preferredStyle.toUpperCase()} variant's values instead of the shortform variant. This is the user's chosen default view.`
@@ -355,7 +362,8 @@ async function analyzeWithOpenAI(
     "  - qrCouponText: short QR coupon banner text for the video ending credit (e.g. 'QR 스캔시 10% 할인쿠폰 + 온라인 주문 링크')\n" +
     "If the photo is NOT a local store scene, set localStoreContext to null and hybridMapping to null.\n" +
     "Return ONLY valid JSON, no markdown." +
-    styleHint;
+    styleHint +
+    toneDirective;
 
   const contextHint = productContext?.productName || productContext?.description
     ? `\n\n사용자가 제공한 제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "알 수 없음"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "알 수 없음"}\n- 브랜드: ${productContext.brand || ""}\n- 플랫폼: ${productContext.platform || ""}\n이 정보를 사진 분석과 마케팅 문구 생성에 적극 활용해. 사진의 상품과 링크 정보가 일치하면 정확한 상품명과 가격을 반영하고, 링크의 핵심 셀링 포인트를 후킹과 caption에 자연스럽게 녹여내.`
@@ -377,8 +385,14 @@ async function analyzeWithOpenAI(
 async function analyzeMultiShotWithOpenAI(
   imageDataUrls: string[],
   apiKey: string,
+  preferredStyle?: string,
   productContext?: ProductContext,
 ): Promise<AnalysisResult> {
+  const toneDirective = preferredStyle === 'raw'
+    ? `\n\n${PSYCHO_ENGINE_CORE}\n\n위 날것 심리 원칙을 모든 훅, 캡션, 심리 분석에 절대적으로 적용하라. 손실 공포와 FOMO를 첫 2초 훅으로 사용하고, 스튜디오 연출이나 긍정적 이익 강조는 절대 금지한다.`
+    : preferredStyle === 'studio'
+    ? `\n\n## 스튜디오 프리미엄 원칙\n최상위 1% 수준의 럭셔리 상업 영상에 걸맞은 고품격 톤으로 마케팅 문구를 생성하라. 우아하고 세련된 언어, 프리미엄 브랜드의 톤앤매너, 품질과 가치를 강조하는 고급스러운 표현을 사용하라. 대중적이나 투박한 표현, 손실 공포, FOMO 자극은 금지. 예: '경험을 바꾸는 단 하나의 선택', '완벽함을 경험하다'\n`
+    : "";
   const systemPrompt =
     "You are a consumer psychology expert and viral short-form marketing strategist. " +
     "You are given MULTIPLE photos of the SAME product taken from different angles. " +
@@ -431,7 +445,8 @@ async function analyzeMultiShotWithOpenAI(
     "  Also populate the top-level hook, hashtags, productAdvantages, caption with the SHORTFORM variant's values (since shortform is the default view).\n" +
     "Also populate detectedProducts as an array with exactly ONE element using the same product data (for backward compatibility).\n" +
     "For shoppingMatches, use the official Naver Brand Connect creator page: https://brandconnect.naver.com/about/creator\n" +
-    "Return ONLY valid JSON, no markdown.";
+    "Return ONLY valid JSON, no markdown." +
+    toneDirective;
 
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
     {

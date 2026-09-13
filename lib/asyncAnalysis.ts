@@ -110,6 +110,7 @@ export async function startAsyncAnalysis(
           images: [buildDataUrl(base64, mimeType), ...additionalBase64Images.map((b) => buildDataUrl(b, 'image/jpeg'))],
           fileName,
           mode: 'multi-shot',
+          ...(preferredStyle ? { preferredStyle } : {}),
         }
       : {
           imageDataUrl: buildDataUrl(base64, mimeType),
