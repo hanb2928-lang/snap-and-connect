@@ -19,24 +19,51 @@ export interface ProductVisionResult {
   };
 }
 
+const VISION_MAX_RETRIES = 2;
+const VISION_TIMEOUT_MS = 120_000;
+
 export async function analyzeProductVision(
   images: string[],
   productName?: string,
   scanId?: string,
 ): Promise<ProductVisionResult> {
-  const { data, error } = await supabase.functions.invoke('analyze-product-vision', {
-    body: { images, productName, scanId },
-  });
+  let lastErr: Error | null = null;
 
-  if (error) {
-    throw new Error(error.message ?? 'Vision AI 분석 실패');
+  for (let attempt = 0; attempt <= VISION_MAX_RETRIES; attempt++) {
+    try {
+      const result = await Promise.race([
+        supabase.functions.invoke('analyze-product-vision', {
+          body: { images, productName, scanId },
+        }),
+        new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(
+            () => resolve({ data: null, error: { message: `Vision AI 분석 요청 시간이 초과되었습니다. 네트워크 연결을 확인해주세요. (제한: ${VISION_TIMEOUT_MS / 1000}초)` } }),
+            VISION_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+
+      const { data, error } = result;
+
+      if (error) {
+        throw new Error(error.message ?? 'Vision AI 분석 실패');
+      }
+
+      if (!data) {
+        throw new Error('Vision AI 분석 결과를 받지 못했습니다.');
+      }
+
+      return data as ProductVisionResult;
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      if (attempt < VISION_MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+      }
+    }
   }
 
-  if (!data) {
-    throw new Error('Vision AI 분석 결과를 받지 못했습니다.');
-  }
-
-  return data as ProductVisionResult;
+  const msg = lastErr?.message ?? 'Vision AI 분석 실패';
+  throw new Error(msg);
 }
 
 export function buildOrbitalPromptExtension(

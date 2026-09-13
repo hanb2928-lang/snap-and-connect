@@ -470,8 +470,8 @@ export default function SettingsScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24, paddingTop: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* API Health Check Badges */}
@@ -2041,7 +2041,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>OpenAI API 키 설정</Text>
         <Text style={styles.sectionDesc}>
-          가상 컷 생성, 가상 피팅 등 AI 이미지 기능에 사용됩니다. 키는 안전하게 저장되며 서버에서만 사용됩니다.
+          가상 컷 생성, AI 범용 합성 등 AI 이미지 기능에 사용됩니다. 키는 안전하게 저장되며 서버에서만 사용됩니다.
         </Text>
         <View style={styles.card}>
           <View style={styles.idInputRow}>
@@ -2227,7 +2227,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%' }}
           >
           <View style={styles.modalContainer}>

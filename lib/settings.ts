@@ -1,7 +1,17 @@
 import { supabase } from '@/lib/supabase';
+import { getItem, setItem } from '@/lib/storage';
 import type { UserSettings } from '@/types/database';
 
 const SINGLETON_ID = 1;
+
+const API_KEY_FIELDS: (keyof UserSettings)[] = [
+  'openai_api_key',
+  'pexels_api_key',
+  'tts_api_key',
+  'runway_api_key',
+];
+
+const LOCAL_API_KEY_PREFIX = 'apikey:';
 
 let cachedSettings: UserSettings | null | undefined;
 
@@ -14,9 +24,40 @@ export async function getUserSettings(): Promise<UserSettings | null> {
     .eq('id', SINGLETON_ID)
     .maybeSingle();
 
-  if (error) return null;
-  cachedSettings = data as UserSettings | null;
+  if (error || !data) {
+    const fallback = await loadApiKeysFromLocal();
+    if (fallback) {
+      cachedSettings = fallback as UserSettings;
+      return cachedSettings;
+    }
+    return null;
+  }
+
+  cachedSettings = data as UserSettings;
+
+  for (const field of API_KEY_FIELDS) {
+    const localVal = await getItem(LOCAL_API_KEY_PREFIX + field);
+    if (!cachedSettings[field] && localVal) {
+      (cachedSettings as unknown as Record<string, unknown>)[field] = localVal;
+    } else if (cachedSettings[field]) {
+      await setItem(LOCAL_API_KEY_PREFIX + field, cachedSettings[field] as string);
+    }
+  }
+
   return cachedSettings;
+}
+
+async function loadApiKeysFromLocal(): Promise<Partial<UserSettings> | null> {
+  const result: Partial<UserSettings> = {};
+  let hasAny = false;
+  for (const field of API_KEY_FIELDS) {
+    const val = await getItem(LOCAL_API_KEY_PREFIX + field);
+    if (val) {
+      (result as Record<string, unknown>)[field] = val;
+      hasAny = true;
+    }
+  }
+  return hasAny ? result : null;
 }
 
 export function invalidateSettingsCache(): void {
@@ -35,5 +76,13 @@ export async function updateUserSettings(
     });
 
   if (error) throw new Error(`Failed to save settings: ${error.message}`);
+
+  for (const field of API_KEY_FIELDS) {
+    if (field in settings) {
+      const val = settings[field];
+      await setItem(LOCAL_API_KEY_PREFIX + field, typeof val === 'string' ? val : '');
+    }
+  }
+
   invalidateSettingsCache();
 }

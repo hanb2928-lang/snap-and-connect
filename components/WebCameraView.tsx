@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHand
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Sparkles, Check } from 'lucide-react-native';
+import { Camera, RotateCcw, Grid3x3, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
 
@@ -63,6 +63,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   const [gridVisible, setGridVisible] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'permission' | 'notfound' | 'generic'>('generic');
   const [capturing, setCapturing] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string>('image/jpeg');
@@ -105,11 +106,14 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       if (!mountedRef.current) return;
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
       if (msg.includes('Permission') || msg.includes('NotAllowed')) {
-        setError('카메라 권한이 필요합니다. 브라우저 설정에서 카메라를 허용해주세요.');
+        setError('카메라 권한이 거부되었습니다. 브라우저 또는 기기 설정에서 카메라 접근을 허용해주세요.');
+        setErrorKind('permission');
       } else if (msg.includes('NotFound') || msg.includes('NotReadable')) {
-        setError('사용 가능한 카메라를 찾을 수 없습니다.');
+        setError('사용 가능한 카메라를 찾을 수 없습니다. 카메라가 다른 앱에서 사용 중이거나 기기에 카메라가 없습니다.');
+        setErrorKind('notfound');
       } else {
         setError('카메라를 시작할 수 없습니다: ' + msg);
+        setErrorKind('generic');
       }
     }
   }, [stopStream]);
@@ -138,6 +142,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
     setPreviewBase64(null);
     setPreviewMime('image/jpeg');
     setError(null);
+    setErrorKind('generic');
     setGridVisible(false);
   }, [captureMode]);
 
@@ -329,15 +334,48 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
 
             {error && (
               <View style={styles.errorWrap}>
-                <Text style={styles.errorTitle}>카메라를 사용할 수 없습니다</Text>
-                <Text style={styles.errorMsg}>{error}</Text>
-                <TouchableOpacity
-                  style={styles.retryBtn}
-                  onPress={() => startStream(facing)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.retryText}>다시 시도</Text>
-                </TouchableOpacity>
+                {errorKind === 'permission' ? (
+                  <>
+                    <ShieldAlert size={36} color={theme.colors.warning[400]} strokeWidth={1.5} />
+                    <Text style={styles.errorTitle}>카메라 권한이 필요합니다</Text>
+                    <Text style={styles.errorMsg}>{error}</Text>
+                    <View style={styles.permissionGuide}>
+                      <Text style={styles.permissionGuideTitle}>권한 허용 방법:</Text>
+                      <Text style={styles.permissionGuideStep}>1. 브라우저 주소창 좌측 자물쇠 아이콘 클릭</Text>
+                      <Text style={styles.permissionGuideStep}>2. 사이트 설정에서 카메라를 허용으로 변경</Text>
+                      <Text style={styles.permissionGuideStep}>3. 페이지 새로고침 후 다시 시도</Text>
+                    </View>
+                    <View style={styles.permissionBtnRow}>
+                      <TouchableOpacity
+                        style={styles.retryBtn}
+                        onPress={() => startStream(facing)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.retryText}>다시 시도</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.galleryFallbackBtn}
+                        onPress={onPickImage}
+                        activeOpacity={0.8}
+                      >
+                        <ImageIcon size={16} color="#fff" strokeWidth={2} />
+                        <Text style={styles.galleryFallbackText}>갤러리에서 선택</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.errorTitle}>카메라를 사용할 수 없습니다</Text>
+                    <Text style={styles.errorMsg}>{error}</Text>
+                    <TouchableOpacity
+                      style={styles.retryBtn}
+                      onPress={() => startStream(facing)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.retryText}>다시 시도</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -528,6 +566,45 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
   },
   retryText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
+  },
+  permissionGuide: {
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 4,
+    gap: 4,
+  },
+  permissionGuideTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+    marginBottom: 2,
+  },
+  permissionGuideStep: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+  },
+  permissionBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  galleryFallbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    borderRadius: theme.radius.lg,
+  },
+  galleryFallbackText: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: '#fff',

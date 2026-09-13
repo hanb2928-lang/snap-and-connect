@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Shirt } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Layers } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -470,13 +470,13 @@ export default function CameraScreen() {
 
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
-      if (!data?.image) throw new Error('가상 피팅 이미지를 생성하지 못했습니다.');
+      if (!data?.image) throw new Error('AI 합성 이미지를 생성하지 못했습니다.');
 
       setFittingResultBase64(data.image as string);
       setScreenPhase('fitting_result');
     } catch (err) {
       if (!isMountedRef.current) return;
-      setError(friendlyError(err, '가상 피팅 생성 중 오류가 발생했습니다. 다시 시도해주세요.'));
+      setError(friendlyError(err, 'AI 합성 생성 중 오류가 발생했습니다. 다시 시도해주세요.'));
     } finally {
       if (isMountedRef.current) setFittingLoading(false);
     }
@@ -516,9 +516,9 @@ export default function CameraScreen() {
             onPress={() => handleModeSelect('single')}
           />
           <ModeCard
-            icon={<Shirt size={32} color="#fff" strokeWidth={2.5} />}
-            title="AI 가상 피팅"
-            desc="의류 사진과 모델 사진을 업로드하면 AI가 가상 착용 결과를 생성"
+            icon={<Layers size={32} color="#fff" strokeWidth={2.5} />}
+            title="AI 범용 합성"
+            desc="가구 배치부터 패션 착용까지, 원하는 제품을 컷 하나로 완벽 합성"
             color={theme.colors.accent[500]}
             onPress={() => handleModeSelect('fitting')}
           />
@@ -550,7 +550,7 @@ export default function CameraScreen() {
           >
             <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={styles.fittingStepTitle}>1/2 의류 사진</Text>
+          <Text style={styles.fittingStepTitle}>1/2 제품 사진</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -560,7 +560,7 @@ export default function CameraScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.fittingDesc}>
-            착용시킬 의류/제품 사진을 선택해주세요. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.
+            합성할 제품 사진을 선택해주세요. 가구, IT 가전, 패션, 뷰티, 인테리어 소품 등 모든 카테고리의 제품을 자연스럽게 배경이나 모델에 투영할 수 있습니다.
           </Text>
 
           {fittingProductBase64 ? (
@@ -601,8 +601,8 @@ export default function CameraScreen() {
               activeOpacity={0.8}
             >
               <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.fittingUploadText}>의류 사진 선택</Text>
-              <Text style={styles.fittingUploadHint}>갤러리에서 의류/제품 사진을 불러옵니다</Text>
+              <Text style={styles.fittingUploadText}>제품 사진 선택</Text>
+              <Text style={styles.fittingUploadHint}>갤러리에서 제품 사진을 불러옵니다</Text>
             </TouchableOpacity>
           )}
 
@@ -638,7 +638,7 @@ export default function CameraScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.fittingDesc}>
-            의류를 입힐 모델 사진을 선택해주세요. 정면 전신 사진이 가장 좋은 결과를 제공합니다.
+            제품을 합성할 배경이나 모델 사진을 선택해주세요. 인테리어 공간, 실내 환경, 사람 모델 등 어떤 이미지든 가능합니다.
           </Text>
 
           {fittingModelBase64 ? (
@@ -670,7 +670,7 @@ export default function CameraScreen() {
                   ) : (
                     <>
                       <Sparkles size={18} color="#fff" strokeWidth={2.5} />
-                      <Text style={styles.fittingNextText}>AI 피팅 생성</Text>
+                      <Text style={styles.fittingNextText}>AI 합성 생성</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -686,8 +686,8 @@ export default function CameraScreen() {
               activeOpacity={0.8}
             >
               <ImageIcon size={32} color={theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={styles.fittingUploadText}>모델 사진 선택</Text>
-              <Text style={styles.fittingUploadHint}>갤러리에서 모델 전신 사진을 불러옵니다</Text>
+              <Text style={styles.fittingUploadText}>배경/모델 사진 선택</Text>
+              <Text style={styles.fittingUploadHint}>갤러리에서 배경 또는 모델 사진을 불러옵니다</Text>
             </TouchableOpacity>
           )}
 
@@ -696,9 +696,9 @@ export default function CameraScreen() {
               <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
                 <Sparkles size={28} color={theme.colors.accent[400]} strokeWidth={2} />
               </Animated.View>
-              <Text style={styles.fittingLoadingTitle}>AI 가상 피팅 생성 중</Text>
+              <Text style={styles.fittingLoadingTitle}>AI 범용 합성 생성 중</Text>
               <Text style={styles.fittingLoadingSub}>
-                모델에게 의류를 입히는 중입니다. 잠시만 기다려주세요.
+                제품을 배경과 자연스럽게 합성하는 중입니다. 잠시만 기다려주세요.
               </Text>
             </View>
           )}
@@ -730,7 +730,7 @@ export default function CameraScreen() {
           >
             <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={styles.fittingStepTitle}>피팅 결과</Text>
+          <Text style={styles.fittingStepTitle}>합성 결과</Text>
           <View style={{ width: 40 }} />
         </View>
 

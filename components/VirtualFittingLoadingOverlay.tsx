@@ -12,7 +12,7 @@ import Animated, {
   interpolate,
   type SharedValue,
 } from 'react-native-reanimated';
-import { Shirt, User, Scan, Sparkles, Check } from 'lucide-react-native';
+import { Layers, User, Scan, Sparkles, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 interface VirtualFittingLoadingOverlayProps {
@@ -23,7 +23,7 @@ interface VirtualFittingLoadingOverlayProps {
 interface LoadingStage {
   id: string;
   label: string;
-  icon: typeof Shirt;
+  icon: typeof Layers;
   color: string;
   durationMs: number;
 }
@@ -31,7 +31,7 @@ interface LoadingStage {
 const STAGES: LoadingStage[] = [
   { id: 'scan', label: 'AI가 제품 원본을 스캔 중입니다...', icon: Scan, color: theme.colors.primary[400], durationMs: 1800 },
   { id: 'body', label: 'AI가 모델 체형 라인을 분석 중입니다...', icon: User, color: theme.colors.accent[400], durationMs: 2400 },
-  { id: 'fit', label: 'AI가 의류를 모델에게 피팅 중입니다...', icon: Shirt, color: theme.colors.warning[400], durationMs: 3000 },
+  { id: 'fit', label: 'AI가 제품을 배경에 자연스럽게 합성 중입니다...', icon: Layers, color: theme.colors.warning[400], durationMs: 3000 },
   { id: 'render', label: 'AI가 최종 결과를 렌더링 중입니다...', icon: Sparkles, color: theme.colors.success[400], durationMs: 1800 },
 ];
 
@@ -99,8 +99,8 @@ export function VirtualFittingLoadingOverlay({ visible }: VirtualFittingLoadingO
       <View style={styles.backdrop}>
         <View style={styles.card}>
           {/* Header */}
-          <Text style={styles.title}>가상 피팅 프리뷰 생성 중</Text>
-          <Text style={styles.subtitle}>의류와 모델 사진을 합성하는 동안 잠시만 기다려주세요</Text>
+          <Text style={styles.title}>AI 범용 합성 생성 중</Text>
+          <Text style={styles.subtitle}>제품과 배경 사진을 합성하는 동안 잠시만 기다려주세요</Text>
 
           {/* Animated preview area */}
           <View style={styles.previewArea}>
@@ -174,7 +174,7 @@ function ScanArea({
   return (
     <View style={styles.scanArea}>
       <View style={styles.scanAreaImageBox}>
-        <Shirt size={36} color={theme.colors.primary[400]} strokeWidth={1.5} />
+        <Layers size={36} color={theme.colors.primary[400]} strokeWidth={1.5} />
         <Text style={styles.scanAreaLabel}>제품</Text>
       </View>
 
@@ -206,7 +206,7 @@ function StageIconRow({
   isActive: boolean;
   isDone: boolean;
   color: string;
-  Icon: typeof Shirt;
+  Icon: typeof Layers;
   pulseSV: SharedValue<number>;
 }) {
   const pulseStyle = useAnimatedStyle(() => ({

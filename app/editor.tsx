@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -634,6 +635,11 @@ export default function EditorScreen() {
   }
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? safeTop : 0}
+    >
     <View style={styles.container}>
       {/* Top bar */}
       <View style={[styles.topBar, { paddingTop: safeTop + 12 }]}>
@@ -1036,6 +1042,7 @@ export default function EditorScreen() {
         </View>
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

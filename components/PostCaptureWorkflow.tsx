@@ -34,7 +34,7 @@ import {
   Plus,
   Trash2,
   Smartphone,
-  Shirt,
+  Layers,
   Video,
   Link2 as LinkIcon,
 } from 'lucide-react-native';
@@ -120,7 +120,7 @@ type ConversionMode = 'shortform' | 'ai_video' | 'virtual_fitting';
 const CONVERSION_MODES: { key: ConversionMode; label: string; desc: string; icon: typeof Video }[] = [
   { key: 'shortform', label: '기본 숏폼', desc: '15초 숏폼 자동 편집', icon: Video },
   { key: 'ai_video', label: 'AI 영상 변환', desc: '사진을 영상으로 AI 변환', icon: Wand2 },
-  { key: 'virtual_fitting', label: '가상 피팅', desc: '의류 착용 피팅 영상', icon: Shirt },
+  { key: 'virtual_fitting', label: 'AI 범용 합성', desc: '제품 합성 영상', icon: Layers },
 ];
 
 export function PostCaptureWorkflow({
@@ -694,7 +694,7 @@ export function PostCaptureWorkflow({
               {conversionMode === 'ai_video'
                 ? '선택한 사진을 AI가 자동으로 카메라 무빙, 줌인/아웃, 전환 효과가 포함된 15초 영상으로 변환합니다. 프롬프트로 원하는 무드를 지정할 수 있습니다.'
                 : conversionMode === 'virtual_fitting'
-                ? '의류/제품 사진과 모델 사진을 업로드하면 AI가 가상 착용 피팅 영상을 생성합니다. 의류, 패션, 뷰티 상품에 최적화되어 있습니다.'
+                ? '제품 사진과 배경/모델 사진을 업로드하면 AI가 가구, IT 가전, 패션, 뷰티 등 모든 카테고리의 제품을 자연스럽게 합성한 영상을 생성합니다.'
                 : '촬영한 원본 영상/사진을 그대로 15초 숏폼으로 자동 편집합니다. 가장 빠르고 리얼한 결과가 필요할 때 선택하세요.'}
             </Text>
 

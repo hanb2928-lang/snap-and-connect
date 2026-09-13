@@ -12,7 +12,7 @@ import {
   ChartBar as BarChart3, Flame, FolderOpen, ClipboardList, CalendarDays,
   MessageSquare, Bug, Send, Film, LayoutTemplate, BookOpen, PenLine,
   Image as ImageIcon, Scissors, Type, Stamp, Share2, Lightbulb, Smartphone,
-  Clapperboard, Music2, Instagram, Youtube, Globe, Shirt, ShoppingBag,
+  Clapperboard, Music2, Instagram, Youtube, Globe, ShoppingBag,
   Wand as Wand2, Target, Users, Layers, Store, Video, Shuffle, TrendingUp,
   History, BookMarked, CalendarClock, CloudRain, Package, QrCode, Link,
   CreditCard, Trophy, ShieldCheck, FileCheck, Megaphone, ImagePlus,
@@ -28,8 +28,8 @@ import { getGuideContent, type GuideItem } from '@/lib/guideContent';
 const ICON_MAP: Record<string, LucideIcon> = {
   Camera, Sparkles, Info, Link2, BarChart3, Flame, FolderOpen, Send, Film,
   LayoutTemplate, BookOpen, PenLine, ImageIcon, Scissors, Type, Share2,
-  Lightbulb, Clapperboard, Music2, Instagram, Youtube, Globe, Shirt,
-  Wand2, Target, Users, Layers, Store, Video, Shuffle, TrendingUp,
+  Lightbulb, Clapperboard, Music2, Instagram, Youtube, Globe, Layers,
+  Wand2, Target, Users, Store, Video, Shuffle, TrendingUp,
   MessageSquare, Bug, CalendarClock, CloudRain, Package, QrCode, Link,
   CreditCard, Trophy, ShieldCheck, FileCheck, Megaphone, ImagePlus,
   ScanLine, Grid3x3, Wallet, Stamp,
@@ -86,7 +86,7 @@ export default function GuideScreen() {
         </Text>
         <View style={styles.flowContainer}>
           {c.flowSteps.map((step, i) => {
-            const Icon = getIcon(['Camera','Link2','LayoutTemplate','Film','BookOpen','Send','Shirt','Target'][i] || 'Camera');
+            const Icon = getIcon(['Camera','Link2','LayoutTemplate','Film','BookOpen','Send','Layers','Target'][i] || 'Camera');
             const colors = [
               theme.colors.primary[500],
               theme.colors.accent[500],

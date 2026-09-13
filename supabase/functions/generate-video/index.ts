@@ -161,7 +161,7 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
       : undefined;
 
     const taskId = await submitWithRetry(
-      () => submitRunwayTask(runwayPrompt, undefined, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId),
+      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId),
       MAX_RETRIES,
     );
 
@@ -491,7 +491,6 @@ async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string
 
 async function submitRunwayTask(
   prompt: string,
-  imageUrl: string | undefined,
   apiKey: string,
   aspectRatio: string,
   durationSec: number,
@@ -510,29 +509,22 @@ async function submitRunwayTask(
       promptText: prompt,
       model: "gen3-alpha-turbo",
       duration: clampedDuration,
+      ratio: ratioValue,
     };
-    if (imageUrl) {
-      payload.promptImage = imageUrl;
-    } else {
-      payload.ratio = ratioValue;
-    }
     if (webhookUrl && scanId) {
       payload.callBackUrl = `${webhookUrl}?mode=webhook&taskId={taskId}&scanId=${scanId}`;
     }
 
-    const endpoint = imageUrl ? "image_to_video" : "text_to_video";
-
     console.log("[generate-video] Runway payload:", JSON.stringify({
-      endpoint,
+      endpoint: "text_to_video",
       model: payload.model,
       duration: payload.duration,
-      ratio: payload.ratio ?? "(omitted, promptImage set)",
+      ratio: payload.ratio,
       promptLength: prompt.length,
       promptPreview: prompt.slice(0, 100),
-      hasPromptImage: !!payload.promptImage,
     }));
 
-    const resp = await fetch(`https://api.dev.runwayml.com/v1/${endpoint}`, {
+    const resp = await fetch("https://api.dev.runwayml.com/v1/text_to_video", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -547,12 +539,8 @@ async function submitRunwayTask(
 
     if (!resp.ok) {
       const errText = await resp.text();
-      console.error("[generate-video] Runway error:", resp.status, errText.slice(0, 500));
-      let errDetail = errText.slice(0, 500);
-      try {
-        const errJson = JSON.parse(errText);
-        errDetail = errJson?.error ?? errJson?.message ?? errDetail;
-      } catch { /* keep raw text */ }
+      console.error("[generate-video] Runway error:", resp.status, errText.slice(0, 800));
+      const errDetail = parseRunwayError(errText);
       if (resp.status === 401) {
         throw new Error(`Runway API 키가 유효하지 않거나 비활성화되었습니다. 설정에서 활성화된 Runway API 키를 다시 등록해주세요. (HTTP 401): ${errDetail}`);
       }
@@ -696,32 +684,51 @@ const HOOK_TEXTS: Record<string, string[]> = {
 
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
-  const orientation = p.aspectRatio === "9:16" ? "vertical 9:16" : p.aspectRatio === "16:9" ? "horizontal 16:9" : "square 1:1";
+  const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
   const style = PLATFORM_STYLE[p.platform] ?? PLATFORM_STYLE.shorts;
   const mood = MOOD_GRADE[p.bgmMood ?? ""] ?? MOOD_GRADE["하이텐션"];
   const hooks = HOOK_TEXTS[p.hookCategory] ?? HOOK_TEXTS.curiosity;
   const hook = hooks[p.variationSeed % hooks.length];
 
-  const parts: string[] = [
-    `Cinematic 3D commercial for ${name}, ${orientation}.`,
-    `Camera: ${style.camera}. Lighting: ${style.lighting}. Color: ${style.grade}, ${mood}.`,
-    `Hook: "${hook}" kinetic typography at 0.3s.`,
+  const tokens: string[] = [
+    `commercial ${name} ${orientation}`,
+    `cam=${style.camera}`,
+    `light=${style.lighting}`,
+    `grade=${style.grade},${mood}`,
+    `hook="${hook}"`,
   ];
 
   if (p.productVision) {
     const v = p.productVision;
-    const feats = v.visualFeatures.slice(0, 3).join(", ");
-    if (feats) parts.push(`Product: ${v.shapeDescription}, ${v.materialGuess}, ${feats}.`);
-    else parts.push(`Product: ${v.shapeDescription}, ${v.materialGuess}.`);
+    const feats = v.visualFeatures.slice(0, 2).join(",");
+    tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
   }
 
   if (p.captionText && p.captionText.trim()) {
-    parts.push(`Context: "${p.captionText.slice(0, 60)}".`);
+    tokens.push(`ctx="${p.captionText.slice(0, 40)}"`);
   }
 
-  parts.push("3-phase: loss-aversion hook → problem/solution contrast → social-proof urgency CTA. Fully AI-generated, no source photos.");
+  tokens.push("3phase:hook→contrast→cta");
 
-  return parts.join(" ").slice(0, 480);
+  return tokens.join(" ").slice(0, 500);
+}
+
+function parseRunwayError(errText: string): string {
+  try {
+    const errJson = JSON.parse(errText);
+    if (errJson?.error) {
+      if (typeof errJson.error === "string") return errJson.error.slice(0, 500);
+      if (typeof errJson.error === "object") {
+        const fields = Object.entries(errJson.error)
+          .map(([field, val]) => `${field}: ${typeof val === "string" ? val : JSON.stringify(val)}`)
+          .join("; ");
+        return fields.slice(0, 500);
+      }
+    }
+    if (errJson?.message) return String(errJson.message).slice(0, 500);
+    if (Array.isArray(errJson?.details)) return errJson.details.map((d: unknown) => String(d)).join("; ").slice(0, 500);
+  } catch { /* not JSON */ }
+  return errText.slice(0, 500);
 }
 
 async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): Promise<string> {

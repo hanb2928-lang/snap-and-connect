@@ -51,6 +51,8 @@ const MAX_POLL_ATTEMPTS = 360;
 const SUBMIT_MAX_RETRIES = 2;
 const SUBMIT_RETRY_DELAY_MS = 2000;
 const MAX_BACKOFF_MS = 8000;
+const MAX_CONSECUTIVE_POLL_ERRORS = 8;
+const POLL_DEADLINE_MS = 150_000;
 
 const STATUS_MESSAGES: Record<string, string> = {
   THROTTLED: 'Runway 서버 대기 중 (순서 대기)...',
@@ -145,6 +147,11 @@ export async function generateAiVideo(
   let consecutiveErrors = 0;
   for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
     const elapsed = Date.now() - pollStartTime;
+    if (elapsed > POLL_DEADLINE_MS) {
+      const deadlineMsg = `비디오 생성 대기 시간이 ${Math.round(POLL_DEADLINE_MS / 1000)}초를 초과했습니다. 네트워크 상태가 불안정할 수 있습니다. 다시 시도해주세요.`;
+      report('error', 0, deadlineMsg);
+      throw new Error(deadlineMsg);
+    }
     const baseInterval = elapsed < ULTRA_POLL_DURATION_MS ? POLL_INTERVAL_ULTRA_MS : POLL_INTERVAL_NORMAL_MS;
     const backoffMultiplier = consecutiveErrors > 0 ? Math.min(Math.pow(2, consecutiveErrors), MAX_BACKOFF_MS / baseInterval) : 1;
     await delay(Math.round(baseInterval * backoffMultiplier));
@@ -169,7 +176,14 @@ export async function generateAiVideo(
       // Network blip — keep polling with exponential backoff
       consecutiveErrors++;
       const msg = err instanceof Error ? err.message : '폴링 오류';
-      report('generating', 0.1 + attempt * 0.005, `연결 재시도 중: ${msg}`);
+
+      if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
+        const deadlineMsg = `네트워크 연결이 반복적으로 실패하여 비디오 생성 상태를 확인할 수 없습니다. Wi-Fi 또는 셀룴러 연결을 확인 후 다시 시도해주세요. (오류: ${msg})`;
+        report('error', 0, deadlineMsg);
+        throw new Error(deadlineMsg);
+      }
+
+      report('generating', 0.1 + attempt * 0.005, `연결 재시도 중 (${consecutiveErrors}/${MAX_CONSECUTIVE_POLL_ERRORS}): ${msg}`);
       continue;
     }
 
