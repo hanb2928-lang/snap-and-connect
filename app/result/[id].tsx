@@ -3124,48 +3124,6 @@ export default function ResultScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* === 하단 고정 액션 바: 저장 / 업로드 === */}
-      <View style={[styles.stickyActionBar, { paddingBottom: 8 + insets.bottom }]}>
-        {uploadError ? (
-          <View style={styles.stickyErrorRow}>
-            <AlertCircleIcon size={14} color={theme.colors.error[400]} strokeWidth={2} />
-            <Text style={styles.stickyErrorText} numberOfLines={1}>{uploadError}</Text>
-            <TouchableOpacity onPress={() => setUploadError(null)} activeOpacity={0.7}>
-              <Text style={styles.stickyErrorDismiss}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-        ) : uploadDone ? (
-          <View style={styles.stickySuccessRow}>
-            <ShieldIcon size={14} color={theme.colors.success[400]} strokeWidth={2} />
-            <Text style={styles.stickySuccessText}>저장 완료! 갤러리에서 확인하세요</Text>
-          </View>
-        ) : null}
-        <View style={styles.stickyBtnRow}>
-          <TouchableOpacity
-            style={styles.stickySaveBtn}
-            onPress={generatedVideoUrl ? handleSaveVideo : handleSaveAndShare}
-            disabled={uploadProgress !== null}
-            activeOpacity={0.8}
-          >
-            {uploadProgress !== null ? (
-              <Loader2Icon size={18} color="#fff" strokeWidth={2.5} />
-            ) : (
-              <Download size={18} color="#fff" strokeWidth={2.5} />
-            )}
-            <Text style={styles.stickySaveBtnText}>
-              {uploadProgress !== null ? '저장 중...' : generatedVideoUrl ? '영상 저장' : '저장'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.stickyUploadBtn}
-            onPress={handlePlatformUpload}
-            activeOpacity={0.8}
-          >
-            <Upload size={18} color={theme.colors.primary[300]} strokeWidth={2.5} />
-            <Text style={styles.stickyUploadBtnText}>업로드</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <AccountSafetyChecker
         platform={activePlatform}
