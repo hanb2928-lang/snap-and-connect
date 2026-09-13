@@ -2322,6 +2322,24 @@ export default function ResultScreen() {
           </TouchableOpacity>
         </View>
 
+        {generatedVideoUrl && (
+          <TouchableOpacity
+            style={styles.aiVideoBtn}
+            onPress={handleSaveVideo}
+            disabled={uploadProgress !== null}
+            activeOpacity={0.7}
+          >
+            {uploadProgress !== null ? (
+              <Loader2Icon size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+            ) : (
+              <Download size={16} color={theme.colors.primary[300]} strokeWidth={2} />
+            )}
+            <Text style={styles.aiVideoBtnText}>
+              {uploadProgress !== null ? '영상 저장 중...' : 'AI 영상 갤러리에 저장'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {showManualSettings && (
         <>
         {/* 목적 선택 */}
