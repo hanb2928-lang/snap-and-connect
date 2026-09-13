@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob, triggerTTS } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, AudioLines, Video as VideoIcon, Image as ImageIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, FileText, AudioLines, Video as VideoIcon, Image as ImageIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -140,7 +140,9 @@ import { DirectShareBridge } from '@/components/DirectShareBridge';
 import { buildCopyOverlayTimeline } from '@/lib/promptBuilder';
 import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
 
-type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip';
+type TargetPlatformKey = 'shorts' | 'tiktok' | 'reels' | 'naverclip' | 'instagramFeed' | 'naverBlog' | 'pinterest' | 'smartstore';
+
+type TargetMediaType = 'video' | 'image';
 
 interface TargetPlatformPreset {
   key: TargetPlatformKey;
@@ -154,6 +156,7 @@ interface TargetPlatformPreset {
   bgmMood: string;
   videoTemplate: string;
   hashtags: string[];
+  mediaType: TargetMediaType;
 }
 
 const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> = {
@@ -169,6 +172,7 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
     bgmMood: '하이텐션',
     videoTemplate: '스토리텔링',
     hashtags: ['쇼츠', '숏폼', '리뷰', '제품추천', '유튜브쇼츠'],
+    mediaType: 'video',
   },
   tiktok: {
     key: 'tiktok',
@@ -182,6 +186,7 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
     bgmMood: '하이텐션',
     videoTemplate: '트렌디 쇼핑',
     hashtags: ['틱톡', '탁해볶', 'tiktok', '제품리뷰', '템'],
+    mediaType: 'video',
   },
   reels: {
     key: 'reels',
@@ -195,6 +200,7 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
     bgmMood: '감성',
     videoTemplate: '라이프스타일',
     hashtags: ['릴스', 'reels', '인스타릴스', '제품추천', '일상'],
+    mediaType: 'video',
   },
   naverclip: {
     key: 'naverclip',
@@ -208,10 +214,70 @@ const TARGET_PLATFORM_PRESETS: Record<TargetPlatformKey, TargetPlatformPreset> =
     bgmMood: '시네마틱',
     videoTemplate: '제품 집중',
     hashtags: ['네이버클립', '클립', '쇼핑', '제품리뷰', 'naver'],
+    mediaType: 'video',
+  },
+  instagramFeed: {
+    key: 'instagramFeed',
+    label: '인스타 피드',
+    icon: Instagram,
+    color: '#C13584',
+    algorithmHint: '카드뉴스 + 감성 스토리텔링 + 해시태그 노출',
+    defaultPrompt: '인스타 피드 알고리즘 최적화: 카드뉴스 형태 스토리텔링, 미적 비주얼, 해시태그 SEO',
+    captionFont: '명조 우아',
+    captionPosition: '하단 고정',
+    bgmMood: '감성',
+    videoTemplate: '라이프스타일',
+    hashtags: ['인스타', '카드뉴스', '제품추천', '일상', 'instagram'],
+    mediaType: 'image',
+  },
+  naverBlog: {
+    key: 'naverBlog',
+    label: '네이버 블로그',
+    icon: FileText,
+    color: '#03C75A',
+    algorithmHint: '상세 정보 + 검색 SEO + 신뢰성',
+    defaultPrompt: '네이버 블로그 최적화: 상세한 제품 설명, 검색 키워드 포함, 신뢰감 있는 톤',
+    captionFont: '고딕 굵게',
+    captionPosition: '하단 고정',
+    bgmMood: '시네마틱',
+    videoTemplate: '제품 집중',
+    hashtags: ['네이버블로그', '블로그', '제품리뷰', '쇼핑', 'naver'],
+    mediaType: 'image',
+  },
+  pinterest: {
+    key: 'pinterest',
+    label: '핀터레스트',
+    icon: ImageIcon,
+    color: '#E60023',
+    algorithmHint: '시각적 어필 + 키워드 핀 + 보드 노출',
+    defaultPrompt: '핀터레스트 알고리즘 최적화: 시각적으로 어필하는 핀 이미지, 키워드 최적화, 보드 노출 극대화',
+    captionFont: '미니멀 얇게',
+    captionPosition: '하단 고정',
+    bgmMood: '로파이',
+    videoTemplate: '라이프스타일',
+    hashtags: ['핀터레스트', 'pinterest', '제품추천', '인테리어', '디자인'],
+    mediaType: 'image',
+  },
+  smartstore: {
+    key: 'smartstore',
+    label: '스마트스토어',
+    icon: ShoppingBagIcon,
+    color: '#00C73C',
+    algorithmHint: '상세 이미지 + 구매 전환 + 상품 상세',
+    defaultPrompt: '스마트스토어 최적화: 상품 상세 이미지, 구매 전환을 유도하는 카피, 명확한 정보 전달',
+    captionFont: '스포츠 강조',
+    captionPosition: '하단 고정',
+    bgmMood: '시네마틱',
+    videoTemplate: '제품 집중',
+    hashtags: ['스마트스토어', '쇼핑', '제품리뷰', '네이버쇼핑', 'naver'],
+    mediaType: 'image',
   },
 };
 
 const TARGET_PLATFORM_LIST = Object.values(TARGET_PLATFORM_PRESETS);
+
+const VIDEO_PLATFORM_LIST = TARGET_PLATFORM_LIST.filter((p) => p.mediaType === 'video');
+const IMAGE_PLATFORM_LIST = TARGET_PLATFORM_LIST.filter((p) => p.mediaType === 'image');
 
 type ContentPurpose = 'monetization' | 'adConversion';
 
@@ -265,13 +331,21 @@ const DEFAULT_PURPOSE_FOR_PLATFORM: Record<TargetPlatformKey, ContentPurpose> = 
   tiktok: 'monetization',
   reels: 'monetization',
   naverclip: 'adConversion',
+  instagramFeed: 'adConversion',
+  naverBlog: 'adConversion',
+  pinterest: 'monetization',
+  smartstore: 'adConversion',
 };
 
-const TARGET_TO_UPLOAD_PLATFORM: Record<TargetPlatformKey, 'youtube' | 'tiktok' | 'instagram' | 'naver_clip'> = {
+const TARGET_TO_UPLOAD_PLATFORM: Partial<Record<TargetPlatformKey, string>> = {
   shorts: 'youtube',
   tiktok: 'tiktok',
   reels: 'instagram',
   naverclip: 'naver_clip',
+  instagramFeed: 'instagram',
+  naverBlog: 'naver_blog',
+  pinterest: 'pinterest',
+  smartstore: 'naver_blog',
 };
 
 
@@ -378,7 +452,7 @@ export default function ResultScreen() {
   const [manualHook, setManualHook] = useState('');
   const [manualKeywords, setManualKeywords] = useState('');
   const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
-  const [targetMediaType, setTargetMediaType] = useState<'video' | 'image'>('video');
+  const [targetMediaType, setTargetMediaType] = useState<TargetMediaType>('video');
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -401,6 +475,19 @@ export default function ResultScreen() {
     setContentPurpose(defaultPurpose);
     applyCombinedPreset(key, defaultPurpose);
   }, [applyCombinedPreset]);
+
+  const handleMediaTypeChange = useCallback((media: TargetMediaType) => {
+    setTargetMediaType(media);
+    const filtered = media === 'video' ? VIDEO_PLATFORM_LIST : IMAGE_PLATFORM_LIST;
+    const currentPreset = TARGET_PLATFORM_PRESETS[targetPlatform];
+    if (currentPreset.mediaType !== media && filtered.length > 0) {
+      const firstKey = filtered[0].key;
+      setTargetPlatform(firstKey);
+      const defaultPurpose = DEFAULT_PURPOSE_FOR_PLATFORM[firstKey];
+      setContentPurpose(defaultPurpose);
+      applyCombinedPreset(firstKey, defaultPurpose);
+    }
+  }, [targetPlatform, applyCombinedPreset]);
 
   const handleContentPurposeChange = useCallback((key: ContentPurpose) => {
     setContentPurpose(key);
@@ -426,7 +513,7 @@ export default function ResultScreen() {
       const prosodyProfile = mapVoiceKeyToProsody('viral_female_1');
       const scriptText = inlineEdit.captionText || activeHookRef.current || scan.summary || '';
       const syncProfile = buildViralAudioSyncProfile(
-        targetPlatform,
+        targetPlatform as 'shorts' | 'tiktok' | 'reels' | 'naverclip',
         contentPurpose,
         selectedDurationMs,
         prosodyProfile,
@@ -1419,6 +1506,7 @@ export default function ResultScreen() {
     }
 
     const uploadKey = TARGET_TO_UPLOAD_PLATFORM[targetPlatform];
+    if (!uploadKey) return;
     const deepLink = getDeepLink(uploadKey);
     const url = Platform.OS === 'web' ? deepLink.uploadWebUrl : deepLink.uploadAppUrl;
     if (!url) return;
@@ -2374,8 +2462,30 @@ export default function ResultScreen() {
             <MonitorPlay size={14} color={theme.colors.primary[300]} strokeWidth={2} />
             <Text style={styles.targetPlatformLabel}>이 영상을 어디에 올릴 건가요?</Text>
           </View>
+          <View style={styles.mediaTypeRow}>
+            <TouchableOpacity
+              style={[styles.mediaTypeBtn, targetMediaType === 'video' && styles.mediaTypeBtnActive]}
+              onPress={() => handleMediaTypeChange('video')}
+              activeOpacity={0.7}
+            >
+              <VideoIcon size={15} color={targetMediaType === 'video' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'video' && styles.mediaTypeBtnTextActive]}>
+                동영상
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mediaTypeBtn, targetMediaType === 'image' && styles.mediaTypeBtnActive]}
+              onPress={() => handleMediaTypeChange('image')}
+              activeOpacity={0.7}
+            >
+              <ImageIcon size={15} color={targetMediaType === 'image' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
+              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'image' && styles.mediaTypeBtnTextActive]}>
+                이미지
+              </Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.targetPlatformScroll}>
-            {TARGET_PLATFORM_LIST.map((p) => {
+            {(targetMediaType === 'video' ? VIDEO_PLATFORM_LIST : IMAGE_PLATFORM_LIST).map((p) => {
               const isActive = targetPlatform === p.key;
               const Icon = p.icon;
               return (
@@ -2396,28 +2506,6 @@ export default function ResultScreen() {
           <Text style={styles.targetPlatformHint}>
             {TARGET_PLATFORM_PRESETS[targetPlatform].algorithmHint}
           </Text>
-          <View style={styles.mediaTypeRow}>
-            <TouchableOpacity
-              style={[styles.mediaTypeBtn, targetMediaType === 'video' && styles.mediaTypeBtnActive]}
-              onPress={() => setTargetMediaType('video')}
-              activeOpacity={0.7}
-            >
-              <VideoIcon size={15} color={targetMediaType === 'video' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'video' && styles.mediaTypeBtnTextActive]}>
-                동영상
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mediaTypeBtn, targetMediaType === 'image' && styles.mediaTypeBtnActive]}
-              onPress={() => setTargetMediaType('image')}
-              activeOpacity={0.7}
-            >
-              <ImageIcon size={15} color={targetMediaType === 'image' ? theme.colors.primary[300] : theme.colors.dark.textDim} strokeWidth={2} />
-              <Text style={[styles.mediaTypeBtnText, targetMediaType === 'image' && styles.mediaTypeBtnTextActive]}>
-                이미지
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* === 하단: AI 자동 생성 + 상세 수동 설정 가로 배치 === */}
