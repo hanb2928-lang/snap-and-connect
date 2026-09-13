@@ -1060,7 +1060,6 @@ export default function ResultScreen() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
-  const [showDisclosure, setShowDisclosure] = useState(false);
 
   const handleCopyCaption = async () => {
     try {
@@ -3041,26 +3040,6 @@ export default function ResultScreen() {
           ) : null}
 
           {/* FeatureTileGrid hidden — marketing agent cards removed to streamline video creation flow */}
-
-          {disclosureText ? (
-            <View style={styles.disclosureSection}>
-              <TouchableOpacity
-                style={styles.disclosureToggle}
-                onPress={() => setShowDisclosure((v) => !v)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.disclosureToggleText}>제휴 마케팅 고지문구</Text>
-                {showDisclosure ? (
-                  <ChevronUp size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                ) : (
-                  <ChevronDown size={12} color={theme.colors.dark.textFaint} strokeWidth={2} />
-                )}
-              </TouchableOpacity>
-              {showDisclosure && (
-                <Text style={styles.disclosureBody}>{disclosureText}</Text>
-              )}
-            </View>
-          ) : null}
 
           <Text style={styles.dateText}>
             {new Date(scan.created_at).toLocaleDateString('ko-KR', {
