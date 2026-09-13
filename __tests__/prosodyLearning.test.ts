@@ -19,8 +19,8 @@ function makeOutcome(
 ): ProsodyOutcome {
   return {
     generationMeta: {
-      voiceKey: 'bright_female_1',
-      prosodyProfileId: 'energetic_reviewer',
+      voiceKey: 'f1_trendy_beauty',
+      prosodyProfileId: 'trendy_beauty',
       phase: 'full',
       speed: 1.1,
       timestamp: Date.now(),
@@ -45,8 +45,8 @@ describe('prosodyLearning', () => {
       await recordProsodyOutcome(makeOutcome());
       expect(setItem).toHaveBeenCalled();
       const savedData = JSON.parse(setItem.mock.calls[0][1]);
-      expect(savedData.profiles.energetic_reviewer).toBeDefined();
-      expect(savedData.profiles.energetic_reviewer.generations).toBe(1);
+      expect(savedData.profiles.trendy_beauty).toBeDefined();
+      expect(savedData.profiles.trendy_beauty.generations).toBe(1);
       expect(savedData.totalGenerations).toBe(1);
     });
 
@@ -57,28 +57,28 @@ describe('prosodyLearning', () => {
       getItem.mockResolvedValueOnce(JSON.stringify(firstSave));
       await recordProsodyOutcome(makeOutcome());
       const secondSave = JSON.parse(setItem.mock.calls[1][1]);
-      expect(secondSave.profiles.energetic_reviewer.generations).toBe(2);
+      expect(secondSave.profiles.trendy_beauty.generations).toBe(2);
       expect(secondSave.totalGenerations).toBe(2);
     });
 
     it('records positive signal when completed and not retried', async () => {
       await recordProsodyOutcome(makeOutcome({ completed: true, retried: false }));
       const saved = JSON.parse(setItem.mock.calls[0][1]);
-      expect(saved.profiles.energetic_reviewer.positiveSignals).toBe(1);
-      expect(saved.profiles.energetic_reviewer.negativeSignals).toBe(0);
+      expect(saved.profiles.trendy_beauty.positiveSignals).toBe(1);
+      expect(saved.profiles.trendy_beauty.negativeSignals).toBe(0);
     });
 
     it('records negative signal when retried', async () => {
       await recordProsodyOutcome(makeOutcome({ completed: false, retried: true }));
       const saved = JSON.parse(setItem.mock.calls[0][1]);
-      expect(saved.profiles.energetic_reviewer.negativeSignals).toBe(1);
-      expect(saved.profiles.energetic_reviewer.positiveSignals).toBe(0);
+      expect(saved.profiles.trendy_beauty.negativeSignals).toBe(1);
+      expect(saved.profiles.trendy_beauty.positiveSignals).toBe(0);
     });
 
     it('increases warmth when shared', async () => {
       await recordProsodyOutcome(makeOutcome({ shared: true }));
       const saved = JSON.parse(setItem.mock.calls[0][1]);
-      const warmth = saved.profiles.energetic_reviewer.adjustedVector.warmth;
+      const warmth = saved.profiles.trendy_beauty.adjustedVector.warmth;
       expect(warmth).toBeGreaterThan(0.5);
     });
 
@@ -91,14 +91,14 @@ describe('prosodyLearning', () => {
         state = typeof state === 'string' ? state : JSON.stringify(state);
       }
       const finalState = JSON.parse(state as string);
-      expect(finalState.profiles.energetic_reviewer.recentOutcomes.length).toBeLessThanOrEqual(50);
+      expect(finalState.profiles.trendy_beauty.recentOutcomes.length).toBeLessThanOrEqual(50);
     });
   });
 
   describe('getLearnedProsodyVector', () => {
     it('returns null when no learning data exists', async () => {
       getItem.mockResolvedValue(null);
-      const result = await getLearnedProsodyVector('energetic_reviewer');
+      const result = await getLearnedProsodyVector('trendy_beauty');
       expect(result).toBeNull();
     });
 
@@ -106,7 +106,7 @@ describe('prosodyLearning', () => {
       await recordProsodyOutcome(makeOutcome());
       const savedState = JSON.parse(setItem.mock.calls[0][1]);
       getItem.mockResolvedValue(JSON.stringify(savedState));
-      const result = await getLearnedProsodyVector('energetic_reviewer');
+      const result = await getLearnedProsodyVector('trendy_beauty');
       expect(result).not.toBeNull();
       expect(result!.baseSpeed).toBeGreaterThan(0);
     });
@@ -117,8 +117,8 @@ describe('prosodyLearning', () => {
       getItem.mockResolvedValue(null);
       const stats = await getProsodyLearningStats();
       expect(stats.totalGenerations).toBe(0);
-      expect(stats.profileStats).toHaveLength(4);
-      expect(stats.profileStats[0].profileId).toBe('energetic_reviewer');
+      expect(stats.profileStats.length).toBeGreaterThanOrEqual(12);
+      expect(stats.profileStats.find(p => p.profileId === 'trendy_beauty')).toBeDefined();
     });
 
     it('counts generations correctly after outcomes', async () => {
@@ -127,7 +127,7 @@ describe('prosodyLearning', () => {
       getItem.mockResolvedValue(JSON.stringify(savedState));
       const stats = await getProsodyLearningStats();
       expect(stats.totalGenerations).toBe(1);
-      expect(stats.profileStats.find(p => p.profileId === 'energetic_reviewer')!.generations).toBe(1);
+      expect(stats.profileStats.find(p => p.profileId === 'trendy_beauty')!.generations).toBe(1);
     });
   });
 

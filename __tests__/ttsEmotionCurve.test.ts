@@ -62,14 +62,14 @@ describe('ttsEmotionCurve', () => {
     });
 
     it('voiceCloningReady is true with prosody profile', () => {
-      const profile = mapVoiceKeyToProsody('bright_female_1');
+      const profile = mapVoiceKeyToProsody('f1_trendy_beauty');
       const curve = generateEmotionCurve(15, profile);
       expect(curve.voiceCloningReady).toBe(true);
       expect(curve.prosodyProfileId).toBe(profile.id);
     });
 
     it('each segment has instructions when prosody profile is provided', () => {
-      const profile = mapVoiceKeyToProsody('viral_female_1');
+      const profile = mapVoiceKeyToProsody('m2_trendy_hype');
       const curve = generateEmotionCurve(15, profile);
       curve.segments.forEach((seg) => {
         expect(seg.instructions).toBeTruthy();
@@ -147,14 +147,14 @@ describe('ttsEmotionCurve', () => {
     });
 
     it('applies breath markers with prosody profile', () => {
-      const profile = mapVoiceKeyToProsody('narration_female_1');
+      const profile = mapVoiceKeyToProsody('f2_professional');
       const curve = generateEmotionCurve(15, profile);
       const segments = splitTextForEmotionCurve(
         '이거 진짜 좋아요. 한번 써보세요. 최고예요. 강춨합니다. 사세요.',
         curve, 'shimmer', undefined, profile,
       );
       segments.forEach((seg) => {
-        expect(seg.instructions).toContain('trustworthy');
+        expect(seg.instructions).toContain('calm');
         expect(seg.instructions.length).toBeGreaterThan(50);
       });
     });
@@ -187,19 +187,24 @@ describe('ttsEmotionCurve', () => {
   });
 
   describe('prosodyProfile mapping', () => {
-    it('maps viral voices to viral_comedian profile', () => {
-      const profile = mapVoiceKeyToProsody('viral_female_1');
-      expect(profile.id).toBe('viral_comedian');
+    it('maps trendy hype voices to trendy_hype profile', () => {
+      const profile = mapVoiceKeyToProsody('m2_trendy_hype');
+      expect(profile.id).toBe('trendy_hype');
     });
 
-    it('maps narration voices to trustworthy_narrator profile', () => {
-      const profile = mapVoiceKeyToProsody('narration_male_1');
-      expect(profile.id).toBe('trustworthy_narrator');
+    it('maps professional voices to professional_female profile', () => {
+      const profile = mapVoiceKeyToProsody('f2_professional');
+      expect(profile.id).toBe('professional_female');
     });
 
-    it('maps bright voices to energetic_reviewer profile', () => {
-      const profile = mapVoiceKeyToProsody('bright_female_1');
-      expect(profile.id).toBe('energetic_reviewer');
+    it('maps trendy beauty voices to trendy_beauty profile', () => {
+      const profile = mapVoiceKeyToProsody('f1_trendy_beauty');
+      expect(profile.id).toBe('trendy_beauty');
+    });
+
+    it('maps authoritative male voices to authoritative_male profile', () => {
+      const profile = mapVoiceKeyToProsody('m1_authoritative');
+      expect(profile.id).toBe('authoritative_male');
     });
   });
 });
