@@ -45,6 +45,22 @@ interface MultiAngleCaptureGuideProps {
   onPickImage?: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
   /** Capture from camera */
   onCaptureImage?: (angleId: string) => Promise<{ base64: string; mimeType: string } | null>;
+  /** Custom angle guides (defaults to 5-angle stereo cut) */
+  guides?: AngleGuide[];
+  /** Minimum shots required before early completion is allowed (default: guides.length) */
+  minShots?: number;
+  /** Custom header title */
+  headerTitle?: string;
+  /** Custom intro title */
+  introTitle?: string;
+  /** Custom intro description */
+  introDesc?: string;
+  /** Accent color for active elements (defaults to primary) */
+  accentColor?: string;
+  /** Label for the complete button when all shots done */
+  completeLabelAll?: string;
+  /** Label for the early-complete button when minShots met but not all done */
+  completeLabelEarly?: string;
 }
 
 export function MultiAngleCaptureGuide({
@@ -53,6 +69,14 @@ export function MultiAngleCaptureGuide({
   onComplete,
   onPickImage,
   onCaptureImage,
+  guides = ANGLE_GUIDES,
+  minShots,
+  headerTitle = '입체컷 오토 · 5각도 가이드',
+  introTitle = '5각도 순차 촬영으로 입체적 AI 영상 완성',
+  introDesc,
+  accentColor,
+  completeLabelAll = '5장으로 콘텐츠 만들기',
+  completeLabelEarly,
 }: MultiAngleCaptureGuideProps) {
   const safeTop = useSafeTop();
   const [shots, setShots] = useState<Record<string, AngleShot>>({});
@@ -63,18 +87,25 @@ export function MultiAngleCaptureGuide({
   const pickLockRef = useRef(false);
   const shotsRef = useRef<Record<string, AngleShot>>({});
 
+  const effectiveMinShots = minShots ?? guides.length;
+  const effectiveAccent = accentColor ?? theme.colors.primary[400];
+  const effectiveAccentBg = accentColor ?? theme.colors.primary[600];
+  const effectiveIntroDesc = introDesc ??
+    '정면, 좌측, 우측, 후면, 상부를 순서대로 촬영하면 AI가 제품의 입체적 특성을 정밀하게 복원합니다. 5장의 사진으로 왜곡 없는 역동적인 숏폼을 생성합니다.';
+
   // Keep ref in sync with state so async callbacks always see the latest shots
   useEffect(() => {
     shotsRef.current = shots;
   }, [shots]);
 
   const completedCount = Object.keys(shots).length;
-  const allDone = completedCount >= ANGLE_GUIDES.length;
+  const allDone = completedCount >= guides.length;
+  const minMet = completedCount >= effectiveMinShots;
 
   const handleAddShot = useCallback(
     async (angleId: string, base64: string, mimeType: string) => {
-      const guideIndex = ANGLE_GUIDES.findIndex((g) => g.id === angleId);
-      const guide = ANGLE_GUIDES[guideIndex];
+      const guideIndex = guides.findIndex((g) => g.id === angleId);
+      const guide = guides[guideIndex];
       if (!guide || !base64) return;
       const dataUrl = `data:${mimeType};base64,${base64}`;
 
@@ -94,15 +125,15 @@ export function MultiAngleCaptureGuide({
       });
 
       // Auto-advance to next incomplete angle
-      const nextIdx = ANGLE_GUIDES.findIndex((g, i) => i > guideIndex && !shotsRef.current[g.id]);
+      const nextIdx = guides.findIndex((g, i) => i > guideIndex && !shotsRef.current[g.id]);
       if (nextIdx !== -1) {
         setCurrentAngle(nextIdx);
-      } else if (guideIndex < ANGLE_GUIDES.length - 1) {
+      } else if (guideIndex < guides.length - 1) {
         setCurrentAngle(guideIndex + 1);
       }
 
     },
-    [],
+    [guides],
   );
 
   const handlePickFromGallery = useCallback(
@@ -162,7 +193,7 @@ export function MultiAngleCaptureGuide({
   const handleComplete = useCallback(() => {
     // Use ref to avoid stale closure — always read the latest shots
     const currentShots = shotsRef.current;
-    const ordered = ANGLE_GUIDES.map((g, idx) => {
+    const ordered = guides.map((g, idx) => {
       const shot = currentShots[g.id];
       if (!shot?.base64) return null;
       return { ...shot, orderIndex: idx };
@@ -172,7 +203,7 @@ export function MultiAngleCaptureGuide({
     setShots({});
     shotsRef.current = {};
     setCurrentAngle(0);
-  }, [onComplete]);
+  }, [guides, onComplete]);
 
   const handleClose = useCallback(() => {
     setShots({});
@@ -191,16 +222,16 @@ export function MultiAngleCaptureGuide({
             <TouchableOpacity style={styles.headerBtn} onPress={handleClose} activeOpacity={0.7}>
               <X size={20} color={theme.colors.dark.text} strokeWidth={2} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>입체컷 오토 · 5각도 가이드</Text>
+            <Text style={styles.headerTitle}>{headerTitle}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           {/* Progress */}
           <View style={styles.progressRow}>
-            {ANGLE_GUIDES.map((g, i) => (
-              <View key={g.id} style={[styles.progressDot, shots[g.id] && styles.progressDotDone, i === currentAngle && styles.progressDotActive]} />
+            {guides.map((g, i) => (
+              <View key={g.id} style={[styles.progressDot, shots[g.id] && styles.progressDotDone, i === currentAngle && { ...styles.progressDotActive, backgroundColor: effectiveAccent }]} />
             ))}
-            <Text style={styles.progressText}>{completedCount}/{ANGLE_GUIDES.length} 완료</Text>
+            <Text style={styles.progressText}>{completedCount}/{guides.length} 완료</Text>
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -211,19 +242,16 @@ export function MultiAngleCaptureGuide({
             )}
             {/* Intro */}
             <View style={styles.introBox}>
-              <Text style={styles.introTitle}>5각도 순차 촬영으로 입체적 AI 영상 완성</Text>
-              <Text style={styles.introDesc}>
-                정면, 좌측, 우측, 후면, 상부를 순서대로 촬영하면 AI가 제품의 입체적 특성을 정밀하게 복원합니다.
-                5장의 사진으로 왜곡 없는 역동적인 숏폼을 생성합니다.
-              </Text>
+              <Text style={styles.introTitle}>{introTitle}</Text>
+              <Text style={styles.introDesc}>{effectiveIntroDesc}</Text>
             </View>
 
             {/* Angle cards */}
-            {ANGLE_GUIDES.map((guide, idx) => {
+            {guides.map((guide, idx) => {
               const shot = shots[guide.id];
               const isActive = idx === currentAngle;
               return (
-                <View key={guide.id} style={[styles.angleCard, isActive && styles.angleCardActive]}>
+                <View key={guide.id} style={[styles.angleCard, isActive && { ...styles.angleCardActive, borderColor: effectiveAccent }]}>
                   <View style={styles.angleHeader}>
                     <Text style={styles.angleEmoji}>{guide.emoji}</Text>
                     <View style={styles.angleHeaderText}>
@@ -262,7 +290,7 @@ export function MultiAngleCaptureGuide({
                       {/* Source toggle: camera / gallery */}
                       <View style={styles.sourceToggle}>
                         <TouchableOpacity
-                          style={[styles.sourceTab, sourceMode === 'camera' && styles.sourceTabActive]}
+                          style={[styles.sourceTab, sourceMode === 'camera' && { ...styles.sourceTabActive, backgroundColor: effectiveAccentBg }]}
                           onPress={() => setSourceMode('camera')}
                           disabled={processing}
                           activeOpacity={0.7}
@@ -271,7 +299,7 @@ export function MultiAngleCaptureGuide({
                           <Text style={[styles.sourceTabLabel, sourceMode === 'camera' && styles.sourceTabLabelActive]}>카메라</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.sourceTab, sourceMode === 'gallery' && styles.sourceTabActive]}
+                          style={[styles.sourceTab, sourceMode === 'gallery' && { ...styles.sourceTabActive, backgroundColor: effectiveAccentBg }]}
                           onPress={() => setSourceMode('gallery')}
                           disabled={processing}
                           activeOpacity={0.7}
@@ -283,7 +311,7 @@ export function MultiAngleCaptureGuide({
 
                       {/* Single action button */}
                       <TouchableOpacity
-                        style={styles.actionBtn}
+                        style={[styles.actionBtn, { backgroundColor: effectiveAccentBg }]}
                         onPress={() => {
                           if (pickLockRef.current || processing) return;
                           setCurrentAngle(idx);
@@ -322,15 +350,28 @@ export function MultiAngleCaptureGuide({
 
           {/* Bottom action */}
           <View style={styles.bottomBar}>
+            {minMet && !allDone && (
+              <TouchableOpacity
+                style={[styles.completeBtn, { backgroundColor: effectiveAccent, marginBottom: 8 }]}
+                onPress={handleComplete}
+                activeOpacity={0.7}
+              >
+                <Check size={18} color="#fff" strokeWidth={2} />
+                <Text style={styles.completeBtnText}>
+                  {completeLabelEarly ?? `${completedCount}장으로 합성하기`}
+                </Text>
+                <ChevronRight size={18} color="#fff" strokeWidth={2} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={[styles.completeBtn, !allDone && styles.completeBtnDisabled]}
+              style={[styles.completeBtn, !allDone && styles.completeBtnDisabled, allDone && { backgroundColor: effectiveAccentBg }]}
               onPress={handleComplete}
               disabled={!allDone}
               activeOpacity={0.7}
             >
               <Check size={18} color={allDone ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2} />
               <Text style={[styles.completeBtnText, !allDone && styles.completeBtnTextDisabled]}>
-                {allDone ? '5장으로 콘텐츠 만들기' : `${ANGLE_GUIDES.length - completedCount}장 더 촬영하세요`}
+                {allDone ? completeLabelAll : `${guides.length - completedCount}장 더 촬영하세요`}
               </Text>
               {allDone && <ChevronRight size={18} color="#fff" strokeWidth={2} />}
             </TouchableOpacity>
