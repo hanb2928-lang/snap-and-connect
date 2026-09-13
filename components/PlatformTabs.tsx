@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag, Video, Image as ImageIcon2 } from 'lucide-react-native';
+import { FileText, Smartphone, Send, Instagram, MessageCircle, Image as ImageIcon, ShoppingBag, Video } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import type { PlatformKey } from '@/types/database';
 
@@ -70,8 +70,8 @@ const PLATFORM_BOARDS: Partial<Record<PlatformKey, MediaType[]>> = {
 };
 
 const BOARD_LABELS: Record<MediaType, { label: string; icon: typeof Video }> = {
-  image: { label: '이미지 게시판', icon: ImageIcon2 },
-  video: { label: '동영상 게시판', icon: Video },
+  image: { label: '이미지', icon: ImageIcon },
+  video: { label: '동영상', icon: Video },
 };
 
 export function BoardTabs({ platform, selected, onSelect }: BoardTabsProps) {
@@ -151,15 +151,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: theme.spacing.md,
+    marginTop: 4,
     paddingHorizontal: 2,
   },
   boardTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
     borderWidth: 1.5,
     borderColor: 'transparent',
