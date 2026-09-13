@@ -542,7 +542,7 @@ export default function ResultScreen() {
       parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
       videoPromptText = parts.join('. ');
     } else {
-      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '';
+      videoPromptText = inlineEdit.aiPrompt || activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '프리미엄 추천 상품. 15-second vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA.';
     }
     if (!videoPromptText.trim()) {
       if (visionData) {
@@ -573,11 +573,11 @@ export default function ResultScreen() {
         {
           durationSec: 5,
           aspectRatio: '9:16',
-          productName: scan.product_name || undefined,
+          productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
           scanId: scan.id,
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
-          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '',
+          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '지금 바로 만나보세요',
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
@@ -995,7 +995,7 @@ export default function ResultScreen() {
 
   const detectedProducts: DetectedProduct[] = useMemo(() => scan?.detected_products ?? [], [scan?.detected_products]);
   const selectedProduct = useMemo(() => detectedProducts[selectedProductIndex] ?? null, [detectedProducts, selectedProductIndex]);
-  const activeProductName = useMemo(() => selectedProduct?.productName || scan?.product_name || '', [selectedProduct, scan?.product_name]);
+  const activeProductName = useMemo(() => selectedProduct?.productName || scan?.product_name || '프리미엄 추천 상품', [selectedProduct, scan?.product_name]);
   const activePriceEstimate = useMemo(() => priceOverride !== null ? priceOverride : (selectedProduct?.priceEstimate || scan?.price_estimate || ''), [priceOverride, selectedProduct, scan?.price_estimate]);
   const activeShoppingMatches = useMemo(() => selectedProduct?.shoppingMatches ?? scan?.shopping_matches ?? [], [selectedProduct, scan?.shopping_matches]);
   const activeTemplateData = useMemo(() => selectedProduct?.templateData ?? scan?.template_data, [selectedProduct, scan?.template_data]);
@@ -1039,7 +1039,7 @@ export default function ResultScreen() {
       setInlineEdit((prev) => ({ ...prev, captionText: baseCaption }));
     }
     if (!inlineEdit.titleText) {
-      const baseTitle = scan.title || activeProductName || td?.hook || '';
+      const baseTitle = scan.title || activeProductName || td?.hook || '프리미엄 추천 상품';
       if (baseTitle) setInlineEdit((prev) => ({ ...prev, titleText: baseTitle }));
     }
   }, [scan?.id, scan?.one_liner, scan?.summary, scan?.title, platformVariant?.caption, td?.caption, td?.hook, activeProductName]);

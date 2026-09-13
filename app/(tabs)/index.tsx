@@ -434,11 +434,6 @@ export default function CameraScreen() {
   }, []);
 
   // ─── Fitting multi-angle capture (reuses stereo-cut handlers) ───
-  const handleFittingCapture = async () => {
-    if (!cameraRef.current || processing || !cameraReady || fittingLoading) return;
-    setFittingGuideVisible(true);
-  };
-
   const handleFittingPickImage = async () => {
     if (fittingLoading) return;
     setFittingGuideVisible(true);
@@ -641,7 +636,7 @@ export default function CameraScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-            <View style={styles.shutterRow}>
+            <View style={styles.fittingGalleryRow}>
               <TouchableOpacity
                 style={styles.fittingGalleryBtn}
                 onPress={handleFittingPickImage}
@@ -650,19 +645,7 @@ export default function CameraScreen() {
               >
                 <ImageIcon size={24} color="#fff" strokeWidth={2} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, { backgroundColor: theme.colors.accent[500] }]}
-                onPress={() => setFittingGuideVisible(true)}
-                disabled={fittingLoading}
-                activeOpacity={0.85}
-              >
-                <Camera size={28} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
-              <View style={{ width: 52 }} />
             </View>
-            <Text style={styles.shutterHintText}>
-              {fittingLoading ? 'AI 합성 생성 중...' : 'AI 범용 합성 · 3~5컷 다각도 촬영'}
-            </Text>
           </View>
 
           <MultiAngleCaptureGuide
@@ -770,7 +753,7 @@ export default function CameraScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
-          <View style={styles.shutterRow}>
+          <View style={styles.fittingGalleryRow}>
             <TouchableOpacity
               style={styles.fittingGalleryBtn}
               onPress={handleFittingPickImage}
@@ -779,19 +762,7 @@ export default function CameraScreen() {
             >
               <ImageIcon size={24} color="#fff" strokeWidth={2} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shutterBtn, !cameraReady && styles.shutterBtnDisabled, { backgroundColor: theme.colors.accent[500] }]}
-              onPress={handleFittingCapture}
-              disabled={processing || fittingLoading || !cameraReady}
-              activeOpacity={0.85}
-            >
-              <Camera size={28} color="#fff" strokeWidth={2.5} />
-            </TouchableOpacity>
-            <View style={{ width: 52 }} />
           </View>
-          <Text style={styles.shutterHintText}>
-            {fittingLoading ? 'AI 합성 생성 중...' : 'AI 범용 합성 · 3~5컷 다각도 촬영'}
-          </Text>
         </View>
 
         <MultiAngleCaptureGuide
@@ -1613,6 +1584,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fittingGalleryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xs,
   },
   // Stereo progress
   stereoLightOverlay: {
