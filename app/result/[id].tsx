@@ -2647,7 +2647,8 @@ export default function ResultScreen() {
           onPriceChange={(price) => setPriceOverride(price)}
         />
 
-        {/* Quick-Tweak 편집 세팅 */}
+        {/* Quick-Tweak 편집 세팅 — 동영상 모드 전용 */}
+        {targetMediaType === 'video' && (
         <View style={styles.chipSection}>
           {/* 영상 길이 선택 */}
           <View style={styles.durationSelectorRow}>
@@ -2810,6 +2811,8 @@ export default function ResultScreen() {
           )}
           </>
           )}
+        </View>
+        )}
 
           {/* 고급 카메라 모션 수동 설정 (접이식) — 동영상 모드 전용 */}
           {targetMediaType === 'video' && (
@@ -3097,7 +3100,6 @@ export default function ResultScreen() {
           </TouchableOpacity>
           </>
           )}
-        </View>
 
         </>
         )}
