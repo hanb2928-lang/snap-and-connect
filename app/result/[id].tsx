@@ -448,6 +448,11 @@ export default function ResultScreen() {
   const [stylePreset, setStylePreset] = useState<string>('clean-studio');
   const [detailRestoration, setDetailRestoration] = useState<boolean>(true);
   const [hdUpscale, setHdUpscale] = useState<boolean>(false);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageGenError, setImageGenError] = useState<string | null>(null);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [narrationPlaying, setNarrationPlaying] = useState(false);
   const [fittingOverlayVisible, setFittingOverlayVisible] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -721,6 +726,94 @@ export default function ResultScreen() {
       setVideoGenProgress(null);
     }
   }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, triggerTtsGeneration, ttsUrl]);
+
+  const handleAiImageGenerate = useCallback(async () => {
+    if (!scan || isGeneratingImage) return;
+    setIsGeneratingImage(true);
+    setImageGenError(null);
+    setGeneratedImages([]);
+
+    const sizeMap: Record<string, '1024x1024' | '1792x1024' | '1024x1792'> = {
+      '1:1': '1024x1024',
+      '4:5': '1024x1792',
+      '9:16': '1024x1792',
+      '16:9': '1792x1024',
+    };
+    const size = sizeMap[imageAspectRatio] ?? '1024x1024';
+
+    const stylePresetMap: Record<string, { style: 'vivid' | 'natural'; quality: 'standard' | 'hd' }> = {
+      'clean-studio': { style: 'vivid', quality: 'standard' },
+      'editorial-film': { style: 'natural', quality: 'standard' },
+      'minimalist-soft': { style: 'natural', quality: 'standard' },
+      'luxury-dark': { style: 'vivid', quality: 'standard' },
+    };
+    const presetConfig = stylePresetMap[stylePreset] ?? stylePresetMap['clean-studio'];
+    const quality = hdUpscale ? 'hd' : presetConfig.quality;
+
+    const basePrompt = inlineEdit.aiPrompt.trim() || activeHookRef.current || scan.summary || scan.product_name || '프리미엄 상품 상업용 이미지';
+    const productName = scan.product_name || '프리미엄 추천 상품';
+
+    const seeds = [101, 202, 303, 404, 505];
+
+    const buildPromptForIndex = (idx: number): string => {
+      const variations = [
+        '정면 클로즈업, 스튜디오 조명',
+        '45도 측면 각도, 얕은 피사계 심도',
+        '사용 시나리오 연출, 라이프스타일 분위기',
+        '매크로 디테일 샷, 텍스처 강조',
+        '풀샷 환경 구도, 배경과 조화',
+      ];
+      return `${basePrompt}. ${variations[idx] ?? variations[0]}`;
+    };
+
+    try {
+      const results = await Promise.allSettled(
+        seeds.map((seed, idx) =>
+          supabase.functions.invoke('generate-image', {
+            body: {
+              prompt: buildPromptForIndex(idx),
+              size,
+              quality,
+              style: presetConfig.style,
+              productName,
+              productCategory: scan?.detected_products?.[selectedProductIndex]?.productCategory,
+              seed,
+              platform: targetPlatform,
+              customPrompt: inlineEdit.aiPrompt || undefined,
+            },
+          }),
+        ),
+      );
+
+      if (!mountedRef.current) return;
+
+      const images: string[] = [];
+      results.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          const { data, error } = result.value;
+          if (error || !data?.image) return;
+          const base64 = data.image as string;
+          const mimeType = (data.mimeType as string) ?? 'image/png';
+          images.push(`data:${mimeType};base64,${base64}`);
+        }
+      });
+
+      if (images.length === 0) {
+        setImageGenError('5장 이미지 생성에 모두 실패했습니다. 다시 시도해주세요.');
+      } else if (images.length < 5) {
+        setImageGenError(`5장 중 ${images.length}장만 생성되었습니다. 일부 실패.`);
+      }
+      setGeneratedImages(images);
+    } catch (err) {
+      if (mountedRef.current) {
+        setImageGenError(err instanceof Error ? err.message : '이미지 생성 중 오류가 발생했습니다.');
+      }
+    }
+
+    if (mountedRef.current) {
+      setIsGeneratingImage(false);
+    }
+  }, [scan, isGeneratingImage, inlineEdit.aiPrompt, imageAspectRatio, stylePreset, hdUpscale, targetPlatform, selectedProductIndex]);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -2555,18 +2648,20 @@ export default function ResultScreen() {
         </View>
         <View style={styles.dualActionRow}>
           <TouchableOpacity
-            style={[styles.dualActionBtn, styles.dualActionPrimary, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
-            onPress={() => handleAiVideoGenerate()}
-            disabled={isGeneratingVideo || !scan}
+            style={[styles.dualActionBtn, styles.dualActionPrimary, ((targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) || !scan) && styles.dualActionDisabled]}
+            onPress={() => targetMediaType === 'video' ? handleAiVideoGenerate() : handleAiImageGenerate()}
+            disabled={(targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) || !scan}
             activeOpacity={0.7}
           >
-            {isGeneratingVideo ? (
+            {(targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) ? (
               <RotatingLoader size={18} color="#fff" />
             ) : (
               <ZapIcon size={18} color="#fff" strokeWidth={2} />
             )}
             <Text style={styles.dualActionBtnText} numberOfLines={1}>
-              {isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성'}
+              {targetMediaType === 'video'
+                ? (isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성')
+                : (isGeneratingImage ? '5장 생성 중...' : 'AI 자동 생성 (5장)')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2589,7 +2684,7 @@ export default function ResultScreen() {
           </TouchableOpacity>
         </View>
 
-        {generatedVideoUrl && (
+        {generatedVideoUrl && targetMediaType === 'video' && (
           <View style={styles.dualActionRow}>
             <TouchableOpacity
               style={[styles.dualActionBtn, styles.aiVideoBtn]}
@@ -2606,6 +2701,49 @@ export default function ResultScreen() {
                 {uploadProgress !== null ? '영상 저장 중...' : 'AI 영상 갤러리에 저장'}
               </Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {imageGenError && targetMediaType === 'image' && (
+          <View style={styles.videoErrorToast}>
+            <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
+            <Text style={styles.videoErrorToastText} numberOfLines={5}>{imageGenError}</Text>
+            <View style={styles.videoErrorActions}>
+              <TouchableOpacity onPress={() => handleAiImageGenerate()} activeOpacity={0.7}>
+                <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setImageGenError(null); }} activeOpacity={0.7}>
+                <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {isGeneratingImage && targetMediaType === 'image' && (
+          <View style={styles.imageGridLoading}>
+            <RotatingLoader size={20} color={theme.colors.accent[300]} />
+            <Text style={styles.imageGridLoadingText}>5장 옴니버스 이미지 병렬 생성 중...</Text>
+          </View>
+        )}
+
+        {generatedImages.length > 0 && targetMediaType === 'image' && (
+          <View style={styles.imageGridSection}>
+            <View style={styles.imageGridHeader}>
+              <ImageIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.imageGridTitle}>AI 생성 이미지 ({generatedImages.length}장)</Text>
+            </View>
+            <View style={styles.imageGrid}>
+              {generatedImages.map((imgUri, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.imageGridItem}
+                  onPress={() => { setImageViewerIndex(idx); setImageViewerVisible(true); }}
+                  activeOpacity={0.85}
+                >
+                  <Image source={{ uri: imgUri }} style={styles.imageGridThumb} resizeMode="cover" />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
@@ -3197,6 +3335,41 @@ export default function ResultScreen() {
           </>
           )}
 
+          {/* AI 이미지 프롬프트 — 이미지 모드 전용 */}
+          {targetMediaType === 'image' && (
+          <>
+          <View style={styles.promptHeader}>
+            <Wand2 size={16} color={theme.colors.accent[300]} strokeWidth={2} />
+            <Text style={styles.promptTitle}>AI 이미지 프롬프트 (5장 병렬 생성)</Text>
+          </View>
+          <TextInput
+            style={styles.promptInput}
+            value={inlineEdit.aiPrompt}
+            onChangeText={(text) => handleInlineEdit({ aiPrompt: text })}
+            placeholder="원하는 연출 분위기나 강조 사항을 입력하세요"
+            placeholderTextColor={theme.colors.dark.textFaint}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+          <TouchableOpacity
+            style={[styles.promptGenBtn, (isGeneratingImage || !scan) && styles.dualActionDisabled]}
+            onPress={() => handleAiImageGenerate()}
+            disabled={isGeneratingImage || !scan}
+            activeOpacity={0.7}
+          >
+            {isGeneratingImage ? (
+              <RotatingLoader size={18} color="#fff" />
+            ) : (
+              <SparklesIcon size={18} color="#fff" strokeWidth={2} />
+            )}
+            <Text style={styles.promptGenBtnText} numberOfLines={1}>
+              {isGeneratingImage ? '5장 생성 중...' : 'AI 5장 자동 생성'}
+            </Text>
+          </TouchableOpacity>
+          </>
+          )}
+
         </>
         )}
 
@@ -3259,6 +3432,85 @@ export default function ResultScreen() {
                         style={[
                           styles.galleryModalThumb,
                           idx === galleryModalIndex && styles.galleryModalThumbActive,
+                        ]}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* === AI 생성 이미지 풀스크린 뷰어 === */}
+        <Modal visible={imageViewerVisible} transparent animationType="fade" onRequestClose={() => setImageViewerVisible(false)}>
+          <View style={styles.galleryModalOverlay}>
+            <View style={styles.galleryModalContent}>
+              <View style={styles.galleryModalHeader}>
+                <Text style={styles.galleryModalTitle} numberOfLines={1}>
+                  AI 이미지 {imageViewerIndex + 1} / {generatedImages.length}
+                </Text>
+                <TouchableOpacity style={styles.galleryModalCloseBtn} onPress={() => setImageViewerVisible(false)} activeOpacity={0.7}>
+                  <X size={20} color="#fff" strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              <Image
+                source={{ uri: generatedImages[imageViewerIndex] ?? generatedImages[0] }}
+                style={styles.galleryModalImage}
+                resizeMode="contain"
+              />
+              <View style={styles.galleryModalActions}>
+                <TouchableOpacity
+                  style={styles.galleryModalActionBtn}
+                  onPress={async () => {
+                    const uri = generatedImages[imageViewerIndex];
+                    if (!uri) return;
+                    try {
+                      const fileUri = `${FileSystem.documentDirectory}ai_image_${Date.now()}.png`;
+                      const base64 = uri.split(',')[1] ?? '';
+                      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+                      await MediaLibrary.saveToLibraryAsync(fileUri);
+                    } catch { /* non-fatal */ }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Download size={15} color={theme.colors.dark.text} strokeWidth={2} />
+                  <Text style={styles.galleryModalActionText}>저장</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.galleryModalActionBtn, styles.galleryModalActionPrimary]}
+                  onPress={async () => {
+                    const uri = generatedImages[imageViewerIndex];
+                    if (!uri) return;
+                    try {
+                      await RNShare.share({ url: uri });
+                    } catch { /* non-fatal */ }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Share2Icon size={15} color="#fff" strokeWidth={2} />
+                  <Text style={[styles.galleryModalActionText, { color: '#fff' }]}>공유</Text>
+                </TouchableOpacity>
+              </View>
+              {generatedImages.length > 1 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.galleryModalThumbScroll}
+                  contentContainerStyle={styles.galleryModalThumbContent}
+                >
+                  {generatedImages.map((imgUri, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => setImageViewerIndex(idx)}
+                      activeOpacity={0.85}
+                    >
+                      <Image
+                        source={{ uri: imgUri }}
+                        style={[
+                          styles.galleryModalThumb,
+                          idx === imageViewerIndex && styles.galleryModalThumbActive,
                         ]}
                         resizeMode="cover"
                       />
@@ -5274,5 +5526,50 @@ iconButton: {
   },
   synthToggleKnobActive: {
     transform: [{ translateX: 18 }],
+  },
+  imageGridLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.md,
+    marginTop: 8,
+  },
+  imageGridLoadingText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[300],
+  },
+  imageGridSection: {
+    marginTop: 12,
+    gap: 8,
+  },
+  imageGridHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  imageGridTitle: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.accent[300],
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  imageGridItem: {
+    width: '32%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.dark.bg,
+  },
+  imageGridThumb: {
+    width: '100%',
+    height: '100%',
   },
 });
