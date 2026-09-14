@@ -444,6 +444,10 @@ export default function ResultScreen() {
   const [zoomSpeed, setZoomSpeed] = useState<number>(2);
   const [cameraRotation, setCameraRotation] = useState<number>(0);
   const [transitionEffect, setTransitionEffect] = useState<string>('컷 전환');
+  const [imageAspectRatio, setImageAspectRatio] = useState<string>('1:1');
+  const [stylePreset, setStylePreset] = useState<string>('clean-studio');
+  const [detailRestoration, setDetailRestoration] = useState<boolean>(true);
+  const [hdUpscale, setHdUpscale] = useState<boolean>(false);
   const [narrationPlaying, setNarrationPlaying] = useState(false);
   const [fittingOverlayVisible, setFittingOverlayVisible] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -674,7 +678,7 @@ export default function ResultScreen() {
         videoPromptText,
         {
           durationSec: 5,
-          aspectRatio: '9:16',
+          aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
           productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
           scanId: scan.id,
           variationSeed: narrativeVariation + 1,
@@ -691,6 +695,9 @@ export default function ResultScreen() {
           zoomSpeed: zoomSpeed === 2 ? undefined : zoomSpeed,
           cameraRotation,
           transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
+          stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
+          detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
+          hdUpscale: targetMediaType === 'image' ? hdUpscale : undefined,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
@@ -713,7 +720,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, triggerTtsGeneration, ttsUrl]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, triggerTtsGeneration, ttsUrl]);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
@@ -2999,6 +3006,95 @@ export default function ResultScreen() {
               </Text>
             </View>
 
+            {/* === 이미지 모드 전용 컨트롤 === */}
+            {targetMediaType === 'image' && (
+            <>
+            {/* 이미지 규격 (Aspect Ratio) */}
+            <View style={styles.synthInputGroup}>
+              <Text style={styles.synthInputLabel}>이미지 규격 (비율)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {[
+                  { id: '1:1', label: '1:1 · 인스타 피드' },
+                  { id: '4:5', label: '4:5 · 인스타 세로' },
+                  { id: '9:16', label: '9:16 · 스토리/릴스' },
+                  { id: '16:9', label: '16:9 · 블로그/배너' },
+                ].map((ar) => (
+                  <TouchableOpacity
+                    key={ar.id}
+                    style={[styles.chipPill, imageAspectRatio === ar.id && styles.chipPillActive]}
+                    onPress={() => setImageAspectRatio(ar.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, imageAspectRatio === ar.id && styles.chipPillTextActive]}>
+                      {ar.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 스타일 프리셋 (Visual Style Preset) */}
+            <View style={styles.synthInputGroup}>
+              <Text style={styles.synthInputLabel}>스타일 무드 프리셋</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                {[
+                  { id: 'clean-studio', label: '상업용 스튜디오' },
+                  { id: 'editorial-film', label: '감성 필름/매거진' },
+                  { id: 'minimalist-soft', label: '미니멀 소프트' },
+                  { id: 'luxury-dark', label: '럭셔리 시네마틱' },
+                ].map((sp) => (
+                  <TouchableOpacity
+                    key={sp.id}
+                    style={[styles.chipPill, stylePreset === sp.id && styles.chipPillActive]}
+                    onPress={() => setStylePreset(sp.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.chipPillText, stylePreset === sp.id && styles.chipPillTextActive]}>
+                      {sp.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={styles.synthHint}>
+                {stylePreset === 'clean-studio' ? '균일한 스튜디오 조명, 깔끔한 상업용 톤' :
+                 stylePreset === 'editorial-film' ? '필름 그레인, 매거진 에디토리얼 무드' :
+                 stylePreset === 'minimalist-soft' ? '파스텔 톤, 여백이 많은 미니멀 감성' :
+                 '딥 블랙, 시네마틱 명암 대비, 럭셔리 분위기'}
+              </Text>
+            </View>
+
+            {/* 디테일 보정 토글 */}
+            <View style={styles.synthToggleRow}>
+              <View style={styles.synthToggleLeft}>
+                <Text style={styles.synthInputLabel}>인물/상품 디테일 보정</Text>
+                <Text style={styles.synthHint}>손가락·인체 왜곡, 텍스처 뭉개짐 방지</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.synthToggleSwitch, detailRestoration && styles.synthToggleSwitchActive]}
+                onPress={() => setDetailRestoration((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.synthToggleKnob, detailRestoration && styles.synthToggleKnobActive]} />
+              </TouchableOpacity>
+            </View>
+
+            {/* HD 업스케일 토글 */}
+            <View style={styles.synthToggleRow}>
+              <View style={styles.synthToggleLeft}>
+                <Text style={styles.synthInputLabel}>고해상도 업스케일링 (HD)</Text>
+                <Text style={styles.synthHint}>최종 결과물 선명도·해상도 향상</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.synthToggleSwitch, hdUpscale && styles.synthToggleSwitchActive]}
+                onPress={() => setHdUpscale((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.synthToggleKnob, hdUpscale && styles.synthToggleKnobActive]} />
+              </TouchableOpacity>
+            </View>
+            </>
+            )}
+
             {/* 카메라 무빙 및 연출 효과 — 동영상 모드 전용 */}
             {targetMediaType === 'video' && (
             <>
@@ -5146,5 +5242,37 @@ iconButton: {
     minHeight: 44,
     borderWidth: 1,
     borderColor: theme.colors.dark.border,
+  },
+  synthToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  synthToggleLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  synthToggleSwitch: {
+    width: 40,
+    height: 22,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  synthToggleSwitchActive: {
+    backgroundColor: theme.colors.accent[400],
+  },
+  synthToggleKnob: {
+    width: 18,
+    height: 18,
+    borderRadius: theme.radius.full,
+    backgroundColor: '#fff',
+    transform: [{ translateX: 0 }],
+  },
+  synthToggleKnobActive: {
+    transform: [{ translateX: 18 }],
   },
 });

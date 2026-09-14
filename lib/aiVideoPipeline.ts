@@ -23,7 +23,7 @@ export interface VideoGenResult {
 
 interface GenerateAiVideoOptions {
   durationSec?: number;
-  aspectRatio?: '9:16' | '16:9' | '1:1';
+  aspectRatio?: '9:16' | '16:9' | '1:1' | '4:5';
   productName?: string;
   scanId?: string;
   variationSeed?: number;
@@ -42,6 +42,9 @@ interface GenerateAiVideoOptions {
   zoomSpeed?: number;
   cameraRotation?: number;
   transitionEffect?: string;
+  stylePreset?: string;
+  detailRestoration?: boolean;
+  hdUpscale?: boolean;
 }
 
 interface PollResponse {
@@ -120,6 +123,9 @@ export async function generateAiVideo(
           zoomSpeed: options.zoomSpeed,
           cameraRotation: options.cameraRotation,
           transitionEffect: options.transitionEffect,
+          stylePreset: options.stylePreset,
+          detailRestoration: options.detailRestoration,
+          hdUpscale: options.hdUpscale,
         },
       });
 
