@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3 } from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3, Camera } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -387,85 +387,50 @@ export default function AssetsScreen() {
         </View>
       </View>
 
-      {/* 3 Action Track Cards */}
-      <View style={styles.trackGrid}>
-        {/* Track 1: 1-click SNS Upload */}
-        <TouchableOpacity
-          style={styles.trackCard}
-          onPress={() => {
-            if (assets.length > 0) setSnsUploadAsset(assets[0]);
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.warning[500] + '22' }]}>
-            <Rocket size={44} color={theme.colors.warning[400]} strokeWidth={2} />
+      {/* Lightweight Tip Cards — only when assets exist */}
+      {assets.length > 0 && (
+        <View style={styles.tipSection}>
+          <View style={styles.tipHeader}>
+            <Lightbulb size={12} color={theme.colors.dark.textDim} strokeWidth={2} />
+            <Text style={styles.tipHeaderText}>이용 팁</Text>
           </View>
-          <Text style={styles.trackTitle}>1초 SNS 멀티 업로드</Text>
-          <Text style={styles.trackDesc}>틱톡·숏츠·릴스에 캡션/해시태그 자동 복사와 함께 원클릭 배포</Text>
-          <View style={styles.trackTagRow}>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-              <Copy size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>캡션 자동복사</Text>
-            </View>
-            <Text style={styles.trackArrow}>→</Text>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.warning[500] + '18' }]}>
-              <Share2 size={10} color={theme.colors.warning[400]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.warning[400] }]}>앱 자동 실행</Text>
-            </View>
+          <View style={styles.tipRow}>
+            <TouchableOpacity
+              style={styles.tipCard}
+              onPress={() => setSnsUploadAsset(assets[0])}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.tipIconWrap, { backgroundColor: theme.colors.warning[500] + '18' }]}>
+                <Rocket size={18} color={theme.colors.warning[400]} strokeWidth={2} />
+              </View>
+              <Text style={styles.tipTitle}>1초 SNS 업로드</Text>
+              <Text style={styles.tipDesc}>캡션/해시태그 자동 복사 후 앱 실행</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tipCard}
+              onPress={() => setShowABCompare(true)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.tipIconWrap, { backgroundColor: theme.colors.success[500] + '18' }]}>
+                <TrendingUp size={18} color={theme.colors.success[400]} strokeWidth={2} />
+              </View>
+              <Text style={styles.tipTitle}>A/B 성과 &amp; 핀</Text>
+              <Text style={styles.tipDesc}>3종 톤 비교 · BEST 상단 고정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tipCard}
+              onPress={() => { const first = assets[0]; if (first) setRemixAsset(first); }}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.tipIconWrap, { backgroundColor: theme.colors.accent[500] + '18' }]}>
+                <Repeat2 size={18} color={theme.colors.accent[400]} strokeWidth={2} />
+              </View>
+              <Text style={styles.tipTitle}>1클릭 리믹스</Text>
+              <Text style={styles.tipDesc}>훅 자막/BGM만 교체해 재생산</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-
-        {/* Track 2: A/B Performance + Pin */}
-        <TouchableOpacity
-          style={styles.trackCard}
-          onPress={() => setShowABCompare(true)}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.success[500] + '22' }]}>
-            <TrendingUp size={44} color={theme.colors.success[400]} strokeWidth={2} />
-          </View>
-          <Text style={styles.trackTitle}>A/B 성과 &amp; BEST 핀</Text>
-          <Text style={styles.trackDesc}>3종 페르소나 톤 비교 시청 · 전환율 최고작 상단 고정</Text>
-          <View style={styles.trackTagRow}>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.success[500] + '18' }]}>
-              <Users size={10} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.success[400] }]}>3톤 비교</Text>
-            </View>
-            <Text style={styles.trackArrow}>→</Text>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.success[500] + '18' }]}>
-              <Pin size={10} color={theme.colors.success[400]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.success[400] }]}>핀 고정</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* Track 3: 1-click Remix */}
-        <TouchableOpacity
-          style={styles.trackCard}
-          onPress={() => {
-            const first = assets[0];
-            if (first) setRemixAsset(first);
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.trackIconWrap, { backgroundColor: theme.colors.accent[500] + '22' }]}>
-            <Repeat2 size={44} color={theme.colors.accent[400]} strokeWidth={2} />
-          </View>
-          <Text style={styles.trackTitle}>1클릭 리믹스 &amp; 변형</Text>
-          <Text style={styles.trackDesc}>기존 완성작의 훅 자막이나 BGM만 1초 만에 교체해 재생산</Text>
-          <View style={styles.trackTagRow}>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-              <Type size={10} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>훅 교체</Text>
-            </View>
-            <Text style={styles.trackArrow}>→</Text>
-            <View style={[styles.trackTag, { backgroundColor: theme.colors.accent[500] + '18' }]}>
-              <Music2 size={10} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={[styles.trackTagText, { color: theme.colors.accent[300] }]}>BGM 변경</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
 
       {/* SNS Quick Upload Hub */}
       {assets.length > 0 && (
@@ -553,6 +518,17 @@ export default function AssetsScreen() {
           <FolderOpen size={56} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
           <Text style={styles.emptyTitle}>{t('assets.empty')}</Text>
           <Text style={styles.emptyText}>{t('assets.emptyDesc')}</Text>
+          <Text style={styles.emptyGuide}>
+            아직 저장된 제작물이 없습니다.{'\n'}카메라를 눌러 첫 숏폼을 만들어보세요!
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyCtaBtn}
+            onPress={() => router.push('/(tabs)/index' as never)}
+            activeOpacity={0.8}
+          >
+            <Camera size={18} color="#fff" strokeWidth={2} />
+            <Text style={styles.emptyCtaText}>카메라로 이동</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -990,15 +966,14 @@ const styles = StyleSheet.create({
   headerTextWrap: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8, marginTop: 2 },
   headerActionBtn: { width: 40, height: 40, borderRadius: theme.radius.full, backgroundColor: theme.colors.dark.surface, justifyContent: 'center', alignItems: 'center' },
-  trackGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
-  trackCard: { width: '48.5%', backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.lg, borderWidth: 1.5, borderColor: theme.colors.dark.border, padding: theme.spacing.md, gap: 6 },
-  trackIconWrap: { width: 64, height: 64, borderRadius: theme.radius.lg, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  trackTitle: { fontSize: 14, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.dark.text },
-  trackDesc: { fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, lineHeight: 15 },
-  trackTagRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  trackTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 3, paddingHorizontal: 6, borderRadius: theme.radius.sm },
-  trackTagText: { fontSize: 9, fontFamily: theme.typography.fontFamily.semiBold },
-  trackArrow: { fontSize: 10, color: theme.colors.dark.textFaint },
+  tipSection: { paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
+  tipHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  tipHeaderText: { fontSize: 11, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.textDim },
+  tipRow: { flexDirection: 'row', gap: theme.spacing.sm },
+  tipCard: { flex: 1, backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.dark.border, padding: 10, gap: 4 },
+  tipIconWrap: { width: 32, height: 32, borderRadius: theme.radius.sm, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  tipTitle: { fontSize: 12, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.text },
+  tipDesc: { fontSize: 10, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, lineHeight: 13 },
   snsHub: { paddingHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md },
   snsHubTitle: { fontSize: 14, fontFamily: theme.typography.fontFamily.bold, color: theme.colors.dark.text, marginBottom: 4 },
   snsHubDesc: { fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, marginBottom: 8, lineHeight: 15 },
@@ -1026,6 +1001,9 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.xl, gap: theme.spacing.md },
   emptyTitle: { fontSize: theme.typography.heading, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.text, marginTop: theme.spacing.md },
   emptyText: { fontSize: theme.typography.body, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, textAlign: 'center', lineHeight: 24 },
+  emptyGuide: { fontSize: 14, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.text, textAlign: 'center', lineHeight: 22, marginTop: theme.spacing.sm },
+  emptyCtaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, borderRadius: theme.radius.lg, backgroundColor: theme.colors.primary[500], marginTop: theme.spacing.md },
+  emptyCtaText: { fontSize: 15, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
   listContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
   columnWrapper: { gap: CARD_GAP, marginBottom: CARD_GAP },
   card: { width: CARD_WIDTH, backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.lg, overflow: 'hidden', ...theme.shadows.card },
