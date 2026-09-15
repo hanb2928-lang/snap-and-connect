@@ -90,7 +90,15 @@ export function useQueuedJob() {
       }));
     }, timeoutMs);
 
-    subRef.current = subscribeToJob(jobId, handleUpdate);
+    subRef.current = subscribeToJob(jobId, handleUpdate, () => {
+      if (mySubmitId !== submitIdRef.current) return;
+      clearAll();
+      setState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: '실시간 연결이 끊겼습니다. 네트워크를 확인 후 다시 시도해주세요.',
+      }));
+    });
 
     getJob(jobId).then((job) => {
       if (mySubmitId !== submitIdRef.current) return;
@@ -99,17 +107,24 @@ export function useQueuedJob() {
       }
     }).catch(() => {});
 
-    let pollErrors = 0;
+    let consecutivePollErrors = 0;
+    const pollErrorTimestamps: number[] = [];
+    const POLL_ERROR_WINDOW_MS = 30000;
 
     pollRef.current = setInterval(() => {
       if (mySubmitId !== submitIdRef.current) return;
       getJob(jobId).then((job) => {
         if (mySubmitId !== submitIdRef.current) return;
-        pollErrors = 0;
+        consecutivePollErrors = 0;
         if (job) handleUpdate(job);
       }).catch(() => {
-        pollErrors++;
-        if (pollErrors >= MAX_POLL_ERRORS) {
+        consecutivePollErrors++;
+        const now = Date.now();
+        pollErrorTimestamps.push(now);
+        while (pollErrorTimestamps.length > 0 && now - pollErrorTimestamps[0] > POLL_ERROR_WINDOW_MS) {
+          pollErrorTimestamps.shift();
+        }
+        if (consecutivePollErrors >= MAX_POLL_ERRORS || pollErrorTimestamps.length >= MAX_POLL_ERRORS) {
           if (mySubmitId !== submitIdRef.current) return;
           clearAll();
           setState((prev) => ({

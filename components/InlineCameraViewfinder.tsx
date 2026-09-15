@@ -129,6 +129,8 @@ export const InlineCameraViewfinder = forwardRef<
       ctx.drawImage(video, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       const base64 = dataUrl.split(',')[1];
+      canvas.width = 0;
+      canvas.height = 0;
       return { base64, mimeType: 'image/jpeg' };
     } catch {
       return null;
@@ -325,6 +327,7 @@ export const InlineCameraViewfinder = forwardRef<
           onPress={onCapture}
           disabled={!cameraReady || processing}
           activeOpacity={0.85}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           {processing ? (
             <Loader size={20} color="#fff" strokeWidth={2} />

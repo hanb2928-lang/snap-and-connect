@@ -110,6 +110,7 @@ export async function urlToDataUrl(url: string, timeoutMs = 15000): Promise<stri
 }
 
 async function imageElementToDataUrl(url: string, timeoutMs = 15000): Promise<string> {
+  const MAX_DIM = 1024;
   return new Promise((resolve, reject) => {
     const img = new (window as any).Image();
     img.crossOrigin = 'anonymous';
@@ -120,16 +121,23 @@ async function imageElementToDataUrl(url: string, timeoutMs = 15000): Promise<st
     img.onload = () => {
       clearTimeout(timer);
       try {
+        const naturalW = img.naturalWidth || img.width;
+        const naturalH = img.naturalHeight || img.height;
+        const scale = Math.min(1, MAX_DIM / Math.max(naturalW, naturalH));
+        const w = Math.max(1, Math.round(naturalW * scale));
+        const h = Math.max(1, Math.round(naturalH * scale));
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
+        canvas.width = w;
+        canvas.height = h;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('canvas 컨텍스트 생성 실패'));
           return;
         }
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        canvas.width = 0;
+        canvas.height = 0;
       } catch {
         reject(new Error('CORS로 인해 이미지를 변환할 수 없습니다'));
       }

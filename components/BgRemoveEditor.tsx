@@ -48,6 +48,9 @@ export function BgRemoveEditor({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const checkerCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const checkerBuiltFor = useRef<string>('');
   const undoStackRef = useRef<ImageData[]>([]);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const isDrawingRef = useRef(false);
@@ -64,6 +67,21 @@ export function BgRemoveEditor({
     });
   }, [visible, imageWidth, imageHeight]);
 
+  // Cleanup canvases when modal closes to free memory
+  useEffect(() => {
+    if (visible) return;
+    if (Platform.OS !== 'web') return;
+    [canvasRef, maskCanvasRef, overlayCanvasRef, checkerCanvasRef].forEach((r) => {
+      if (r.current) {
+        r.current.width = 0;
+        r.current.height = 0;
+        r.current = null;
+      }
+    });
+    undoStackRef.current = [];
+    checkerBuiltFor.current = '';
+  }, [visible]);
+
   // Initialize canvases when modal opens
   useEffect(() => {
     if (!visible || !displaySize.w || !displaySize.h || Platform.OS !== 'web') return;
@@ -72,7 +90,7 @@ export function BgRemoveEditor({
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      // Main image canvas (full resolution)
+      // Main image canvas
       const canvas = document.createElement('canvas');
       canvas.width = imageWidth;
       canvas.height = imageHeight;
@@ -81,7 +99,7 @@ export function BgRemoveEditor({
       ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
       canvasRef.current = canvas;
 
-      // Mask canvas (full resolution) — white = keep, black = remove
+      // Mask canvas — white = keep, black = remove
       const maskCanvas = document.createElement('canvas');
       maskCanvas.width = imageWidth;
       maskCanvas.height = imageHeight;
@@ -124,22 +142,26 @@ export function BgRemoveEditor({
 
     dCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
 
-    // Draw the original image
     dCtx.drawImage(canvasRef.current, 0, 0, displayCanvas.width, displayCanvas.height);
 
-    // Draw the mask overlay: removed areas show as semi-transparent red
     const maskCanvas = maskCanvasRef.current;
     const maskCtx = maskCanvas.getContext('2d');
     if (!maskCtx) return;
 
-    // Create a temporary canvas for the overlay
-    const overlayCanvas = document.createElement('canvas');
-    overlayCanvas.width = imageWidth;
-    overlayCanvas.height = imageHeight;
+    const maskData = maskCtx.getImageData(0, 0, imageWidth, imageHeight);
+
+    // Reuse persistent overlay canvas
+    if (!overlayCanvasRef.current) {
+      overlayCanvasRef.current = document.createElement('canvas');
+    }
+    const overlayCanvas = overlayCanvasRef.current;
+    if (overlayCanvas.width !== imageWidth || overlayCanvas.height !== imageHeight) {
+      overlayCanvas.width = imageWidth;
+      overlayCanvas.height = imageHeight;
+    }
     const oCtx = overlayCanvas.getContext('2d');
     if (!oCtx) return;
-
-    const maskData = maskCtx.getImageData(0, 0, imageWidth, imageHeight);
+    oCtx.clearRect(0, 0, imageWidth, imageHeight);
     const overlayData = oCtx.createImageData(imageWidth, imageHeight);
     for (let i = 0; i < imageWidth * imageHeight; i++) {
       const isRemoved = maskData.data[i * 4] < 128;
@@ -153,21 +175,31 @@ export function BgRemoveEditor({
     oCtx.putImageData(overlayData, 0, 0);
     dCtx.drawImage(overlayCanvas, 0, 0, displayCanvas.width, displayCanvas.height);
 
-    // Draw checkerboard pattern for removed areas to indicate transparency
-    const checkerCanvas = document.createElement('canvas');
-    checkerCanvas.width = imageWidth;
-    checkerCanvas.height = imageHeight;
+    // Build checkerboard once and cache
+    const checkerKey = `${imageWidth}x${imageHeight}`;
+    if (!checkerCanvasRef.current || checkerBuiltFor.current !== checkerKey) {
+      const checkerCanvas = document.createElement('canvas');
+      checkerCanvas.width = imageWidth;
+      checkerCanvas.height = imageHeight;
+      const cCtx = checkerCanvas.getContext('2d');
+      if (!cCtx) return;
+      const checkerSize = 12;
+      for (let y = 0; y < imageHeight; y += checkerSize) {
+        for (let x = 0; x < imageWidth; x += checkerSize) {
+          const isLight = ((x / checkerSize) + (y / checkerSize)) % 2 === 0;
+          cCtx.fillStyle = isLight ? '#e8e8e8' : '#c0c0c0';
+          cCtx.fillRect(x, y, checkerSize, checkerSize);
+        }
+      }
+      checkerCanvasRef.current = checkerCanvas;
+      checkerBuiltFor.current = checkerKey;
+    }
+
+    const checkerCanvas = checkerCanvasRef.current!;
     const cCtx = checkerCanvas.getContext('2d');
     if (!cCtx) return;
-    const checkerSize = 12;
-    for (let y = 0; y < imageHeight; y += checkerSize) {
-      for (let x = 0; x < imageWidth; x += checkerSize) {
-        const isLight = ((x / checkerSize) + (y / checkerSize)) % 2 === 0;
-        cCtx.fillStyle = isLight ? '#e8e8e8' : '#c0c0c0';
-        cCtx.fillRect(x, y, checkerSize, checkerSize);
-      }
-    }
-    // Apply checker only to removed areas
+
+    // Apply checker only to removed areas using composite ops on the checker itself
     cCtx.globalCompositeOperation = 'destination-in';
     const removedMask = document.createElement('canvas');
     removedMask.width = imageWidth;
@@ -183,7 +215,9 @@ export function BgRemoveEditor({
     cCtx.drawImage(removedMask, 0, 0);
     cCtx.globalCompositeOperation = 'source-over';
 
-    // Draw the checker behind the image for removed areas
+    removedMask.width = 0;
+    removedMask.height = 0;
+
     dCtx.globalCompositeOperation = 'destination-over';
     dCtx.drawImage(checkerCanvas, 0, 0, displayCanvas.width, displayCanvas.height);
     dCtx.globalCompositeOperation = 'source-over';

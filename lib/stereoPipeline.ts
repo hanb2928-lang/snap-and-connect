@@ -111,12 +111,19 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
 
   const additionalShots = sorted.slice(1);
   const additionalUrls: string[] = [];
+  let uploadFailures = 0;
   for (const shot of additionalShots) {
     if (!shot.base64) continue;
     try {
       const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
       additionalUrls.push(url);
-    } catch { /* skip failed uploads */ }
+      uploadFailures = 0;
+    } catch {
+      uploadFailures++;
+      if (uploadFailures >= 2) {
+        throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+      }
+    }
   }
   if (additionalUrls.length > 0) {
     await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
@@ -146,15 +153,25 @@ export async function runStereoPipeline(
 
   const additionalShots = sorted.slice(1);
   const additionalUrls: string[] = [];
+  let uploadFailures = 0;
   for (let i = 0; i < additionalShots.length; i++) {
     const shot = additionalShots[i];
     if (!shot.base64) continue;
     try {
       const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
       additionalUrls.push(url);
+      uploadFailures = 0;
       steps[0].detail = `5각도 이미지 전송 (${i + 2}/${sorted.length}) 완료`;
       report(0, 0.05 + ((i + 2) / sorted.length) * 0.1);
-    } catch { /* skip failed uploads */ }
+    } catch (err) {
+      uploadFailures++;
+      if (uploadFailures >= 2) {
+        steps[0].status = 'error';
+        steps[0].detail = '이미지 업로드 중 네트워크 연결이 끊겼습니다.';
+        report(0, 0.05, err instanceof Error ? err.message : '네트워크 오류로 이미지 업로드에 실패했습니다.');
+        throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+      }
+    }
   }
   if (additionalUrls.length > 0) {
     await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);

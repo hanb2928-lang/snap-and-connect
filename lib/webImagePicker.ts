@@ -6,53 +6,110 @@ export interface PickedImage {
   mimeType: string;
 }
 
-function fileToBase64(file: File): Promise<string> {
+const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.65;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
+type ResizeOptions = {
+  resizeWidth?: number;
+  resizeHeight?: number;
+};
+
+function hasCreateImageBitmap(): boolean {
+  return typeof createImageBitmap === 'function';
+}
+
+function calculateTargetSize(naturalW: number, naturalH: number, maxSize: number): { width: number; height: number } {
+  let width = naturalW;
+  let height = naturalH;
+  if (width > maxSize || height > maxSize) {
+    const ratio = Math.min(maxSize / width, maxSize / height);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+  return { width, height };
+}
+
+async function resizeWithImageBitmap(file: File): Promise<{ base64: string; uri: string; mimeType: string }> {
+  const opts: ResizeOptions = {};
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file, { ...opts, imageOrientation: 'from-image' } as ImageBitmapOptions);
+  } catch {
+    bitmap = await createImageBitmap(file);
+  }
+
+  const { width, height } = calculateTargetSize(bitmap.width, bitmap.height, MAX_DIMENSION);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    throw new Error('이미지 처리를 할 수 없습니다');
+  }
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  const isWebpSupported = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+  const mimeType = isWebpSupported ? 'image/webp' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+  const dataUrl = canvas.toDataURL(mimeType, JPEG_QUALITY);
+  const commaIdx = dataUrl.indexOf(',');
+  const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+  canvas.width = 0;
+  canvas.height = 0;
+
+  return { base64, uri: dataUrl, mimeType };
+}
+
+function resizeWithImageElement(file: File): Promise<{ base64: string; uri: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const commaIdx = result.indexOf(',');
-      resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+    const objUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const { width, height } = calculateTargetSize(img.naturalWidth, img.naturalHeight, MAX_DIMENSION);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('이미지 처리를 할 수 없습니다'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      const isWebpSupported = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+      const mimeType = isWebpSupported ? 'image/webp' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      const dataUrl = canvas.toDataURL(mimeType, JPEG_QUALITY);
+      const commaIdx = dataUrl.indexOf(',');
+      const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+
+      canvas.width = 0;
+      canvas.height = 0;
+
+      resolve({ base64, uri: dataUrl, mimeType });
     };
-    reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다'));
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objUrl);
+      reject(new Error('이미지를 불러올 수 없습니다'));
+    };
+    img.src = objUrl;
   });
 }
 
-function resizeImage(file: File, maxSize = 1280, quality = 0.65): Promise<{ base64: string; uri: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxSize || height > maxSize) {
-          const ratio = Math.min(maxSize / width, maxSize / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('이미지 처리를 할 수 없습니다'));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        const isWebpSupported = canvas.toDataURL('image/webp').startsWith('data:image/webp');
-        const mimeType = isWebpSupported ? 'image/webp' : file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        const dataUrl = canvas.toDataURL(mimeType, quality);
-        const commaIdx = dataUrl.indexOf(',');
-        const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
-        resolve({ base64, uri: dataUrl, mimeType });
-      };
-      img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다'));
-      img.src = reader.result as string;
-    };
-    reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다'));
-    reader.readAsDataURL(file);
-  });
+async function resizeImage(file: File): Promise<{ base64: string; uri: string; mimeType: string }> {
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('이미지 크기가 너무 큽니다. 25MB 이하의 이미지를 선택해주세요.');
+  }
+  if (hasCreateImageBitmap()) {
+    try {
+      return await resizeWithImageBitmap(file);
+    } catch {
+      // fall through to legacy path
+    }
+  }
+  return resizeWithImageElement(file);
 }
 
 export async function pickImageWeb(multiple = false, maxCount = 4, useCamera = false): Promise<PickedImage[]> {
@@ -104,9 +161,10 @@ export async function pickImageWeb(multiple = false, maxCount = 4, useCamera = f
       }
       try {
         const limited = files.slice(0, multiple ? maxCount : 1);
-        const results = await Promise.all(
-          limited.map((f) => resizeImage(f)),
-        );
+        const results: { base64: string; uri: string; mimeType: string }[] = [];
+        for (const f of limited) {
+          results.push(await resizeImage(f));
+        }
         resolve(results);
       } catch (err) {
         reject(err instanceof Error ? err : new Error('이미지 선택에 실패했습니다'));

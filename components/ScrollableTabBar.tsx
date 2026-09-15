@@ -119,6 +119,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingTop: 10,
     paddingBottom: 8,
+    zIndex: 1,
+    elevation: 1,
   },
   tabRow: {
     flexDirection: 'row',

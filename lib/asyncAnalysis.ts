@@ -94,12 +94,17 @@ export async function startAsyncAnalysis(
   const imageUrl = await uploadImage(base64, mimeType);
 
   const additionalUrls: string[] = [];
+  let uploadFailures = 0;
   for (const b64 of additionalBase64Images) {
     try {
       const url = await uploadImage(b64, 'image/jpeg');
       additionalUrls.push(url);
+      uploadFailures = 0;
     } catch {
-      // individual angle upload failure shouldn't block
+      uploadFailures++;
+      if (uploadFailures >= 2) {
+        throw new Error('추가 이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+      }
     }
   }
 

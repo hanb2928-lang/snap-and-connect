@@ -224,7 +224,7 @@ export function MultiAngleCaptureGuide({
   }, [onClose]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={[styles.overlay, { paddingTop: safeTop }]}>
         <View style={styles.container}>
           {/* Header */}
@@ -315,6 +315,7 @@ export function MultiAngleCaptureGuide({
                         }}
                         disabled={processing}
                         activeOpacity={0.6}
+                        hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
                       >
                         {processing ? (
                           <>
@@ -342,6 +343,7 @@ export function MultiAngleCaptureGuide({
                 style={[styles.completeBtn, { backgroundColor: effectiveAccent, marginBottom: 8 }]}
                 onPress={handleComplete}
                 activeOpacity={0.7}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
               >
                 <Check size={18} color="#fff" strokeWidth={2} />
                 <Text style={styles.completeBtnText}>
@@ -355,6 +357,7 @@ export function MultiAngleCaptureGuide({
               onPress={handleComplete}
               disabled={!allDone}
               activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
             >
               <Check size={18} color={allDone ? '#fff' : theme.colors.dark.textFaint} strokeWidth={2} />
               <Text style={[styles.completeBtnText, !allDone && styles.completeBtnTextDisabled]}>
@@ -373,6 +376,8 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: theme.colors.dark.bg,
+    zIndex: 9999,
+    elevation: 9999,
   },
   container: {
     flex: 1,
@@ -551,9 +556,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
     paddingHorizontal: 24,
-    paddingVertical: 11,
+    paddingVertical: 13,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.primary[600],
+    minHeight: 48,
+    zIndex: 5,
+    elevation: 5,
   },
   actionBtnText: {
     fontSize: 14,
@@ -565,15 +573,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.dark.border,
     backgroundColor: theme.colors.dark.surface,
+    zIndex: 10,
+    elevation: 10,
   },
   completeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.primary[500],
+    minHeight: 52,
   },
   completeBtnDisabled: {
     backgroundColor: theme.colors.dark.surfaceLight,

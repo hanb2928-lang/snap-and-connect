@@ -245,6 +245,7 @@ function cropOnWeb(
   rotation: number,
   imageDim: { w: number; h: number },
 ): Promise<string> {
+  const MAX_INTERMEDIATE = 2048;
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -258,6 +259,7 @@ function cropOnWeb(
       const cropY = Math.max(0, (crop.y - imageRect.y) * scaleY);
       const cropW = Math.min(rotatedW - cropX, crop.w * scaleX);
       const cropH = Math.min(rotatedH - cropY, crop.h * scaleY);
+
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(cropW));
       canvas.height = Math.max(1, Math.round(cropH));
@@ -267,9 +269,13 @@ function cropOnWeb(
         return;
       }
 
+      const intermediateScale = Math.min(1, MAX_INTERMEDIATE / Math.max(rotatedW, rotatedH));
+      const interW = Math.max(1, Math.round(rotatedW * intermediateScale));
+      const interH = Math.max(1, Math.round(rotatedH * intermediateScale));
+
       const rotatedCanvas = document.createElement('canvas');
-      rotatedCanvas.width = rotatedW;
-      rotatedCanvas.height = rotatedH;
+      rotatedCanvas.width = interW;
+      rotatedCanvas.height = interH;
       const rotatedCtx = rotatedCanvas.getContext('2d');
       if (!rotatedCtx) {
         reject(new Error('canvas error'));
@@ -277,19 +283,30 @@ function cropOnWeb(
       }
       rotatedCtx.save();
       if (rotation === 90) {
-        rotatedCtx.translate(rotatedW, 0);
+        rotatedCtx.translate(interW, 0);
         rotatedCtx.rotate(Math.PI / 2);
       } else if (rotation === 180) {
-        rotatedCtx.translate(rotatedW, rotatedH);
+        rotatedCtx.translate(interW, interH);
         rotatedCtx.rotate(Math.PI);
       } else if (rotation === 270) {
-        rotatedCtx.translate(0, rotatedH);
+        rotatedCtx.translate(0, interH);
         rotatedCtx.rotate(-Math.PI / 2);
       }
-      rotatedCtx.drawImage(img, 0, 0, sourceW, sourceH);
+      rotatedCtx.drawImage(img, 0, 0, sourceW, sourceH, 0, 0, interW, interH);
       rotatedCtx.restore();
-      ctx.drawImage(rotatedCanvas, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+      const adjCropX = cropX * intermediateScale;
+      const adjCropY = cropY * intermediateScale;
+      const adjCropW = cropW * intermediateScale;
+      const adjCropH = cropH * intermediateScale;
+      ctx.drawImage(rotatedCanvas, adjCropX, adjCropY, adjCropW, adjCropH, 0, 0, canvas.width, canvas.height);
+
+      rotatedCanvas.width = 0;
+      rotatedCanvas.height = 0;
+
       resolve(canvas.toDataURL('image/jpeg', 0.85));
+      canvas.width = 0;
+      canvas.height = 0;
     };
     img.onerror = () => reject(new Error('image load error'));
     img.src = dataUrl;

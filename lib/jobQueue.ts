@@ -114,28 +114,39 @@ export async function waitForJob<T = Record<string, unknown>>(
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' && !settled) {
+          finish({ success: false, error: '실시간 연결이 끊겼습니다. 네트워크를 확인해주세요.' });
+        }
+      });
 
     timeoutTimer = setTimeout(() => {
       finish({ success: false, error: 'Job timed out' });
     }, timeoutMs);
 
-    let pollErrors = 0;
+    let consecutivePollErrors = 0;
+    const pollErrorWindow: number[] = [];
+    const POLL_ERROR_WINDOW_MS = 30000;
 
     const poll = async () => {
       if (settled) return;
       try {
         const job = await getJob(jobId);
-        pollErrors = 0;
         if (!job) { finish({ success: false, error: 'Job not found' }); return; }
+        consecutivePollErrors = 0;
         if (job.status === 'done') {
           finish({ success: true, result: (job.result ?? {}) as T });
         } else if (job.status === 'error') {
           finish({ success: false, error: job.error_message ?? 'Job failed' });
         }
       } catch {
-        pollErrors++;
-        if (pollErrors >= MAX_POLL_ERRORS) {
+        consecutivePollErrors++;
+        const now = Date.now();
+        pollErrorWindow.push(now);
+        while (pollErrorWindow.length > 0 && now - pollErrorWindow[0] > POLL_ERROR_WINDOW_MS) {
+          pollErrorWindow.shift();
+        }
+        if (consecutivePollErrors >= MAX_POLL_ERRORS || pollErrorWindow.length >= MAX_POLL_ERRORS) {
           finish({ success: false, error: '네트워크 연결이 불안정합니다. 다시 시도해주세요.' });
         }
       }
@@ -149,6 +160,7 @@ export async function waitForJob<T = Record<string, unknown>>(
 export function subscribeToJob(
   jobId: string,
   onUpdate: (job: RenderJob) => void,
+  onError?: () => void,
 ): { unsubscribe: () => void } {
   const channel = supabase
     .channel(`job:${jobId}`)
@@ -161,7 +173,11 @@ export function subscribeToJob(
         }
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' && onError) {
+        onError();
+      }
+    });
 
   return {
     unsubscribe: () => {
