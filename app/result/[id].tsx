@@ -120,7 +120,7 @@ import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { getBgmTemplateForMood } from '@/lib/bgmEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
-import { generateAiVideo, submitVideoDraft, upgradeVideoToHd, subscribeHdUpgrade, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { generateAiVideo, submitVideoDraft, upgradeVideoToHd, subscribeHdUpgrade, recoverVideoJob, type VideoGenProgress } from '@/lib/aiVideoPipeline';
 import { analyzeProductVision, type ProductVisionResult } from '@/lib/productVision';
 import {
   buildViralAudioSyncProfile,
@@ -1092,6 +1092,24 @@ export default function ResultScreen() {
 
     (async () => {
       try {
+        // First try to recover a previously-completed job (e.g. after timeout)
+        const recovered = await recoverVideoJob(scan.id);
+        if (cancelled || !recovered) {
+          // recoverVideoJob returned null — check for pending jobs below
+        } else if (recovered.status === 'SUCCESS' && recovered.videoUrl) {
+          if (mountedRef.current) {
+            setGeneratedVideoUrl(recovered.videoUrl);
+            setVideoStage(recovered.isHd ? 'hd_ready' : 'draft_ready');
+            setIsGeneratingVideo(false);
+            setVideoGenProgress(null);
+          }
+          return;
+        } else if (recovered.status === 'FAILED') {
+          // Job already failed — don't re-poll
+          return;
+        }
+
+        // No completed job found — check for pending jobs and resume polling
         const { data: jobRow } = await supabase
           .from('video_jobs')
           .select('task_id, status, is_draft')

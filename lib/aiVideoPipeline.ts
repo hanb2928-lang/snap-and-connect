@@ -54,8 +54,11 @@ interface GenerateAiVideoOptions {
 
 const SUBMIT_MAX_RETRIES = 2;
 const SUBMIT_RETRY_DELAY_MS = 2000;
-const REALTIME_TIMEOUT_MS = 180_000;
+const REALTIME_TIMEOUT_MS = 300_000;
+const REALTIME_SOFT_WARN_MS = 120_000;
 const FALLBACK_POLL_INTERVAL_MS = 5000;
+const RUNWAY_POLL_FALLBACK_INTERVAL_MS = 15000;
+const RUNWAY_POLL_FALLBACK_START_MS = 30_000;
 
 
 export async function generateAiVideo(
@@ -250,6 +253,8 @@ function waitForVideoCompletion(
       if (channel) supabase.removeChannel(channel);
       if (pollTimer) clearInterval(pollTimer);
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      if (softWarnTimer) clearTimeout(softWarnTimer);
+      if (runwayPollTimer) clearTimeout(runwayPollTimer);
     };
 
     const finish = (fn: () => void) => {
@@ -349,13 +354,67 @@ function waitForVideoCompletion(
       checkScanVideoUrl();
       // Progress hint based on elapsed time
       const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-      const timeProgress = Math.min(0.1 + (elapsedSec / 120) * 0.8, 0.95);
+      const timeProgress = Math.min(0.1 + (elapsedSec / 180) * 0.8, 0.95);
       report('generating', timeProgress, `AI가 영상을 렌더링하고 있어요 (${elapsedSec}초)...`);
     }, FALLBACK_POLL_INTERVAL_MS);
 
-    // Overall timeout
+    // Runway API direct-poll fallback: after 30s, if DB still shows no result,
+    // poll the Runway API directly every 15s as a second safety net.
+    // This catches cases where the webhook fails but Runway has the video ready.
+    let runwayPollTimer: ReturnType<typeof setTimeout> | null = null;
+    const startRunwayPollFallback = () => {
+      if (settled || runwayPollTimer) return;
+      const runwayPoll = async () => {
+        if (settled) return;
+        try {
+          const { data, error } = await supabase.functions.invoke('generate-video', {
+            body: { mode: 'poll', taskId: submitData.taskId, scanId },
+          });
+          if (error) { scheduleNext(); return; }
+          const resp = data as { status?: string; videoUrl?: string; error?: string };
+          if (resp.status === 'SUCCESS' && resp.videoUrl) {
+            report('completed', 1.0, 'AI 비디오 생성 완료');
+            finish(() => resolve({
+              videoUrl: resp.videoUrl!,
+              jobId: submitData.taskId,
+              motionPrompt: submitData.motionPrompt,
+              durationSec: submitData.durationSec,
+              aspectRatio: submitData.aspectRatio,
+              variationSeed: submitData.variationSeed,
+              persisted: true,
+              provider: 'runway',
+            }));
+            return;
+          }
+          if (resp.status === 'FAILED') {
+            const msg = resp.error ?? 'Runway 비디오 생성에 실패했습니다.';
+            report('error', 0, msg);
+            finish(() => reject(new Error(msg)));
+            return;
+          }
+        } catch {
+          // ignore — DB poll and realtime are still running
+        }
+        scheduleNext();
+      };
+      const scheduleNext = () => {
+        if (settled) return;
+        runwayPollTimer = setTimeout(runwayPoll, RUNWAY_POLL_FALLBACK_INTERVAL_MS);
+      };
+      runwayPoll();
+    };
+    setTimeout(startRunwayPollFallback, RUNWAY_POLL_FALLBACK_START_MS);
+
+    // Soft warning at 120s — don't reject, just inform the user
+    let softWarnTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (settled) return;
+      const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+      report('generating', 0.85, `렌더링이 조금 오래 걸리고 있어요 (${elapsedSec}초). 백그라운드에서 계속 진행 중입니다...`);
+    }, REALTIME_SOFT_WARN_MS);
+
+    // Overall timeout — 5 minutes. Don't orphan the job; inform the user.
     timeoutTimer = setTimeout(() => {
-      const msg = `비디오 생성 대기 시간이 ${Math.round(REALTIME_TIMEOUT_MS / 1000)}초를 초과했습니다. 네트워크 상태가 불안정할 수 있습니다. 다시 시도해주세요.`;
+      const msg = `비디오 생성이 5분을 초과했습니다. 서버에서는 계속 렌더링 중일 수 있어요. 잠시 후 이 페이지를 다시 방문하면 완성된 영상을 확인할 수 있습니다.`;
       report('error', 0, msg);
       finish(() => reject(new Error(msg)));
     }, REALTIME_TIMEOUT_MS);
@@ -521,5 +580,59 @@ export function subscribeHdUpgrade(
     settled = true;
     cleanup();
   };
+}
+
+/**
+ * Check the database for a previously-submitted video job that may have
+ * completed after the client timed out or the user navigated away.
+ * Returns the video URL if the job is already done, or null if it's still
+ * pending or was never submitted. Also checks scans.video_url as a fallback
+ * since the webhook writes there too.
+ */
+export async function recoverVideoJob(
+  scanId: string,
+): Promise<{ videoUrl: string; isHd: boolean; status: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('video_jobs')
+      .select('status, video_url, error_message, is_hd, hd_status, hd_video_url')
+      .eq('scan_id', scanId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      // Fallback: check scans.video_url directly
+      const { data: scanData } = await supabase
+        .from('scans')
+        .select('video_url')
+        .eq('id', scanId)
+        .maybeSingle();
+      if (scanData?.video_url) {
+        return { videoUrl: scanData.video_url, isHd: false, status: 'SUCCESS' };
+      }
+      return null;
+    }
+
+    const row = data as VideoJobRow & { is_hd?: boolean };
+
+    // Check HD result first (if HD was requested)
+    if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
+      return { videoUrl: row.hd_video_url, isHd: true, status: 'SUCCESS' };
+    }
+
+    // Check standard result
+    if (row.status === 'SUCCESS' && row.video_url) {
+      return { videoUrl: row.video_url, isHd: row.is_hd ?? false, status: 'SUCCESS' };
+    }
+
+    if (row.status === 'FAILED') {
+      return { videoUrl: '', isHd: false, status: 'FAILED' };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
