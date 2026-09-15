@@ -769,25 +769,38 @@ export default function ResultScreen() {
     };
 
     try {
-      const results = await Promise.allSettled(
-        seeds.map((seed, idx) =>
-          supabase.functions.invoke('generate-image', {
-            body: {
-              output_type: 'image',
-              mode: 'image',
-              prompt: buildPromptForIndex(idx),
-              size,
-              quality,
-              style: presetConfig.style,
-              productName,
-              productCategory: scan?.detected_products?.[selectedProductIndex]?.productCategory,
-              seed,
-              platform: targetPlatform,
-              customPrompt: inlineEdit.aiPrompt || undefined,
-            },
-          }),
-        ),
-      );
+      // Stagger requests in waves of 2→2→1 to avoid OpenAI rate limits (5 images/min for DALL-E 3)
+      const wave1 = [0, 1];
+      const wave2 = [2, 3];
+      const wave3 = [4];
+
+      const invokeOne = async (idx: number) =>
+        supabase.functions.invoke('generate-image', {
+          body: {
+            output_type: 'image',
+            mode: 'image',
+            prompt: buildPromptForIndex(idx),
+            size,
+            quality,
+            style: presetConfig.style,
+            productName,
+            productCategory: scan?.detected_products?.[selectedProductIndex]?.productCategory,
+            seed: seeds[idx],
+            platform: targetPlatform,
+            customPrompt: inlineEdit.aiPrompt || undefined,
+          },
+        });
+
+      const runWave = async (indices: number[]) =>
+        Promise.allSettled(indices.map((idx) => invokeOne(idx)));
+
+      const [r1, r2, r3] = await Promise.all([
+        runWave(wave1),
+        runWave(wave2),
+        runWave(wave3),
+      ]);
+
+      const results = [...r1, ...r2, ...r3];
 
       if (!mountedRef.current) return;
 
@@ -805,7 +818,8 @@ export default function ResultScreen() {
             return;
           }
           if (!data?.image) {
-            failedErrors.push(`이미지 ${idx + 1}번: 응답 데이터 없음`);
+            const serverErr = data?.error as string | undefined;
+            failedErrors.push(serverErr ?? `이미지 ${idx + 1}번: 응답 데이터 없음`);
             return;
           }
           const base64 = data.image as string;
@@ -819,10 +833,12 @@ export default function ResultScreen() {
 
       if (images.length === 0) {
         setImageGenError(
-          `5장 이미지 생성에 모두 실패했습니다.\n${failedErrors.slice(0, 2).join('\n')}\n다시 시도해주세요.`,
+          `5장 이미지 생성에 모두 실패했습니다.\n${failedErrors.slice(0, 3).join('\n')}\n다시 시도해주세요.`,
         );
       } else if (images.length < 5) {
-        setImageGenError(`5장 중 ${images.length}장 생성 성공, ${failedErrors.length}장 실패.\n${failedErrors.slice(0, 2).join('\n')}`);
+        setImageGenError(`5장 중 ${images.length}장 생성 성공, ${failedErrors.length}장 실패.\n${failedErrors.slice(0, 3).join('\n')}`);
+      } else {
+        setImageGenError(null);
       }
       setGeneratedImages(images);
       if (images.length > 0 && mountedRef.current) {

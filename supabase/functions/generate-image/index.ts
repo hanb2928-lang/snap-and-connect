@@ -226,8 +226,17 @@ Deno.serve(async (req: Request) => {
 
     if (!response.ok) {
       const errText = await response.text();
+      let errDetail = `이미지 생성 실패: ${response.status}`;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson?.error?.message) {
+          errDetail = `OpenAI ${response.status}: ${errJson.error.message}`;
+        }
+      } catch {
+        if (errText && errText.length < 500) errDetail = `이미지 생성 실패: ${response.status} — ${errText}`;
+      }
       return new Response(
-        JSON.stringify({ error: `이미지 생성 실패: ${response.status}` }),
+        JSON.stringify({ error: errDetail }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
