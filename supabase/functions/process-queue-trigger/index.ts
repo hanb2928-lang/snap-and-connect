@@ -26,8 +26,11 @@ Deno.serve(async (req: Request) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const processorUrl = `${supabaseUrl}/functions/v1/process-queue`;
-    await fetch(processorUrl, {
+
+    // Invoke autoscale-manager which evaluates queue depth and spawns
+    // the appropriate number of parallel process-queue workers
+    const autoscaleUrl = `${supabaseUrl}/functions/v1/autoscale-manager`;
+    const autoscaleResp = await fetch(autoscaleUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -37,8 +40,26 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({ trigger: true }),
     });
 
+    let autoscaleResult: Record<string, unknown> = {};
+    if (autoscaleResp.ok) {
+      autoscaleResult = await autoscaleResp.json() as Record<string, unknown>;
+    } else {
+      // Fallback: if autoscale-manager fails, directly trigger one worker
+      const processorUrl = `${supabaseUrl}/functions/v1/process-queue`;
+      await fetch(processorUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey,
+        },
+        body: JSON.stringify({ trigger: true }),
+      });
+      autoscaleResult = { fallback: true, action: "direct_trigger_fallback" };
+    }
+
     return new Response(
-      JSON.stringify({ triggered: true }),
+      JSON.stringify({ triggered: true, autoscale: autoscaleResult }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

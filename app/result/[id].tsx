@@ -105,7 +105,7 @@ import type { FeatureCategory, ScanMode, MediaType } from '@/components/FeatureT
 import { subscribeToJob } from '@/lib/jobQueue';
 import { finalizeAnalysisFromJob, triggerTTS } from '@/lib/asyncAnalysis';
 import type { RenderJob } from '@/lib/jobQueue';
-import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, FileText, AudioLines, Video as VideoIcon, Image as ImageIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw } from 'lucide-react-native';
+import { TrendingUp as TrendingUpIcon, Hash as HashIcon, PenLine, LayoutTemplate, ShoppingBag as ShoppingBagIcon, Wand as Wand2, Film as FilmIcon, Lightbulb, Store, BookOpen, Rocket, Users, Globe, Share2 as Share2Icon, Palette as PaletteIcon, Clock, Camera as CameraIcon, Sun as SunIcon, ShieldCheck as ShieldIcon, Link2 as Link2Icon, User as UserIcon, SlidersHorizontal as SlidersIcon, Pencil as PencilIcon, Sparkles as SparklesIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Youtube, Music2, Instagram, MonitorPlay, FileText, AudioLines, Video as VideoIcon, Image as ImageIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader2Icon, Download, Upload, Settings2, RotateCcw, CheckCircle2 } from 'lucide-react-native';
 import { LightingContextStudio } from '@/components/LightingContextStudio';
 import { QuickTweakPanel } from '@/components/QuickTweakPanel';
 import { AccountSafetyChecker } from '@/components/AccountSafetyChecker';
@@ -120,7 +120,7 @@ import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { getBgmTemplateForMood } from '@/lib/bgmEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
-import { generateAiVideo, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { generateAiVideo, submitVideoDraft, upgradeVideoToHd, subscribeHdUpgrade, type VideoGenProgress } from '@/lib/aiVideoPipeline';
 import { analyzeProductVision, type ProductVisionResult } from '@/lib/productVision';
 import {
   buildViralAudioSyncProfile,
@@ -432,6 +432,10 @@ export default function ResultScreen() {
   const [narrativeVariation, setNarrativeVariation] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoGenProgress, setVideoGenProgress] = useState<VideoGenProgress | null>(null);
+  const [videoStage, setVideoStage] = useState<'idle' | 'drafting' | 'draft_ready' | 'hd_upgrading' | 'hd_ready' | 'failed'>('idle');
+  const [draftVideoUrl, setDraftVideoUrl] = useState<string | null>(null);
+  const [hdUpgradeProgress, setHdUpgradeProgress] = useState<string | null>(null);
+  const hdUnsubRef = useRef<(() => void) | null>(null);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
@@ -697,10 +701,11 @@ export default function ResultScreen() {
     }
 
     try {
-      const result = await generateAiVideo(
+      // Stage 1: Generate a fast draft (low-res, 3sec) and show it immediately
+      const draftResult = await submitVideoDraft(
         videoPromptText,
         {
-          durationSec: 5,
+          durationSec: 3,
           aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
           productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
           scanId: scan.id,
@@ -720,27 +725,90 @@ export default function ResultScreen() {
           transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
           stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
           detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
-          hdUpscale: targetMediaType === 'image' ? hdUpscale : undefined,
+          hdUpscale: false,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
         },
       );
-      if (mountedRef.current) {
-        setGeneratedVideoUrl(result.videoUrl);
+
+      if (!mountedRef.current) return;
+
+      // Draft is ready — show it immediately
+      setDraftVideoUrl(draftResult.videoUrl);
+      setGeneratedVideoUrl(draftResult.videoUrl);
+      setVideoStage('draft_ready');
+      setIsGeneratingVideo(false);
+      setVideoGenProgress(null);
+
+      // Stage 2: Kick off HD upgrade in the background
+      setVideoStage('hd_upgrading');
+      setHdUpgradeProgress('고화질 업그레이드를 백그라운드에서 시작했어요...');
+
+      try {
+        const { hdJobId } = await upgradeVideoToHd(scan.id, draftResult.jobId, videoPromptText, {
+          durationSec: 5,
+          aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
+          productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
+          scanId: scan.id,
+          variationSeed: narrativeVariation + 1,
+          bgmMood: inlineEdit.bgmMood,
+          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '지금 바로 만나보세요',
+          platform: targetPlatform,
+          hookCategory: inlineEdit.hookEffect || 'curiosity',
+          productVision: visionData,
+          isCleanVideoMode,
+          promptStrength,
+          negativePrompt: negativePrompt.trim() || undefined,
+          bgStyle: bgStyle === '자동' ? undefined : bgStyle,
+          outfitIntensity: outfitIntensity === 3 ? undefined : outfitIntensity,
+          zoomSpeed: zoomSpeed === 2 ? undefined : zoomSpeed,
+          cameraRotation,
+          transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
+          stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
+          detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
+          hdUpscale: true,
+        });
+
+        if (!mountedRef.current) return;
+
+        // Subscribe to the HD upgrade via Realtime — when it completes,
+        // seamlessly swap the draft video for the HD version
+        hdUnsubRef.current = subscribeHdUpgrade(scan.id, draftResult.jobId, (hdResult) => {
+          if (!mountedRef.current) return;
+          if (hdResult.status === 'SUCCESS' && hdResult.videoUrl) {
+            setGeneratedVideoUrl(hdResult.videoUrl);
+            setDraftVideoUrl(null);
+            setVideoStage('hd_ready');
+            setHdUpgradeProgress(null);
+          } else if (hdResult.status === 'FAILED') {
+            // HD failed — keep the draft, show a subtle notice
+            setVideoStage('draft_ready');
+            setHdUpgradeProgress(null);
+            setVideoGenError(prev => prev ? `${prev}\n고화질 업그레이드 실패 (초안 유지)` : '고화질 업그레이드 실패 (초안 유지)');
+          }
+        });
+      } catch {
+        if (mountedRef.current) {
+          // HD submit failed — draft is still usable, just stay on draft
+          setVideoStage('draft_ready');
+          setHdUpgradeProgress(null);
+        }
       }
     } catch (err) {
       if (mountedRef.current) {
         const msg = err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.';
         setVideoGenError(msg);
+        setVideoStage('failed');
       }
     }
 
-    if (mountedRef.current) {
+    // Safety net: if we somehow reach here without having shown the draft
+    if (mountedRef.current && videoStage !== 'draft_ready' && videoStage !== 'hd_upgrading') {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, triggerTtsGeneration, ttsUrl]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, triggerTtsGeneration, ttsUrl, videoStage]);
 
   const handleAiImageGenerate = useCallback(async () => {
     if (!scan || isGeneratingImage) return;
@@ -938,7 +1006,10 @@ export default function ResultScreen() {
   }, [id]);
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      if (hdUnsubRef.current) hdUnsubRef.current();
+    };
   }, []);
 
   useEffect(() => {
@@ -2839,6 +2910,28 @@ export default function ResultScreen() {
         </View>
 
         {generatedVideoUrl && targetMediaType === 'video' && (
+          <>
+          {videoStage === 'hd_upgrading' && (
+            <View style={styles.hdUpgradingBanner}>
+              <RotatingLoader size={14} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.hdUpgradingText}>
+                고화질 업그레이드 진행 중 — 초안을 먼저 확인하세요
+              </Text>
+            </View>
+          )}
+          {videoStage === 'hd_ready' && (
+            <View style={styles.hdReadyBanner}>
+              <CheckCircle2 size={14} color={theme.colors.success[400]} strokeWidth={2} />
+              <Text style={styles.hdReadyText}>
+                고화질 영상으로 교체 완료
+              </Text>
+            </View>
+          )}
+          {videoStage === 'draft_ready' && (
+            <View style={styles.draftBadgeRow}>
+              <Text style={styles.draftBadgeText}>초안 미리보기</Text>
+            </View>
+          )}
           <View style={styles.dualActionRow}>
             <TouchableOpacity
               style={[styles.dualActionBtn, styles.aiVideoBtn]}
@@ -2856,6 +2949,7 @@ export default function ResultScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+          </>
         )}
 
         {showManualSettings && (
@@ -5395,6 +5489,58 @@ iconButton: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  hdUpgradingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.accent[400] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '30',
+  },
+  hdUpgradingText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[300],
+  },
+  hdReadyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.success[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.success[400] + '30',
+  },
+  hdReadyText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.success[400],
+  },
+  draftBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.warning[500] + '15',
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  draftBadgeText: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.warning[400],
   },
   videoErrorToast: {
     flexDirection: 'row',

@@ -13,6 +13,8 @@ const MAX_ATTEMPTS = 3;
 const MAX_JOBS_PER_RUN = 1;
 const JOB_TIMEOUT_MS = 200000;
 
+const WORKER_ID = `w-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 const ALLOWED_JOB_TYPES = new Set([
   "analyze-photo",
   "virtual-fitting",
@@ -49,6 +51,7 @@ Deno.serve(async (req: Request) => {
   try {
     const processed: Array<{ id: string; status: string; error?: string }> = [];
 
+    await registerWorker();
     await recoverStaleJobs();
 
     for (let i = 0; i < MAX_JOBS_PER_RUN; i++) {
@@ -79,8 +82,8 @@ Deno.serve(async (req: Request) => {
     const hasRequeued = processed.some((p) => p.status === "requeued");
     const hasRemaining = processed.length > 0 ? await checkQueuedJobs() : false;
     if ((hasRequeued || hasRemaining) && processed.length > 0) {
-      // Re-trigger for remaining/requeued jobs so they don't sit idle
-      fetch(`${supabaseUrl}/functions/v1/process-queue`, {
+      await updateWorkerHeartbeat(processed.length);
+      fetch(`${supabaseUrl}/functions/v1/autoscale-manager`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,10 +92,13 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({ trigger: true }),
       }).catch(() => {});
+    } else if (processed.length === 0) {
+      await markWorkerDone();
     }
 
+    await markWorkerDone();
     return new Response(
-      JSON.stringify({ processed, count: processed.length }),
+      JSON.stringify({ processed, count: processed.length, workerId: WORKER_ID }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
@@ -102,6 +108,82 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function registerWorker(): Promise<void> {
+  try {
+    const queueDepth = await checkQueuedJobsRaw();
+    await fetch(`${supabaseUrl}/rest/v1/gpu_worker_heartbeats`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        worker_id: WORKER_ID,
+        status: 'ACTIVE',
+        queue_depth_at_start: queueDepth,
+      }),
+    });
+  } catch {
+    // non-fatal — heartbeat is best-effort
+  }
+}
+
+async function updateWorkerHeartbeat(jobsProcessed: number): Promise<void> {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/gpu_worker_heartbeats?worker_id=eq.${WORKER_ID}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        last_heartbeat_at: new Date().toISOString(),
+        jobs_processed: jobsProcessed,
+      }),
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+async function markWorkerDone(): Promise<void> {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/gpu_worker_heartbeats?worker_id=eq.${WORKER_ID}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        status: 'DONE',
+        last_heartbeat_at: new Date().toISOString(),
+      }),
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+async function checkQueuedJobsRaw(): Promise<number> {
+  try {
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/render_jobs?select=id&status=eq.queued`,
+      { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } },
+    );
+    if (!resp.ok) return 0;
+    const rows = await resp.json() as Array<{ id: string }>;
+    return rows.length;
+  } catch {
+    return 0;
+  }
+}
 
 async function checkQueuedJobs(): Promise<boolean> {
   const resp = await fetch(

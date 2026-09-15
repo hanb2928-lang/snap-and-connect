@@ -28,6 +28,7 @@ import { TTS_VOICES, DEFAULT_TTS_VOICE } from '@/lib/ttsVoices';
 import { SUBSCRIPTION_PLANS, TOKEN_PACKS, formatKRW as formatPlanKRW } from '@/lib/subscriptionPlans';
 import { CreditBalanceBadge } from '@/components/CreditBalanceBadge';
 import { CreditPurchaseModal } from '@/components/CreditPurchaseModal';
+import { GpuAutoscaleCard } from '@/components/GpuAutoscaleCard';
 import { getCreditBalance, getCreditHistory, type CreditBalance, type CreditTransaction } from '@/lib/credits';
 import { restorePurchases, isRevenueCatAvailable } from '@/lib/purchases';
 import type { UserSettings, RevenueRecord } from '@/types/database';
@@ -2199,6 +2200,8 @@ export default function SettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <GpuAutoscaleCard />
       </View>
 
       <View style={styles.section}>

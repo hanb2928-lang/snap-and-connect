@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { ProductVisionResult } from './productVision';
 
-export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error';
+export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error' | 'hd_upgrading' | 'hd_completed';
 
 export interface VideoGenProgress {
   phase: VideoGenPhase;
@@ -19,6 +19,7 @@ export interface VideoGenResult {
   variationSeed: number;
   persisted: boolean;
   provider: string;
+  isDraft?: boolean;
 }
 
 interface GenerateAiVideoOptions {
@@ -47,31 +48,12 @@ interface GenerateAiVideoOptions {
   hdUpscale?: boolean;
 }
 
-interface PollResponse {
-  status: string;
-  videoUrl?: string;
-  progress?: string;
-  error?: string;
-  persisted?: boolean;
-}
 
-const POLL_INTERVAL_ULTRA_MS = 500;
-const POLL_INTERVAL_NORMAL_MS = 1000;
-const ULTRA_POLL_DURATION_MS = 5000;
-const MAX_POLL_ATTEMPTS = 360;
 const SUBMIT_MAX_RETRIES = 2;
 const SUBMIT_RETRY_DELAY_MS = 2000;
-const MAX_BACKOFF_MS = 8000;
-const MAX_CONSECUTIVE_POLL_ERRORS = 8;
-const POLL_DEADLINE_MS = 150_000;
+const REALTIME_TIMEOUT_MS = 180_000;
+const FALLBACK_POLL_INTERVAL_MS = 5000;
 
-const STATUS_MESSAGES: Record<string, string> = {
-  THROTTLED: 'Runway 서버 대기 중 (순서 대기)...',
-  PENDING: '작업 대기 중...',
-  RUNNING: 'AI가 영상을 렌더링하고 있어요',
-  PROCESSING: 'AI가 영상을 렌더링하고 있어요',
-  QUEUED: '작업 대기 중...',
-};
 
 export async function generateAiVideo(
   prompt: string,
@@ -163,88 +145,11 @@ export async function generateAiVideo(
   const draftLabel = isDraft ? '빠른 미리보기' : 'AI 비디오';
   report('generating', 0.1, `${draftLabel} 작업이 접수되었습니다. 완료되면 알려드릴게요...`);
 
-  const pollStartTime = Date.now();
-
-  // Phase 2: Poll until complete (ultra-fast 0.5s for first 5s, then 1s with exponential backoff on errors)
-  let consecutiveErrors = 0;
-  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-    const elapsed = Date.now() - pollStartTime;
-    if (elapsed > POLL_DEADLINE_MS) {
-      const deadlineMsg = `비디오 생성 대기 시간이 ${Math.round(POLL_DEADLINE_MS / 1000)}초를 초과했습니다. 네트워크 상태가 불안정할 수 있습니다. 다시 시도해주세요.`;
-      report('error', 0, deadlineMsg);
-      throw new Error(deadlineMsg);
-    }
-    const baseInterval = elapsed < ULTRA_POLL_DURATION_MS ? POLL_INTERVAL_ULTRA_MS : POLL_INTERVAL_NORMAL_MS;
-    const backoffMultiplier = consecutiveErrors > 0 ? Math.min(Math.pow(2, consecutiveErrors), MAX_BACKOFF_MS / baseInterval) : 1;
-    await delay(Math.round(baseInterval * backoffMultiplier));
-
-    let pollData: PollResponse | null = null;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: {
-          mode: 'poll',
-          taskId: submitData.taskId,
-          scanId: options.scanId,
-        },
-      });
-
-      if (error) {
-        throw await buildVideoFunctionError(error);
-      }
-
-      pollData = data as PollResponse;
-    } catch (err) {
-      // Network blip — keep polling with exponential backoff
-      consecutiveErrors++;
-      const msg = err instanceof Error ? err.message : '폴링 오류';
-
-      if (consecutiveErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
-        const deadlineMsg = `네트워크 연결이 반복적으로 실패하여 비디오 생성 상태를 확인할 수 없습니다. Wi-Fi 또는 셀룴러 연결을 확인 후 다시 시도해주세요. (오류: ${msg})`;
-        report('error', 0, deadlineMsg);
-        throw new Error(deadlineMsg);
-      }
-
-      report('generating', 0.1 + attempt * 0.005, `연결 재시도 중 (${consecutiveErrors}/${MAX_CONSECUTIVE_POLL_ERRORS}): ${msg}`);
-      continue;
-    }
-
-    consecutiveErrors = 0;
-    if (!pollData) continue;
-
-    if (pollData.status === 'SUCCESS' && pollData.videoUrl) {
-      report('completed', 1.0, 'AI 비디오 생성 완료');
-      return {
-        videoUrl: pollData.videoUrl,
-        jobId: submitData.taskId,
-        motionPrompt: submitData.motionPrompt,
-        durationSec: submitData.durationSec,
-        aspectRatio: submitData.aspectRatio,
-        variationSeed: submitData.variationSeed,
-        persisted: pollData.persisted ?? false,
-        provider: 'runway',
-      };
-    }
-
-    if (pollData.status === 'FAILED') {
-      const msg = pollData.error ?? 'Runway 비디오 생성에 실패했습니다.';
-      report('error', 0, msg);
-      throw new Error(msg);
-    }
-
-    // Map Runway progress (0.0–1.0) to our 0.1–0.95 range
-    const rawProgress = pollData.progress ? parseFloat(pollData.progress) : NaN;
-    const numericProgress = !isNaN(rawProgress)
-      ? 0.1 + rawProgress * 0.85
-      : 0.1 + (attempt / MAX_POLL_ATTEMPTS) * 0.85;
-
-    const statusMsg = STATUS_MESSAGES[pollData.status] ?? `Runway 상태: ${pollData.status}`;
-    const pctLabel = !isNaN(rawProgress) ? ` (${Math.round(rawProgress * 100)}%)` : '';
-    report('generating', Math.min(numericProgress, 0.95), `${statusMsg}${pctLabel}`);
-  }
-
-  report('error', 0, 'Runway 비디오 생성 시간이 초과되었습니다. 다시 시도해주세요.');
-  throw new Error('Runway 비디오 생성 시간이 초과되었습니다. 다시 시도해주세요.');
+  // Phase 2: Wait for completion via Supabase Realtime on video_jobs table.
+  // Runway's webhook writes the result to video_jobs — we subscribe to that DB
+  // change instead of polling the Runway API in a tight loop. A low-frequency
+  // fallback poll guards against missed realtime events.
+  return waitForVideoCompletion(submitData, options.scanId, startTime, report);
 }
 
 export function createVideoGenProgressTracker(
@@ -307,3 +212,305 @@ async function buildVideoFunctionError(error: unknown): Promise<Error> {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+interface VideoJobRow {
+  status: string;
+  video_url: string | null;
+  error_message: string | null;
+  hd_status?: string | null;
+  hd_video_url?: string | null;
+  hd_task_id?: string | null;
+}
+
+/**
+ * Subscribe to the video_jobs table via Supabase Realtime and resolve when the
+ * job transitions to SUCCESS or FAILED. A low-frequency DB poll runs in parallel
+ * as a safety net in case the realtime event is missed.
+ */
+function waitForVideoCompletion(
+  submitData: { taskId: string; motionPrompt: string; durationSec: number; aspectRatio: string; variationSeed: number },
+  scanId: string | undefined,
+  startTime: number,
+  report: (phase: VideoGenPhase, progress: number, message: string) => void,
+): Promise<VideoGenResult> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    let elapsedTick = 0;
+
+    const cleanup = () => {
+      if (channel) supabase.removeChannel(channel);
+      if (pollTimer) clearInterval(pollTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    };
+
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+
+    const handleRow = (row: VideoJobRow) => {
+      if (row.status === 'SUCCESS' && row.video_url) {
+        report('completed', 1.0, 'AI 비디오 생성 완료');
+        finish(() => resolve({
+          videoUrl: row.video_url!,
+          jobId: submitData.taskId,
+          motionPrompt: submitData.motionPrompt,
+          durationSec: submitData.durationSec,
+          aspectRatio: submitData.aspectRatio,
+          variationSeed: submitData.variationSeed,
+          persisted: true,
+          provider: 'runway',
+        }));
+        return true;
+      }
+      if (row.status === 'FAILED') {
+        const msg = row.error_message ?? 'Runway 비디오 생성에 실패했습니다.';
+        report('error', 0, msg);
+        finish(() => reject(new Error(msg)));
+        return true;
+      }
+      return false;
+    };
+
+    // Check video_jobs table directly (used for initial check + fallback polling)
+    const checkDb = async () => {
+      if (settled || !scanId) return;
+      try {
+        const { data, error } = await supabase
+          .from('video_jobs')
+          .select('status, video_url, error_message')
+          .eq('scan_id', scanId)
+          .eq('task_id', submitData.taskId)
+          .maybeSingle();
+        if (error || !data) return;
+        handleRow(data as VideoJobRow);
+      } catch {
+        // ignore — realtime subscription is the primary path
+      }
+    };
+
+    // Also check scans.video_url for the persisted URL (webhook writes here too)
+    const checkScanVideoUrl = async () => {
+      if (settled || !scanId) return;
+      try {
+        const { data, error } = await supabase
+          .from('scans')
+          .select('video_url')
+          .eq('id', scanId)
+          .maybeSingle();
+        if (error || !data?.video_url) return;
+        report('completed', 1.0, 'AI 비디오 생성 완료');
+        finish(() => resolve({
+          videoUrl: data.video_url!,
+          jobId: submitData.taskId,
+          motionPrompt: submitData.motionPrompt,
+          durationSec: submitData.durationSec,
+          aspectRatio: submitData.aspectRatio,
+          variationSeed: submitData.variationSeed,
+          persisted: true,
+          provider: 'runway',
+        }));
+      } catch {
+        // ignore
+      }
+    };
+
+    // Primary path: Realtime subscription on video_jobs
+    if (scanId) {
+      channel = supabase
+        .channel(`video-job:${scanId}:${submitData.taskId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
+          (payload) => {
+            if (!payload.new) return;
+            handleRow(payload.new as VideoJobRow);
+          },
+        )
+        .subscribe();
+    }
+
+    // Safety-net: low-frequency DB poll every 5s (vs. old 0.5s tight loop)
+    pollTimer = setInterval(() => {
+      if (settled) return;
+      elapsedTick++;
+      checkDb();
+      checkScanVideoUrl();
+      // Progress hint based on elapsed time
+      const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+      const timeProgress = Math.min(0.1 + (elapsedSec / 120) * 0.8, 0.95);
+      report('generating', timeProgress, `AI가 영상을 렌더링하고 있어요 (${elapsedSec}초)...`);
+    }, FALLBACK_POLL_INTERVAL_MS);
+
+    // Overall timeout
+    timeoutTimer = setTimeout(() => {
+      const msg = `비디오 생성 대기 시간이 ${Math.round(REALTIME_TIMEOUT_MS / 1000)}초를 초과했습니다. 네트워크 상태가 불안정할 수 있습니다. 다시 시도해주세요.`;
+      report('error', 0, msg);
+      finish(() => reject(new Error(msg)));
+    }, REALTIME_TIMEOUT_MS);
+
+    // Initial DB check in case the webhook already completed before we subscribed
+    checkDb();
+    checkScanVideoUrl();
+  });
+}
+
+/**
+ * Stage 1: Submit a fast draft video (low-res, 3sec) and wait for it via Realtime.
+ * Returns as soon as the draft is ready so the user can preview it immediately.
+ */
+export async function submitVideoDraft(
+  prompt: string,
+  options: GenerateAiVideoOptions,
+  onProgress?: (progress: VideoGenProgress) => void,
+): Promise<VideoGenResult> {
+  return generateAiVideo(prompt, { ...options, draft: true }, onProgress);
+}
+
+/**
+ * Stage 2: Submit an HD upgrade job for an existing draft and return immediately
+ * with the HD task ID. The caller should then call subscribeHdUpgrade to listen
+ * for completion and swap the video URL when ready.
+ */
+export async function upgradeVideoToHd(
+  scanId: string,
+  draftJobId: string,
+  prompt: string,
+  options: GenerateAiVideoOptions,
+): Promise<{ hdTaskId: string; hdJobId: string }> {
+  const { data, error } = await supabase.functions.invoke('generate-video', {
+    body: {
+      mode: 'submit',
+      prompt,
+      durationSec: options.durationSec ?? 5,
+      aspectRatio: options.aspectRatio ?? '9:16',
+      productName: options.productName,
+      scanId,
+      variationSeed: options.variationSeed ?? 0,
+      bgmMood: options.bgmMood,
+      captionText: options.captionText,
+      platform: options.platform ?? 'shorts',
+      hookCategory: options.hookCategory ?? 'curiosity',
+      cutCount: options.cutCount,
+      productVision: options.productVision ?? null,
+      draft: false,
+      isCleanVideoMode: options.isCleanVideoMode ?? false,
+      promptStrength: options.promptStrength,
+      negativePrompt: options.negativePrompt,
+      bgStyle: options.bgStyle,
+      outfitIntensity: options.outfitIntensity,
+      zoomSpeed: options.zoomSpeed,
+      cameraRotation: options.cameraRotation,
+      transitionEffect: options.transitionEffect,
+      stylePreset: options.stylePreset,
+      detailRestoration: options.detailRestoration,
+      hdUpscale: true,
+    },
+  });
+
+  if (error) throw await buildVideoFunctionError(error);
+  if (!data || typeof data.taskId !== 'string') {
+    throw new Error('서버가 HD 작업 ID를 반환하지 않았습니다.');
+  }
+
+  const hdTaskId = data.taskId as string;
+
+  // Record the HD task on the existing video_jobs row
+  try {
+    await supabase
+      .from('video_jobs')
+      .update({ hd_task_id: hdTaskId, hd_status: 'PENDING' })
+      .eq('scan_id', scanId)
+      .eq('task_id', draftJobId);
+  } catch {
+    // non-fatal — the HD job still runs on Runway's side
+  }
+
+  return { hdTaskId, hdJobId: hdTaskId };
+}
+
+export type HdUpgradeCallback = (result: { status: 'SUCCESS' | 'FAILED'; videoUrl?: string; error?: string }) => void;
+
+/**
+ * Subscribe to the HD upgrade job via Supabase Realtime. Calls the callback
+ * when the hd_status column transitions to SUCCESS or FAILED. Returns an
+ * unsubscribe function.
+ */
+export function subscribeHdUpgrade(
+  scanId: string,
+  draftJobId: string,
+  callback: HdUpgradeCallback,
+): () => void {
+  let settled = false;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  const checkAndNotify = async () => {
+    if (settled) return;
+    try {
+      const { data, error } = await supabase
+        .from('video_jobs')
+        .select('hd_status, hd_video_url, error_message')
+        .eq('scan_id', scanId)
+        .eq('task_id', draftJobId)
+        .maybeSingle();
+      if (error || !data) return;
+      const row = data as VideoJobRow;
+      if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
+        settled = true;
+        cleanup();
+        callback({ status: 'SUCCESS', videoUrl: row.hd_video_url });
+      } else if (row.hd_status === 'FAILED') {
+        settled = true;
+        cleanup();
+        callback({ status: 'FAILED', error: row.error_message ?? 'HD 업그레이드에 실패했습니다.' });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const channel = supabase
+    .channel(`hd-upgrade:${scanId}:${draftJobId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
+      (payload) => {
+        if (!payload.new) return;
+        const row = payload.new as VideoJobRow;
+        if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          callback({ status: 'SUCCESS', videoUrl: row.hd_video_url });
+        } else if (row.hd_status === 'FAILED') {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          callback({ status: 'FAILED', error: row.error_message ?? 'HD 업그레이드에 실패했습니다.' });
+        }
+      },
+    )
+    .subscribe();
+
+  const cleanup = () => {
+    supabase.removeChannel(channel);
+    if (pollTimer) clearInterval(pollTimer);
+  };
+
+  // Safety-net poll every 5s
+  pollTimer = setInterval(checkAndNotify, FALLBACK_POLL_INTERVAL_MS);
+
+  // Initial check
+  checkAndNotify();
+
+  return () => {
+    settled = true;
+    cleanup();
+  };
+}
+
