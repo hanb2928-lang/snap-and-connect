@@ -453,6 +453,7 @@ export default function ResultScreen() {
   const [imageGenError, setImageGenError] = useState<string | null>(null);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [narrationPlaying, setNarrationPlaying] = useState(false);
   const [fittingOverlayVisible, setFittingOverlayVisible] = useState(false);
   const [activeCutIndex, setActiveCutIndex] = useState(0);
@@ -2528,7 +2529,7 @@ export default function ResultScreen() {
             </TouchableOpacity>
           </View>
         )}
-        {/* === 1순위: 실시간 자동 완성 영상 (최상단, Zero-Touch 자동 재생) === */}
+        {/* === 1순위: 미리보기 (동영상: 자동 완성 영상 / 이미지: 대형 프리뷰 + 썸네일 스트립) === */}
         <View style={styles.previewSection}>
           {isRegenerating && (
             <View style={styles.regenBanner}>
@@ -2536,7 +2537,7 @@ export default function ResultScreen() {
               <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
             </View>
           )}
-          {isGeneratingVideo && (
+          {isGeneratingVideo && targetMediaType === 'video' && (
             <View style={styles.regenBanner}>
               <RotatingLoader size={14} color={theme.colors.primary[300]} />
               <Text style={styles.regenBannerText}>
@@ -2545,13 +2546,19 @@ export default function ResultScreen() {
               </Text>
             </View>
           )}
+          {isGeneratingImage && targetMediaType === 'image' && (
+            <View style={styles.regenBanner}>
+              <RotatingLoader size={14} color={theme.colors.accent[300]} />
+              <Text style={styles.regenBannerText}>5장 옴니버스 이미지 병렬 생성 중...</Text>
+            </View>
+          )}
           {visionAnalyzing && (
             <View style={styles.regenBanner}>
               <Sparkles size={14} color={theme.colors.accent[300]} strokeWidth={2} />
               <Text style={styles.regenBannerText}>Vision AI가 제품을 분석하는 중...</Text>
             </View>
           )}
-          {videoGenError && (
+          {videoGenError && targetMediaType === 'video' && (
             <View style={styles.videoErrorToast}>
               <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
               <Text style={styles.videoErrorToastText} numberOfLines={5}>AI 영상 생성 실패: {videoGenError}</Text>
@@ -2565,16 +2572,81 @@ export default function ResultScreen() {
               </View>
             </View>
           )}
-          <ShortFormPreviewPlayer
-            editPlan={previewEditPlan}
-            videoUri={generatedVideoUrl}
-            narrativePlan={narrativePlan}
-            videoGenProgress={videoGenProgress}
-            bgmVolume={bgmVolume}
-            copyOverlays={copyOverlaysForPreview}
-            narrationActive={narrationPlaying}
-            ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-          />
+          {imageGenError && targetMediaType === 'image' && (
+            <View style={styles.videoErrorToast}>
+              <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
+              <Text style={styles.videoErrorToastText} numberOfLines={5}>{imageGenError}</Text>
+              <View style={styles.videoErrorActions}>
+                <TouchableOpacity onPress={() => handleAiImageGenerate()} activeOpacity={0.7}>
+                  <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setImageGenError(null); }} activeOpacity={0.7}>
+                  <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {targetMediaType === 'video' ? (
+            <ShortFormPreviewPlayer
+              editPlan={previewEditPlan}
+              videoUri={generatedVideoUrl}
+              narrativePlan={narrativePlan}
+              videoGenProgress={videoGenProgress}
+              bgmVolume={bgmVolume}
+              copyOverlays={copyOverlaysForPreview}
+              narrationActive={narrationPlaying}
+              ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+            />
+          ) : (
+            generatedImages.length > 0 ? (
+              <View style={styles.imageHeroContainer}>
+                <TouchableOpacity
+                  style={styles.imageHeroView}
+                  onPress={() => { setImageViewerIndex(selectedImageIndex); setImageViewerVisible(true); }}
+                  activeOpacity={0.95}
+                >
+                  <Image
+                    source={{ uri: generatedImages[selectedImageIndex] ?? generatedImages[0] }}
+                    style={styles.imageHeroImg}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+                {generatedImages.length > 1 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.imageThumbStrip}
+                    contentContainerStyle={styles.imageThumbStripContent}
+                  >
+                    {generatedImages.map((imgUri, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        onPress={() => setSelectedImageIndex(idx)}
+                        activeOpacity={0.85}
+                      >
+                        <Image
+                          source={{ uri: imgUri }}
+                          style={[
+                            styles.imageThumbItem,
+                            idx === selectedImageIndex && styles.imageThumbItemActive,
+                          ]}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            ) : (
+              <View style={styles.imageHeroPlaceholder}>
+                <ImageIcon size={32} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
+                <Text style={styles.imageHeroPlaceholderText}>
+                  이미지 모드 — AI 자동 생성을 눌러 5장 이미지를 만들어보세요
+                </Text>
+              </View>
+            )
+          )}
         </View>
 
         {/* === 2순위: 플랫폼 선택 === */}
@@ -2701,49 +2773,6 @@ export default function ResultScreen() {
                 {uploadProgress !== null ? '영상 저장 중...' : 'AI 영상 갤러리에 저장'}
               </Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {imageGenError && targetMediaType === 'image' && (
-          <View style={styles.videoErrorToast}>
-            <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
-            <Text style={styles.videoErrorToastText} numberOfLines={5}>{imageGenError}</Text>
-            <View style={styles.videoErrorActions}>
-              <TouchableOpacity onPress={() => handleAiImageGenerate()} activeOpacity={0.7}>
-                <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setImageGenError(null); }} activeOpacity={0.7}>
-                <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {isGeneratingImage && targetMediaType === 'image' && (
-          <View style={styles.imageGridLoading}>
-            <RotatingLoader size={20} color={theme.colors.accent[300]} />
-            <Text style={styles.imageGridLoadingText}>5장 옴니버스 이미지 병렬 생성 중...</Text>
-          </View>
-        )}
-
-        {generatedImages.length > 0 && targetMediaType === 'image' && (
-          <View style={styles.imageGridSection}>
-            <View style={styles.imageGridHeader}>
-              <ImageIcon size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.imageGridTitle}>AI 생성 이미지 ({generatedImages.length}장)</Text>
-            </View>
-            <View style={styles.imageGrid}>
-              {generatedImages.map((imgUri, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.imageGridItem}
-                  onPress={() => { setImageViewerIndex(idx); setImageViewerVisible(true); }}
-                  activeOpacity={0.85}
-                >
-                  <Image source={{ uri: imgUri }} style={styles.imageGridThumb} resizeMode="cover" />
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
         )}
 
@@ -5527,49 +5556,51 @@ iconButton: {
   synthToggleKnobActive: {
     transform: [{ translateX: 18 }],
   },
-  imageGridLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    backgroundColor: theme.colors.dark.surface,
-    borderRadius: theme.radius.md,
-    marginTop: 8,
-  },
-  imageGridLoadingText: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.accent[300],
-  },
-  imageGridSection: {
-    marginTop: 12,
+  imageHeroContainer: {
     gap: 8,
   },
-  imageGridHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  imageGridTitle: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.accent[300],
-  },
-  imageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  imageGridItem: {
-    width: '32%',
+  imageHeroView: {
+    width: '100%',
     aspectRatio: 1,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     backgroundColor: theme.colors.dark.bg,
   },
-  imageGridThumb: {
+  imageHeroImg: {
     width: '100%',
     height: '100%',
+  },
+  imageThumbStrip: {
+    flexGrow: 0,
+  },
+  imageThumbStripContent: {
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  imageThumbItem: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.radius.sm,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  imageThumbItemActive: {
+    borderColor: theme.colors.accent[400],
+  },
+  imageHeroPlaceholder: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+  },
+  imageHeroPlaceholderText: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textFaint,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });
