@@ -769,10 +769,30 @@ export default function ResultScreen() {
     };
 
     try {
-      // Stagger requests in waves of 2→2→1 to avoid OpenAI rate limits (5 images/min for DALL-E 3)
       const wave1 = [0, 1];
       const wave2 = [2, 3];
       const wave3 = [4];
+
+      const refImageUrl = scan.edited_image_url || scan.image_url;
+      let referenceImageBase64: string | undefined;
+      if (refImageUrl) {
+        try {
+          const imgResp = await fetch(refImageUrl);
+          if (imgResp.ok) {
+            const arrayBuffer = await imgResp.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+              binary += String.fromCharCode(...chunk);
+            }
+            referenceImageBase64 = btoa(binary);
+          }
+        } catch {
+          // If fetch fails, proceed without reference image
+        }
+      }
 
       const invokeOne = async (idx: number) =>
         supabase.functions.invoke('generate-image', {
@@ -788,6 +808,7 @@ export default function ResultScreen() {
             seed: seeds[idx],
             platform: targetPlatform,
             customPrompt: inlineEdit.aiPrompt || undefined,
+            referenceImage: referenceImageBase64,
           },
         });
 

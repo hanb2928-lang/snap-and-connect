@@ -200,14 +200,7 @@ Deno.serve(async (req: Request) => {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
-    const imageBody: Record<string, unknown> = {
-      model: "gpt-image-1",
-      prompt: finalPrompt,
-      n: 1,
-      size,
-      quality: quality === "hd" ? "high" : "medium",
-      output_format: "png",
-    };
+    const qualityMapped = quality === "hd" ? "high" : "medium";
 
     let response: Response | null = null;
     let lastErrorDetail = "";
@@ -215,15 +208,41 @@ Deno.serve(async (req: Request) => {
 
     for (let attempt = 0; attempt <= MAX_IMAGE_RETRIES; attempt++) {
       try {
-        response = await fetch("https://api.openai.com/v1/images/generations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiKey}`,
-          },
-          body: JSON.stringify(imageBody),
-          signal: controller.signal,
-        });
+        if (body.referenceImage) {
+          const formData = new FormData();
+          const refBlob = base64ToBlob(body.referenceImage);
+          formData.append("image", refBlob, "reference.jpeg");
+          formData.append("model", "gpt-image-1");
+          formData.append("prompt", finalPrompt);
+          formData.append("size", size);
+          formData.append("quality", qualityMapped);
+          formData.append("output_format", "png");
+          formData.append("n", "1");
+          response = await fetch("https://api.openai.com/v1/images/edits", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${openaiKey}` },
+            body: formData,
+            signal: controller.signal,
+          });
+        } else {
+          const imageBody: Record<string, unknown> = {
+            model: "gpt-image-1",
+            prompt: finalPrompt,
+            n: 1,
+            size,
+            quality: qualityMapped,
+            output_format: "png",
+          };
+          response = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openaiKey}`,
+            },
+            body: JSON.stringify(imageBody),
+            signal: controller.signal,
+          });
+        }
       } catch (fetchErr) {
         clearTimeout(timeoutId);
         return new Response(
@@ -428,4 +447,13 @@ async function resolveOpenAIKey(): Promise<string | null> {
     }
   }
   return null;
+}
+
+function base64ToBlob(base64: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: "image/jpeg" });
 }
