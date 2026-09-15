@@ -591,16 +591,18 @@ export default function ResultScreen() {
   const styleApplyCounter = useRef(0);
   const handleJobUpdateRef = useRef<((job: RenderJob) => void) | null>(null);
 
-  const triggerTtsGeneration = useCallback(async (scanId: string) => {
-    // Use scan data directly to avoid race with activeHookRef (which updates after render)
+  const triggerTtsGeneration = useCallback(async (scanId: string): Promise<boolean> => {
     const tdDirect = scan?.template_data as { hook?: string; platformVariants?: Record<string, { hook?: string }> } | undefined;
     const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
-    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || '';
-    if (!hookText) return;
+    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || scan?.product_name || '';
+    if (!hookText) return false;
     try {
       await triggerTTS(scanId, hookText);
-    } catch {
-      // TTS generation failed — non-fatal
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'TTS 나레이션 생성에 실패했습니다.';
+      if (mountedRef.current) setVideoGenError(prev => prev ? `${prev}\n나레이션: ${msg}` : `나레이션: ${msg}`);
+      return false;
     }
   }, [scan, activePlatform]);
 
@@ -679,6 +681,20 @@ export default function ResultScreen() {
       }
     }
 
+    // Trigger TTS generation in parallel with video generation so narration is ready when video completes
+    if (!isCleanVideoMode) {
+      triggerTtsGeneration(scan.id).then((ok) => {
+        if (ok && mountedRef.current) {
+          setTtsUrl(null);
+          Promise.resolve(
+            supabase.from('scans').select('tts_url').eq('id', scan.id).maybeSingle()
+          ).then(({ data }: { data: { tts_url: string } | null }) => {
+            if (data?.tts_url && mountedRef.current) setTtsUrl(data.tts_url);
+          }).catch(() => {});
+        }
+      });
+    }
+
     try {
       const result = await generateAiVideo(
         videoPromptText,
@@ -711,9 +727,6 @@ export default function ResultScreen() {
       );
       if (mountedRef.current) {
         setGeneratedVideoUrl(result.videoUrl);
-        if (!isCleanVideoMode && !scan?.tts_url && !ttsUrl) {
-          triggerTtsGeneration(scan.id);
-        }
       }
     } catch (err) {
       if (mountedRef.current) {
