@@ -733,6 +733,7 @@ export default function ResultScreen() {
     setIsGeneratingImage(true);
     setImageGenError(null);
     setGeneratedImages([]);
+    setSelectedImageIndex(0);
 
     const sizeMap: Record<string, '1024x1024' | '1792x1024' | '1024x1792'> = {
       '1:1': '1024x1024',
@@ -772,6 +773,8 @@ export default function ResultScreen() {
         seeds.map((seed, idx) =>
           supabase.functions.invoke('generate-image', {
             body: {
+              output_type: 'image',
+              mode: 'image',
               prompt: buildPromptForIndex(idx),
               size,
               quality,
@@ -789,22 +792,42 @@ export default function ResultScreen() {
       if (!mountedRef.current) return;
 
       const images: string[] = [];
-      results.forEach((result) => {
+      const failedErrors: string[] = [];
+
+      results.forEach((result, idx) => {
         if (result.status === 'fulfilled') {
           const { data, error } = result.value;
-          if (error || !data?.image) return;
+          if (error) {
+            const errMsg = typeof error === 'object' && error !== null && 'message' in error
+              ? String((error as { message: unknown }).message)
+              : `이미지 ${idx + 1}번 생성 실패`;
+            failedErrors.push(errMsg);
+            return;
+          }
+          if (!data?.image) {
+            failedErrors.push(`이미지 ${idx + 1}번: 응답 데이터 없음`);
+            return;
+          }
           const base64 = data.image as string;
           const mimeType = (data.mimeType as string) ?? 'image/png';
           images.push(`data:${mimeType};base64,${base64}`);
+        } else {
+          const errMsg = result.reason instanceof Error ? result.reason.message : `이미지 ${idx + 1}번 요청 실패`;
+          failedErrors.push(errMsg);
         }
       });
 
       if (images.length === 0) {
-        setImageGenError('5장 이미지 생성에 모두 실패했습니다. 다시 시도해주세요.');
+        setImageGenError(
+          `5장 이미지 생성에 모두 실패했습니다.\n${failedErrors.slice(0, 2).join('\n')}\n다시 시도해주세요.`,
+        );
       } else if (images.length < 5) {
-        setImageGenError(`5장 중 ${images.length}장만 생성되었습니다. 일부 실패.`);
+        setImageGenError(`5장 중 ${images.length}장 생성 성공, ${failedErrors.length}장 실패.\n${failedErrors.slice(0, 2).join('\n')}`);
       }
       setGeneratedImages(images);
+      if (images.length > 0 && mountedRef.current) {
+        setSelectedImageIndex(0);
+      }
     } catch (err) {
       if (mountedRef.current) {
         setImageGenError(err instanceof Error ? err.message : '이미지 생성 중 오류가 발생했습니다.');
@@ -815,6 +838,12 @@ export default function ResultScreen() {
       setIsGeneratingImage(false);
     }
   }, [scan, isGeneratingImage, inlineEdit.aiPrompt, imageAspectRatio, stylePreset, hdUpscale, targetPlatform, selectedProductIndex]);
+
+  useEffect(() => {
+    if (generatedImages.length > 0 && selectedImageIndex >= generatedImages.length) {
+      setSelectedImageIndex(0);
+    }
+  }, [generatedImages.length, selectedImageIndex]);
 
   const fetchScan = useCallback(async () => {
     if (!id) {
