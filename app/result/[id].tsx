@@ -455,6 +455,7 @@ export default function ResultScreen() {
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageGenError, setImageGenError] = useState<string | null>(null);
+  const [imageGenProgress, setImageGenProgress] = useState<{ phase: 'submitting' | 'generating' | 'completed' | 'error'; progress: number; message: string; completedCount: number; totalCount: number } | null>(null);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -816,6 +817,7 @@ export default function ResultScreen() {
     setImageGenError(null);
     setGeneratedImages([]);
     setSelectedImageIndex(0);
+    setImageGenProgress({ phase: 'submitting', progress: 0, message: '이미지 생성 준비 중...', completedCount: 0, totalCount: 5 });
 
     const sizeMap: Record<string, '1024x1024' | '1792x1024' | '1024x1792'> = {
       '1:1': '1024x1024',
@@ -858,6 +860,7 @@ export default function ResultScreen() {
       const refImageUrl = scan.edited_image_url || scan.image_url;
       let referenceImageBase64: string | undefined;
       if (refImageUrl) {
+        setImageGenProgress({ phase: 'submitting', progress: 0.05, message: '참조 이미지 로딩 중...', completedCount: 0, totalCount: 5 });
         try {
           const imgResp = await fetch(refImageUrl);
           if (imgResp.ok) {
@@ -899,11 +902,18 @@ export default function ResultScreen() {
 
       const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+      setImageGenProgress({ phase: 'generating', progress: 0.1, message: '1~2번 이미지 병렬 생성 중...', completedCount: 0, totalCount: 5 });
       const r1 = await runWave(wave1);
+      if (!mountedRef.current) return;
+      setImageGenProgress({ phase: 'generating', progress: 0.35, message: '3~4번 이미지 병렬 생성 중...', completedCount: 2, totalCount: 5 });
       await delay(12000);
       const r2 = await runWave(wave2);
+      if (!mountedRef.current) return;
+      setImageGenProgress({ phase: 'generating', progress: 0.65, message: '5번 이미지 생성 중...', completedCount: 4, totalCount: 5 });
       await delay(12000);
       const r3 = await runWave(wave3);
+      if (!mountedRef.current) return;
+      setImageGenProgress({ phase: 'generating', progress: 0.85, message: '생성 결과 수집 중...', completedCount: 5, totalCount: 5 });
 
       const results = [...r1, ...r2, ...r3];
 
@@ -940,10 +950,13 @@ export default function ResultScreen() {
         setImageGenError(
           `5장 이미지 생성에 모두 실패했습니다.\n${failedErrors.slice(0, 3).join('\n')}\n다시 시도해주세요.`,
         );
+        setImageGenProgress({ phase: 'error', progress: 1, message: '생성 실패', completedCount: 0, totalCount: 5 });
       } else if (images.length < 5) {
         setImageGenError(`5장 중 ${images.length}장 생성 성공, ${failedErrors.length}장 실패.\n${failedErrors.slice(0, 3).join('\n')}`);
+        setImageGenProgress({ phase: 'completed', progress: 1, message: `${images.length}/5장 완료`, completedCount: images.length, totalCount: 5 });
       } else {
         setImageGenError(null);
+        setImageGenProgress({ phase: 'completed', progress: 1, message: '5장 생성 완료', completedCount: 5, totalCount: 5 });
       }
       setGeneratedImages(images);
       if (images.length > 0 && mountedRef.current) {
@@ -952,12 +965,22 @@ export default function ResultScreen() {
     } catch (err) {
       if (mountedRef.current) {
         setImageGenError(err instanceof Error ? err.message : '이미지 생성 중 오류가 발생했습니다.');
+        setImageGenProgress({ phase: 'error', progress: 1, message: '생성 실패', completedCount: 0, totalCount: 5 });
       }
     }
 
     if (mountedRef.current) {
       setIsGeneratingImage(false);
     }
+
+    // Auto-clear progress after 3 seconds on success
+    setTimeout(() => {
+      if (mountedRef.current) {
+        setImageGenProgress((prev) =>
+          prev?.phase === 'completed' ? null : prev,
+        );
+      }
+    }, 3000);
   }, [scan, isGeneratingImage, inlineEdit.aiPrompt, imageAspectRatio, stylePreset, hdUpscale, targetPlatform, selectedProductIndex]);
 
   useEffect(() => {
@@ -2700,9 +2723,34 @@ export default function ResultScreen() {
             </View>
           )}
           {isGeneratingImage && targetMediaType === 'image' && (
-            <View style={styles.regenBanner}>
-              <RotatingLoader size={14} color={theme.colors.accent[300]} />
-              <Text style={styles.regenBannerText}>5장 옴니버스 이미지 병렬 생성 중...</Text>
+            <View style={styles.imageGenProgressContainer}>
+              <View style={styles.imageGenProgressHeader}>
+                <RotatingLoader size={14} color={theme.colors.accent[300]} />
+                <Text style={styles.regenBannerText}>
+                  {imageGenProgress?.message ?? '5장 옴니버스 이미지 병렬 생성 중...'}
+                </Text>
+                <Text style={styles.imageGenProgressPercent}>
+                  {imageGenProgress ? `${Math.round(imageGenProgress.progress * 100)}%` : '0%'}
+                </Text>
+              </View>
+              <View style={styles.imageGenProgressBarTrack}>
+                <View
+                  style={[
+                    styles.imageGenProgressBarFill,
+                    {
+                      width: `${(imageGenProgress?.progress ?? 0) * 100}%`,
+                      backgroundColor: imageGenProgress?.phase === 'error'
+                        ? theme.colors.error[400]
+                        : theme.colors.accent[400],
+                    },
+                  ]}
+                />
+              </View>
+              {imageGenProgress && imageGenProgress.totalCount > 0 && (
+                <Text style={styles.imageGenProgressCount}>
+                  {imageGenProgress.completedCount}/{imageGenProgress.totalCount}장 완료
+                </Text>
+              )}
             </View>
           )}
           {visionAnalyzing && (
@@ -2886,7 +2934,7 @@ export default function ResultScreen() {
             <Text style={styles.dualActionBtnText} numberOfLines={1}>
               {targetMediaType === 'video'
                 ? (isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성')
-                : (isGeneratingImage ? '5장 생성 중...' : 'AI 자동 생성 (5장)')}
+                : (isGeneratingImage ? (imageGenProgress ? `${Math.round(imageGenProgress.progress * 100)}% 생성 중...` : '5장 생성 중...') : 'AI 자동 생성 (5장)')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -3569,7 +3617,7 @@ export default function ResultScreen() {
               <SparklesIcon size={18} color="#fff" strokeWidth={2} />
             )}
             <Text style={styles.promptGenBtnText} numberOfLines={1}>
-              {isGeneratingImage ? '5장 생성 중...' : 'AI 5장 자동 생성'}
+              {isGeneratingImage ? (imageGenProgress ? `${Math.round(imageGenProgress.progress * 100)}% 생성 중...` : '5장 생성 중...') : 'AI 5장 자동 생성'}
             </Text>
           </TouchableOpacity>
           </>
@@ -4919,6 +4967,43 @@ iconButton: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  imageGenProgressContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '12',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '20',
+  },
+  imageGenProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  imageGenProgressPercent: {
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.accent[300],
+    marginLeft: 'auto',
+  },
+  imageGenProgressBarTrack: {
+    height: 4,
+    backgroundColor: theme.colors.dark.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  imageGenProgressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  imageGenProgressCount: {
+    fontSize: 10,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.textDim,
+    marginTop: 4,
   },
   targetPlatformSection: {
     paddingHorizontal: theme.spacing.md,
