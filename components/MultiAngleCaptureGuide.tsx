@@ -8,9 +8,13 @@ import {
   ScrollView,
   Image as RNImage,
 } from 'react-native';
-import { Camera, Check, X, RotateCcw, ChevronRight, Image as ImageIcon, Loader } from 'lucide-react-native';
+import { Camera, Check, X, RotateCcw, ChevronRight, Loader } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 import { useSafeTop } from '@/hooks/useSafeTop';
+import {
+  InlineCameraViewfinder,
+  type InlineViewfinderHandle,
+} from '@/components/InlineCameraViewfinder';
 
 export type AngleShot = {
   id: string;
@@ -82,10 +86,10 @@ export function MultiAngleCaptureGuide({
   const [shots, setShots] = useState<Record<string, AngleShot>>({});
   const [currentAngle, setCurrentAngle] = useState(0);
   const [processing, setProcessing] = useState(false);
-  const [sourceMode, setSourceMode] = useState<'camera' | 'gallery'>('camera');
   const [captureError, setCaptureError] = useState<string | null>(null);
   const pickLockRef = useRef(false);
   const shotsRef = useRef<Record<string, AngleShot>>({});
+  const viewfinderRefs = useRef<Record<string, InlineViewfinderHandle | null>>({});
 
   const effectiveMinShots = minShots ?? guides.length;
   const effectiveAccent = accentColor ?? theme.colors.primary[400];
@@ -161,13 +165,19 @@ export function MultiAngleCaptureGuide({
 
   const handleCaptureFromCamera = useCallback(
     async (angleId: string) => {
-      if (!onCaptureImage) return;
       if (pickLockRef.current) return;
       pickLockRef.current = true;
       setProcessing(true);
       setCaptureError(null);
       try {
-        const result = await onCaptureImage(angleId);
+        const viewfinder = viewfinderRefs.current[angleId];
+        let result: { base64: string; mimeType: string } | null = null;
+        if (viewfinder?.isReady()) {
+          result = await viewfinder.capture();
+        }
+        if (!result && onCaptureImage) {
+          result = await onCaptureImage(angleId);
+        }
         if (result?.base64) {
           await handleAddShot(angleId, result.base64, result.mimeType);
         } else {
@@ -287,57 +297,34 @@ export function MultiAngleCaptureGuide({
                     </View>
                   ) : (
                     <View style={styles.shotPlaceholder}>
-                      {/* Source toggle: camera / gallery */}
-                      <View style={styles.sourceToggle}>
-                        <TouchableOpacity
-                          style={[styles.sourceTab, sourceMode === 'camera' && { ...styles.sourceTabActive, backgroundColor: effectiveAccentBg }]}
-                          onPress={() => setSourceMode('camera')}
-                          disabled={processing}
-                          activeOpacity={0.7}
-                        >
-                          <Camera size={15} color={sourceMode === 'camera' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={[styles.sourceTabLabel, sourceMode === 'camera' && styles.sourceTabLabelActive]}>카메라</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.sourceTab, sourceMode === 'gallery' && { ...styles.sourceTabActive, backgroundColor: effectiveAccentBg }]}
-                          onPress={() => setSourceMode('gallery')}
-                          disabled={processing}
-                          activeOpacity={0.7}
-                        >
-                          <ImageIcon size={15} color={sourceMode === 'gallery' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-                          <Text style={[styles.sourceTabLabel, sourceMode === 'gallery' && styles.sourceTabLabelActive]}>갤러리</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Single action button */}
+                      <InlineCameraViewfinder
+                        ref={(r) => { viewfinderRefs.current[guide.id] = r; }}
+                        isActive={isActive}
+                        accentColor={effectiveAccent}
+                        onPickFromGallery={() => handlePickFromGallery(guide.id)}
+                        onCapture={() => handleCaptureFromCamera(guide.id)}
+                        processing={processing}
+                      />
+                      {/* Capture button */}
                       <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: effectiveAccentBg }]}
+                        style={[styles.actionBtn, { backgroundColor: effectiveAccentBg }, !onCaptureImage && styles.actionBtnHidden]}
                         onPress={() => {
                           if (pickLockRef.current || processing) return;
                           setCurrentAngle(idx);
-                          if (sourceMode === 'camera' && onCaptureImage) {
-                            handleCaptureFromCamera(guide.id);
-                          } else if (sourceMode === 'gallery' && onPickImage) {
-                            handlePickFromGallery(guide.id);
-                          }
+                          handleCaptureFromCamera(guide.id);
                         }}
-                        disabled={processing || (sourceMode === 'camera' && !onCaptureImage) || (sourceMode === 'gallery' && !onPickImage)}
+                        disabled={processing}
                         activeOpacity={0.6}
                       >
                         {processing ? (
                           <>
                             <Loader size={16} color="#fff" strokeWidth={2} />
-                            <Text style={styles.actionBtnText}>불러오는 중...</Text>
-                          </>
-                        ) : sourceMode === 'camera' ? (
-                          <>
-                            <Camera size={18} color="#fff" strokeWidth={2} />
-                            <Text style={styles.actionBtnText}>촬영하기</Text>
+                            <Text style={styles.actionBtnText}>촬영 중...</Text>
                           </>
                         ) : (
                           <>
-                            <ImageIcon size={18} color="#fff" strokeWidth={2} />
-                            <Text style={styles.actionBtnText}>갤러리에서 선택</Text>
+                            <Camera size={18} color="#fff" strokeWidth={2} />
+                            <Text style={styles.actionBtnText}>촬영하기</Text>
                           </>
                         )}
                       </TouchableOpacity>
@@ -549,43 +536,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   shotPlaceholder: {
-    minHeight: 120,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.dark.surfaceLight,
-    borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
     gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
-  sourceToggle: {
-    flexDirection: 'row',
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.dark.surface,
-    padding: 3,
-    gap: 3,
-  },
-  sourceTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: theme.radius.sm,
-  },
-  sourceTabActive: {
-    backgroundColor: theme.colors.primary[600],
-  },
-  sourceTabLabel: {
-    fontSize: 12,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
-  },
-  sourceTabLabelActive: {
-    color: '#fff',
+  actionBtnHidden: {
+    opacity: 0,
   },
   actionBtn: {
     flexDirection: 'row',
