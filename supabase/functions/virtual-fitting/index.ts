@@ -115,8 +115,8 @@ async function callImageEdit(
   const productBlob = dataUrlToBlob(productDataUrl);
   const modelBlob = dataUrlToBlob(modelDataUrl);
 
-  formData.append("image", modelBlob, "model.jpg");
-  formData.append("image", productBlob, "product.jpg");
+  formData.append("image[]", modelBlob, "model.jpg");
+  formData.append("image[]", productBlob, "product.jpg");
   formData.append("model", "gpt-image-1");
   formData.append("prompt", prompt);
   formData.append("size", "1024x1024");

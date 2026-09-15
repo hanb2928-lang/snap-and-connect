@@ -201,7 +201,6 @@ Deno.serve(async (req: Request) => {
       n: 1,
       size,
       quality,
-      style,
       response_format: "b64_json",
     };
 
