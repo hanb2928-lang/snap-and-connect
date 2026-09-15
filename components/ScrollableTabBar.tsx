@@ -3,6 +3,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import type {
   BottomTabBarProps,
@@ -29,6 +30,8 @@ const TAB_KEYS: Record<string, string> = {
   assets: 'tab.library',
 };
 
+const DISABLED_TABS = new Set<string>(['marketing']);
+
 const HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 export type TabBadgeMap = Record<string, boolean>;
@@ -49,8 +52,14 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
           const Icon = TAB_ICONS[route.name];
           const label = t(TAB_KEYS[route.name] || '', route.name);
           const hasBadge = badges?.[route.name] === true;
+          const isDisabled = DISABLED_TABS.has(route.name);
 
           const onPress = () => {
+            if (isDisabled) {
+              Alert.alert('준비 중', '현재 준비 중인 기능입니다.');
+              return;
+            }
+
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -66,25 +75,27 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
             <TouchableOpacity
               key={route.key}
               accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityState={isFocused ? { selected: true } : isDisabled ? { disabled: true } : {}}
               onPress={onPress}
-              activeOpacity={0.6}
+              activeOpacity={isDisabled ? 1 : 0.6}
               hitSlop={HIT_SLOP}
               style={styles.tabItem}
             >
-              <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
+              <View style={[styles.iconWrap, isFocused && !isDisabled && styles.iconWrapActive]}>
                 <Icon
                   size={26}
-                  color={isFocused ? theme.colors.primary[400] : theme.colors.dark.textDim}
-                  strokeWidth={isFocused ? 2.5 : 2.2}
-                  fill={isFocused ? theme.colors.primary[400] + '3C' : 'transparent'}
+                  color={isDisabled ? theme.colors.dark.textFaint : isFocused ? theme.colors.primary[400] : theme.colors.dark.textDim}
+                  strokeWidth={isFocused && !isDisabled ? 2.5 : 2.2}
+                  fill={isFocused && !isDisabled ? theme.colors.primary[400] + '3C' : 'transparent'}
                 />
-                {hasBadge && <View style={styles.tabBadgeDot} />}
+                {isDisabled && <View style={styles.disabledBadge}><Text style={styles.disabledBadgeText}>준비중</Text></View>}
+                {hasBadge && !isDisabled && <View style={styles.tabBadgeDot} />}
               </View>
               <Text
                 style={[
                   styles.tabLabel,
-                  isFocused && styles.tabLabelActive,
+                  isFocused && !isDisabled && styles.tabLabelActive,
+                  isDisabled && styles.tabLabelDisabled,
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
@@ -92,7 +103,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
               >
                 {label}
               </Text>
-              {isFocused && <View style={styles.activeBar} />}
+              {isFocused && !isDisabled && <View style={styles.activeBar} />}
             </TouchableOpacity>
           );
         })}
@@ -151,6 +162,26 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: theme.colors.primary[400],
     fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  tabLabelDisabled: {
+    opacity: 0.4,
+  },
+  disabledBadge: {
+    position: 'absolute',
+    top: 2,
+    right: -2,
+    backgroundColor: theme.colors.dark.border,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.dark.surface,
+  },
+  disabledBadgeText: {
+    fontSize: 7,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textFaint,
+    letterSpacing: 0.3,
   },
   activeBar: {
     width: 24,
