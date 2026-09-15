@@ -191,7 +191,7 @@ function buildMultipartForm(imageDataUrl: string): FormData {
   const base64Match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!base64Match) throw new Error("Invalid image data URL");
 
-  const ext = base64Match[1] === "png" ? "png" : "jpg";
+  const ext = base64Match[1].toLowerCase() === "png" ? "png" : "jpeg";
   const base64Data = base64Match[2];
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
@@ -216,7 +216,7 @@ function buildMaskMultipartForm(imageDataUrl: string, maskDataUrl: string): Form
   const base64Match = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!base64Match) throw new Error("Invalid image data URL");
 
-  const ext = base64Match[1] === "png" ? "png" : "jpg";
+  const ext = base64Match[1].toLowerCase() === "png" ? "png" : "jpeg";
   const base64Data = base64Match[2];
   const imageBinary = atob(base64Data);
   const imageBytes = new Uint8Array(imageBinary.length);

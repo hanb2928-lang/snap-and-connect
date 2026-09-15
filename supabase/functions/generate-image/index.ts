@@ -177,9 +177,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const size = body.size ?? "1024x1024";
+    const rawSize = body.size ?? "1024x1024";
+    const sizeMap: Record<string, string> = {
+      "1024x1024": "1024x1024",
+      "1024x1792": "1024x1536",
+      "1792x1024": "1536x1024",
+    };
+    const size = sizeMap[rawSize] ?? "1024x1024";
     const quality = body.quality ?? "standard";
-    const style = body.style ?? "vivid";
     const n = Math.min(body.n ?? 1, 4);
     const industry = body.industry ?? "general";
     const preset = INDUSTRY_PRESETS[industry] ?? INDUSTRY_PRESETS.general;
@@ -196,12 +201,12 @@ Deno.serve(async (req: Request) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
     const imageBody: Record<string, unknown> = {
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt: finalPrompt,
       n: 1,
       size,
-      quality,
-      response_format: "b64_json",
+      quality: quality === "hd" ? "high" : "medium",
+      output_format: "png",
     };
 
     let response: Response | null = null;

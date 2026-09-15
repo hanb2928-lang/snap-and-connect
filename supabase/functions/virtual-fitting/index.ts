@@ -115,8 +115,8 @@ async function callImageEdit(
   const productBlob = dataUrlToBlob(productDataUrl);
   const modelBlob = dataUrlToBlob(modelDataUrl);
 
-  formData.append("image[]", modelBlob, "model.jpg");
-  formData.append("image[]", productBlob, "product.jpg");
+  formData.append("image[]", modelBlob, "model.jpeg");
+  formData.append("image[]", productBlob, "product.jpeg");
   formData.append("model", "gpt-image-1");
   formData.append("prompt", prompt);
   formData.append("size", "1024x1024");
@@ -150,7 +150,7 @@ async function callImageEdit(
 function dataUrlToBlob(dataUrl: string): Blob {
   const match = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!match) throw new Error("Invalid image data URL");
-  const ext = match[1] === "png" ? "png" : "jpg";
+  const ext = match[1].toLowerCase() === "png" ? "png" : match[1].toLowerCase() === "webp" ? "webp" : "jpeg";
   const base64Data = match[2];
   const binary = atob(base64Data);
   const bytes = new Uint8Array(binary.length);
