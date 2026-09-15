@@ -46,6 +46,9 @@ interface GenerateAiVideoOptions {
   stylePreset?: string;
   detailRestoration?: boolean;
   hdUpscale?: boolean;
+  qualityTier?: 'standard' | 'pro';
+  resolution?: string;
+  fps?: number;
 }
 
 
@@ -108,6 +111,9 @@ export async function generateAiVideo(
           stylePreset: options.stylePreset,
           detailRestoration: options.detailRestoration,
           hdUpscale: options.hdUpscale,
+          qualityTier: options.hdUpscale ? 'pro' : (options.qualityTier ?? 'standard'),
+          resolution: options.resolution ?? (options.hdUpscale ? '1080p' : '720p'),
+          fps: options.fps ?? (options.hdUpscale ? 30 : 24),
         },
       });
 
@@ -410,6 +416,9 @@ export async function upgradeVideoToHd(
       stylePreset: options.stylePreset,
       detailRestoration: options.detailRestoration,
       hdUpscale: true,
+      qualityTier: 'pro',
+      resolution: options.resolution ?? '1080p',
+      fps: options.fps ?? 30,
     },
   });
 

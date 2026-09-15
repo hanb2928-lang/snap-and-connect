@@ -48,6 +48,10 @@ interface GenerateVideoRequest {
   zoomSpeed?: number;
   cameraRotation?: number;
   transitionEffect?: string;
+  hdUpscale?: boolean;
+  qualityTier?: 'standard' | 'pro';
+  resolution?: string;
+  fps?: number;
   // webhook fields (sent by Runway callback)
   status?: string;
   output?: string[] | { url?: string } | string;
@@ -151,6 +155,11 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
 
+  const hdUpscale = body.hdUpscale === true;
+  const qualityTier = hdUpscale ? 'pro' : (body.qualityTier ?? 'standard');
+  const resolution = body.resolution ?? (hdUpscale ? '1080p' : '720p');
+  const fps = body.fps ?? (hdUpscale ? 30 : 24);
+
   const runwayPrompt = buildCompactRunwayPrompt({
     userPrompt: effectivePrompt,
     productName: body.productName,
@@ -169,6 +178,9 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     zoomSpeed: body.zoomSpeed,
     cameraRotation: body.cameraRotation,
     transitionEffect: body.transitionEffect,
+    qualityTier,
+    resolution,
+    fps,
   });
 
   try {
@@ -183,12 +195,12 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     }
 
     const taskId = await submitWithRetry(
-      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId, promptImage),
+      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId, promptImage, hdUpscale, resolution, fps),
       MAX_RETRIES,
     );
 
     if (body.scanId) {
-      await saveVideoJob(body.scanId, taskId, isDraft);
+      await saveVideoJob(body.scanId, taskId, isDraft, hdUpscale);
     }
 
     return new Response(
@@ -440,7 +452,7 @@ async function checkWebhookResult(scanId: string): Promise<string | null> {
   return null;
 }
 
-async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean): Promise<void> {
+async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean, isHd: boolean): Promise<void> {
   if (!supabaseUrl || !serviceRoleKey) return;
   try {
     const controller = new AbortController();
@@ -458,6 +470,7 @@ async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean): P
         task_id: taskId,
         status: "PENDING",
         is_draft: isDraft,
+        is_hd: isHd,
       }),
       signal: controller.signal,
     });
@@ -548,20 +561,32 @@ async function submitRunwayTask(
   webhookUrl?: string,
   scanId?: string,
   promptImage?: string | null,
+  isHd?: boolean,
+  resolution?: string,
+  fps?: number,
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RUNWAY_SUBMIT_TIMEOUT_MS);
 
   try {
     const clampedDuration = Math.min(Math.max(Math.round(durationSec), 2), 10);
-    const ratioMap: Record<string, string> = {
-      "9:16": "720:1280",
-      "16:9": "1280:720",
-      "1:1": "960:960",
-      "4:3": "1104:832",
-      "3:4": "832:1104",
-      "21:9": "1584:672",
-    };
+    const ratioMap: Record<string, string> = isHd
+      ? {
+          "9:16": "1080:1920",
+          "16:9": "1920:1080",
+          "1:1": "1440:1440",
+          "4:3": "1440:1080",
+          "3:4": "1080:1440",
+          "21:9": "2376:1008",
+        }
+      : {
+          "9:16": "720:1280",
+          "16:9": "1280:720",
+          "1:1": "960:960",
+          "4:3": "1104:832",
+          "3:4": "832:1104",
+          "21:9": "1584:672",
+        };
 
     const hasImage = typeof promptImage === "string" && promptImage.length > 0;
     const endpoint = hasImage ? "image_to_video" : "text_to_video";
@@ -575,6 +600,8 @@ async function submitRunwayTask(
       duration: clampedDuration,
       ratio: ratioValue,
     };
+    if (resolution) payload.resolution = resolution;
+    if (fps != null) payload.fps = fps;
     if (hasImage && promptImage) {
       payload.promptImage = promptImage;
     }
@@ -775,6 +802,9 @@ type CompactPromptParams = {
   zoomSpeed?: number;
   cameraRotation?: number;
   transitionEffect?: string;
+  qualityTier: string;
+  resolution: string;
+  fps: number;
 };
 
 const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
@@ -869,6 +899,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     if (rotTag) tokens.push(rotTag);
     if (transTag) tokens.push(transTag);
     tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
+    tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
     if (negTag) tokens.push(negTag);
     return tokens.join(" ").slice(0, 500);
   }
@@ -905,7 +936,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   if (transTag) tokens.push(transTag);
   if (negTag) tokens.push(negTag);
 
-  tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production")
+  tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production");
+  tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
 
   return tokens.join(" ").slice(0, 500);
 }
