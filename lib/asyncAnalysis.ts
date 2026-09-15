@@ -228,7 +228,8 @@ async function createScanWithAnalysis(
   if (error || !data) throw new Error(`스캔 생성 실패: ${error?.message || '알 수 없는 오류'}`);
 
   // Kick off TTS in background (same as saveScan does)
-  const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
+  const dp0 = analysis.detectedProducts?.[0];
+  const hookText = analysis.templateData?.hook || analysis.oneLiner || analysis.summary || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || '';
   if (hookText) {
     // Fire-and-forget TTS via direct fetch
     triggerTTS(data.id, hookText).catch(() => {});
@@ -332,8 +333,16 @@ export async function finalizeAnalysisFromJob(
     }, { onConflict: 'image_hash' }).then(() => {}, () => {});
   }
 
-  // Kick off TTS in background
-  const hookText = analysis.templateData?.hook || analysis.oneLiner || '';
+  // Kick off TTS in background — fall back to detectedProducts if top-level hook is empty
+  const dp0 = analysis.detectedProducts?.[0];
+  const hookText =
+    analysis.templateData?.hook ||
+    analysis.oneLiner ||
+    analysis.summary ||
+    dp0?.templateData?.hook ||
+    dp0?.oneLiner ||
+    dp0?.productName ||
+    '';
   if (hookText) {
     triggerTTS(scanId, hookText).catch(() => {});
   }

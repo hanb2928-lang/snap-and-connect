@@ -594,7 +594,8 @@ export default function ResultScreen() {
   const triggerTtsGeneration = useCallback(async (scanId: string): Promise<boolean> => {
     const tdDirect = scan?.template_data as { hook?: string; platformVariants?: Record<string, { hook?: string }> } | undefined;
     const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
-    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || scan?.product_name || '';
+    const dp0 = scan?.detected_products?.[0] as { templateData?: { hook?: string }; oneLiner?: string; productName?: string } | undefined;
+    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || '';
     if (!hookText) return false;
     try {
       await triggerTTS(scanId, hookText);
