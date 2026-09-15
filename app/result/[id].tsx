@@ -794,11 +794,13 @@ export default function ResultScreen() {
       const runWave = async (indices: number[]) =>
         Promise.allSettled(indices.map((idx) => invokeOne(idx)));
 
-      const [r1, r2, r3] = await Promise.all([
-        runWave(wave1),
-        runWave(wave2),
-        runWave(wave3),
-      ]);
+      const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+      const r1 = await runWave(wave1);
+      await delay(12000);
+      const r2 = await runWave(wave2);
+      await delay(12000);
+      const r3 = await runWave(wave3);
 
       const results = [...r1, ...r2, ...r3];
 

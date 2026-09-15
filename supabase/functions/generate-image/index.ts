@@ -195,48 +195,66 @@ Deno.serve(async (req: Request) => {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000);
-    let response: Response;
-    try {
-      const imageBody: Record<string, unknown> = {
-        model: "dall-e-3",
-        prompt: finalPrompt,
-        n: 1,
-        size,
-        quality,
-        style,
-        response_format: "b64_json",
-      };
-      response = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify(imageBody),
-        signal: controller.signal,
-      });
-    } catch (fetchErr) {
-      clearTimeout(timeoutId);
-      return new Response(
-        JSON.stringify({ error: "이미지 생성 요청 시간이 초과되었습니다." }),
-        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const imageBody: Record<string, unknown> = {
+      model: "dall-e-3",
+      prompt: finalPrompt,
+      n: 1,
+      size,
+      quality,
+      style,
+      response_format: "b64_json",
+    };
+
+    let response: Response | null = null;
+    let lastErrorDetail = "";
+    const MAX_IMAGE_RETRIES = 2;
+
+    for (let attempt = 0; attempt <= MAX_IMAGE_RETRIES; attempt++) {
+      try {
+        response = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openaiKey}`,
+          },
+          body: JSON.stringify(imageBody),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        return new Response(
+          JSON.stringify({ error: "이미지 생성 요청 시간이 초과되었습니다." }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (response.ok) break;
+
+      const errText = await response.text();
+      try {
+        const errJson = JSON.parse(errText);
+        lastErrorDetail = errJson?.error?.message
+          ? `OpenAI ${response.status}: ${errJson.error.message}`
+          : `이미지 생성 실패: ${response.status}`;
+      } catch {
+        lastErrorDetail = errText && errText.length < 500
+          ? `이미지 생성 실패: ${response.status} — ${errText}`
+          : `이미지 생성 실패: ${response.status}`;
+      }
+
+      if (response.status === 429 && attempt < MAX_IMAGE_RETRIES) {
+        const retryAfter = parseInt(response.headers.get("retry-after") ?? "20", 10);
+        const waitMs = (isNaN(retryAfter) ? 20 : Math.min(retryAfter, 30)) * 1000;
+        await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+        continue;
+      }
+      break;
     }
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errText = await response.text();
-      let errDetail = `이미지 생성 실패: ${response.status}`;
-      try {
-        const errJson = JSON.parse(errText);
-        if (errJson?.error?.message) {
-          errDetail = `OpenAI ${response.status}: ${errJson.error.message}`;
-        }
-      } catch {
-        if (errText && errText.length < 500) errDetail = `이미지 생성 실패: ${response.status} — ${errText}`;
-      }
+    if (!response || !response.ok) {
       return new Response(
-        JSON.stringify({ error: errDetail }),
+        JSON.stringify({ error: lastErrorDetail || "이미지 생성 실패" }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
