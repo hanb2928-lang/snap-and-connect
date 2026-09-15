@@ -91,7 +91,10 @@ Deno.serve(async (req: Request) => {
     const speedJitter = (Math.random() - 0.5) * 0.16;
     const speed = Math.min(Math.max(effectiveSpeed + speedJitter, 0.5), 2.0);
 
-    const openaiKey = body.ttsApiKey?.trim() || await resolveOpenAIKey();
+    // Try ttsApiKey first, fall back to resolved OpenAI key from env/DB
+    const primaryKey = body.ttsApiKey?.trim() || null;
+    const fallbackKey = await resolveOpenAIKey();
+    const openaiKey = primaryKey || fallbackKey;
 
     if (!openaiKey) {
       return new Response(
@@ -101,10 +104,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── Content Cache: check for cached TTS by text+voice+speed hash ─────
-    // TTS for the same text+voice+speed produces identical audio — no need
-    // to call OpenAI again. 30-day TTL. Speed jitter is excluded from the
-    // cache key so the same baseSpeed reuses cached audio.
-    // Cache key uses processedText + instructions (includes silence markers)
     const cacheText = body.processedText?.trim() || rawText;
     const ttsCacheKey = `generate-tts:${contentHashTts(`${cacheText}|${voice}|${baseSpeed}|${body.pitch ?? 0}|${instructions ?? ''}`)}`;
     const cachedTts = await checkTtsCache(ttsCacheKey);
@@ -131,23 +130,56 @@ Deno.serve(async (req: Request) => {
       ttsBody.instructions = instructions;
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    // Try primary key; on auth failure, retry with fallback key
+    const keysToTry = [openaiKey];
+    if (primaryKey && fallbackKey && primaryKey !== fallbackKey) {
+      keysToTry.push(fallbackKey);
+    }
 
-    const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify(ttsBody),
-      signal: controller.signal,
-    });
+    let ttsResponse: Response | null = null;
+    let lastErrorDetail = "";
 
-    clearTimeout(timeoutId);
+    for (let i = 0; i < keysToTry.length; i++) {
+      const tryKey = keysToTry[i];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    if (!ttsResponse.ok) {
-      throw new Error(`OpenAI TTS error: ${ttsResponse.status}`);
+      try {
+        ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tryKey}`,
+          },
+          body: JSON.stringify(ttsBody),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (ttsResponse.ok) break;
+
+        const errText = await ttsResponse.text().catch(() => "");
+        lastErrorDetail = `OpenAI TTS error: ${ttsResponse.status} — ${errText.slice(0, 300)}`;
+
+        // Only retry with fallback on auth errors (401/403)
+        if ((ttsResponse.status === 401 || ttsResponse.status === 403) && i < keysToTry.length - 1) {
+          continue;
+        }
+        throw new Error(lastErrorDetail);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err instanceof Error && err.name === "AbortError") {
+          throw new Error("TTS 생성 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+        }
+        if (i < keysToTry.length - 1 && !(err instanceof Error && err.message.includes("TTS error"))) {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!ttsResponse || !ttsResponse.ok) {
+      throw new Error(lastErrorDetail || "OpenAI TTS request failed");
     }
 
     const audioBuffer = await ttsResponse.arrayBuffer();
