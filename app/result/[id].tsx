@@ -726,7 +726,7 @@ export default function ResultScreen() {
           transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
           stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
           detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
-          hdUpscale: false,
+          hdUpscale,
         },
         (progress) => {
           if (mountedRef.current) setVideoGenProgress(progress);
@@ -742,7 +742,12 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
 
-      // Stage 2: Kick off HD upgrade in the background
+      // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
+      if (!hdUpscale) {
+        setVideoStage('draft_ready');
+        return;
+      }
+
       setVideoStage('hd_upgrading');
       setHdUpgradeProgress('고화질 업그레이드를 백그라운드에서 시작했어요...');
 
@@ -3548,6 +3553,23 @@ export default function ResultScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+            </View>
+
+            {/* 고화질 PRO 생성 토글 — 동영상 모드 전용 */}
+            <View style={styles.synthToggleRow}>
+              <View style={styles.synthToggleLeft}>
+                <Text style={styles.synthInputLabel}>고화질 PRO 생성 (HD Upscale)</Text>
+                <Text style={styles.synthHint}>
+                  {hdUpscale ? '초안 생성 후 자동으로 고화질 업그레이드 진행' : '빠른 일화질 생성 (업그레이드 미포함)'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.synthToggleSwitch, hdUpscale && styles.synthToggleSwitchActive]}
+                onPress={() => setHdUpscale((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.synthToggleKnob, hdUpscale && styles.synthToggleKnobActive]} />
+              </TouchableOpacity>
             </View>
             </>
             )}
