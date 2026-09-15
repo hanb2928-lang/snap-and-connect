@@ -166,6 +166,7 @@ export function StockVideoPicker({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraMountedRef = useRef(true);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
 
   const stopCameraStream = useCallback(() => {
@@ -173,12 +174,16 @@ export function StockVideoPicker({
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setCameraReady(false);
   }, []);
 
   const startCamera = useCallback(async (face: 'user' | 'environment') => {
     if (Platform.OS !== 'web') return;
     stopCameraStream();
+    cameraMountedRef.current = true;
     setCameraError(null);
     setCameraReady(false);
     try {
@@ -186,11 +191,15 @@ export function StockVideoPicker({
         video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
+      if (!cameraMountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        setCameraReady(true);
+        if (cameraMountedRef.current) setCameraReady(true);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
@@ -369,7 +378,10 @@ export function StockVideoPicker({
   }, [mobileCapturedUri]);
 
   useEffect(() => {
-    return () => { stopCameraStream(); };
+    return () => {
+      cameraMountedRef.current = false;
+      stopCameraStream();
+    };
   }, [stopCameraStream]);
 
   // ── Image picker (from gallery / file system) ──

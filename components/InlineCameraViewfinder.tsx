@@ -50,6 +50,9 @@ export const InlineCameraViewfinder = forwardRef<
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setCameraReady(false);
   }, []);
 

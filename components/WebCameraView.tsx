@@ -76,6 +76,9 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     setCameraReady(false);
     onCameraReady?.(false);
   }, [onCameraReady]);
