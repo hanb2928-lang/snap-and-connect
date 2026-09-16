@@ -70,6 +70,7 @@ const SERVER_POLL_INITIAL_DELAY_MS = 4000;
 const SERVER_POLL_MAX_DELAY_MS = 15000;
 const SERVER_POLL_SELF_INVOKE_TIMEOUT_MS = 15000; // AbortController timeout for self-reinvocation fetch
 const JITTER_MAX_MS = 2000; // Random jitter added to each backoff delay to desynchronize concurrent polls
+const VIDEO_DAILY_LIMIT = 10; // Max AI video generations per IP per day
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -129,6 +130,20 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+
+      // Rate limit: max VIDEO_DAILY_LIMIT submissions per IP per day
+      const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+      const rateLimitOk = await checkRateLimit(clientIp);
+      if (!rateLimitOk) {
+        return new Response(
+          JSON.stringify({
+            error: `일일 AI 비디오 생성 한도(${VIDEO_DAILY_LIMIT}회)를 초과했습니다. 내일 다시 이용해주세요.`,
+            step: "rate_limit",
+            provider: "none",
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     const runwayKey = await resolveRunwayKey();
@@ -152,10 +167,10 @@ Deno.serve(async (req: Request) => {
     }
 
     return await handleSubmit(body, runwayKey);
-  } catch (err) {
+  } catch {
     return new Response(
       JSON.stringify({
-        error: err instanceof Error ? err.message : "비디오 생성 중 오류가 발생했습니다.",
+        error: "비디오 생성 중 오류가 발생했습니다.",
         step: "unhandled",
         provider: "unknown",
       }),
@@ -272,11 +287,10 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-  } catch (err) {
-    const errorDetail = err instanceof Error ? err.message : "Runway 작업 생성 실패";
+  } catch {
     return new Response(
       JSON.stringify({
-        error: `AI 비디오 생성 요청에 실패했습니다: ${errorDetail}`,
+        error: "AI 비디오 생성 요청에 실패했습니다. 잠시 후 다시 시도해주세요.",
         step: "submit",
         provider: "runway",
         motionPrompt: runwayPrompt,
@@ -943,7 +957,7 @@ async function pollRunwayTask(
     if (err instanceof Error && err.name === "AbortError") {
       return { status: "PROCESSING", progress: "polling timeout, retrying" };
     }
-    return { status: "FAILED", error: err instanceof Error ? err.message : "Runway 폴링 오류" };
+    return { status: "FAILED", error: "Runway 폴링 오류" };
   }
 }
 
@@ -1326,4 +1340,35 @@ async function resolveRunwayKey(): Promise<string | null> {
   }
 
   return serverKey || null;
+}
+
+async function checkRateLimit(identifier: string): Promise<boolean> {
+  if (!supabaseUrl || !serviceRoleKey) return true;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/rpc/check_rate_limit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          p_identifier: identifier,
+          p_feature: "generate_video",
+          p_daily_limit: VIDEO_DAILY_LIMIT,
+        }),
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (!resp.ok) return true;
+    const data = await resp.json();
+    return data === true;
+  } catch {
+    return true;
+  }
 }
