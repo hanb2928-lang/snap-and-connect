@@ -368,7 +368,7 @@ export default function CameraScreen() {
     }
 
     // Background: run synthesis/directing/publish pipeline without blocking UI
-    runStereoPipeline(sorted, () => {}, cleanMode).catch(() => {});
+    runStereoPipeline(sorted, () => {}, cleanMode, scanId).catch(() => {});
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
