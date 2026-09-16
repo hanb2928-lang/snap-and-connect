@@ -83,7 +83,7 @@ export async function removeBackground(
   return `data:${data.mimeType || 'image/png'};base64,${base64}`;
 }
 
-function base64ToBlob(base64: string, mimeType: string): any {
+export function base64ToBlob(base64: string, mimeType: string): any {
   const bytes = base64ToUint8Array(base64);
   return new (global as any).Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
 }
@@ -97,10 +97,10 @@ export async function compressImage(uri: string, maxWidth = 1080, quality = 0.8)
   return result.uri;
 }
 
-const UPLOAD_MAX_DIMENSION = 1280;
-const UPLOAD_QUALITY = 0.75;
-const CAPTURE_MAX_DIMENSION = 1280;
-const CAPTURE_QUALITY = 0.85;
+export const UPLOAD_MAX_DIMENSION = 1080;
+export const UPLOAD_QUALITY = 0.68;
+const CAPTURE_MAX_DIMENSION = 1080;
+const CAPTURE_QUALITY = 0.78;
 
 export async function compressCaptureFrameToBlob(
   base64: string,
@@ -308,16 +308,20 @@ export async function prepareImageForApi(
   if (Platform.OS === 'web') {
     try {
       const img = await loadImageElement(normalizedDataUrl);
-      const canvas = document.createElement('canvas');
       const scale = Math.min(1, maxDimension / Math.max(img.naturalWidth, img.naturalHeight));
-      canvas.width = Math.round(img.naturalWidth * scale);
-      canvas.height = Math.round(img.naturalHeight * scale);
+      // Round dimensions to multiples of 8 for better JPEG/WebP block encoding efficiency
+      const rawW = Math.round(img.naturalWidth * scale);
+      const rawH = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = rawW - (rawW % 8);
+      canvas.height = rawH - (rawH % 8);
       const ctx = canvas.getContext('2d');
       if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       if (moodFilter !== 'none') {
         applyMoodOverlay(ctx, canvas.width, canvas.height, moodFilter);
       }
+      // Use WebP when the browser supports it (smaller payload), fall back to JPEG
       const result = canvas.toDataURL('image/webp', quality);
       canvas.width = 0;
       canvas.height = 0;

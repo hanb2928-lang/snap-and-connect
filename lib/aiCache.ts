@@ -114,4 +114,53 @@ export async function aiCachedCall<T>(
   return { data: fresh, cached: false };
 }
 
+/**
+ * Finds a cached result by task type whose input metadata matches a category/tone pattern.
+ * This enables reusing AI results across different products in the same category without
+ * waiting for a full AI call — the warm-cache fast path.
+ */
+export async function findSimilarCachedResult<T>(
+  taskType: string,
+  category: string,
+  toneKeys: string[],
+): Promise<T | null> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_content_cache')
+      .select('id, cache_key, result, expires_at, hit_count')
+      .eq('task_type', taskType)
+      .gte('expires_at', new Date().toISOString())
+      .order('hit_count', { ascending: false })
+      .limit(10);
+
+    if (error || !data || data.length === 0) return null;
+
+    for (const row of data) {
+      const result = row.result as Record<string, unknown>;
+      const resultCategory = (result.productCategory as string) || '';
+      if (resultCategory !== category) continue;
+
+      const resultTone = (result.productMood as string) || (result.targetAudience as string) || '';
+      if (toneKeys.length > 0 && !toneKeys.some((k) => resultTone.includes(k))) continue;
+
+      // Bump hit count for the matched entry
+      supabase
+        .from('ai_content_cache')
+        .update({ hit_count: (row as { hit_count?: number }).hit_count ?? 0 + 1, updated_at: new Date().toISOString() })
+        .eq('id', (row as { id: string }).id)
+        .then(() => {}, () => {});
+
+      // Promote to L1
+      const cacheKey = (row as { cache_key: string }).cache_key;
+      await setL1<T>(cacheKey, result as T);
+
+      return result as T;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export { L1_TTL_MS, L2_TTL_DAYS };

@@ -6,7 +6,7 @@ import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
 import { deductCredits } from '@/lib/credits';
-import { compressBase64ForUpload } from '@/lib/imageEdit';
+import { compressBase64ForUpload, prepareImageForApi, base64ToBlob, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY } from '@/lib/imageEdit';
 import { compressForEdgeFunction, compressBase64ArrayForEdgeFunction } from '@/lib/parallelImageCompress';
 import { aiCachedCall } from '@/lib/aiCache';
 import { hashObject } from '@/lib/contentHash';
@@ -37,17 +37,44 @@ export async function uploadImageBlob(
   blob: Blob,
   mimeType: string,
 ): Promise<string> {
-  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  // If the blob is already small enough, upload as-is to avoid double-compression
+  const MAX_RAW_BLOB_BYTES = 800_000; // ~800KB threshold
+  let uploadBlob = blob;
+  let uploadMime = mimeType;
+
+  if (blob.size > MAX_RAW_BLOB_BYTES && mimeType.startsWith('image/')) {
+    try {
+      const dataUrl = await blobToDataUrl(blob);
+      const compressed = await prepareImageForApi(dataUrl, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY);
+      const compressedBase64 = cleanBase64(compressed);
+      const compressedMime = compressed.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+      uploadBlob = base64ToBlob(compressedBase64, compressedMime);
+      uploadMime = compressedMime;
+    } catch {
+      // If re-compression fails, proceed with the original blob
+    }
+  }
+
+  const ext = uploadMime === 'image/png' ? 'png' : uploadMime === 'image/webp' ? 'webp' : 'jpg';
   const fileName = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, blob, { contentType: mimeType, cacheControl: '360000' });
+    .upload(fileName, uploadBlob, { contentType: uploadMime, cacheControl: '360000' });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
   const { data: urlData } = supabase.storage.from('scans').getPublicUrl(fileName);
   return urlData.publicUrl;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Blob 변환 실패'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export async function analyzeImage(

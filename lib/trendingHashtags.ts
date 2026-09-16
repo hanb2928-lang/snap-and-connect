@@ -1,5 +1,6 @@
 import { supabase, supabaseUrl, supabaseAnonKey } from './supabase';
 import { safeFetch } from './apiClient';
+import { aiCachedCall } from './aiCache';
 
 const TRENDING_URL = `${supabaseUrl}/functions/v1/naver-trending`;
 
@@ -38,33 +39,41 @@ export async function fetchMatchedTrendingHashtags(
     }
   }
 
-  const params = new URLSearchParams();
-  if (productCategory) params.set('productCategory', productCategory);
-  if (tags && tags.length > 0) params.set('tags', tags.join(','));
-  if (productName) params.set('productName', productName);
+  const { data } = await aiCachedCall<MatchedHashtagsResult>(
+    'trending-hashtags-match',
+    { productCategory, tags: tags.join(','), productName },
+    async () => {
+      const params = new URLSearchParams();
+      if (productCategory) params.set('productCategory', productCategory);
+      if (tags && tags.length > 0) params.set('tags', tags.join(','));
+      if (productName) params.set('productName', productName);
 
-  try {
-    const resp = await safeFetch(`${TRENDING_URL}?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${supabaseAnonKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.hashtags && Array.isArray(data.hashtags)) {
-        return { hashtags: data.hashtags, category: data.category || null };
+      try {
+        const resp = await safeFetch(`${TRENDING_URL}?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.hashtags && Array.isArray(data.hashtags)) {
+            return { hashtags: data.hashtags, category: data.category || null };
+          }
+        }
+      } catch {
+        // fall through to cache
       }
-    }
-  } catch {
-    // fall through to cache
-  }
 
-  if (cachedAllHashtags && cachedAllHashtags.length > 0) {
-    return { hashtags: cachedAllHashtags.slice(0, 10), category: null };
-  }
+      if (cachedAllHashtags && cachedAllHashtags.length > 0) {
+        return { hashtags: cachedAllHashtags.slice(0, 10), category: null };
+      }
 
-  return { hashtags: [], category: null };
+      return { hashtags: [], category: null };
+    },
+    'naver-trending',
+  );
+  return data;
 }
 
 export function getTrendingSuggestions(

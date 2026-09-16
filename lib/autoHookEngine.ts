@@ -11,7 +11,7 @@
 
 import type { EmotionPhase } from './psychologyEngine';
 import type { HookOption } from './shortFormEditEngine';
-import { aiCachedCall } from './aiCache';
+import { aiCachedCall, findSimilarCachedResult } from './aiCache';
 import { hashObject } from './contentHash';
 
 export type HookVariant = 'stimulus' | 'curiosity' | 'benefit';
@@ -159,6 +159,16 @@ export function autoSelectHook(input: ProductAnalysisInput): AutoHookResult {
 }
 
 export async function autoSelectHookCached(input: ProductAnalysisInput): Promise<AutoHookResult> {
+  // Warm-cache fast path: check for a similar cached result by category+tone before
+  // falling through to the standard hash-based cache. This lets us reuse hook results
+  // across different products in the same category without re-computing.
+  const preCategory = detectCategory(input.productCategory || '', input.productName || '', input.customPrompt || '');
+  const preMood = detectMood(input.productCategory || '', input.customPrompt || '');
+  const preAudience = detectAudience(input.productCategory || '', input.customPrompt || '');
+
+  const similar = await findSimilarCachedResult<AutoHookResult>('auto-hook', preCategory, [preMood, preAudience]);
+  if (similar) return similar;
+
   const cacheInput: Record<string, unknown> = {
     productName: input.productName || '',
     productCategory: input.productCategory || '',

@@ -1,5 +1,6 @@
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { safeFetch, friendlyApiError } from '@/lib/apiClient';
+import { aiCachedCall } from '@/lib/aiCache';
 
 export interface StockVideoClip {
   id: number;
@@ -27,26 +28,34 @@ export async function searchStockVideos(
   perPage = 10,
   mediaType: "video" | "image" = "video",
 ): Promise<StockVideoClip[]> {
-  try {
-    const resp = await safeFetch(SEARCH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      body: JSON.stringify({ query, orientation, perPage, mediaType }),
-      timeoutMs: 20000,
-    });
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({ error: '영상 검색에 실패했습니다.' }));
-      throw new Error(errData.error || `검색 실패 (${resp.status})`);
-    }
-    const data = (await resp.json()) as SearchResponse;
-    if (!data.clips || !Array.isArray(data.clips)) {
-      return [];
-    }
-    return data.clips;
-  } catch (err) {
-    throw new Error(friendlyApiError(err, '영상 검색 중 오류가 발생했습니다.'));
-  }
+  const { data } = await aiCachedCall<StockVideoClip[]>(
+    'pexels-search',
+    { query, orientation, perPage, mediaType },
+    async () => {
+      try {
+        const resp = await safeFetch(SEARCH_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ query, orientation, perPage, mediaType }),
+          timeoutMs: 20000,
+        });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({ error: '영상 검색에 실패했습니다.' }));
+          throw new Error(errData.error || `검색 실패 (${resp.status})`);
+        }
+        const data = (await resp.json()) as SearchResponse;
+        if (!data.clips || !Array.isArray(data.clips)) {
+          return [];
+        }
+        return data.clips;
+      } catch (err) {
+        throw new Error(friendlyApiError(err, '영상 검색 중 오류가 발생했습니다.'));
+      }
+    },
+    'pexels-api',
+  );
+  return data;
 }

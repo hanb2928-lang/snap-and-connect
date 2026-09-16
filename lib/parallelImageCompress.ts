@@ -3,7 +3,7 @@ import { cleanBase64, getMimeTypeFromDataUrl, buildDataUrl } from './base64';
 
 const EDGE_FN_MAX_DIMENSION = 1080;
 const EDGE_FN_QUALITY = 0.72;
-const PARALLEL_BATCH_SIZE = 3;
+const PARALLEL_BATCH_SIZE = 5;
 
 export interface CompressedImage {
   base64: string;

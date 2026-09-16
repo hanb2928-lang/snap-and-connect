@@ -84,7 +84,7 @@ const mockNavigator = { onLine: true };
 };
 
 describe('compressCaptureFrameToBlob', () => {
-  it('compresses a raw capture frame to JPEG Blob at 1280px max with quality 0.85', async () => {
+  it('compresses a raw capture frame to JPEG Blob at 1080px max with quality 0.78', async () => {
     const rawBase64 = 'rawbase64data';
     const result = await compressCaptureFrameToBlob(rawBase64, 'image/jpeg');
     expect(result.mimeType).toBe('image/jpeg');
