@@ -25,9 +25,10 @@ interface ProductVisionData {
 }
 
 interface GenerateVideoRequest {
-  mode?: "submit" | "poll" | "webhook";
+  mode?: "submit" | "poll" | "webhook" | "runway-submit";
   taskId?: string;
   prompt?: string;
+  runwayPrompt?: string;
   durationSec?: number;
   aspectRatio?: "9:16" | "16:9" | "1:1";
   productName?: string;
@@ -113,7 +114,7 @@ Deno.serve(async (req: Request) => {
     const mode = body.mode ?? "submit";
 
     // Validate required fields per mode
-    const validModes = ["submit", "poll", "server-poll", "webhook"];
+    const validModes = ["submit", "poll", "server-poll", "webhook", "runway-submit"];
     if (!validModes.includes(mode)) {
       return new Response(
         JSON.stringify({ error: `지원하지 않는 모드입니다: ${mode}`, step: "validation", provider: "unknown" }),
@@ -146,27 +147,36 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const runwayKey = await resolveRunwayKey();
-    if (!runwayKey) {
-      return new Response(
-        JSON.stringify({
-          error: "AI 비디오 생성을 위한 Runway API 키가 설정되지 않았습니다. 설정에서 Runway API 키를 등록해주세요.",
-          step: "key_resolution",
-          provider: "none",
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    // runway-submit mode needs the Runway key to call the API
+    if (mode === "runway-submit") {
+      const runwayKey = await resolveRunwayKey();
+      if (!runwayKey) {
+        return new Response(
+          JSON.stringify({ error: "Runway API 키가 설정되지 않았습니다.", step: "key_resolution", provider: "none" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return await handleRunwaySubmit(body, runwayKey);
     }
 
-    if (mode === "poll") {
-      return await handlePoll(body, runwayKey);
-    }
-
-    if (mode === "server-poll") {
+    // poll and server-poll need the Runway key to poll the Runway API
+    if (mode === "poll" || mode === "server-poll") {
+      const runwayKey = await resolveRunwayKey();
+      if (!runwayKey) {
+        return new Response(
+          JSON.stringify({
+            error: "AI 비디오 생성을 위한 Runway API 키가 설정되지 않았습니다. 설정에서 Runway API 키를 등록해주세요.",
+            step: "key_resolution",
+            provider: "none",
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (mode === "poll") return await handlePoll(body, runwayKey);
       return await handleServerPoll(body, runwayKey);
     }
 
-    return await handleSubmit(body, runwayKey);
+    return await handleSubmit(body);
   } catch (err) {
     console.error("[generate-video] Unhandled error:", err);
     return new Response(
@@ -180,7 +190,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Promise<Response> {
+async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
   console.log("[generate-video] Submit payload:", JSON.stringify({
     promptLength: body.prompt?.length ?? 0,
     durationSec: body.durationSec,
@@ -230,30 +240,111 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     fps,
   });
 
+  // Generate internal job ID immediately — no waiting for Runway API
+  const internalJobId = crypto.randomUUID();
+
+  // Save PENDING row to DB immediately
+  if (body.scanId) {
+    await saveVideoJob(body.scanId, internalJobId, isDraft, hdUpscale);
+  }
+
+  // Fire-and-forget: self-invoke runway-submit mode to call Runway API asynchronously
+  if (supabaseUrl && serviceRoleKey) {
+    const selfUrl = `${supabaseUrl}/functions/v1/generate-video`;
+    fetch(selfUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+      body: JSON.stringify({
+        mode: "runway-submit",
+        taskId: internalJobId,
+        scanId: body.scanId,
+        runwayPrompt,
+        durationSec,
+        aspectRatio,
+        isDraft,
+        hdUpscale,
+        resolution,
+        fps,
+      }),
+    }).catch((err) => {
+      console.error("[generate-video] Failed to self-invoke runway-submit:", err);
+      // Mark job as FAILED if we can't even start the Runway submission
+      if (body.scanId) {
+        markVideoJobFailed(body.scanId, internalJobId, "Runway API 호출 시작에 실패했습니다.");
+      }
+    });
+  }
+
+  // Return HTTP 202 Accepted immediately — client polls via Realtime/poll mode
+  return new Response(
+    JSON.stringify({
+      mode: "submit",
+      taskId: internalJobId,
+      provider: "runway",
+      motionPrompt: runwayPrompt,
+      durationSec,
+      aspectRatio,
+      variationSeed,
+      draft: isDraft,
+      status: "PENDING",
+    }),
+    { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+/**
+ * Async Runway API submission — called via self-invoke from handleSubmit.
+ * Calls the Runway API, stores the real runway_task_id, then kicks off server-poll.
+ */
+async function handleRunwaySubmit(body: GenerateVideoRequest, runwayKey: string): Promise<Response> {
+  const internalJobId = body.taskId;
+  const scanId = body.scanId;
+
+  if (!internalJobId || !scanId) {
+    return new Response(
+      JSON.stringify({ error: "runway-submit 모드에서는 taskId와 scanId가 필요합니다." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const runwayPrompt = body.prompt ?? body.runwayPrompt ?? "";
+  if (!runwayPrompt) {
+    await markVideoJobFailed(scanId, internalJobId, "Runway 프롬프트가 비어 있습니다.");
+    return new Response(
+      JSON.stringify({ error: "runwayPrompt가 필요합니다." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const aspectRatio = body.aspectRatio ?? "9:16";
+  const durationSec = Math.min(Math.max(Math.round(body.durationSec ?? 5), 2), 10);
+  const isDraft = body.draft === true;
+  const hdUpscale = body.hdUpscale === true;
+  const resolution = body.resolution ?? (hdUpscale ? "1080p" : "720p");
+  const fps = body.fps ?? (hdUpscale ? 30 : 24);
+
   try {
-    const webhookUrl = body.scanId && supabaseUrl
-      ? `${supabaseUrl}/functions/v1/generate-video`
-      : undefined;
+    const webhookUrl = `${supabaseUrl}/functions/v1/generate-video`;
 
     let promptImage: string | null = null;
-    if (body.scanId) {
-      promptImage = await fetchScanImageUrl(body.scanId);
-      console.log("[generate-video] Fetched scan image for promptImage:", promptImage ? "found" : "not found");
-    }
+    promptImage = await fetchScanImageUrl(scanId);
+    console.log("[generate-video] runway-submit: Fetched scan image:", promptImage ? "found" : "not found");
 
-    const taskId = await submitWithRetry(
-      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, body.scanId, promptImage, hdUpscale, resolution, fps),
+    const runwayTaskId = await submitWithRetry(
+      () => submitRunwayTask(runwayPrompt, runwayKey, aspectRatio, durationSec, isDraft, webhookUrl, scanId, promptImage, hdUpscale, resolution, fps),
       MAX_RETRIES,
     );
 
-    if (body.scanId) {
-      await saveVideoJob(body.scanId, taskId, isDraft, hdUpscale);
-    }
+    // Store the real Runway task ID in the video_jobs row
+    await updateRunwayTaskId(scanId, internalJobId, runwayTaskId);
+    console.log(`[generate-video] runway-submit: Runway task ${runwayTaskId} saved for job ${internalJobId}`);
 
-    // Fire-and-forget: start server-side polling so the job completes
-    // even if the client disconnects. The server-poll loop self-reinvokes
-    // with exponential backoff and is independent of client survival.
-    if (body.scanId && supabaseUrl && serviceRoleKey) {
+    // Kick off server-poll using the Runway task ID
+    if (supabaseUrl && serviceRoleKey) {
       setTimeout(() => {
         const selfUrl = `${supabaseUrl}/functions/v1/generate-video`;
         fetch(selfUrl, {
@@ -265,8 +356,8 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
           },
           body: JSON.stringify({
             mode: "server-poll",
-            taskId,
-            scanId: body.scanId,
+            taskId: runwayTaskId,
+            scanId,
             variationSeed: 0,
           }),
         }).catch(() => {
@@ -276,27 +367,15 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
     }
 
     return new Response(
-      JSON.stringify({
-        mode: "submit",
-        taskId,
-        provider: "runway",
-        motionPrompt: runwayPrompt,
-        durationSec,
-        aspectRatio,
-        variationSeed,
-        draft: isDraft,
-      }),
+      JSON.stringify({ mode: "runway-submit", status: "SUBMITTED", runwayTaskId, internalJobId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("[generate-video] Submit error:", err);
+    console.error("[generate-video] runway-submit error:", err);
+    const errMsg = err instanceof Error ? err.message : "Runway API 호출에 실패했습니다.";
+    await markVideoJobFailed(scanId, internalJobId, errMsg);
     return new Response(
-      JSON.stringify({
-        error: "AI 비디오 생성 요청에 실패했습니다. 잠시 후 다시 시도해주세요.",
-        step: "submit",
-        provider: "runway",
-        motionPrompt: runwayPrompt,
-      }),
+      JSON.stringify({ error: errMsg, step: "runway-submit", provider: "runway" }),
       { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
@@ -340,6 +419,63 @@ async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promis
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // Resolve runway_task_id — the client may poll with the internal job ID
+    // before the async Runway submission has completed. If runway_task_id is
+    // not yet set, the job is still being submitted to Runway.
+    const runwayTaskId = jobStatus?.runwayTaskId ?? taskId;
+    const pollStatus = await pollRunwayTask(runwayTaskId, runwayKey);
+
+    if (pollStatus.status === "SUCCESS" && pollStatus.videoUrl) {
+      let persistedUrl: string | null = null;
+      if (supabaseUrl && serviceRoleKey) {
+        persistedUrl = await uploadToStorage(pollStatus.videoUrl, body.scanId);
+        if (persistedUrl) {
+          await updateScanWithVideo(body.scanId, persistedUrl);
+        }
+        await markVideoJobComplete(body.scanId, taskId, persistedUrl ?? pollStatus.videoUrl);
+      }
+      const finalUrl = persistedUrl ?? pollStatus.videoUrl;
+      return new Response(
+        JSON.stringify({
+          mode: "poll",
+          status: "SUCCESS",
+          videoUrl: finalUrl,
+          originalVideoUrl: pollStatus.videoUrl !== finalUrl ? pollStatus.videoUrl : undefined,
+          taskId,
+          provider: "runway",
+          persisted: !!persistedUrl,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (pollStatus.status === "FAILED") {
+      if (supabaseUrl && serviceRoleKey) {
+        await markVideoJobFailed(body.scanId, taskId, pollStatus.error ?? "Runway 생성 실패");
+      }
+      return new Response(
+        JSON.stringify({
+          mode: "poll",
+          status: "FAILED",
+          error: pollStatus.error ?? "Runway 비디오 생성에 실패했습니다.",
+          taskId,
+          provider: "runway",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        mode: "poll",
+        status: pollStatus.status,
+        progress: pollStatus.progress ?? "",
+        taskId,
+        provider: "runway",
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
   const status = await pollRunwayTask(taskId, runwayKey);
@@ -415,23 +551,24 @@ async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): 
     );
   }
 
-  // Check if the job was already marked FAILED
-  const jobStatus = await checkVideoJobStatus(scanId, taskId);
-  if (jobStatus?.status === "FAILED") {
+  // Check if the job was already marked FAILED or SUCCESS — look up by runway_task_id
+  const jobInfo = await findJobByRunwayTaskId(scanId, taskId);
+  if (jobInfo?.status === "FAILED") {
     return new Response(
-      JSON.stringify({ mode: "server-poll", status: "FAILED", error: jobStatus.error, taskId }),
+      JSON.stringify({ mode: "server-poll", status: "FAILED", error: jobInfo.error, taskId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-  if (jobStatus?.status === "SUCCESS" && jobStatus.videoUrl) {
+  if (jobInfo?.status === "SUCCESS" && jobInfo.videoUrl) {
     return new Response(
-      JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: jobStatus.videoUrl, taskId, persisted: true }),
+      JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: jobInfo.videoUrl, taskId, persisted: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
+  const internalJobId = jobInfo?.internalJobId ?? taskId;
 
   if (attempt >= SERVER_POLL_MAX_ATTEMPTS) {
-    await markVideoJobFailed(scanId, taskId, "서버 폴링이 최대 횟수에 도달했습니다. 좀비 작업으로 분류됩니다.");
+    await markVideoJobFailed(scanId, internalJobId, "서버 폴링이 최대 횟수에 도달했습니다. 좀비 작업으로 분류됩니다.");
     return new Response(
       JSON.stringify({ mode: "server-poll", status: "FAILED", error: "서버 폴링 한도 초과", taskId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -443,7 +580,7 @@ async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): 
 
   if (status.status === "SUCCESS" && status.videoUrl) {
     // Check if the webhook already completed this job — skip redundant work
-    const existing = await checkVideoJobStatus(scanId, taskId);
+    const existing = await findJobByRunwayTaskId(scanId, taskId);
     if (existing?.status === "SUCCESS" && existing.videoUrl) {
       return new Response(
         JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: existing.videoUrl, taskId, persisted: true, alreadyCompleted: true }),
@@ -457,7 +594,7 @@ async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): 
       if (persistedUrl) {
         await updateScanWithVideo(scanId, persistedUrl);
       }
-      await markVideoJobComplete(scanId, taskId, persistedUrl ?? status.videoUrl);
+      await markVideoJobComplete(scanId, internalJobId, persistedUrl ?? status.videoUrl);
     }
     await sendVideoCompletePush(scanId);
     return new Response(
@@ -474,7 +611,7 @@ async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): 
 
   if (status.status === "FAILED") {
     if (supabaseUrl && serviceRoleKey) {
-      await markVideoJobFailed(scanId, taskId, status.error ?? "Runway 생성 실패");
+      await markVideoJobFailed(scanId, internalJobId, status.error ?? "Runway 생성 실패");
     }
     return new Response(
       JSON.stringify({ mode: "server-poll", status: "FAILED", error: status.error, taskId }),
@@ -567,8 +704,8 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
       );
     }
 
-    // Check if server-poll already completed this job — skip redundant work
-    const existing = await checkVideoJobStatus(scanId, taskId);
+    // Check if server-poll already completed this job — look up by runway_task_id
+    const existing = await findJobByRunwayTaskId(scanId, taskId);
     if (existing?.status === "SUCCESS" && existing.videoUrl) {
       console.log("[generate-video] Webhook: job already completed by server-poll, skipping");
       return new Response(
@@ -576,6 +713,7 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const internalJobId = existing?.internalJobId ?? taskId;
 
     let persistedUrl: string | null = null;
     if (supabaseUrl && serviceRoleKey) {
@@ -583,7 +721,7 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
       if (persistedUrl) {
         await updateScanWithVideo(scanId, persistedUrl);
       }
-      await markVideoJobComplete(scanId, taskId, persistedUrl ?? videoUrl);
+      await markVideoJobComplete(scanId, internalJobId, persistedUrl ?? videoUrl);
     }
     await sendVideoCompletePush(scanId);
 
@@ -597,7 +735,9 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
   if (status === "FAILED" || status === "CANCELED") {
     const errMsg = body.failure ?? body.error ?? "Runway 생성 실패";
     if (supabaseUrl && serviceRoleKey) {
-      await markVideoJobFailed(scanId, taskId, errMsg);
+      const jobInfo = await findJobByRunwayTaskId(scanId, taskId);
+      const internalJobId = jobInfo?.internalJobId ?? taskId;
+      await markVideoJobFailed(scanId, internalJobId, errMsg);
     }
     return new Response(
       JSON.stringify({ mode: "webhook", status: "FAILED", error: errMsg }),
@@ -611,13 +751,13 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
   );
 }
 
-async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ status: string; error?: string; videoUrl?: string } | null> {
+async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ status: string; error?: string; videoUrl?: string; runwayTaskId?: string } | null> {
   if (!supabaseUrl || !serviceRoleKey) return null;
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&select=status,error_message,video_url,created_at`,
+      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&select=status,error_message,video_url,created_at,runway_task_id`,
       {
         headers: {
           apikey: serviceRoleKey,
@@ -628,7 +768,7 @@ async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ st
     );
     clearTimeout(timeoutId);
     if (resp.ok) {
-      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null; created_at: string }>;
+      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null; created_at: string; runway_task_id: string | null }>;
       if (rows.length > 0) {
         const row = rows[0];
         const isZombie = (row.status === 'PENDING' || row.status === 'PROCESSING' || row.status === 'RUNNING' || row.status === 'THROTTLED')
@@ -641,6 +781,7 @@ async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ st
           status: row.status,
           error: row.error_message ?? undefined,
           videoUrl: row.video_url ?? undefined,
+          runwayTaskId: row.runway_task_id ?? undefined,
         };
       }
     }
@@ -705,6 +846,68 @@ async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean, is
   } catch {
     // non-fatal
   }
+}
+
+async function updateRunwayTaskId(scanId: string, internalJobId: string, runwayTaskId: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${internalJobId}`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ runway_task_id: runwayTaskId }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal — server-poll can still find the job via task_id
+  }
+}
+
+async function findJobByRunwayTaskId(scanId: string, runwayTaskId: string): Promise<{ status: string; error?: string; videoUrl?: string; internalJobId?: string } | null> {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&runway_task_id=eq.${runwayTaskId}&select=status,error_message,video_url,task_id,created_at`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null; task_id: string; created_at: string }>;
+      if (rows.length > 0) {
+        const row = rows[0];
+        const isZombie = (row.status === 'PENDING' || row.status === 'PROCESSING' || row.status === 'RUNNING' || row.status === 'THROTTLED')
+          && Date.now() - new Date(row.created_at).getTime() > ZOMBIE_JOB_TIMEOUT_MS;
+        if (isZombie) {
+          await markVideoJobFailed(scanId, row.task_id, '영상 생성이 6분 이상 진행 중 상태로 멈춰 있어 좀비 작업으로 분류되었습니다. 다시 시도해주세요.');
+          return { status: 'FAILED', error: '영상 생성 작업이 시간 초과로 실패했습니다. 다시 시도해주세요.' };
+        }
+        return {
+          status: row.status,
+          error: row.error_message ?? undefined,
+          videoUrl: row.video_url ?? undefined,
+          internalJobId: row.task_id,
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 async function markVideoJobComplete(scanId: string, taskId: string, videoUrl: string): Promise<void> {
