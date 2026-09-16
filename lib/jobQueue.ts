@@ -138,7 +138,6 @@ export async function waitForJob<T = Record<string, unknown>>(
       finish({ success: false, error: 'Job timed out' });
     }, timeoutMs);
 
-    let consecutivePollErrors = 0;
     const pollErrorWindow: number[] = [];
     const POLL_ERROR_WINDOW_MS = 30000;
 
@@ -147,20 +146,18 @@ export async function waitForJob<T = Record<string, unknown>>(
       try {
         const job = await getJob(jobId);
         if (!job) { finish({ success: false, error: 'Job not found' }); return; }
-        consecutivePollErrors = 0;
         if (job.status === 'done') {
           finish({ success: true, result: (job.result ?? {}) as T });
         } else if (job.status === 'error') {
           finish({ success: false, error: job.error_message ?? 'Job failed' });
         }
       } catch {
-        consecutivePollErrors++;
         const now = Date.now();
         pollErrorWindow.push(now);
         while (pollErrorWindow.length > 0 && now - pollErrorWindow[0] > POLL_ERROR_WINDOW_MS) {
           pollErrorWindow.shift();
         }
-        if (consecutivePollErrors >= MAX_POLL_ERRORS || pollErrorWindow.length >= MAX_POLL_ERRORS) {
+        if (pollErrorWindow.length >= MAX_POLL_ERRORS) {
           finish({ success: false, error: '네트워크 연결이 불안정합니다. 다시 시도해주세요.' });
         }
       }

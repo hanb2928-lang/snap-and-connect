@@ -107,7 +107,6 @@ export function useQueuedJob() {
       }
     }).catch(() => {});
 
-    let consecutivePollErrors = 0;
     const pollErrorTimestamps: number[] = [];
     const POLL_ERROR_WINDOW_MS = 30000;
 
@@ -115,16 +114,14 @@ export function useQueuedJob() {
       if (mySubmitId !== submitIdRef.current) return;
       getJob(jobId).then((job) => {
         if (mySubmitId !== submitIdRef.current) return;
-        consecutivePollErrors = 0;
         if (job) handleUpdate(job);
       }).catch(() => {
-        consecutivePollErrors++;
         const now = Date.now();
         pollErrorTimestamps.push(now);
         while (pollErrorTimestamps.length > 0 && now - pollErrorTimestamps[0] > POLL_ERROR_WINDOW_MS) {
           pollErrorTimestamps.shift();
         }
-        if (consecutivePollErrors >= MAX_POLL_ERRORS || pollErrorTimestamps.length >= MAX_POLL_ERRORS) {
+        if (pollErrorTimestamps.length >= MAX_POLL_ERRORS) {
           if (mySubmitId !== submitIdRef.current) return;
           clearAll();
           setState((prev) => ({
