@@ -79,7 +79,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      try { videoRef.current.srcObject = null; } catch { /* element may be detached */ }
     }
     setCameraReady(false);
     onCameraReady?.(false);

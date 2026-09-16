@@ -176,16 +176,16 @@ export function StockVideoPicker({
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      try { videoRef.current.srcObject = null; } catch { /* element may be detached */ }
     }
     setCameraReady(false);
   }, []);
 
   const startCamera = useCallback(async (face: 'user' | 'environment') => {
     if (Platform.OS !== 'web') return;
+    if (!cameraMountedRef.current) return;
     stopCameraStream();
     const gen = ++streamGenRef.current;
-    cameraMountedRef.current = true;
     setCameraError(null);
     setCameraReady(false);
     try {
@@ -216,10 +216,16 @@ export function StockVideoPicker({
     }
   }, [stopCameraStream]);
 
+  const cameraOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleOpenCamera = useCallback(() => {
     setCapturedDataUrl(null);
     setShowCamera(true);
-    setTimeout(() => startCamera(facing), 100);
+    if (cameraOpenTimerRef.current) clearTimeout(cameraOpenTimerRef.current);
+    cameraOpenTimerRef.current = setTimeout(() => {
+      cameraOpenTimerRef.current = null;
+      startCamera(facing);
+    }, 100);
   }, [facing, startCamera]);
 
   const handleCloseCamera = useCallback(() => {
@@ -385,6 +391,10 @@ export function StockVideoPicker({
   useEffect(() => {
     return () => {
       cameraMountedRef.current = false;
+      if (cameraOpenTimerRef.current) {
+        clearTimeout(cameraOpenTimerRef.current);
+        cameraOpenTimerRef.current = null;
+      }
       stopCameraStream();
     };
   }, [stopCameraStream]);
