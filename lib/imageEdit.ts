@@ -272,7 +272,10 @@ export async function prepareImageForApi(
       if (moodFilter !== 'none') {
         applyMoodOverlay(ctx, canvas.width, canvas.height, moodFilter);
       }
-      return canvas.toDataURL('image/webp', quality);
+      const result = canvas.toDataURL('image/webp', quality);
+      canvas.width = 0;
+      canvas.height = 0;
+      return result;
     } catch {
       return normalizedDataUrl;
     }
@@ -315,7 +318,10 @@ export async function prepareImageForEdit(
       const ctx = canvas.getContext('2d');
       if (!ctx) return normalizedDataUrl;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      return canvas.toDataURL('image/png');
+      const result = canvas.toDataURL('image/png');
+      canvas.width = 0;
+      canvas.height = 0;
+      return result;
     } catch {
       return normalizedDataUrl;
     }
@@ -406,6 +412,9 @@ export async function extractVideoFrameBase64(
     if (!ctx) throw new Error('캔버스를 생성할 수 없습니다');
     ctx.drawImage(video, 0, 0, w, h);
     const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    canvas.width = 0;
+    canvas.height = 0;
+    video.src = '';
     return { base64: cleanBase64(dataUrl), mimeType: 'image/jpeg' };
   }
 

@@ -1130,9 +1130,19 @@ export default function ResultScreen() {
 
           const startTime = Date.now();
           let consecutiveErrors = 0;
+          const MAX_CONSECUTIVE_ERRORS = 8;
+          const POLL_TIMEOUT_MS = 300000;
 
           const pollOnce = async () => {
             if (cancelled) return;
+            if (Date.now() - startTime > POLL_TIMEOUT_MS) {
+              if (mountedRef.current) {
+                setVideoGenError('영상 생성 시간이 초과되었습니다. 다시 시도해주세요.');
+                setIsGeneratingVideo(false);
+                setVideoGenProgress(null);
+              }
+              return;
+            }
             try {
               const { data: pollData } = await supabase.functions.invoke('generate-video', {
                 body: { mode: 'poll', taskId, scanId: scan.id },
@@ -1173,7 +1183,14 @@ export default function ResultScreen() {
               }
             } catch {
               consecutiveErrors++;
-              // network blip — keep polling with backoff
+              if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                if (mountedRef.current) {
+                  setVideoGenError('네트워크 연결이 불안정하여 영상 생성 상태를 확인할 수 없습니다. 다시 시도해주세요.');
+                  setIsGeneratingVideo(false);
+                  setVideoGenProgress(null);
+                }
+                return;
+              }
             }
             // Schedule next poll with adaptive interval
             const elapsedMs = Date.now() - startTime;
@@ -1243,8 +1260,20 @@ export default function ResultScreen() {
     handleJobUpdateRef.current = handleJobUpdate;
 
     // Also poll the job as a fallback (realtime can miss events)
+    let pollErrorCount = 0;
+    const MAX_POLL_ERRORS = 10;
+    const ANALYSIS_TIMEOUT_MS = 300000;
+    const analysisStartTime = Date.now();
     const pollInterval = setInterval(async () => {
       if (!mountedRef.current) return;
+      if (Date.now() - analysisStartTime > ANALYSIS_TIMEOUT_MS) {
+        clearInterval(pollInterval);
+        if (mountedRef.current && analysisStatus === 'processing') {
+          setAnalysisStatus('error');
+          setAnalysisError('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+        }
+        return;
+      }
       try {
         const { data: jobRow } = await supabase
           .from('render_jobs')
@@ -1255,8 +1284,16 @@ export default function ResultScreen() {
           clearInterval(pollInterval);
           handleJobUpdate(jobRow as RenderJob);
         }
+        pollErrorCount = 0;
       } catch {
-        // network error — keep polling
+        pollErrorCount++;
+        if (pollErrorCount >= MAX_POLL_ERRORS) {
+          clearInterval(pollInterval);
+          if (mountedRef.current && analysisStatus === 'processing') {
+            setAnalysisStatus('error');
+            setAnalysisError('네트워크 연결이 불안정하여 분석 상태를 확인할 수 없습니다. 다시 시도해주세요.');
+          }
+        }
       }
     }, 3000);
 

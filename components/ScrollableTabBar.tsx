@@ -119,8 +119,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingTop: 10,
     paddingBottom: 8,
-    zIndex: 1,
-    elevation: 1,
+    zIndex: 9000,
+    elevation: 24,
   },
   tabRow: {
     flexDirection: 'row',
@@ -133,6 +133,8 @@ const styles = StyleSheet.create({
     maxWidth: 120,
     alignItems: 'center',
     paddingVertical: 6,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   iconWrap: {
     width: 54,
