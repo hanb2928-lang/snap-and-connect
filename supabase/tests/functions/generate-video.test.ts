@@ -204,6 +204,49 @@ describe('generate-video edge function', () => {
       expect(body.status).toBe('RUNNING');
       expect(body.progress).toBe('0.45');
     });
+
+    it('retries on transient 503 then succeeds', async () => {
+      let pollCallCount = 0;
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('/rest/v1/user_settings')) {
+          return Promise.resolve(jsonResponse([{ runway_api_key: 'user-key' }]));
+        }
+        if (url.includes('/rest/v1/scans?select=video_url')) {
+          return Promise.resolve(jsonResponse([{ video_url: null }]));
+        }
+        if (url.includes('/rest/v1/video_jobs')) {
+          return Promise.resolve(jsonResponse([]));
+        }
+        if (url.includes('api.dev.runwayml.com/v1/tasks/')) {
+          pollCallCount++;
+          if (pollCallCount === 1) {
+            return Promise.resolve(jsonResponse({ error: 'Service Unavailable' }, 503));
+          }
+          return Promise.resolve(jsonResponse({
+            status: 'SUCCEEDED',
+            output: ['https://cdn.runway.com/video.mp4'],
+          }));
+        }
+        if (url.includes('/storage/v1/object/videos/')) {
+          return Promise.resolve(jsonResponse({}, 200));
+        }
+        if (url.includes('/rest/v1/scans?id=eq.')) {
+          return Promise.resolve(jsonResponse({}, 200));
+        }
+        return Promise.resolve(jsonResponse({}, 200));
+      });
+
+      const req = new Request('https://test.supabase.co/functions/v1/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'poll', taskId: 'task-123', scanId: 'scan-456' }),
+      });
+      const resp = await handler(req);
+      expect(resp.status).toBe(200);
+      const body = await resp.json();
+      expect(body.status).toBe('SUCCESS');
+      expect(pollCallCount).toBe(2);
+    });
   });
 
   describe('webhook mode', () => {
@@ -286,10 +329,40 @@ describe('generate-video edge function', () => {
       expect(body.status).toBe('FAILED');
       expect(body.error).toContain('render error');
     });
+
+    it('skips duplicate SUCCESS webhook when job already completed', async () => {
+      mockFetch.mockImplementation((url: string, opts?: any) => {
+        // findJobByRunwayTaskId returns a SUCCESS row
+        if (url.includes('/rest/v1/video_jobs') && url.includes('runway_task_id=eq.') && url.includes('select=')) {
+          return Promise.resolve(jsonResponse([{
+            status: 'SUCCESS',
+            error_message: null,
+            video_url: 'https://test.supabase.co/storage/v1/object/videos/existing.mp4',
+            task_id: 'internal-job-1',
+            created_at: new Date().toISOString(),
+          }]));
+        }
+        return Promise.resolve(jsonResponse({}, 200));
+      });
+
+      const req = new Request(
+        'https://test.supabase.co/functions/v1/generate-video?mode=webhook&taskId=runway-1&scanId=scan-1',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'SUCCESS', output: ['https://cdn.runway.com/new.mp4'] }),
+        },
+      );
+      const resp = await handler(req);
+      expect(resp.status).toBe(200);
+      const body = await resp.json();
+      expect(body.status).toBe('SUCCESS');
+      expect(body.alreadyCompleted).toBe(true);
+    });
   });
 
   describe('key resolution', () => {
-    it('returns 503 when no Runway API key is configured', async () => {
+    it('returns 503 when no Runway API key is configured for poll mode', async () => {
       (global as any).__DENO_ENV__ = {
         SUPABASE_URL: 'https://test.supabase.co',
         SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
@@ -305,12 +378,45 @@ describe('generate-video edge function', () => {
       const req = new Request('https://test.supabase.co/functions/v1/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'submit', prompt: 'test' }),
+        body: JSON.stringify({ mode: 'poll', taskId: 'task-123' }),
       });
       const resp = await handler(req);
       expect(resp.status).toBe(503);
       const body = await resp.json();
       expect(body.error).toContain('Runway API 키');
+    });
+  });
+
+  describe('submit mode (async)', () => {
+    it('returns 202 immediately with taskId and PENDING status', async () => {
+      mockFetch.mockImplementation((url: string, opts?: any) => {
+        if (url.includes('/rest/v1/rpc/check_rate_limit')) {
+          return Promise.resolve(jsonResponse(true));
+        }
+        if (url.includes('/rest/v1/video_jobs') && opts?.method === 'POST') {
+          return Promise.resolve(jsonResponse({}, 201));
+        }
+        // self-invoke runway-submit — mock as success
+        if (url.includes('/functions/v1/generate-video') && opts?.method === 'POST') {
+          const body = JSON.parse(opts.body);
+          if (body.mode === 'runway-submit') {
+            return Promise.resolve(jsonResponse({ mode: 'runway-submit', status: 'SUBMITTED' }));
+          }
+        }
+        return Promise.resolve(jsonResponse({}, 200));
+      });
+
+      const req = new Request('https://test.supabase.co/functions/v1/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'submit', prompt: 'test', scanId: 'scan-123' }),
+      });
+      const resp = await handler(req);
+      expect(resp.status).toBe(202);
+      const body = await resp.json();
+      expect(body.taskId).toBeDefined();
+      expect(body.status).toBe('PENDING');
+      expect(body.provider).toBe('runway');
     });
   });
 

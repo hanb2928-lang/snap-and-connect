@@ -60,13 +60,13 @@ interface GenerateVideoRequest {
   error?: string;
 }
 
-const MAX_RETRIES = 1;
-const RETRY_DELAY_MS = 1500;
+const MAX_RETRIES = 3; // Max retry attempts for transient API errors (4 total attempts)
+const RETRY_INITIAL_DELAY_MS = 1500; // Base delay for first retry, doubled each attempt
 const RUNWAY_SUBMIT_TIMEOUT_MS = 20000;
 const RUNWAY_POLL_TIMEOUT_MS = 10000;
 const EDGE_WALL_CLOCK_BUDGET_MS = 120000;
-const ZOMBIE_JOB_TIMEOUT_MS = 360000; // 6 minutes — must exceed server-poll total budget so active jobs aren't marked zombie
-const SERVER_POLL_MAX_ATTEMPTS = 40; // ~6 min of polling with jitter, covers 2-4 min Runway renders + HD upscale
+const ZOMBIE_JOB_TIMEOUT_MS = 600000; // 10 minutes — jobs exceeding this in PENDING/PROCESSING are auto-failed
+const SERVER_POLL_MAX_ATTEMPTS = 60; // ~10 min of polling with jitter, covers 2-4 min Runway renders + HD upscale + retries
 const SERVER_POLL_INITIAL_DELAY_MS = 4000;
 const SERVER_POLL_MAX_DELAY_MS = 15000;
 const SERVER_POLL_SELF_INVOKE_TIMEOUT_MS = 15000; // AbortController timeout for self-reinvocation fetch
@@ -415,6 +415,23 @@ async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promis
           error: jobStatus.error ?? "Runway 비디오 생성에 실패했습니다.",
           taskId,
           provider: "runway",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Idempotency: if the job is already SUCCESS in DB, return immediately
+    // without polling Runway again. This prevents redundant API calls from
+    // repeated client polls after completion.
+    if (jobStatus?.status === "SUCCESS" && jobStatus.videoUrl) {
+      return new Response(
+        JSON.stringify({
+          mode: "poll",
+          status: "SUCCESS",
+          videoUrl: jobStatus.videoUrl,
+          taskId,
+          provider: "runway",
+          persisted: true,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1109,62 +1126,122 @@ async function pollRunwayTask(
   taskId: string,
   apiKey: string,
 ): Promise<{ status: string; videoUrl?: string; error?: string; progress?: string }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
+  let lastErr: string | null = null;
 
-  try {
-    const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Runway-Version": "2024-11-06",
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RUNWAY_POLL_TIMEOUT_MS);
 
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      return { status: "FAILED", error: `Runway 폴링 실패 (HTTP ${resp.status}): ${parseRunwayError(errText)}` };
-    }
-
-    const respText = await resp.text();
-    const trimmed = respText.trim();
-    if (trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<HTML")) {
-      return { status: "FAILED", error: "Runway API 서버가 HTML 페이지를 반환했습니다. API 엔드포인트 경로가 잘못되었거나 서버가 일시적으로 사용 불가능합니다." };
-    }
-
-    let result: Record<string, unknown>;
     try {
-      result = JSON.parse(trimmed);
-    } catch {
-      return { status: "FAILED", error: `Runway 폴링 실패: 유효하지 않은 응답 형식 (HTTP ${resp.status})` };
-    }
-    const status = (result.status as string) ?? "PROCESSING";
-    const progress = result.progress != null ? String(result.progress) : "";
+      const resp = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "X-Runway-Version": "2024-11-06",
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
 
-    if (status === "SUCCESS" || status === "SUCCEEDED" || status === "COMPLETED") {
-      const output = result.output;
-      const videoUrl = typeof output === "string"
-        ? output
-        : Array.isArray(output) ? output[0] : output?.url ?? result.artifacts?.[0]?.url ?? result.url;
-      if (!videoUrl) return { status: "FAILED", error: "Runway 비디오 URL이 없습니다." };
-      return { status: "SUCCESS", videoUrl, progress };
-    }
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        const errDetail = parseRunwayError(errText);
 
-    if (status === "FAILED" || status === "CANCELED") {
-      const errMsg = result.failure ?? result.error ?? "Runway 생성 실패";
-      return { status: "FAILED", error: errMsg };
-    }
+        // 5xx errors are transient — retry with backoff
+        if (resp.status >= 500 && resp.status < 600 && attempt < MAX_RETRIES) {
+          lastErr = `Runway 폴링 실패 (HTTP ${resp.status}): ${errDetail}`;
+          const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (HTTP ${resp.status})`);
+          await delay(backoffDelay);
+          continue;
+        }
 
-    return { status, progress };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error && err.name === "AbortError") {
-      return { status: "PROCESSING", progress: "polling timeout, retrying" };
+        // 4xx errors (except 429) are non-retryable — fail immediately
+        if (resp.status === 429 && attempt < MAX_RETRIES) {
+          lastErr = `Runway API 요청 한도 초과 (HTTP 429): ${errDetail}`;
+          const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (HTTP 429)`);
+          await delay(backoffDelay);
+          continue;
+        }
+
+        return { status: "FAILED", error: `Runway 폴링 실패 (HTTP ${resp.status}): ${errDetail}` };
+      }
+
+      const respText = await resp.text();
+      const trimmed = respText.trim();
+      if (trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<HTML")) {
+        // HTML response is transient (server maintenance) — retry
+        if (attempt < MAX_RETRIES) {
+          lastErr = "Runway API 서버가 HTML 페이지를 반환했습니다.";
+          const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (HTML response)`);
+          await delay(backoffDelay);
+          continue;
+        }
+        return { status: "FAILED", error: "Runway API 서버가 HTML 페이지를 반환했습니다. API 엔드포인트 경로가 잘못되었거나 서버가 일시적으로 사용 불가능합니다." };
+      }
+
+      let result: Record<string, unknown>;
+      try {
+        result = JSON.parse(trimmed);
+      } catch {
+        // Invalid JSON is transient — retry
+        if (attempt < MAX_RETRIES) {
+          lastErr = `Runway 폴링 실패: 유효하지 않은 응답 형식 (HTTP ${resp.status})`;
+          const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (invalid JSON)`);
+          await delay(backoffDelay);
+          continue;
+        }
+        return { status: "FAILED", error: `Runway 폴링 실패: 유효하지 않은 응답 형식 (HTTP ${resp.status})` };
+      }
+      const status = (result.status as string) ?? "PROCESSING";
+      const progress = result.progress != null ? String(result.progress) : "";
+
+      if (status === "SUCCESS" || status === "SUCCEEDED" || status === "COMPLETED") {
+        const output = result.output;
+        const videoUrl = typeof output === "string"
+          ? output
+          : Array.isArray(output) ? output[0] : output?.url ?? result.artifacts?.[0]?.url ?? result.url;
+        if (!videoUrl) return { status: "FAILED", error: "Runway 비디오 URL이 없습니다." };
+        return { status: "SUCCESS", videoUrl, progress };
+      }
+
+      if (status === "FAILED" || status === "CANCELED") {
+        const errMsg = result.failure ?? result.error ?? "Runway 생성 실패";
+        return { status: "FAILED", error: errMsg };
+      }
+
+      return { status, progress };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof Error && err.name === "AbortError") {
+        // Timeout — treat as transient, retry with backoff
+        if (attempt < MAX_RETRIES) {
+          lastErr = "Runway 폴링 시간 초과";
+          const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (timeout)`);
+          await delay(backoffDelay);
+          continue;
+        }
+        return { status: "PROCESSING", progress: "polling timeout, will retry on next poll cycle" };
+      }
+      // Network error — retry with backoff
+      if (attempt < MAX_RETRIES) {
+        lastErr = err instanceof Error ? err.message : "Runway 폴링 네트워크 오류";
+        const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+        console.log(`[generate-video] Poll retry ${attempt + 1}/${MAX_RETRIES} after ${backoffDelay}ms (network error: ${lastErr})`);
+        await delay(backoffDelay);
+        continue;
+      }
+      console.error("[generate-video] Poll error after all retries:", err);
+      return { status: "FAILED", error: lastErr ?? "Runway 폴링 오류" };
     }
-    console.error("[generate-video] Poll error:", err);
-    return { status: "FAILED", error: "Runway 폴링 오류" };
   }
+
+  // All retries exhausted — return PROCESSING so server-poll continues to next cycle
+  console.error("[generate-video] Poll: all retries exhausted, returning PROCESSING:", lastErr);
+  return { status: "PROCESSING", progress: lastErr ?? "transient error, will retry on next poll cycle" };
 }
 
 // === Shared helpers ===
@@ -1410,8 +1487,11 @@ async function submitWithRetry(fn: () => Promise<string>, maxRetries: number): P
       return await fn();
     } catch (err) {
       lastErr = err instanceof Error ? err : new Error(String(err));
-      if (attempt < maxRetries && Date.now() + RETRY_DELAY_MS < deadline) {
-        await delay(RETRY_DELAY_MS * (attempt + 1));
+      // Exponential backoff: 1.5s, 3s, 6s, 12s — stop if next delay exceeds deadline
+      const backoffDelay = RETRY_INITIAL_DELAY_MS * Math.pow(2, attempt);
+      if (attempt < maxRetries && Date.now() + backoffDelay < deadline) {
+        console.log(`[generate-video] Retry ${attempt + 1}/${maxRetries} after ${backoffDelay}ms:`, lastErr.message);
+        await delay(backoffDelay);
       }
     }
   }
