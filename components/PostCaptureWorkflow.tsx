@@ -271,7 +271,8 @@ export function PostCaptureWorkflow({
     [selectedOption.key, selectedOption.customSpec],
   );
 
-  const hookOptions = useMemo(() => generateHookOptions(customPrompt), [customPrompt]);
+  const derivedProductName = customPrompt.trim().split(/[,.]/)[0]?.trim() || undefined;
+  const hookOptions = useMemo(() => generateHookOptions(customPrompt, derivedProductName), [customPrompt, derivedProductName]);
   const selectedHook = useMemo(
     () => hookOptions.find((h) => h.id === selectedHookId) ?? hookOptions[0] ?? null,
     [hookOptions, selectedHookId],
@@ -282,7 +283,7 @@ export function PostCaptureWorkflow({
       selectedOption.key,
       customPrompt,
       selectedHook?.text ?? null,
-      customPrompt.trim().split(/[,.]/)[0]?.trim() || undefined,
+      derivedProductName,
       [],
       true,
       disclosureEnabled,
@@ -300,7 +301,7 @@ export function PostCaptureWorkflow({
           }
         : undefined,
     ),
-    [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled, bgmRecommendation],
+    [selectedOption.key, selectedOption.customSpec, customPrompt, selectedHook, disclosureEnabled, bgmRecommendation, derivedProductName],
   );
 
   const fusionInfo = useMemo(() => describeMultiAngleFusion(imageUri ? 1 : 0), [imageUri]);
@@ -495,10 +496,13 @@ export function PostCaptureWorkflow({
   const platformLabel = selectedOption.label;
   const spec = editPlan.spec;
 
+  if (!visible) return null;
+
   if (mediaError) {
     return (
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+      <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+        <View style={styles.overlay}>
+          <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>입체컷 오토 · 4단계로 숏폼 완성</Text>
             <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.closeBtn}>
@@ -513,10 +517,12 @@ export function PostCaptureWorkflow({
           </View>
         </View>
       </View>
+      </Modal>
     );
   }
 
   return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
     <View style={styles.overlay}>
       <View style={styles.sheet}>
         <View style={styles.header}>
@@ -1005,6 +1011,7 @@ export function PostCaptureWorkflow({
         </View>
       </Modal>
     </View>
+    </Modal>
   );
 }
 
@@ -1034,14 +1041,8 @@ function VerticalStepCard({ stepNum, title, subtitle, children }: VerticalStepCa
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '100%',
+    flex: 1,
     backgroundColor: 'rgba(5, 8, 18, 0.92)',
-    zIndex: 200,
   },
   sheet: {
     flex: 1,

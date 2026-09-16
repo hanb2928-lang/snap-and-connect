@@ -460,10 +460,25 @@ export default function CameraScreen() {
       setPostCaptureVideoUri(payload);
       postCaptureVideoUriRef.current = payload;
     } else {
-      setPostCaptureBase64(payload);
-      postCaptureBase64Ref.current = payload;
-      setPostCaptureMime(mimeType);
-      postCaptureMimeRef.current = mimeType;
+      try {
+        const compressed = await prepareImageForApi(
+          buildDataUrl(cleanBase64(payload), mimeType),
+          1080,
+          0.7,
+          'none' as MoodFilterType,
+        );
+        const b64 = cleanBase64(compressed);
+        const mime = getMimeTypeFromDataUrl(compressed);
+        setPostCaptureBase64(b64);
+        postCaptureBase64Ref.current = b64;
+        setPostCaptureMime(mime);
+        postCaptureMimeRef.current = mime;
+      } catch {
+        setPostCaptureBase64(cleanBase64(payload));
+        postCaptureBase64Ref.current = cleanBase64(payload);
+        setPostCaptureMime(mimeType);
+        postCaptureMimeRef.current = mimeType;
+      }
       setPostCaptureVideoUri(null);
       postCaptureVideoUriRef.current = null;
     }
@@ -1019,17 +1034,17 @@ export default function CameraScreen() {
       />
 
       {/* Auto-save toast */}
-      {autoSaveToast && (
+      <Modal visible={!!autoSaveToast} transparent animationType="fade">
         <View style={styles.autoSaveToastWrap}>
           <View style={styles.autoSaveToastInner}>
             <Check size={18} color={theme.colors.success[400]} strokeWidth={2.5} />
             <Text style={styles.autoSaveToastText}>{autoSaveToast}</Text>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Auto-saving overlay */}
-      {autoSaving && (
+      <Modal visible={autoSaving} transparent animationType="fade">
         <View style={styles.autoSavingOverlay}>
           <View style={styles.autoSavingCard}>
             <Animated.View style={{ transform: [{ scale: autoSavePulse }] }}>
@@ -1048,7 +1063,7 @@ export default function CameraScreen() {
             </Text>
           </View>
         </View>
-      )}
+      </Modal>
 
       <PostCaptureWorkflow
         key={`pcw-native-${workflowMountKey}`}
@@ -1452,12 +1467,9 @@ const styles = StyleSheet.create({
   },
   // Auto-save toast
   autoSaveToastWrap: {
-    position: 'absolute',
-    top: '40%',
-    left: 0,
-    right: 0,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 150,
   },
   autoSaveToastInner: {
     flexDirection: 'row',
@@ -1480,11 +1492,10 @@ const styles = StyleSheet.create({
   },
   // Auto-saving overlay
   autoSavingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(5, 8, 18, 0.7)',
-    zIndex: 140,
   },
   autoSavingCard: {
     backgroundColor: theme.colors.dark.surface,

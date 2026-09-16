@@ -411,7 +411,6 @@ export default function ResultScreen() {
   const [ttsUrl, setTtsUrl] = useState<string | null>(null);
   const [focusTileKey, setFocusTileKey] = useState<string | null>(null);
   const [safetyCheckerVisible, setSafetyCheckerVisible] = useState(false);
-  const [cleanMode, setCleanMode] = useState(false);
   const [inlineEdit, setInlineEdit] = useState<InlineEditState>({
     volumeIntensity: 0.75,
     hookEffect: 'rotation_zoom' as HookEffectType,
@@ -620,6 +619,27 @@ export default function ResultScreen() {
     setIsGeneratingVideo(true);
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
+
+    // Before submitting a new job, check if a previous one already completed
+    // (e.g. after a client-side timeout the server may have finished rendering)
+    try {
+      const recovered = await recoverVideoJob(scan.id);
+      if (recovered?.status === 'SUCCESS' && recovered.videoUrl) {
+        if (mountedRef.current) {
+          setGeneratedVideoUrl(recovered.videoUrl);
+          setVideoStage(recovered.isHd ? 'hd_ready' : 'draft_ready');
+          setIsGeneratingVideo(false);
+          setVideoGenProgress(null);
+          setVideoGenError(null);
+        }
+        return;
+      }
+      if (recovered?.status === 'FAILED') {
+        // Previous job failed — clear it so we can submit a fresh one
+      }
+    } catch {
+      // Recovery check failed — proceed with new submission
+    }
 
     const videoCutImages = narrativeReorderedImages.length > 0 ? narrativeReorderedImages : allCutImages;
 
@@ -1024,6 +1044,8 @@ export default function ResultScreen() {
         setLocalStoreInfo(scanData.local_store_info ?? null);
         if (scanData.template_data?.cleanMode) {
           setIsCleanVideoMode(true);
+        } else if (settingsResult?.clean_footage_enabled) {
+          setIsCleanVideoMode(true);
         }
         if (scanData.video_url) {
           setGeneratedVideoUrl(scanData.video_url);
@@ -1033,7 +1055,6 @@ export default function ResultScreen() {
         }
       }
       if (mountedRef.current) setSettings(settingsResult);
-      setCleanMode(!!settingsResult?.clean_footage_enabled);
     } catch (err) {
       if (mountedRef.current) setError(friendlyError(err, '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.'));
     } finally {
@@ -1288,6 +1309,45 @@ export default function ResultScreen() {
       bgVideoChannelRef.current = null;
     };
   }, [scan, generatedVideoUrl, activePlatform]);
+
+  // Realtime subscription on the scans row itself: when the background
+  // stereo pipeline (or any other background task) writes text data
+  // (template_data, one_liner, summary, product_name) to the scan row
+  // after the user has already landed on this page, re-fetch so the
+  // generated hooks/captions appear without requiring a manual reload.
+  useEffect(() => {
+    if (!scan) return;
+    let skipInitial = true;
+    const channel = supabase
+      .channel(`scan-row-watch:${scan.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'scans', filter: `id=eq.${scan.id}` },
+        () => {
+          if (!mountedRef.current) return;
+          if (skipInitial) {
+            skipInitial = false;
+            return;
+          }
+          Promise.resolve(
+            supabase
+              .from('scans')
+              .select('*')
+              .eq('id', scan.id)
+              .maybeSingle(),
+          ).then(({ data }) => {
+            if (mountedRef.current && data) {
+              setScan(data as Scan);
+            }
+          }).catch(() => {});
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [scan?.id]);
 
   // Realtime subscription for async analysis job completion
   useEffect(() => {
@@ -1550,7 +1610,7 @@ export default function ResultScreen() {
   const td = activeTemplateData;
   const platformVariant = td?.platformVariants?.[activePlatform];
   const activeHook = hookOverride || platformVariant?.hook || td?.hook || productVision?.suggestedCopyLayers.primary || '';
-  useEffect(() => { activeHookRef.current = activeHook; }, [activeHook]);
+  activeHookRef.current = activeHook;
   const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || productVision?.suggestedCopyLayers.secondary || '');
   const activeHashtags = platformVariant?.hashtags || td?.hashtags || [];
   const allDisplayHashtags = [...activeHashtags, ...addedHashtags];
@@ -2063,9 +2123,9 @@ export default function ResultScreen() {
         subtitleCopy: productVision.suggestedCopyLayers.secondary,
       });
     }
-    const hookText = activeHook || activeOneLiner || scan?.summary || '';
+    const hookText = activeHook || activeOneLiner || scan?.summary || scan?.product_name || scan?.one_liner || '';
     const ctaText = shortUrl ? `자세히 보기 ${shortUrl}` : '지금 확인하세요';
-    const featureText = activeCaption || inlineEdit.captionText || '';
+    const featureText = activeCaption || inlineEdit.captionText || scan?.one_liner || '';
     if (!hookText && !featureText) return null;
     return buildCopyOverlayTimeline({
       title: hookText,
@@ -2074,7 +2134,7 @@ export default function ResultScreen() {
       ctaCopy: ctaText,
       subtitleCopy: featureText,
     });
-  }, [productVision, isCleanVideoMode, activeHook, activeOneLiner, scan?.summary, activeCaption, inlineEdit.captionText, shortUrl]);
+  }, [productVision, isCleanVideoMode, activeHook, activeOneLiner, scan?.summary, scan?.product_name, scan?.one_liner, activeCaption, inlineEdit.captionText, shortUrl]);
 
   const trendingSuggestions = getTrendingSuggestions(trendingHashtags, [...activeHashtags, ...addedHashtags]);
 
@@ -2248,12 +2308,12 @@ export default function ResultScreen() {
                     <Text style={styles.cleanModeDesc}>텍스트 오버레이 없이 순수 원본 비주얼만 추출</Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setCleanMode((v) => !v)}
+                    onPress={() => setIsCleanVideoMode((v) => !v)}
                     activeOpacity={0.7}
                     hitSlop={12}
                   >
-                    <View style={[styles.cleanModeSwitch, cleanMode && styles.cleanModeSwitchActive]}>
-                      <View style={[styles.cleanModeKnob, cleanMode && styles.cleanModeKnobActive]} />
+                    <View style={[styles.cleanModeSwitch, isCleanVideoMode && styles.cleanModeSwitchActive]}>
+                      <View style={[styles.cleanModeKnob, isCleanVideoMode && styles.cleanModeKnobActive]} />
                     </View>
                   </TouchableOpacity>
                 </View>

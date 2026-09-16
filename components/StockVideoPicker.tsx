@@ -167,6 +167,7 @@ export function StockVideoPicker({
   const streamRef = useRef<MediaStream | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cameraMountedRef = useRef(true);
+  const streamGenRef = useRef(0);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
 
   const stopCameraStream = useCallback(() => {
@@ -183,6 +184,7 @@ export function StockVideoPicker({
   const startCamera = useCallback(async (face: 'user' | 'environment') => {
     if (Platform.OS !== 'web') return;
     stopCameraStream();
+    const gen = ++streamGenRef.current;
     cameraMountedRef.current = true;
     setCameraError(null);
     setCameraReady(false);
@@ -191,7 +193,7 @@ export function StockVideoPicker({
         video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
-      if (!cameraMountedRef.current) {
+      if (!cameraMountedRef.current || gen !== streamGenRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -199,9 +201,10 @@ export function StockVideoPicker({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        if (cameraMountedRef.current) setCameraReady(true);
+        if (cameraMountedRef.current && gen === streamGenRef.current) setCameraReady(true);
       }
     } catch (err) {
+      if (!cameraMountedRef.current || gen !== streamGenRef.current) return;
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
       if (msg.includes('Permission') || msg.includes('NotAllowed')) {
         setCameraError('카메라 권한이 필요합니다. 브라우저 설정에서 카메라를 허용해주세요.');
@@ -254,6 +257,8 @@ export function StockVideoPicker({
       }
       ctx.drawImage(video, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      canvas.width = 0;
+      canvas.height = 0;
       setCapturedDataUrl(dataUrl);
     } catch {
       setCameraError('촬영에 실패했습니다. 다시 시도해주세요.');

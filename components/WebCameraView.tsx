@@ -180,6 +180,8 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       }
       ctx.drawImage(video, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      canvas.width = 0;
+      canvas.height = 0;
       const compressed = await prepareImageForApi(dataUrl, 1080, 0.7);
       const b64 = cleanBase64(compressed);
       const mime = getMimeTypeFromDataUrl(compressed);

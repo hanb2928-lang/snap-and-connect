@@ -116,6 +116,10 @@ export function generateHookOptions(customPrompt: string, productName?: string):
     }
   }
 
+  if (hooks.length === 0) {
+    hooks.push({ id: 1, text: `${nameShort} 진짜인지 확인하셈`, psychology: '호기심', emotion: 'curiosity' });
+  }
+
   return hooks.slice(0, 3);
 }
 
@@ -342,7 +346,8 @@ export function buildShortFormEditPlan(
   const { label, spec, safeZone } = getPlatformInfo(platform, customSpec);
   const totalDurationSec = 15;
   const hookOptions = generateHookOptions(customPrompt, productName);
-  const hook = selectedHook || hookOptions[0]?.text || '';
+  const fallbackHook = hookOptions[0]?.text || '이거 보면 무조건 클릭';
+  const hook = selectedHook || fallbackHook;
   const matchedHook = hookOptions.find((h) => h.text === hook);
   const emotion: EmotionPhase = matchedHook?.emotion ?? 'curiosity';
   const story = buildStoryNarrative(hook, emotion, productName);

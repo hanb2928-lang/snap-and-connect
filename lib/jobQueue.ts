@@ -99,26 +99,40 @@ export async function waitForJob<T = Record<string, unknown>>(
       resolve(result);
     };
 
-    channel = supabase
-      .channel(`job-wait:${jobId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
-        (payload) => {
-          if (!payload.new) return;
-          const job = payload.new as RenderJob;
-          if (job.status === 'done') {
-            finish({ success: true, result: (job.result ?? {}) as T });
-          } else if (job.status === 'error') {
-            finish({ success: false, error: job.error_message ?? 'Job failed' });
+    let channelRetryCount = 0;
+    const MAX_WAIT_CHANNEL_RETRIES = 5;
+    const connectChannel = () => {
+      channel = supabase
+        .channel(`job-wait:${jobId}${channelRetryCount > 0 ? `:r${channelRetryCount}` : ''}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
+          (payload) => {
+            if (!payload.new) return;
+            const job = payload.new as RenderJob;
+            if (job.status === 'done') {
+              finish({ success: true, result: (job.result ?? {}) as T });
+            } else if (job.status === 'error') {
+              finish({ success: false, error: job.error_message ?? 'Job failed' });
+            }
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' && !settled) {
+            if (channel) {
+              supabase.removeChannel(channel);
+              channel = undefined;
+            }
+            channelRetryCount++;
+            if (channelRetryCount > MAX_WAIT_CHANNEL_RETRIES) {
+              finish({ success: false, error: '실시간 연결이 끊겼습니다. 네트워크를 확인해주세요.' });
+            } else {
+              setTimeout(connectChannel, 3000);
+            }
           }
-        },
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' && !settled) {
-          finish({ success: false, error: '실시간 연결이 끊겼습니다. 네트워크를 확인해주세요.' });
-        }
-      });
+        });
+    };
+    connectChannel();
 
     timeoutTimer = setTimeout(() => {
       finish({ success: false, error: 'Job timed out' });
@@ -157,31 +171,61 @@ export async function waitForJob<T = Record<string, unknown>>(
   });
 }
 
+const MAX_CHANNEL_RETRIES = 5;
+const CHANNEL_RETRY_DELAY_MS = 3000;
+
 export function subscribeToJob(
   jobId: string,
   onUpdate: (job: RenderJob) => void,
   onError?: () => void,
 ): { unsubscribe: () => void } {
-  const channel = supabase
-    .channel(`job:${jobId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
-      (payload) => {
-        if (payload.new) {
-          onUpdate(payload.new as RenderJob);
+  let disposed = false;
+  let retryCount = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+
+  const connect = () => {
+    if (disposed) return;
+
+    currentChannel = supabase
+      .channel(`job:${jobId}${retryCount > 0 ? `:r${retryCount}` : ''}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'render_jobs', filter: `id=eq.${jobId}` },
+        (payload) => {
+          if (payload.new) {
+            retryCount = 0;
+            onUpdate(payload.new as RenderJob);
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (disposed) return;
+        if (status === 'CHANNEL_ERROR') {
+          if (currentChannel) {
+            supabase.removeChannel(currentChannel);
+            currentChannel = null;
+          }
+          retryCount++;
+          if (retryCount > MAX_CHANNEL_RETRIES) {
+            if (onError) onError();
+          } else {
+            retryTimer = setTimeout(connect, CHANNEL_RETRY_DELAY_MS);
+          }
         }
-      },
-    )
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' && onError) {
-        onError();
-      }
-    });
+      });
+  };
+
+  connect();
 
   return {
     unsubscribe: () => {
-      supabase.removeChannel(channel);
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (currentChannel) {
+        supabase.removeChannel(currentChannel);
+        currentChannel = null;
+      }
     },
   };
 }
