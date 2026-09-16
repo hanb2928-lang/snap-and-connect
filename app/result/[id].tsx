@@ -120,7 +120,7 @@ import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { getBgmTemplateForMood } from '@/lib/bgmEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
-import { generateAiVideo, submitVideoDraft, upgradeVideoToHd, subscribeHdUpgrade, recoverVideoJob, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { submitVideoJobAsync, subscribeVideoJob, upgradeVideoToHd, subscribeHdUpgrade, recoverVideoJob, type VideoGenProgress } from '@/lib/aiVideoPipeline';
 import { analyzeProductVision, type ProductVisionResult } from '@/lib/productVision';
 import {
   buildViralAudioSyncProfile,
@@ -136,6 +136,7 @@ import { HumanTtsProfileCard } from '@/components/HumanTtsProfileCard';
 import { ViralFormulaCard } from '@/components/ViralFormulaCard';
 import { AutoHookSubtitleCard } from '@/components/AutoHookSubtitleCard';
 import { VirtualFittingLoadingOverlay } from '@/components/VirtualFittingLoadingOverlay';
+import { useWebPush } from '@/hooks/useWebPush';
 import { DirectShareBridge } from '@/components/DirectShareBridge';
 import { buildCopyOverlayTimeline } from '@/lib/promptBuilder';
 import type { CopyOverlayTimeline } from '@/lib/promptBuilder';
@@ -435,6 +436,7 @@ export default function ResultScreen() {
   const [draftVideoUrl, setDraftVideoUrl] = useState<string | null>(null);
   const [hdUpgradeProgress, setHdUpgradeProgress] = useState<string | null>(null);
   const hdUnsubRef = useRef<(() => void) | null>(null);
+  const videoUnsubRef = useRef<(() => void) | null>(null);
   const videoGenLockRef = useRef(false);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
@@ -477,6 +479,8 @@ export default function ResultScreen() {
   const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
   const [targetMediaType, setTargetMediaType] = useState<TargetMediaType>('video');
   const [bgJobNotice, setBgJobNotice] = useState<string | null>(null);
+  const [pushPromptVisible, setPushPromptVisible] = useState(false);
+  const { supported: pushSupported, isSubscribed: pushSubscribed, subscribe: subscribePush } = useWebPush();
   const autoSavedVideoRef = useRef<string | null>(null);
   const bgVideoChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -619,6 +623,7 @@ export default function ResultScreen() {
     if (!scan || isGeneratingVideo || videoGenLockRef.current) return;
     videoGenLockRef.current = true;
     if (hdUnsubRef.current) { hdUnsubRef.current(); hdUnsubRef.current = null; }
+    if (videoUnsubRef.current) { videoUnsubRef.current(); videoUnsubRef.current = null; }
     setIsGeneratingVideo(true);
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
@@ -729,9 +734,10 @@ export default function ResultScreen() {
     }
 
     try {
-      // Stage 1: Generate a fast draft (low-res, 3sec) and show it immediately
+      // Stage 1: Submit the video job and return immediately — no blocking wait.
+      // The user gets a toast and can navigate freely while the server renders.
       const requestedDurationSec = Math.max(Math.round(selectedDurationMs / 1000), 3);
-      const draftResult = await submitVideoDraft(
+      const submitResult = await submitVideoJobAsync(
         videoPromptText,
         {
           durationSec: requestedDurationSec,
@@ -755,81 +761,90 @@ export default function ResultScreen() {
           stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
           detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
           hdUpscale,
-        },
-        (progress) => {
-          if (mountedRef.current) setVideoGenProgress(progress);
+          draft: true,
         },
       );
 
       if (!mountedRef.current) return;
 
-      // Draft is ready — show it immediately
-      setDraftVideoUrl(draftResult.videoUrl);
-      setGeneratedVideoUrl(draftResult.videoUrl);
-      setVideoStage('draft_ready');
+      // Job submitted — immediately free the user. Show toast and let them navigate.
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
-      setBgJobNotice('백그라운드에서 안전하게 생성 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
+      setVideoStage('drafting');
+      setBgJobNotice('영상이 접수되었습니다! 완료 시 알림을 보내드릴게요. 다른 메뉴를 이용하셔도 됩니다.');
 
-      // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
-      if (!hdUpscale) {
-        setVideoStage('draft_ready');
-        return;
+      // Optimal push permission timing: ask after the user submits their first video generation.
+      // This is the moment they have the highest intent to know when the result is ready.
+      if (pushSupported && !pushSubscribed) {
+        setPushPromptVisible(true);
       }
 
-      setVideoStage('hd_upgrading');
-      setHdUpgradeProgress('고화질 업그레이드를 백그라운드에서 시작했어요...');
-
-      try {
-        const { hdJobId } = await upgradeVideoToHd(scan.id, draftResult.jobId, videoPromptText, {
-          durationSec: requestedDurationSec,
-          aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
-          productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
-          scanId: scan.id,
-          variationSeed: narrativeVariation + 1,
-          bgmMood: inlineEdit.bgmMood,
-          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '지금 바로 만나보세요',
-          platform: targetPlatform,
-          hookCategory: inlineEdit.hookEffect || 'curiosity',
-          productVision: visionData,
-          isCleanVideoMode,
-          promptStrength,
-          negativePrompt: negativePrompt.trim() || undefined,
-          bgStyle: bgStyle === '자동' ? undefined : bgStyle,
-          outfitIntensity: outfitIntensity === 3 ? undefined : outfitIntensity,
-          zoomSpeed: zoomSpeed === 2 ? undefined : zoomSpeed,
-          cameraRotation,
-          transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
-          stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
-          detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
-          hdUpscale: true,
-        });
-
+      // Subscribe to the video job via Realtime — non-blocking.
+      // When the draft completes, show it immediately. If HD was requested,
+      // kick off the HD upgrade in the background after the draft is ready.
+      videoUnsubRef.current = subscribeVideoJob(scan.id, submitResult.taskId, (result) => {
         if (!mountedRef.current) return;
-
-        // Subscribe to the HD upgrade via Realtime — when it completes,
-        // seamlessly swap the draft video for the HD version
-        hdUnsubRef.current = subscribeHdUpgrade(scan.id, draftResult.jobId, (hdResult) => {
-          if (!mountedRef.current) return;
-          if (hdResult.status === 'SUCCESS' && hdResult.videoUrl) {
-            setGeneratedVideoUrl(hdResult.videoUrl);
-            setDraftVideoUrl(null);
-            setVideoStage('hd_ready');
-            setHdUpgradeProgress(null);
-          } else if (hdResult.status === 'FAILED') {
-            // HD failed — keep the draft, show a subtle notice
-            setVideoStage('draft_ready');
-            setHdUpgradeProgress(null);
-            setVideoGenError(prev => prev ? `${prev}\n고화질 업그레이드 실패 (초안 유지)` : '고화질 업그레이드 실패 (초안 유지)');
-          }
-        });
-      } catch {
-        if (mountedRef.current) {
-          // HD submit failed — draft is still usable, just stay on draft
+        if (result.status === 'SUCCESS' && result.videoUrl) {
+          setDraftVideoUrl(result.videoUrl);
+          setGeneratedVideoUrl(result.videoUrl);
           setVideoStage('draft_ready');
-          setHdUpgradeProgress(null);
+          setBgJobNotice('백그라운드에서 안전하게 생성 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
+
+          // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
+          if (!hdUpscale) return;
+
+          setVideoStage('hd_upgrading');
+          setHdUpgradeProgress('고화질 업그레이드를 백그라운드에서 시작했어요...');
+
+          upgradeVideoToHd(scan.id, submitResult.taskId, videoPromptText, {
+            durationSec: requestedDurationSec,
+            aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
+            productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
+            scanId: scan.id,
+            variationSeed: narrativeVariation + 1,
+            bgmMood: inlineEdit.bgmMood,
+            captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '지금 바로 만나보세요',
+            platform: targetPlatform,
+            hookCategory: inlineEdit.hookEffect || 'curiosity',
+            productVision: visionData,
+            isCleanVideoMode,
+            promptStrength,
+            negativePrompt: negativePrompt.trim() || undefined,
+            bgStyle: bgStyle === '자동' ? undefined : bgStyle,
+            outfitIntensity: outfitIntensity === 3 ? undefined : outfitIntensity,
+            zoomSpeed: zoomSpeed === 2 ? undefined : zoomSpeed,
+            cameraRotation,
+            transitionEffect: transitionEffect === '컷 전환' ? undefined : transitionEffect,
+            stylePreset: targetMediaType === 'image' ? stylePreset : undefined,
+            detailRestoration: targetMediaType === 'image' ? detailRestoration : undefined,
+            hdUpscale: true,
+          }).then(({ hdJobId }) => {
+            if (!mountedRef.current) return;
+            hdUnsubRef.current = subscribeHdUpgrade(scan.id, submitResult.taskId, (hdResult) => {
+              if (!mountedRef.current) return;
+              if (hdResult.status === 'SUCCESS' && hdResult.videoUrl) {
+                setGeneratedVideoUrl(hdResult.videoUrl);
+                setDraftVideoUrl(null);
+                setVideoStage('hd_ready');
+                setHdUpgradeProgress(null);
+              } else if (hdResult.status === 'FAILED') {
+                setVideoStage('draft_ready');
+                setHdUpgradeProgress(null);
+                setVideoGenError(prev => prev ? `${prev}\n고화질 업그레이드 실패 (초안 유지)` : '고화질 업그레이드 실패 (초안 유지)');
+              }
+            });
+          }).catch(() => {
+            if (mountedRef.current) {
+              setVideoStage('draft_ready');
+              setHdUpgradeProgress(null);
+            }
+          });
+        } else if (result.status === 'FAILED') {
+          const msg = result.error ?? 'AI 영상 생성에 실패했습니다.';
+          setVideoGenError(msg);
+          setVideoStage('failed');
         }
-      }
+      });
     } catch (err) {
       if (mountedRef.current) {
         const msg = err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.';
@@ -1067,6 +1082,7 @@ export default function ResultScreen() {
       mountedRef.current = false;
       videoGenLockRef.current = false;
       if (hdUnsubRef.current) hdUnsubRef.current();
+      if (videoUnsubRef.current) videoUnsubRef.current();
     };
   }, []);
 
@@ -4262,6 +4278,38 @@ export default function ResultScreen() {
       />
 
       <VirtualFittingLoadingOverlay visible={fittingOverlayVisible} />
+
+      <Modal visible={pushPromptVisible} transparent animationType="fade" onRequestClose={() => setPushPromptVisible(false)}>
+        <View style={styles.pushPromptOverlay}>
+          <View style={styles.pushPromptCard}>
+            <View style={styles.pushPromptIconWrap}>
+              <BellRing size={32} color={theme.colors.primary[300]} strokeWidth={2} />
+            </View>
+            <Text style={styles.pushPromptTitle}>작업 완료 시 알림을 보내드릴까요?</Text>
+            <Text style={styles.pushPromptDesc}>
+              AI 영상 생성은 2~4분 소요됩니다. 완료되면 브라우저 알림으로 즉시 알려드리고, 결과 페이지로 바로 이동할 수 있습니다.
+            </Text>
+            <View style={styles.pushPromptBtnRow}>
+              <TouchableOpacity
+                style={styles.pushPromptDeclineBtn}
+                onPress={() => setPushPromptVisible(false)}
+                activeOpacity={0.7}>
+                <Text style={styles.pushPromptDeclineText}>나중에 하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pushPromptAcceptBtn}
+                onPress={async () => {
+                  setPushPromptVisible(false);
+                  await subscribePush();
+                }}
+                activeOpacity={0.8}>
+                <BellRing size={16} color="#fff" strokeWidth={2.5} />
+                <Text style={styles.pushPromptAcceptText}>알림 받기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -6182,5 +6230,79 @@ iconButton: {
     color: theme.colors.dark.textFaint,
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  pushPromptOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  pushPromptCard: {
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    ...theme.shadows.elevated,
+  },
+  pushPromptIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500] + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  pushPromptTitle: {
+    fontSize: 18,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+    lineHeight: 24,
+  },
+  pushPromptDesc: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
+  },
+  pushPromptBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  pushPromptDeclineBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pushPromptDeclineText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+  },
+  pushPromptAcceptBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 13,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary[500],
+  },
+  pushPromptAcceptText: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
 });

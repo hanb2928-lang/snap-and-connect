@@ -64,7 +64,12 @@ const RETRY_DELAY_MS = 1500;
 const RUNWAY_SUBMIT_TIMEOUT_MS = 20000;
 const RUNWAY_POLL_TIMEOUT_MS = 10000;
 const EDGE_WALL_CLOCK_BUDGET_MS = 120000;
-const ZOMBIE_JOB_TIMEOUT_MS = 300000; // 5 minutes — jobs stuck in PENDING/PROCESSING are considered dead
+const ZOMBIE_JOB_TIMEOUT_MS = 360000; // 6 minutes — must exceed server-poll total budget so active jobs aren't marked zombie
+const SERVER_POLL_MAX_ATTEMPTS = 40; // ~6 min of polling with jitter, covers 2-4 min Runway renders + HD upscale
+const SERVER_POLL_INITIAL_DELAY_MS = 4000;
+const SERVER_POLL_MAX_DELAY_MS = 15000;
+const SERVER_POLL_SELF_INVOKE_TIMEOUT_MS = 15000; // AbortController timeout for self-reinvocation fetch
+const JITTER_MAX_MS = 2000; // Random jitter added to each backoff delay to desynchronize concurrent polls
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -120,6 +125,10 @@ Deno.serve(async (req: Request) => {
 
     if (mode === "poll") {
       return await handlePoll(body, runwayKey);
+    }
+
+    if (mode === "server-poll") {
+      return await handleServerPoll(body, runwayKey);
     }
 
     return await handleSubmit(body, runwayKey);
@@ -203,6 +212,31 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
 
     if (body.scanId) {
       await saveVideoJob(body.scanId, taskId, isDraft, hdUpscale);
+    }
+
+    // Fire-and-forget: start server-side polling so the job completes
+    // even if the client disconnects. The server-poll loop self-reinvokes
+    // with exponential backoff and is independent of client survival.
+    if (body.scanId && supabaseUrl && serviceRoleKey) {
+      setTimeout(() => {
+        const selfUrl = `${supabaseUrl}/functions/v1/generate-video`;
+        fetch(selfUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+          },
+          body: JSON.stringify({
+            mode: "server-poll",
+            taskId,
+            scanId: body.scanId,
+            variationSeed: 0,
+          }),
+        }).catch(() => {
+          // Non-fatal — zombie-job guard will catch it if this fails.
+        });
+      }, SERVER_POLL_INITIAL_DELAY_MS);
     }
 
     return new Response(
@@ -324,6 +358,142 @@ async function handlePoll(body: GenerateVideoRequest, runwayKey: string): Promis
 
 // === Runway API ===
 
+async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): Promise<Response> {
+  const taskId = body.taskId;
+  const scanId = body.scanId;
+  const attempt = body.variationSeed ?? 0; // reuse field as poll attempt counter
+
+  if (!taskId || !scanId) {
+    return new Response(
+      JSON.stringify({ error: "server-poll 모드에서는 taskId와 scanId가 필요합니다." }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Check if the job was already completed by a webhook
+  const cached = await checkWebhookResult(scanId);
+  if (cached) {
+    return new Response(
+      JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: cached, taskId, persisted: true }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Check if the job was already marked FAILED
+  const jobStatus = await checkVideoJobStatus(scanId, taskId);
+  if (jobStatus?.status === "FAILED") {
+    return new Response(
+      JSON.stringify({ mode: "server-poll", status: "FAILED", error: jobStatus.error, taskId }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  if (jobStatus?.status === "SUCCESS" && jobStatus.videoUrl) {
+    return new Response(
+      JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: jobStatus.videoUrl, taskId, persisted: true }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (attempt >= SERVER_POLL_MAX_ATTEMPTS) {
+    await markVideoJobFailed(scanId, taskId, "서버 폴링이 최대 횟수에 도달했습니다. 좀비 작업으로 분류됩니다.");
+    return new Response(
+      JSON.stringify({ mode: "server-poll", status: "FAILED", error: "서버 폴링 한도 초과", taskId }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Poll Runway once
+  const status = await pollRunwayTask(taskId, runwayKey);
+
+  if (status.status === "SUCCESS" && status.videoUrl) {
+    // Check if the webhook already completed this job — skip redundant work
+    const existing = await checkVideoJobStatus(scanId, taskId);
+    if (existing?.status === "SUCCESS" && existing.videoUrl) {
+      return new Response(
+        JSON.stringify({ mode: "server-poll", status: "SUCCESS", videoUrl: existing.videoUrl, taskId, persisted: true, alreadyCompleted: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    let persistedUrl: string | null = null;
+    if (supabaseUrl && serviceRoleKey) {
+      persistedUrl = await uploadToStorage(status.videoUrl, scanId);
+      if (persistedUrl) {
+        await updateScanWithVideo(scanId, persistedUrl);
+      }
+      await markVideoJobComplete(scanId, taskId, persistedUrl ?? status.videoUrl);
+    }
+    await sendVideoCompletePush(scanId);
+    return new Response(
+      JSON.stringify({
+        mode: "server-poll",
+        status: "SUCCESS",
+        videoUrl: persistedUrl ?? status.videoUrl,
+        taskId,
+        persisted: !!persistedUrl,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  if (status.status === "FAILED") {
+    if (supabaseUrl && serviceRoleKey) {
+      await markVideoJobFailed(scanId, taskId, status.error ?? "Runway 생성 실패");
+    }
+    return new Response(
+      JSON.stringify({ mode: "server-poll", status: "FAILED", error: status.error, taskId }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Still PROCESSING — schedule the next poll via self-reinvocation
+  // Exponential backoff with full jitter to desynchronize concurrent jobs
+  const baseDelay = Math.min(SERVER_POLL_INITIAL_DELAY_MS * Math.pow(1.5, attempt), SERVER_POLL_MAX_DELAY_MS);
+  const jitter = Math.random() * JITTER_MAX_MS;
+  const nextDelay = Math.round(baseDelay + jitter);
+  const nextAttempt = attempt + 1;
+
+  // Fire-and-forget self-reinvoke after delay with AbortController guard
+  setTimeout(() => {
+    const selfUrl = `${supabaseUrl}/functions/v1/generate-video`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SERVER_POLL_SELF_INVOKE_TIMEOUT_MS);
+    fetch(selfUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+      body: JSON.stringify({
+        mode: "server-poll",
+        taskId,
+        scanId,
+        variationSeed: nextAttempt,
+      }),
+      signal: controller.signal,
+    }).then(() => {
+      clearTimeout(timeoutId);
+    }).catch(() => {
+      clearTimeout(timeoutId);
+      // If self-reinvoke fails, the zombie-job guard in checkVideoJobStatus
+      // will eventually mark it FAILED after ZOMBIE_JOB_TIMEOUT_MS.
+    });
+  }, nextDelay);
+
+  return new Response(
+    JSON.stringify({
+      mode: "server-poll",
+      status: "PROCESSING",
+      progress: status.progress ?? "",
+      taskId,
+      nextPollInMs: nextDelay,
+      attempt: nextAttempt,
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
 async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
   const taskId = body.taskId;
   const scanId = body.scanId;
@@ -361,6 +531,16 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
       );
     }
 
+    // Check if server-poll already completed this job — skip redundant work
+    const existing = await checkVideoJobStatus(scanId, taskId);
+    if (existing?.status === "SUCCESS" && existing.videoUrl) {
+      console.log("[generate-video] Webhook: job already completed by server-poll, skipping");
+      return new Response(
+        JSON.stringify({ mode: "webhook", status: "SUCCESS", scanId, persisted: true, alreadyCompleted: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     let persistedUrl: string | null = null;
     if (supabaseUrl && serviceRoleKey) {
       persistedUrl = await uploadToStorage(videoUrl, scanId);
@@ -369,6 +549,7 @@ async function handleWebhook(body: GenerateVideoRequest): Promise<Response> {
       }
       await markVideoJobComplete(scanId, taskId, persistedUrl ?? videoUrl);
     }
+    await sendVideoCompletePush(scanId);
 
     console.log("[generate-video] Webhook: video persisted for scan", scanId);
     return new Response(
@@ -417,7 +598,7 @@ async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ st
         const isZombie = (row.status === 'PENDING' || row.status === 'PROCESSING' || row.status === 'RUNNING' || row.status === 'THROTTLED')
           && Date.now() - new Date(row.created_at).getTime() > ZOMBIE_JOB_TIMEOUT_MS;
         if (isZombie) {
-          await markVideoJobFailed(scanId, taskId, '영상 생성이 5분 이상 진행 중 상태로 멈춰 있어 좀비 작업으로 분류되었습니다. 다시 시도해주세요.');
+          await markVideoJobFailed(scanId, taskId, '영상 생성이 6분 이상 진행 중 상태로 멈춰 있어 좀비 작업으로 분류되었습니다. 다시 시도해주세요.');
           return { status: 'FAILED', error: '영상 생성 작업이 시간 초과로 실패했습니다. 다시 시도해주세요.' };
         }
         return {
@@ -495,7 +676,9 @@ async function markVideoJobComplete(scanId: string, taskId: string, videoUrl: st
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}`, {
+    // Atomic transition: only PATCH if the job is NOT already in a terminal state.
+    // This prevents webhook and server-poll from racing to overwrite each other.
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&status=not.in.(SUCCESS,FAILED)`, {
       method: "PATCH",
       headers: {
         apikey: serviceRoleKey,
@@ -517,7 +700,9 @@ async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}`, {
+    // Atomic transition: only PATCH if the job is NOT already in a terminal state.
+    // Prevents a late failure from overwriting a successful completion.
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&status=not.in.(SUCCESS,FAILED)`, {
       method: "PATCH",
       headers: {
         apikey: serviceRoleKey,
@@ -1031,7 +1216,8 @@ async function updateScanWithVideo(scanId: string, videoUrl: string): Promise<vo
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    await fetch(`${supabaseUrl}/rest/v1/scans?id=eq.${scanId}`, {
+    // Guard: don't overwrite an existing video_url — the first completion wins.
+    await fetch(`${supabaseUrl}/rest/v1/scans?id=eq.${scanId}&video_url=is.null`, {
       method: "PATCH",
       headers: {
         apikey: serviceRoleKey,
@@ -1045,6 +1231,44 @@ async function updateScanWithVideo(scanId: string, videoUrl: string): Promise<vo
     clearTimeout(timeoutId);
   } catch {
     // non-fatal
+  }
+}
+
+async function sendVideoCompletePush(scanId: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/scans?select=user_id&id=eq.${scanId}`,
+      { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }, signal: controller.signal },
+    );
+    clearTimeout(timeoutId);
+    if (!resp.ok) return;
+    const rows = await resp.json() as Array<{ user_id: string | null }>;
+    if (!rows[0]?.user_id) return;
+    const userId = rows[0].user_id;
+
+    const pushController = new AbortController();
+    const pushTimeoutId = setTimeout(() => pushController.abort(), 10000);
+    await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+      body: JSON.stringify({
+        userId,
+        title: "숏폼 영상 제작 완료!",
+        body: "AI 영상이 완성되었습니다. 지금 바로 확인해보세요.",
+        url: `/result/${scanId}`,
+      }),
+      signal: pushController.signal,
+    });
+    clearTimeout(pushTimeoutId);
+  } catch {
+    // non-fatal — push is best-effort
   }
 }
 

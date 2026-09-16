@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addRevenueRecord, fetchRevenueRecords, deleteRevenueRecord } from '@/lib/revenue';
 import { formatKRW } from '@/lib/dashboard';
 import { useMascotSettings, type MascotStyle } from '@/hooks/useMascotSettings';
+import { useWebPush } from '@/hooks/useWebPush';
 import { invalidateSettingsCache, updateUserSettings as persistUserSettings } from '@/lib/settings';
 import { useI18n } from '@/hooks/useI18n';
 import { SUPPORTED_LANGUAGES, type AppLanguage } from '@/lib/i18n';
@@ -1408,6 +1409,14 @@ export default function SettingsScreen() {
                 <View style={[styles.toggleKnob, cleanFootage && styles.toggleKnobActive]} />
               </View>
             </TouchableOpacity>
+          </View>
+          <Divider />
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.featureTitle}>영상 완성 푸시 알림</Text>
+              <Text style={styles.featureDesc}>AI 영상 제작이 완료되면 브라우저 상단에 알림을 보냅니다. 앱을 닫아도 완료 시점에 알려드립니다</Text>
+            </View>
+            <PushNotificationToggle />
           </View>
         </View>
         <TouchableOpacity
@@ -3883,3 +3892,40 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
 });
+
+function PushNotificationToggle() {
+  const { supported, isSubscribed, subscribe, unsubscribe, error } = useWebPush();
+  const [toggling, setToggling] = useState(false);
+  const colors = useAppTheme().colors;
+
+  if (!supported) {
+    return (
+      <View style={[styles.toggleSwitch, { opacity: 0.4 }]}>
+        <View style={styles.toggleKnob} />
+      </View>
+    );
+  }
+
+  const handleToggle = async () => {
+    setToggling(true);
+    if (isSubscribed) {
+      await unsubscribe();
+    } else {
+      await subscribe();
+    }
+    setToggling(false);
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleToggle}
+      activeOpacity={0.7}
+      hitSlop={12}
+      disabled={toggling}
+    >
+      <View style={[styles.toggleSwitch, isSubscribed && styles.toggleSwitchActive]}>
+        <View style={[styles.toggleKnob, isSubscribed && styles.toggleKnobActive]} />
+      </View>
+    </TouchableOpacity>
+  );
+}

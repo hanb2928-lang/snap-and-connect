@@ -577,6 +577,203 @@ export async function submitVideoDraft(
   return generateAiVideo(prompt, { ...options, draft: true }, onProgress);
 }
 
+export interface SubmitOnlyResult {
+  taskId: string;
+  motionPrompt: string;
+  durationSec: number;
+  aspectRatio: string;
+  variationSeed: number;
+}
+
+/**
+ * Submit a video generation job to the edge function and return immediately
+ * with the task ID. Does NOT wait for completion — the caller should use
+ * subscribeVideoJob to listen for the result via Realtime.
+ */
+export async function submitVideoJobAsync(
+  prompt: string,
+  options: GenerateAiVideoOptions,
+): Promise<SubmitOnlyResult> {
+  const { data, error } = await supabase.functions.invoke('generate-video', {
+    body: {
+      mode: 'submit',
+      prompt,
+      durationSec: options.durationSec ?? 5,
+      aspectRatio: options.aspectRatio ?? '9:16',
+      productName: options.productName,
+      scanId: options.scanId,
+      variationSeed: options.variationSeed ?? 0,
+      bgmMood: options.bgmMood,
+      captionText: options.captionText,
+      platform: options.platform ?? 'shorts',
+      hookCategory: options.hookCategory ?? 'curiosity',
+      cutCount: options.cutCount,
+      productVision: options.productVision ?? null,
+      draft: options.draft ?? false,
+      isCleanVideoMode: options.isCleanVideoMode ?? false,
+      promptStrength: options.promptStrength,
+      negativePrompt: options.negativePrompt,
+      bgStyle: options.bgStyle,
+      outfitIntensity: options.outfitIntensity,
+      zoomSpeed: options.zoomSpeed,
+      cameraRotation: options.cameraRotation,
+      transitionEffect: options.transitionEffect,
+      stylePreset: options.stylePreset,
+      detailRestoration: options.detailRestoration,
+      hdUpscale: options.hdUpscale,
+      qualityTier: options.hdUpscale ? 'pro' : (options.qualityTier ?? 'standard'),
+      resolution: options.resolution ?? (options.hdUpscale ? '1080p' : '720p'),
+      fps: options.fps ?? (options.hdUpscale ? 30 : 24),
+    },
+  });
+
+  if (error) throw await buildVideoFunctionError(error);
+  if (!data || typeof data.taskId !== 'string') {
+    throw new Error('서버가 작업 ID를 반환하지 않았습니다.');
+  }
+
+  return {
+    taskId: data.taskId,
+    motionPrompt: data.motionPrompt as string,
+    durationSec: data.durationSec as number,
+    aspectRatio: data.aspectRatio as string,
+    variationSeed: data.variationSeed as number,
+  };
+}
+
+export type VideoJobCallback = (result: { status: 'SUCCESS' | 'FAILED'; videoUrl?: string; error?: string }) => void;
+
+/**
+ * Subscribe to a video job via Supabase Realtime on the video_jobs table.
+ * Calls the callback when the job transitions to SUCCESS or FAILED.
+ * Returns an unsubscribe function. Includes adaptive DB polling as a
+ * safety net, same strategy as subscribeHdUpgrade.
+ */
+export function subscribeVideoJob(
+  scanId: string,
+  taskId: string,
+  callback: VideoJobCallback,
+): () => void {
+  let settled = false;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let channelHealth: ChannelHealth = ChannelHealth.DISCONNECTED;
+  let reconnectAttempts = 0;
+  let pollBackoffAttempt = 0;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+
+  const checkAndNotify = async () => {
+    if (settled) return;
+    try {
+      const { data, error } = await supabase
+        .from('video_jobs')
+        .select('status, video_url, error_message')
+        .eq('scan_id', scanId)
+        .eq('task_id', taskId)
+        .maybeSingle();
+      if (error || !data) return;
+      const row = data as VideoJobRow;
+      if (row.status === 'SUCCESS' && row.video_url) {
+        settled = true;
+        cleanup();
+        callback({ status: 'SUCCESS', videoUrl: row.video_url });
+      } else if (row.status === 'FAILED') {
+        settled = true;
+        cleanup();
+        callback({ status: 'FAILED', error: row.error_message ?? '비디오 생성에 실패했습니다.' });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const cleanup = () => {
+    if (channel) supabase.removeChannel(channel);
+    if (pollTimer) clearTimeout(pollTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+  };
+
+  const scheduleReconnect = () => {
+    if (settled || reconnectAttempts >= CHANNEL_MAX_RECONNECT_ATTEMPTS) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    const delayMs = CHANNEL_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts);
+    reconnectAttempts++;
+    reconnectTimer = setTimeout(() => {
+      if (settled) return;
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch { /* ignore */ }
+        channel = null;
+      }
+      setupChannel();
+    }, delayMs);
+  };
+
+  const setupChannel = () => {
+    if (settled) return;
+    channel = supabase
+      .channel(`video-job:${scanId}:${taskId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
+        (payload) => {
+          if (!payload.new) return;
+          channelHealth = ChannelHealth.HEALTHY;
+          pollBackoffAttempt = 0;
+          reconnectAttempts = 0;
+          const row = payload.new as VideoJobRow;
+          if (row.status === 'SUCCESS' && row.video_url) {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            callback({ status: 'SUCCESS', videoUrl: row.video_url });
+          } else if (row.status === 'FAILED') {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            callback({ status: 'FAILED', error: row.error_message ?? '비디오 생성에 실패했습니다.' });
+          }
+        },
+      )
+      .subscribe((status: string) => {
+        if (settled) return;
+        if (status === 'SUBSCRIBED') {
+          channelHealth = ChannelHealth.HEALTHY;
+          reconnectAttempts = 0;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          channelHealth = ChannelHealth.DEGRADED;
+          pollBackoffAttempt = 0;
+          scheduleReconnect();
+        }
+      });
+  };
+
+  const scheduleNextPoll = () => {
+    if (settled) return;
+    const interval = channelHealth === ChannelHealth.HEALTHY
+      ? computeBackoffDelay(pollBackoffAttempt)
+      : POLL_MIN_INTERVAL_MS;
+    pollTimer = setTimeout(async () => {
+      if (settled) return;
+      await checkAndNotify();
+      if (!settled) {
+        if (channelHealth === ChannelHealth.HEALTHY) {
+          pollBackoffAttempt++;
+        }
+        scheduleNextPoll();
+      }
+    }, interval);
+  };
+
+  setupChannel();
+  scheduleNextPoll();
+  checkAndNotify();
+
+  return () => {
+    settled = true;
+    cleanup();
+  };
+}
+
 /**
  * Stage 2: Submit an HD upgrade job for an existing draft and return immediately
  * with the HD task ID. The caller should then call subscribeHdUpgrade to listen
