@@ -206,6 +206,7 @@ export async function runStereoPipeline(
   onProgress: (progress: StereoPipelineProgress) => void,
   cleanMode = false,
   existingScanId?: string,
+  contentTone?: 'studio' | 'raw',
 ): Promise<StereoPipelineResult> {
   const steps = makeInitialSteps();
   const report = (currentStep: number, overallProgress: number, error: string | null = null, result: StereoPipelineResult | null = null) => {
@@ -292,9 +293,14 @@ export async function runStereoPipeline(
   // cloud call to cut total latency to max(local, cloud) instead of local + cloud.
   steps[0].detail = '로컬 3D 분석 + 클라우드 GPU 볼륨 복원 동시 처리 중...';
   report(0, 0.15);
+  const tonePrompt = contentTone === 'studio'
+    ? '스튜디오 프리미엄 화장품 주얼리 패션 전자기기 럭셔리'
+    : contentTone === 'raw'
+    ? '날것의 심리자극 생활용품 식품 가성비 꿀팁 꿀템'
+    : '';
   const [localSynthesis, cloudResultRaw] = await Promise.all([
-    Promise.resolve(runSynthesis(angleInputs, '')),
-    invokeStereoCutAuto(anglePayloads, '', '', scanId).catch(() => null),
+    Promise.resolve(runSynthesis(angleInputs, tonePrompt)),
+    invokeStereoCutAuto(anglePayloads, tonePrompt, contentTone ?? '', scanId).catch(() => null),
   ]);
 
   let cloudResult: CloudPipelineResult | null = cloudResultRaw;
@@ -316,9 +322,13 @@ export async function runStereoPipeline(
   const cloudLabel = cloudResult?.synthesis?.contextMatch?.label?.trim();
   const productName = cloudLabel
     ? `${cloudLabel} 제품`
+    : contentTone === 'studio'
+    ? '프리미엄 스튜디오 제품'
     : '프리미엄 추천 상품';
   const productContext = cloudLabel
     ? `${cloudLabel} 제품 — ${synthesisSummary}`
+    : contentTone
+    ? `${tonePrompt} — ${synthesisSummary}`
     : synthesisSummary;
 
   if (cleanMode) {
@@ -335,7 +345,9 @@ export async function runStereoPipeline(
     ? buildShortFormEditPlan('youtube', '', null, '', undefined, undefined, true, undefined, undefined)
     : buildShortFormEditPlan('youtube', productContext, null, productName, undefined, undefined, true, undefined, undefined);
 
-  const directingPlan = buildDirectingPlan(
+  const directingPlan = cleanMode
+    ? null
+    : buildDirectingPlan(
     editPlan.segments,
     editPlan.bgmTemplate,
     context,
@@ -344,11 +356,11 @@ export async function runStereoPipeline(
 
   const directingSummary = cleanMode
     ? '클린 모드: 텍스트 오버레이 없이 순수 비주얼만 추출'
-    : getDirectingSummary(directingPlan);
+    : getDirectingSummary(directingPlan!);
 
   if (!cleanMode) {
     await new Promise((r) => setTimeout(r, 600));
-    steps[1].detail = `훅: ${directingPlan.hookTransition.description} | SFX ${directingPlan.sfxPlans.length}건 | 킬링포인트 자막 ${directingPlan.killPointCaptions.length}건`;
+    steps[1].detail = `훅: ${directingPlan!.hookTransition.description} | SFX ${directingPlan!.sfxPlans.length}건 | 킬링포인트 자막 ${directingPlan!.killPointCaptions.length}건`;
   }
 
   steps[2].status = 'active';
