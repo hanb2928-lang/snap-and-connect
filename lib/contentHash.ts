@@ -20,6 +20,27 @@ export function hashImage(base64: string): string {
   return contentHash(base64, 4096);
 }
 
+/**
+ * Produces a deterministic hash for a multi-angle image set combined
+ * with a content tone. The same set of images + tone always yields the
+ * same hash, enabling cache hits when a user re-captures the same
+ * product from the same angles with the same tone.
+ *
+ * Each image is hashed independently then the sorted per-image hashes
+ * are joined with the tone and hashed again, so image ordering doesn't
+ * affect the result.
+ */
+export function hashMultiAngle(
+  images: string[],
+  contentTone?: string,
+): string {
+  const perImage = images
+    .map((img) => hashImage(img))
+    .sort()
+    .join(',');
+  return contentHash(`${perImage}|tone:${contentTone ?? 'default'}`, 2048);
+}
+
 export function hashObject(obj: Record<string, unknown>): string {
   const keys = Object.keys(obj).sort();
   const parts: string[] = [];

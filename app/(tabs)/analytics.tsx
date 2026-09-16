@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {
   ChartBar as BarChart3,
+  Film,
   MousePointerClick,
   TrendingUp,
   TrendingDown,
@@ -25,6 +26,7 @@ import {
   Target,
   Layers,
   ArrowRight,
+  ChevronRight,
   Flame,
   DollarSign,
   Sparkles,
@@ -726,6 +728,26 @@ export default function AnalyticsScreen() {
         <TierBadge />
       </View>
 
+      {/* Short-form Archive entry */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.archiveEntryCard}
+          onPress={() => router.push('/(tabs)/analytics/archive')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.archiveEntryLeft}>
+            <View style={[styles.archiveEntryIcon, { backgroundColor: theme.colors.primary[400] + '20' }]}>
+              <Film size={18} color={theme.colors.primary[400]} strokeWidth={2} />
+            </View>
+            <View>
+              <Text style={styles.archiveEntryTitle}>숏폼 보관함</Text>
+              <Text style={styles.archiveEntrySub}>과거에 제작한 숏폼을 모아보고 재다운로드하세요</Text>
+            </View>
+          </View>
+          <ChevronRight size={20} color={theme.colors.dark.textFaint} strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
+
       {/* Daily Quests */}
       <View style={styles.section}>
         <QuestCard />
@@ -1399,5 +1421,38 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.textFaint,
     textAlign: 'center',
+  },
+  archiveEntryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.dark.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    ...theme.shadows.card,
+  },
+  archiveEntryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  archiveEntryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  archiveEntryTitle: {
+    fontSize: theme.typography.body,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.dark.text,
+  },
+  archiveEntrySub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    marginTop: 2,
   },
 });

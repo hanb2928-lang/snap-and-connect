@@ -163,4 +163,70 @@ export async function findSimilarCachedResult<T>(
   }
 }
 
+// ─── Multi-angle analysis cache (ai_analysis_cache) ───
+
+export interface MultiAngleCacheEntry {
+  productContext: Record<string, unknown>;
+  hookOptions: Record<string, unknown>;
+  renderedVideoUrl: string;
+}
+
+/**
+ * Checks the ai_analysis_cache table for a cached result matching the
+ * given image hash + tone. Returns null on miss, error, or expiry.
+ */
+export async function getMultiAngleCache(
+  imageHash: string,
+  toneManner: string,
+): Promise<MultiAngleCacheEntry | null> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_analysis_cache')
+      .select('product_context, hook_options, rendered_video_url, expires_at')
+      .eq('image_hash', imageHash)
+      .eq('tone_manner', toneManner)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const expiresAt = new Date(data.expires_at as string).getTime();
+    if (Date.now() > expiresAt) return null;
+
+    return {
+      productContext: data.product_context as Record<string, unknown>,
+      hookOptions: data.hook_options as Record<string, unknown>,
+      renderedVideoUrl: data.rendered_video_url as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stores a multi-angle analysis result in ai_analysis_cache.
+ * Uses upsert on image_hash to handle re-captures of the same product.
+ */
+export async function setMultiAngleCache(
+  imageHash: string,
+  toneManner: string,
+  productContext: Record<string, unknown>,
+  hookOptions: Record<string, unknown>,
+  renderedVideoUrl: string,
+): Promise<void> {
+  try {
+    await supabase
+      .from('ai_analysis_cache')
+      .upsert({
+        image_hash: imageHash,
+        tone_manner: toneManner,
+        product_context: productContext,
+        hook_options: hookOptions,
+        rendered_video_url: renderedVideoUrl,
+        expires_at: new Date(Date.now() + L2_TTL_MS).toISOString(),
+      }, { onConflict: 'image_hash' });
+  } catch {
+    // best-effort
+  }
+}
+
 export { L1_TTL_MS, L2_TTL_DAYS };

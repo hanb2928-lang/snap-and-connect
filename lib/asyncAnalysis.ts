@@ -5,7 +5,7 @@ import { uploadImage } from '@/lib/analysis';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { buildDataUrl } from '@/lib/base64';
-import { hashImage } from '@/lib/contentHash';
+import { hashImage, hashMultiAngle } from '@/lib/contentHash';
 
 const SUPABASE_TIMEOUT_MS = 30000;
 
@@ -58,7 +58,9 @@ export async function startAsyncAnalysis(
   preferredStyle?: string,
 ): Promise<AsyncAnalysisResult> {
   const fileName = `scan-${Date.now()}`;
-  const imageHash = hashImage(base64);
+  const imageHash = additionalBase64Images.length > 0
+    ? hashMultiAngle([base64, ...additionalBase64Images], preferredStyle)
+    : hashImage(base64);
 
   // Check cache BEFORE uploading to skip storage entirely on a hit
   const cacheResult = await withSupabaseTimeout(

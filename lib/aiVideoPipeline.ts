@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { ProductVisionResult } from './productVision';
 import { isOnline } from '@/hooks/useNetworkStatus';
+import { getMultiAngleCache, setMultiAngleCache } from './aiCache';
 
 export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error' | 'hd_upgrading' | 'hd_completed';
 
@@ -50,6 +51,8 @@ interface GenerateAiVideoOptions {
   qualityTier?: 'standard' | 'pro';
   resolution?: string;
   fps?: number;
+  imageHash?: string;
+  contentTone?: string;
 }
 
 
@@ -152,6 +155,26 @@ export async function generateAiVideo(
 
   const isDraft = options.draft === true;
 
+  // Cache hit check: if we have an imageHash + contentTone, look up
+  // ai_analysis_cache before submitting to the render queue. On a hit,
+  // skip the entire LLM + rendering pipeline and return the cached video.
+  if (options.imageHash && options.contentTone && !isDraft) {
+    const cached = await getMultiAngleCache(options.imageHash, options.contentTone);
+    if (cached) {
+      report('completed', 1.0, '캐시된 영상을 불러왔습니다.');
+      return {
+        videoUrl: cached.renderedVideoUrl,
+        jobId: '',
+        motionPrompt: '',
+        durationSec: options.durationSec ?? 5,
+        aspectRatio: options.aspectRatio ?? '9:16',
+        variationSeed: options.variationSeed ?? 0,
+        persisted: true,
+        provider: 'cache',
+      };
+    }
+  }
+
   report('submitting', 0.05, isDraft ? '빠른 미리보기 생성 요청 중...' : 'AI 비디오 생성 요청 전송 중...');
 
   // Phase 1: Submit task
@@ -237,7 +260,29 @@ export async function generateAiVideo(
   // Runway's webhook writes the result to video_jobs — we subscribe to that DB
   // change instead of polling the Runway API in a tight loop. A low-frequency
   // fallback poll guards against missed realtime events.
-  return waitForVideoCompletion(submitData, options.scanId, startTime, report);
+  const result = await waitForVideoCompletion(submitData, options.scanId, startTime, report);
+
+  // Cache miss path: now that rendering is complete, archive the result
+  // into ai_analysis_cache so future requests for the same image+tone
+  // combination can skip the entire pipeline.
+  if (options.imageHash && options.contentTone) {
+    setMultiAngleCache(
+      options.imageHash,
+      options.contentTone,
+      {
+        productName: options.productName ?? '',
+        prompt,
+        scanId: options.scanId ?? '',
+      },
+      {
+        captionText: options.captionText ?? '',
+        hookCategory: options.hookCategory ?? '',
+      },
+      result.videoUrl,
+    ).catch(() => {});
+  }
+
+  return result;
 }
 
 export function createVideoGenProgressTracker(
