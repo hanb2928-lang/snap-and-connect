@@ -61,6 +61,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mountedRef = useRef(true);
+  const streamGenRef = useRef(0);
   const [facing, setFacing] = useState<Facing>('environment');
   const [gridVisible, setGridVisible] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -86,6 +87,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   const startStream = useCallback(async (face: Facing) => {
     if (Platform.OS !== 'web') return;
     stopStream();
+    const gen = ++streamGenRef.current;
     setError(null);
     setCameraReady(false);
     try {
@@ -98,7 +100,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      if (!mountedRef.current) {
+      if (!mountedRef.current || gen !== streamGenRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -106,13 +108,13 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        if (mountedRef.current) {
+        if (mountedRef.current && gen === streamGenRef.current) {
           setCameraReady(true);
           onCameraReady?.(true);
         }
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || gen !== streamGenRef.current) return;
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
       if (msg.includes('Permission') || msg.includes('NotAllowed')) {
         setError('카메라 권한이 거부되었습니다. 브라우저 또는 기기 설정에서 카메라 접근을 허용해주세요.');

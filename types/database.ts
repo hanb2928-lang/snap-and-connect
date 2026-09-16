@@ -74,6 +74,7 @@ export interface TemplateData {
   caption: string;
   platformVariants?: Record<PlatformKey, PlatformVariant>;
   psychologyInsight?: PsychologyInsight | null;
+  cleanMode?: boolean;
 }
 
 export interface CustomReview {

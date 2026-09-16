@@ -1017,6 +1017,9 @@ export default function ResultScreen() {
         setScan(scanData);
         setCustomAffiliateLinks(scanData.custom_affiliate_links ?? []);
         setLocalStoreInfo(scanData.local_store_info ?? null);
+        if (scanData.template_data?.cleanMode) {
+          setIsCleanVideoMode(true);
+        }
         if (scanData.video_url) {
           setGeneratedVideoUrl(scanData.video_url);
         }

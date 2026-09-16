@@ -135,6 +135,7 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
 export async function runStereoPipeline(
   shots: AngleShot[],
   onProgress: (progress: StereoPipelineProgress) => void,
+  cleanMode = false,
 ): Promise<StereoPipelineResult> {
   const steps = makeInitialSteps();
   const report = (currentStep: number, overallProgress: number, error: string | null = null, result: StereoPipelineResult | null = null) => {
@@ -222,17 +223,23 @@ export async function runStereoPipeline(
   steps[0].detail = synthesisSummary;
   report(0, 0.25);
 
-  steps[1].status = 'active';
-  steps[1].detail = '초반 3초 패러독스 훅 + 비트 싱크 설계 중...';
-  report(1, 0.3);
-
   const productName = cloudResult?.synthesis?.contextMatch?.label
     ? `${cloudResult.synthesis.contextMatch.label} 제품`
     : '프리미엄 추천 상품';
 
-  const editPlan = buildShortFormEditPlan(
-    'youtube', synthesisSummary, 'curiosity_gap', productName, undefined, undefined, true, undefined, undefined,
-  );
+  if (cleanMode) {
+    steps[1].status = 'done';
+    steps[1].detail = '클린 모드 — 훅/자막 생성 건너뜀 (순수 비주얼 추출)';
+    report(1, 0.5);
+  } else {
+    steps[1].status = 'active';
+    steps[1].detail = '초반 3초 패러독스 훅 + 비트 싱크 설계 중...';
+    report(1, 0.3);
+  }
+
+  const editPlan = cleanMode
+    ? buildShortFormEditPlan('youtube', '', 'curiosity_gap', '', undefined, undefined, true, undefined, undefined)
+    : buildShortFormEditPlan('youtube', synthesisSummary, 'curiosity_gap', productName, undefined, undefined, true, undefined, undefined);
 
   const directingPlan = buildDirectingPlan(
     editPlan.segments,
@@ -241,19 +248,22 @@ export async function runStereoPipeline(
     'youtube',
   );
 
-  const directingSummary = getDirectingSummary(directingPlan);
+  const directingSummary = cleanMode
+    ? '클린 모드: 텍스트 오버레이 없이 순수 비주얼만 추출'
+    : getDirectingSummary(directingPlan);
 
-  await new Promise((r) => setTimeout(r, 600));
-
-  steps[1].status = 'done';
-  steps[1].detail = `훅: ${directingPlan.hookTransition.description} | SFX ${directingPlan.sfxPlans.length}건 | 킬링포인트 자막 ${directingPlan.killPointCaptions.length}건`;
-  report(1, 0.5);
+  if (!cleanMode) {
+    await new Promise((r) => setTimeout(r, 600));
+    steps[1].detail = `훅: ${directingPlan.hookTransition.description} | SFX ${directingPlan.sfxPlans.length}건 | 킬링포인트 자막 ${directingPlan.killPointCaptions.length}건`;
+  }
 
   steps[2].status = 'active';
-  steps[2].detail = '9:16 H.264 렌더링 코덱 적용 & 메타데이터 생성 중...';
+  steps[2].detail = cleanMode ? '클린 모드 렌더링 준비 (텍스트 메타데이터 제외)...' : '9:16 H.264 렌더링 코덱 적용 & 메타데이터 생성 중...';
   report(2, 0.55);
 
-  const publishPlans = buildMultiPlatformPublishPlans(productName, context, ['youtube', 'instagram', 'tiktok']);
+  const publishPlans = cleanMode
+    ? []
+    : buildMultiPlatformPublishPlans(productName, context, ['youtube', 'instagram', 'tiktok']);
 
   const publishTargets = PUBLISH_TARGETS.map(({ key, label }) => {
     const dl = getDeepLink(key);
@@ -263,8 +273,12 @@ export async function runStereoPipeline(
   await new Promise((r) => setTimeout(r, 600));
 
   steps[2].status = 'done';
-  const metadataSummary = publishPlans.map((p) => `${p.target}: ${p.metadata.title.slice(0, 20)}...`).join(' | ');
-  steps[2].detail = `3개 플랫폼 렌더링 준비 완료 | ${metadataSummary}`;
+  if (cleanMode) {
+    steps[2].detail = '클린 모드 렌더링 준비 완료 (텍스트 메타데이터 없음)';
+  } else {
+    const metadataSummary = publishPlans.map((p) => `${p.target}: ${p.metadata.title.slice(0, 20)}...`).join(' | ');
+    steps[2].detail = `3개 플랫폼 렌더링 준비 완료 | ${metadataSummary}`;
+  }
   report(2, 0.75);
 
   steps[3].status = 'active';
@@ -294,21 +308,22 @@ export async function runStereoPipeline(
   };
 
   // Save generated hooks/captions back to the scan record so the result page
-  // can display them. Without this, the result page sees empty template_data
-  // and all hooks/captions appear blank.
-  const hookText = editPlan.selectedHook || '';
-  const captionText = editPlan.segments.map((s) => s.textOverlay).filter(Boolean).join('\n') || '';
+  // can display them. In clean mode, all text fields are empty and cleanMode
+  // flag is set so the result page auto-enables clean video mode.
+  const hookText = cleanMode ? '' : (editPlan.selectedHook || '');
+  const captionText = cleanMode ? '' : (editPlan.segments.map((s) => s.textOverlay).filter(Boolean).join('\n') || '');
   const templateData = {
     priceLabel: '',
     oneLiner: hookText,
     category: cloudResult?.synthesis?.contextMatch?.label || '',
     accentColor: '#2f9dff',
     hook: hookText,
-    hashtags: publishPlans[0]?.metadata?.hashtags || [],
-    productAdvantages: [],
+    hashtags: cleanMode ? [] : (publishPlans[0]?.metadata?.hashtags || []),
+    productAdvantages: [] as string[],
     caption: captionText,
     psychologyInsight: null as unknown,
-    platformVariants: publishPlans.reduce<Record<string, { hook?: string; caption?: string; hashtags?: string[] }>>((acc, p) => {
+    cleanMode,
+    platformVariants: cleanMode ? {} : publishPlans.reduce<Record<string, { hook?: string; caption?: string; hashtags?: string[] }>>((acc, p) => {
       acc[p.target] = {
         hook: p.metadata.title,
         caption: p.metadata.description,

@@ -43,7 +43,7 @@ import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
-async function runFittingPipeline(shots: AngleShot[], scanId: string, customPrompt?: string): Promise<void> {
+async function runFittingPipeline(shots: AngleShot[], scanId: string, customPrompt?: string, cleanMode = false): Promise<void> {
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
   const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
@@ -60,7 +60,24 @@ async function runFittingPipeline(shots: AngleShot[], scanId: string, customProm
     if (error || !data?.image) return;
 
     const imageUrl = await uploadImage(data.image as string, 'image/png');
-    await supabase.from('scans').update({ edited_image_url: imageUrl }).eq('id', scanId);
+    const updatePayload: Record<string, unknown> = { edited_image_url: imageUrl };
+    if (cleanMode) {
+      updatePayload.template_data = {
+        priceLabel: '',
+        oneLiner: '',
+        category: '',
+        accentColor: '#2f9dff',
+        hook: '',
+        hashtags: [],
+        productAdvantages: [],
+        caption: '',
+        psychologyInsight: null,
+        cleanMode: true,
+      };
+      updatePayload.one_liner = '';
+      updatePayload.summary = '';
+    }
+    await supabase.from('scans').update(updatePayload).eq('id', scanId);
   } catch {
     // Background pipeline — errors are silently ignored; user already has the scan
   }
@@ -123,6 +140,7 @@ export default function CameraScreen() {
   const [screenPhase, setScreenPhase] = useState<ScreenPhase>('mode_select');
   const [captureMode, setCaptureMode] = useState<CaptureMode>('single');
   const [contentTone, setContentTone] = useState<ContentTone>('raw');
+  const [cleanMode, setCleanMode] = useState(false);
 
   // Virtual fitting state
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
@@ -350,7 +368,7 @@ export default function CameraScreen() {
     }
 
     // Background: run synthesis/directing/publish pipeline without blocking UI
-    runStereoPipeline(sorted, () => {}).catch(() => {});
+    runStereoPipeline(sorted, () => {}, cleanMode).catch(() => {});
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
@@ -489,8 +507,8 @@ export default function CameraScreen() {
     }
 
     // Background: run virtual fitting pipeline without blocking UI
-    runFittingPipeline(sorted, scanId).catch(() => {});
-  }, [router]);
+    runFittingPipeline(sorted, scanId, undefined, cleanMode).catch(() => {});
+  }, [router, cleanMode]);
 
   const handleModeSelect = useCallback((mode: CaptureMode) => {
     setCaptureMode(mode);
@@ -563,6 +581,22 @@ export default function CameraScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.cleanModeWrap}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cleanModeLabel}>✨ 클린 모드 (자막·문구 제외)</Text>
+            <Text style={styles.cleanModeSub}>체크 시 훅, 자막, 마케팅 문구를 생성하지 않고 순수 영상/이미지 원본만 추출합니다</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setCleanMode((v) => !v)}
+            activeOpacity={0.7}
+            hitSlop={12}
+          >
+            <View style={[styles.cleanModeSwitch, cleanMode && styles.cleanModeSwitchActive]}>
+              <View style={[styles.cleanModeKnob, cleanMode && styles.cleanModeKnobActive]} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.modeCardsWrap}>
@@ -1137,6 +1171,47 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
+  },
+  cleanModeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  cleanModeLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  cleanModeSub: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textDim,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  cleanModeSwitch: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: theme.colors.dark.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  cleanModeSwitchActive: {
+    backgroundColor: theme.colors.accent[500],
+  },
+  cleanModeKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    transform: [{ translateX: 0 }],
+  },
+  cleanModeKnobActive: {
+    transform: [{ translateX: 18 }],
   },
   toneSelectorWrap: {
     paddingHorizontal: theme.spacing.lg,

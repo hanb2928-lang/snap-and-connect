@@ -36,6 +36,7 @@ export const InlineCameraViewfinder = forwardRef<
   const streamRef = useRef<MediaStream | null>(null);
   const nativeCameraRef = useRef<CameraView>(null);
   const mountedRef = useRef(true);
+  const streamGenRef = useRef(0);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export const InlineCameraViewfinder = forwardRef<
   const startWebStream = useCallback(async () => {
     if (Platform.OS !== 'web') return;
     stopStream();
+    const gen = ++streamGenRef.current;
     setError(null);
     try {
       const constraints: MediaStreamConstraints = {
@@ -66,7 +68,7 @@ export const InlineCameraViewfinder = forwardRef<
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      if (!mountedRef.current) {
+      if (!mountedRef.current || gen !== streamGenRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -74,10 +76,10 @@ export const InlineCameraViewfinder = forwardRef<
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
-        if (mountedRef.current) setCameraReady(true);
+        if (mountedRef.current && gen === streamGenRef.current) setCameraReady(true);
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || gen !== streamGenRef.current) return;
       const msg = err instanceof Error ? err.message : '카메라 접근 실패';
       if (msg.includes('Permission') || msg.includes('NotAllowed')) {
         setError('카메라 권한이 거부되었습니다. 브라우저 설정에서 카메라를 허용해주세요.');
