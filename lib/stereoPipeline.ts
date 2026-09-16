@@ -13,6 +13,18 @@ import type { AngleShot } from '@/components/MultiAngleCaptureGuide';
 const UPLOAD_MAX_RETRIES = 2;
 const UPLOAD_RETRY_DELAY_MS = 1500;
 
+function extractStoragePath(publicUrl: string): string | null {
+  const marker = '/storage/v1/object/public/scans/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
+async function rollbackUploads(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await supabase.storage.from('scans').remove(paths).catch(() => {});
+}
+
 function waitForOnline(): Promise<boolean> {
   if (isOnline()) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -144,8 +156,19 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
 
+  const uploadedPaths: string[] = [];
+
   const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-  const scanId = await saveManualScan(imageUrl);
+  const p = extractStoragePath(imageUrl);
+  if (p) uploadedPaths.push(p);
+
+  let scanId: string;
+  try {
+    scanId = await saveManualScan(imageUrl);
+  } catch (err) {
+    await rollbackUploads(uploadedPaths);
+    throw err;
+  }
 
   const additionalShots = sorted.slice(1).filter((s) => s.base64);
   const uploadResults = await Promise.allSettled(
@@ -156,16 +179,23 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
   for (const result of uploadResults) {
     if (result.status === 'fulfilled') {
       additionalUrls.push(result.value);
+      const ap = extractStoragePath(result.value);
+      if (ap) uploadedPaths.push(ap);
       uploadFailures = 0;
     } else {
       uploadFailures++;
     }
   }
   if (uploadFailures >= 2) {
+    await rollbackUploads(uploadedPaths);
     throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
   }
   if (additionalUrls.length > 0) {
-    await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+    try {
+      await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+    } catch {
+      // non-fatal — angles are still used for in-memory synthesis
+    }
   }
 
   return scanId;
@@ -189,12 +219,21 @@ export async function runStereoPipeline(
   steps[0].detail = '5각도 이미지 병렬 분석 및 3D 볼륨 복원 중...';
   report(0, 0.05);
 
+  const uploadedPaths: string[] = [];
+
   let scanId: string;
   if (existingScanId) {
     scanId = existingScanId;
   } else {
     const imageUrl = await uploadWithRetry(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-    scanId = await saveManualScan(imageUrl);
+    const p = extractStoragePath(imageUrl);
+    if (p) uploadedPaths.push(p);
+    try {
+      scanId = await saveManualScan(imageUrl);
+    } catch (err) {
+      await rollbackUploads(uploadedPaths);
+      throw err;
+    }
   }
 
   // Upload additional angle images to storage so they persist beyond this session.
@@ -209,10 +248,13 @@ export async function runStereoPipeline(
   for (const result of additionalUploadResults) {
     if (result.status === 'fulfilled') {
       additionalUrls.push(result.value);
+      const ap = extractStoragePath(result.value);
+      if (ap) uploadedPaths.push(ap);
       consecutiveUploadFailures = 0;
     } else {
       consecutiveUploadFailures++;
       if (consecutiveUploadFailures >= 2) {
+        await rollbackUploads(uploadedPaths);
         throw new Error('추가 각도 이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
       }
     }

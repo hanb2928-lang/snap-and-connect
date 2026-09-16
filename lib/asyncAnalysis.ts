@@ -8,6 +8,18 @@ import { buildDataUrl } from '@/lib/base64';
 
 const SUPABASE_TIMEOUT_MS = 30000;
 
+function extractStoragePath(publicUrl: string): string | null {
+  const marker = '/storage/v1/object/public/scans/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return publicUrl.slice(idx + marker.length);
+}
+
+async function rollbackUploads(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await supabase.storage.from('scans').remove(paths).catch(() => {});
+}
+
 function withSupabaseTimeout<T>(
   operation: () => Promise<{ data: T | null; error: { message: string } | null }>,
   label: string,
@@ -91,7 +103,15 @@ export async function startAsyncAnalysis(
   }
 
   // Cache miss — upload image and additional angles
-  const imageUrl = await uploadImage(base64, mimeType);
+  const uploadedPaths: string[] = [];
+  let imageUrl: string;
+  try {
+    imageUrl = await uploadImage(base64, mimeType);
+    const p = extractStoragePath(imageUrl);
+    if (p) uploadedPaths.push(p);
+  } catch (err) {
+    throw err;
+  }
 
   const additionalUrls: string[] = [];
   let uploadFailures = 0;
@@ -99,10 +119,13 @@ export async function startAsyncAnalysis(
     try {
       const url = await uploadImage(b64, 'image/jpeg');
       additionalUrls.push(url);
+      const ap = extractStoragePath(url);
+      if (ap) uploadedPaths.push(ap);
       uploadFailures = 0;
     } catch {
       uploadFailures++;
       if (uploadFailures >= 2) {
+        await rollbackUploads(uploadedPaths);
         throw new Error('추가 이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
       }
     }
@@ -125,11 +148,23 @@ export async function startAsyncAnalysis(
           ...(preferredStyle ? { preferredStyle } : {}),
         };
 
-  const jobId = await enqueueJob('analyze-photo', payload, {
-    priority: 3,
-  });
+  let jobId: string;
+  try {
+    jobId = await enqueueJob('analyze-photo', payload, {
+      priority: 3,
+    });
+  } catch (err) {
+    await rollbackUploads(uploadedPaths);
+    throw err;
+  }
 
-  const scanId = await createPendingScan(imageUrl, jobId, additionalUrls, mode, imageHash);
+  let scanId: string;
+  try {
+    scanId = await createPendingScan(imageUrl, jobId, additionalUrls, mode, imageHash);
+  } catch (err) {
+    await rollbackUploads(uploadedPaths);
+    throw err;
+  }
 
   return { scanId, jobId, cached: false };
 }
