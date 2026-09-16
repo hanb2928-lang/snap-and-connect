@@ -167,7 +167,8 @@ Deno.serve(async (req: Request) => {
     }
 
     return await handleSubmit(body, runwayKey);
-  } catch {
+  } catch (err) {
+    console.error("[generate-video] Unhandled error:", err);
     return new Response(
       JSON.stringify({
         error: "비디오 생성 중 오류가 발생했습니다.",
@@ -287,7 +288,8 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-  } catch {
+  } catch (err) {
+    console.error("[generate-video] Submit error:", err);
     return new Response(
       JSON.stringify({
         error: "AI 비디오 생성 요청에 실패했습니다. 잠시 후 다시 시도해주세요.",
@@ -957,6 +959,7 @@ async function pollRunwayTask(
     if (err instanceof Error && err.name === "AbortError") {
       return { status: "PROCESSING", progress: "polling timeout, retrying" };
     }
+    console.error("[generate-video] Poll error:", err);
     return { status: "FAILED", error: "Runway 폴링 오류" };
   }
 }

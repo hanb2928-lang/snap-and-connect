@@ -25,6 +25,7 @@ export function useVoiceRecording(): MediaRecorderLike {
   const durationRef = useRef(0);
   const stoppingRef = useRef(false);
   const pendingStopRef = useRef<((v: string | null) => void) | null>(null);
+  const mountedRef = useRef(true);
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -46,7 +47,11 @@ export function useVoiceRecording(): MediaRecorderLike {
   }, []);
 
   useEffect(() => {
-    return cleanup;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
   }, [cleanup]);
 
   const start = useCallback(async () => {
@@ -74,6 +79,10 @@ export function useVoiceRecording(): MediaRecorderLike {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')

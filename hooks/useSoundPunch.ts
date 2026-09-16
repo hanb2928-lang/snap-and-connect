@@ -69,6 +69,7 @@ export function useSoundPunch() {
   });
   const isStartingRef = useRef(false);
   const lastStateUpdateRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const isWeb = typeof window !== 'undefined' &&
     (typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined');
@@ -104,7 +105,11 @@ export function useSoundPunch() {
   }, []);
 
   useEffect(() => {
-    return () => cleanup();
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
   }, [cleanup]);
 
   const detectVoiceCommand = useCallback((transcript: string): PunchEffectType | null => {
@@ -150,6 +155,12 @@ export function useSoundPunch() {
           autoGainControl: true,
         },
       });
+
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        isStartingRef.current = false;
+        return;
+      }
 
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const sourceNode = audioContext.createMediaStreamSource(stream);
