@@ -59,6 +59,22 @@ const REALTIME_SOFT_WARN_MS = 120_000;
 const FALLBACK_POLL_INTERVAL_MS = 5000;
 const RUNWAY_POLL_FALLBACK_INTERVAL_MS = 15000;
 const RUNWAY_POLL_FALLBACK_START_MS = 30_000;
+const POLL_MIN_INTERVAL_MS = 2000;
+const POLL_MAX_INTERVAL_MS = 12000;
+const POLL_BACKOFF_FACTOR = 1.5;
+const CHANNEL_RECONNECT_DELAY_MS = 3000;
+const CHANNEL_MAX_RECONNECT_ATTEMPTS = 5;
+
+enum ChannelHealth {
+  HEALTHY = 'healthy',
+  DEGRADED = 'degraded',
+  DISCONNECTED = 'disconnected',
+}
+
+function computeBackoffDelay(attempt: number): number {
+  const base = POLL_MIN_INTERVAL_MS * Math.pow(POLL_BACKOFF_FACTOR, attempt);
+  return Math.min(Math.round(base), POLL_MAX_INTERVAL_MS);
+}
 
 
 export async function generateAiVideo(
@@ -245,16 +261,20 @@ function waitForVideoCompletion(
   return new Promise((resolve, reject) => {
     let settled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let elapsedTick = 0;
+    let channelHealth: ChannelHealth = ChannelHealth.DISCONNECTED;
+    let reconnectAttempts = 0;
+    let pollBackoffAttempt = 0;
 
     const cleanup = () => {
       if (channel) supabase.removeChannel(channel);
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (softWarnTimer) clearTimeout(softWarnTimer);
       if (runwayPollTimer) clearTimeout(runwayPollTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
     };
 
     const finish = (fn: () => void) => {
@@ -331,8 +351,11 @@ function waitForVideoCompletion(
       }
     };
 
-    // Primary path: Realtime subscription on video_jobs
-    if (scanId) {
+    // Primary path: Realtime subscription on video_jobs with health monitoring
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const setupChannel = () => {
+      if (settled || !scanId) return;
       channel = supabase
         .channel(`video-job:${scanId}:${submitData.taskId}`)
         .on(
@@ -340,23 +363,76 @@ function waitForVideoCompletion(
           { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
           (payload) => {
             if (!payload.new) return;
+            // Realtime event received — channel is healthy, reset backoff
+            channelHealth = ChannelHealth.HEALTHY;
+            pollBackoffAttempt = 0;
+            reconnectAttempts = 0;
             handleRow(payload.new as VideoJobRow);
           },
         )
-        .subscribe();
-    }
+        .subscribe((status: string) => {
+          if (settled) return;
+          if (status === 'SUBSCRIBED') {
+            channelHealth = ChannelHealth.HEALTHY;
+            reconnectAttempts = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            channelHealth = ChannelHealth.DEGRADED;
+            // Exponentially increase poll frequency when channel is unhealthy
+            pollBackoffAttempt = 0;
+            scheduleReconnect();
+          } else if (status === 'CLOSED') {
+            channelHealth = ChannelHealth.DISCONNECTED;
+            pollBackoffAttempt = 0;
+            scheduleReconnect();
+          }
+        });
+    };
 
-    // Safety-net: low-frequency DB poll every 5s (vs. old 0.5s tight loop)
-    pollTimer = setInterval(() => {
+    const scheduleReconnect = () => {
+      if (settled || reconnectAttempts >= CHANNEL_MAX_RECONNECT_ATTEMPTS) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      const delayMs = CHANNEL_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts);
+      reconnectAttempts++;
+      report('generating', 0.12, `실시간 연결이 불안정합니다. 재연결 시도 중 (${reconnectAttempts}/${CHANNEL_MAX_RECONNECT_ATTEMPTS})...`);
+      reconnectTimer = setTimeout(() => {
+        if (settled) return;
+        if (channel) {
+          try { supabase.removeChannel(channel); } catch { /* ignore */ }
+          channel = null;
+        }
+        setupChannel();
+      }, delayMs);
+    };
+
+    setupChannel();
+
+    // Safety-net: adaptive DB poll with exponential backoff.
+    // When the realtime channel is healthy, back off to reduce unnecessary
+    // DB queries. When the channel degrades, reset to fast polling.
+    const scheduleNextPoll = () => {
       if (settled) return;
-      elapsedTick++;
-      checkDb();
-      checkScanVideoUrl();
-      // Progress hint based on elapsed time
-      const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-      const timeProgress = Math.min(0.1 + (elapsedSec / 180) * 0.8, 0.95);
-      report('generating', timeProgress, `AI가 영상을 렌더링하고 있어요 (${elapsedSec}초)...`);
-    }, FALLBACK_POLL_INTERVAL_MS);
+      const interval = channelHealth === ChannelHealth.HEALTHY
+        ? computeBackoffDelay(pollBackoffAttempt)
+        : POLL_MIN_INTERVAL_MS; // Fast poll when channel is degraded
+      pollTimer = setTimeout(async () => {
+        if (settled) return;
+        elapsedTick++;
+        await Promise.all([checkDb(), checkScanVideoUrl()]);
+        if (!settled) {
+          const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+          const timeProgress = Math.min(0.1 + (elapsedSec / 180) * 0.8, 0.95);
+          const healthHint = channelHealth === ChannelHealth.HEALTHY
+            ? ''
+            : ' (실시간 연결 불안정 — 폴링으로 대체 중)';
+          report('generating', timeProgress, `AI가 영상을 렌더링하고 있어요 (${elapsedSec}초)${healthHint}...`);
+          if (channelHealth === ChannelHealth.HEALTHY) {
+            pollBackoffAttempt++;
+          }
+          scheduleNextPoll();
+        }
+      }, interval);
+    };
+    scheduleNextPoll();
 
     // Runway API direct-poll fallback: after 30s, if DB still shows no result,
     // poll the Runway API directly every 15s as a second safety net.
@@ -515,7 +591,12 @@ export function subscribeHdUpgrade(
   callback: HdUpgradeCallback,
 ): () => void {
   let settled = false;
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let channelHealth: ChannelHealth = ChannelHealth.DISCONNECTED;
+  let reconnectAttempts = 0;
+  let pollBackoffAttempt = 0;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
 
   const checkAndNotify = async () => {
     if (settled) return;
@@ -542,38 +623,86 @@ export function subscribeHdUpgrade(
     }
   };
 
-  const channel = supabase
-    .channel(`hd-upgrade:${scanId}:${draftJobId}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
-      (payload) => {
-        if (!payload.new) return;
-        const row = payload.new as VideoJobRow;
-        if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          callback({ status: 'SUCCESS', videoUrl: row.hd_video_url });
-        } else if (row.hd_status === 'FAILED') {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          callback({ status: 'FAILED', error: row.error_message ?? 'HD 업그레이드에 실패했습니다.' });
-        }
-      },
-    )
-    .subscribe();
-
   const cleanup = () => {
-    supabase.removeChannel(channel);
-    if (pollTimer) clearInterval(pollTimer);
+    if (channel) supabase.removeChannel(channel);
+    if (pollTimer) clearTimeout(pollTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
   };
 
-  // Safety-net poll every 5s
-  pollTimer = setInterval(checkAndNotify, FALLBACK_POLL_INTERVAL_MS);
+  const scheduleReconnect = () => {
+    if (settled || reconnectAttempts >= CHANNEL_MAX_RECONNECT_ATTEMPTS) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    const delayMs = CHANNEL_RECONNECT_DELAY_MS * Math.pow(2, reconnectAttempts);
+    reconnectAttempts++;
+    reconnectTimer = setTimeout(() => {
+      if (settled) return;
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch { /* ignore */ }
+        channel = null;
+      }
+      setupChannel();
+    }, delayMs);
+  };
 
-  // Initial check
+  const setupChannel = () => {
+    if (settled) return;
+    channel = supabase
+      .channel(`hd-upgrade:${scanId}:${draftJobId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scanId}` },
+        (payload) => {
+          if (!payload.new) return;
+          channelHealth = ChannelHealth.HEALTHY;
+          pollBackoffAttempt = 0;
+          reconnectAttempts = 0;
+          const row = payload.new as VideoJobRow;
+          if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            callback({ status: 'SUCCESS', videoUrl: row.hd_video_url });
+          } else if (row.hd_status === 'FAILED') {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            callback({ status: 'FAILED', error: row.error_message ?? 'HD 업그레이드에 실패했습니다.' });
+          }
+        },
+      )
+      .subscribe((status: string) => {
+        if (settled) return;
+        if (status === 'SUBSCRIBED') {
+          channelHealth = ChannelHealth.HEALTHY;
+          reconnectAttempts = 0;
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          channelHealth = ChannelHealth.DEGRADED;
+          pollBackoffAttempt = 0;
+          scheduleReconnect();
+        }
+      });
+  };
+
+  // Adaptive DB poll with exponential backoff — same strategy as waitForVideoCompletion
+  const scheduleNextPoll = () => {
+    if (settled) return;
+    const interval = channelHealth === ChannelHealth.HEALTHY
+      ? computeBackoffDelay(pollBackoffAttempt)
+      : POLL_MIN_INTERVAL_MS;
+    pollTimer = setTimeout(async () => {
+      if (settled) return;
+      await checkAndNotify();
+      if (!settled) {
+        if (channelHealth === ChannelHealth.HEALTHY) {
+          pollBackoffAttempt++;
+        }
+        scheduleNextPoll();
+      }
+    }, interval);
+  };
+
+  setupChannel();
+  scheduleNextPoll();
   checkAndNotify();
 
   return () => {
