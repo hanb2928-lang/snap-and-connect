@@ -789,7 +789,7 @@ export default function ResultScreen() {
           setDraftVideoUrl(result.videoUrl);
           setGeneratedVideoUrl(result.videoUrl);
           setVideoStage('draft_ready');
-          setBgJobNotice('백그라운드에서 안전하게 생성 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
+          setBgJobNotice('백그라운드에서 계속 진행 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
 
           // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
           if (!hdUpscale) return;
@@ -3603,6 +3603,7 @@ export default function ResultScreen() {
                 <Text style={styles.synthHint}>최종 결과물 선명도·해상도 향상</Text>
               </View>
               <TouchableOpacity
+                testID="hd-upscale-toggle"
                 style={[styles.synthToggleSwitch, hdUpscale && styles.synthToggleSwitchActive]}
                 onPress={() => setHdUpscale((v) => !v)}
                 activeOpacity={0.7}
@@ -3686,6 +3687,7 @@ export default function ResultScreen() {
                 </Text>
               </View>
               <TouchableOpacity
+                testID="hd-upscale-toggle"
                 style={[styles.synthToggleSwitch, hdUpscale && styles.synthToggleSwitchActive]}
                 onPress={() => setHdUpscale((v) => !v)}
                 activeOpacity={0.7}

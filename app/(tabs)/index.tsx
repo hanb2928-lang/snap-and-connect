@@ -631,6 +631,16 @@ export default function CameraScreen() {
           />
         </View>
 
+        <TouchableOpacity
+          testID="start-capture-btn"
+          style={styles.startCaptureBtn}
+          onPress={() => handleModeSelect('single')}
+          activeOpacity={0.85}
+        >
+          <Camera size={22} color="#fff" strokeWidth={2.5} />
+          <Text style={styles.startCaptureBtnText}>카메라 시작</Text>
+        </TouchableOpacity>
+
         <CreditPurchaseModal
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
@@ -1352,6 +1362,22 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.error[400],
     textAlign: 'center',
+  },
+  startCaptureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    paddingVertical: 16,
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.primary[600],
+  },
+  startCaptureBtnText: {
+    fontSize: 16,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#fff',
   },
   // Permission
   permissionContainer: {

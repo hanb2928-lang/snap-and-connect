@@ -313,4 +313,30 @@ describe('generate-video edge function', () => {
       expect(body.error).toContain('Runway API 키');
     });
   });
+
+  describe('input validation', () => {
+    it('returns 400 when submit payload has no prompt, scanId, or productName', async () => {
+      const req = new Request('https://test.supabase.co/functions/v1/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invalid_payload: true }),
+      });
+      const resp = await handler(req);
+      expect(resp.status).toBe(400);
+      const body = await resp.json();
+      expect(body.error).toBeDefined();
+    });
+
+    it('returns 400 for unsupported mode', async () => {
+      const req = new Request('https://test.supabase.co/functions/v1/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'invalid-mode' }),
+      });
+      const resp = await handler(req);
+      expect(resp.status).toBe(400);
+      const body = await resp.json();
+      expect(body.error).toContain('지원하지 않는 모드');
+    });
+  });
 });
