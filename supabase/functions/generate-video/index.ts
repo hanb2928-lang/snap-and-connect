@@ -1519,6 +1519,7 @@ async function uploadToStorage(videoUrl: string, scanId: string): Promise<string
         apikey: serviceRoleKey,
         "Content-Type": "video/mp4",
         "x-upsert": "true",
+        "Cache-Control": "max-age=360000",
       },
       body: videoBlob,
       signal: uploadController.signal,

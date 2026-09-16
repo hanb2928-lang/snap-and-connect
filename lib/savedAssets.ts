@@ -38,7 +38,7 @@ export async function uploadAssetBlob(
     const result = await withRetry(async () => {
       const { error } = await supabase.storage
         .from(BUCKET)
-        .upload(path, blob, { contentType: mimeType, upsert: true });
+        .upload(path, blob, { contentType: mimeType, upsert: true, cacheControl: '360000' });
       if (error) throw error;
       return true;
     });
@@ -75,6 +75,7 @@ export async function uploadAssetBlobWithProgress(
       xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
       xhr.setRequestHeader('Content-Type', mimeType);
       xhr.setRequestHeader('x-upsert', 'true');
+      xhr.setRequestHeader('Cache-Control', 'max-age=360000');
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
@@ -139,7 +140,7 @@ export async function uploadAssetDataUrl(
       const result = await withRetry(async () => {
         const { error } = await supabase.storage
           .from(BUCKET)
-          .upload(fileName, formData, { contentType: mimeType, upsert: true });
+          .upload(fileName, formData, { contentType: mimeType, upsert: true, cacheControl: '360000' });
         if (error) throw error;
         return true;
       });
@@ -173,7 +174,7 @@ export async function uploadAssetFromFileUri(
     const result = await withRetry(async () => {
       const { error } = await supabase.storage
         .from(BUCKET)
-        .upload(fileName, formData, { contentType: mimeType, upsert: true });
+        .upload(fileName, formData, { contentType: mimeType, upsert: true, cacheControl: '360000' });
       if (error) throw error;
       return true;
     });
@@ -206,7 +207,7 @@ export async function uploadAssetFromFileUriWithProgress(
       const result = await new Promise<string | null>((resolve) => {
         supabase.storage
           .from(BUCKET)
-          .upload(fileName, formData, { contentType: mimeType, upsert: true })
+          .upload(fileName, formData, { contentType: mimeType, upsert: true, cacheControl: '360000' })
           .then(({ error }) => {
             if (error) {
               resolve(null);

@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { X, ChevronLeft, ChevronRight, Download } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { getThumbnailUrl } from '@/lib/imageUtils';
 import type { PsychScene } from '@/lib/psychologyEngine';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -146,7 +147,7 @@ export function FullScreenGalleryModal({
               <View style={styles.baItem}>
                 <Text style={styles.baLabel}>원본</Text>
                 {beforeImage ? (
-                  <Image source={{ uri: beforeImage }} style={styles.baImage} resizeMode="contain" />
+                  <Image source={{ uri: getThumbnailUrl(beforeImage, 600) }} style={styles.baImage} resizeMode="contain" />
                 ) : (
                   <View style={styles.baPlaceholder}>
                     <Text style={styles.baPlaceholderText}>원본 없음</Text>
@@ -156,7 +157,7 @@ export function FullScreenGalleryModal({
               <View style={styles.baItem}>
                 <Text style={styles.baLabel}>AI 보정</Text>
                 {afterImage ? (
-                  <Image source={{ uri: afterImage }} style={styles.baImage} resizeMode="contain" />
+                  <Image source={{ uri: getThumbnailUrl(afterImage, 600) }} style={styles.baImage} resizeMode="contain" />
                 ) : (
                   <View style={styles.baPlaceholder}>
                     <Text style={styles.baPlaceholderText}>보정 전</Text>

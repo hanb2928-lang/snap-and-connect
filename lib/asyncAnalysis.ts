@@ -330,7 +330,7 @@ export async function triggerTTS(scanId: string, text: string): Promise<void> {
   const audioFileName = `tts-${scanId}-${Date.now()}.mp3`;
   const { error: uploadError } = await supabase.storage
     .from('scans')
-    .upload(audioFileName, audioBytes, { contentType: 'audio/mpeg' });
+    .upload(audioFileName, audioBytes, { contentType: 'audio/mpeg', cacheControl: '360000' });
   if (uploadError) throw new Error(`TTS 오디오 업로드 실패: ${uploadError.message}`);
 
   const { data: urlData } = supabase.storage.from('scans').getPublicUrl(audioFileName);

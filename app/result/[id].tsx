@@ -41,6 +41,7 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { getThumbnailUrl } from '@/lib/imageUtils';
 import { supabase } from '@/lib/supabase';
 import { getUserSettings } from '@/lib/settings';
 import { generateAffiliateLinks } from '@/lib/affiliate';
@@ -3827,7 +3828,7 @@ export default function ResultScreen() {
                       activeOpacity={0.85}
                     >
                       <Image
-                        source={{ uri: imgUrl }}
+                        source={{ uri: getThumbnailUrl(imgUrl, 120) }}
                         style={[
                           styles.galleryModalThumb,
                           idx === galleryModalIndex && styles.galleryModalThumbActive,
@@ -3906,7 +3907,7 @@ export default function ResultScreen() {
                       activeOpacity={0.85}
                     >
                       <Image
-                        source={{ uri: imgUri }}
+                        source={{ uri: getThumbnailUrl(imgUri, 120) }}
                         style={[
                           styles.galleryModalThumb,
                           idx === imageViewerIndex && styles.galleryModalThumbActive,
@@ -4137,7 +4138,7 @@ export default function ResultScreen() {
                       }}
                       activeOpacity={0.85}
                     >
-                      <Image source={{ uri: imgUrl }} style={styles.angleThumbImage} resizeMode="cover" />
+                      <Image source={{ uri: getThumbnailUrl(imgUrl, 200) }} style={styles.angleThumbImage} resizeMode="cover" />
                       <View style={styles.angleThumbLabelWrap}>
                         <Text style={styles.angleThumbLabel}>{label}</Text>
                       </View>

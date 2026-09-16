@@ -17,6 +17,7 @@ import {
 } from 'lucide-react-native';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { theme } from '@/lib/theme';
+import { getThumbnailUrl } from '@/lib/imageUtils';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import type { NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import type { VideoGenProgress } from '@/lib/aiVideoPipeline';
@@ -239,7 +240,7 @@ export function ResultPreviewSection({
                   activeOpacity={0.85}
                 >
                   <Image
-                    source={{ uri: imgUri }}
+                    source={{ uri: getThumbnailUrl(imgUri, 120) }}
                     style={[
                       styles.imageThumbItem,
                       idx === selectedImageIndex && styles.imageThumbItemActive,

@@ -21,6 +21,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
+import { getThumbnailUrl } from '@/lib/imageUtils';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
 
 interface StockVideoPickerProps {
@@ -531,7 +532,7 @@ export function StockVideoPicker({
       {selectedClip && (
         <View style={styles.selectedBox}>
           <Image
-            source={{ uri: selectedClip.thumbnailUrl }}
+            source={{ uri: getThumbnailUrl(selectedClip.thumbnailUrl, 96) }}
             style={styles.selectedThumb}
             resizeMode="cover"
           />
@@ -603,7 +604,7 @@ export function StockVideoPicker({
               activeOpacity={0.85}
             >
               <Image
-                source={{ uri: item.thumbnailUrl }}
+                source={{ uri: getThumbnailUrl(item.thumbnailUrl, 240) }}
                 style={styles.clipThumb}
                 resizeMode="cover"
               />

@@ -188,13 +188,14 @@ Deno.serve(async (req: Request) => {
           square: p.src.square,
         };
         const imageUrl = srcMap[orient] || p.src.large;
+        const thumbUrl = p.src.small || p.src.medium || imageUrl;
         return {
           id: p.id,
           duration: 0,
           width: p.width,
           height: p.height,
-          previewUrl: imageUrl,
-          thumbnailUrl: imageUrl,
+          previewUrl: thumbUrl,
+          thumbnailUrl: thumbUrl,
           videoUrl: imageUrl,
           author: p.photographer ?? "Unknown",
           ratio: buildRatio(p.width, p.height),

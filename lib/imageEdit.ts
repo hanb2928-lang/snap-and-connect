@@ -97,6 +97,33 @@ export async function compressImage(uri: string, maxWidth = 1080, quality = 0.8)
   return result.uri;
 }
 
+const UPLOAD_MAX_DIMENSION = 1920;
+const UPLOAD_QUALITY = 0.8;
+
+export async function compressBase64ForUpload(
+  base64: string,
+  mimeType: string,
+): Promise<{ base64: string; mimeType: string }> {
+  const dataUrl = `data:${mimeType};base64,${base64}`;
+
+  if (Platform.OS === 'web') {
+    try {
+      const compressed = await prepareImageForApi(dataUrl, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY);
+      const compressedMime = compressed.startsWith('data:image/webp') ? 'image/webp' : mimeType;
+      return { base64: cleanBase64(compressed), mimeType: compressedMime };
+    } catch {
+      return { base64, mimeType };
+    }
+  }
+
+  try {
+    const compressed = await prepareImageForApi(dataUrl, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY);
+    return { base64: cleanBase64(compressed), mimeType: 'image/jpeg' };
+  } catch {
+    return { base64, mimeType };
+  }
+}
+
 export async function compressImageToBase64(
   uri: string,
   maxDimension = 1080,
@@ -137,7 +164,7 @@ export async function uploadEditedImage(base64: string, mimeType: string): Promi
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, body, { contentType: uploadMime });
+    .upload(fileName, body, { contentType: uploadMime, cacheControl: '360000' });
 
   if (error) throw new Error(`업로드 실패: ${error.message}`);
 

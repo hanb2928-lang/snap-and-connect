@@ -6,18 +6,22 @@ import { getUserSettings } from '@/lib/settings';
 import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
 import { deductCredits } from '@/lib/credits';
+import { compressBase64ForUpload } from '@/lib/imageEdit';
 
 export async function uploadImage(
   base64: string,
   mimeType: string,
 ): Promise<string> {
-  const uploadMime = mimeType || 'image/jpeg';
+  // Compress before upload: resize to max 1920px, convert to WebP at quality 0.8
+  const { base64: compressedBase64, mimeType: compressedMime } = await compressBase64ForUpload(base64, mimeType);
+
+  const uploadMime = compressedMime || 'image/jpeg';
   const ext = uploadMime === 'image/png' ? 'png' : uploadMime === 'image/webp' ? 'webp' : 'jpg';
   const fileName = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage
     .from('scans')
-    .upload(fileName, base64ToUint8Array(base64), { contentType: uploadMime });
+    .upload(fileName, base64ToUint8Array(compressedBase64), { contentType: uploadMime, cacheControl: '360000' });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
@@ -193,7 +197,7 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
   const fileName = `tts-${scanId}-${Date.now()}.mp3`;
   const { error: uploadError } = await supabase.storage
     .from('scans')
-    .upload(fileName, audioBytes, { contentType: 'audio/mpeg' });
+    .upload(fileName, audioBytes, { contentType: 'audio/mpeg', cacheControl: '360000' });
   if (uploadError) return;
 
   const { data: urlData } = supabase.storage.from('scans').getPublicUrl(fileName);
