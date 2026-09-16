@@ -476,6 +476,9 @@ export default function ResultScreen() {
   const [manualKeywords, setManualKeywords] = useState('');
   const [isCleanVideoMode, setIsCleanVideoMode] = useState(false);
   const [targetMediaType, setTargetMediaType] = useState<TargetMediaType>('video');
+  const [bgJobNotice, setBgJobNotice] = useState<string | null>(null);
+  const autoSavedVideoRef = useRef<string | null>(null);
+  const bgVideoChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const applyCombinedPreset = useCallback((platform: TargetPlatformKey, purpose: ContentPurpose) => {
     const pp = TARGET_PLATFORM_PRESETS[platform];
@@ -703,10 +706,11 @@ export default function ResultScreen() {
 
     try {
       // Stage 1: Generate a fast draft (low-res, 3sec) and show it immediately
+      const requestedDurationSec = Math.max(Math.round(selectedDurationMs / 1000), 3);
       const draftResult = await submitVideoDraft(
         videoPromptText,
         {
-          durationSec: 3,
+          durationSec: requestedDurationSec,
           aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
           productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
           scanId: scan.id,
@@ -741,6 +745,7 @@ export default function ResultScreen() {
       setVideoStage('draft_ready');
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
+      setBgJobNotice('백그라운드에서 안전하게 생성 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
 
       // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
       if (!hdUpscale) {
@@ -753,7 +758,7 @@ export default function ResultScreen() {
 
       try {
         const { hdJobId } = await upgradeVideoToHd(scan.id, draftResult.jobId, videoPromptText, {
-          durationSec: 5,
+          durationSec: requestedDurationSec,
           aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
           productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
           scanId: scan.id,
@@ -814,7 +819,7 @@ export default function ResultScreen() {
       setIsGeneratingVideo(false);
       setVideoGenProgress(null);
     }
-  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, triggerTtsGeneration, ttsUrl, videoStage]);
+  }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, selectedDurationMs, triggerTtsGeneration, ttsUrl, videoStage]);
 
   const handleAiImageGenerate = useCallback(async () => {
     if (!scan || isGeneratingImage) return;
@@ -1211,6 +1216,78 @@ export default function ResultScreen() {
       if (intervalId) clearTimeout(intervalId);
     };
   }, [scan, generatedVideoUrl]);
+
+  // Background realtime subscription: watch video_jobs for this scan so that
+  // even if the user navigated away and came back, the completed video is
+  // detected and auto-saved to the Assets tab.
+  useEffect(() => {
+    if (!scan) return;
+
+    const autoSaveVideoToAssets = async (videoUrl: string) => {
+      if (autoSavedVideoRef.current === videoUrl) return;
+      autoSavedVideoRef.current = videoUrl;
+      try {
+        const fileName = `snap-connect-video-${scan.id}-${Date.now()}.mp4`;
+        let cloudUrl: string | null = null;
+        if (Platform.OS === 'web') {
+          const res = await fetch(videoUrl);
+          const blob = await res.blob();
+          cloudUrl = await uploadAssetBlobWithProgress(blob, fileName, 'video/mp4', () => {});
+        } else {
+          cloudUrl = await uploadAssetFromFileUriWithProgress(videoUrl, fileName, 'video/mp4', () => {});
+        }
+        if (cloudUrl) {
+          await saveAssetRecord({
+            scan_id: scan.id,
+            asset_type: 'video',
+            title: scan.product_name || scan.title || 'AI 영상',
+            file_url: cloudUrl,
+            file_name: fileName,
+            mime_type: 'video/mp4',
+            platform: activePlatform,
+          });
+        }
+      } catch {
+        // Auto-save is best-effort; user can still manually save
+      }
+    };
+
+    const channel = supabase
+      .channel(`bg-video-watch:${scan.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'video_jobs', filter: `scan_id=eq.${scan.id}` },
+        (payload) => {
+          if (!mountedRef.current || !payload.new) return;
+          const row = payload.new as { status: string; video_url: string | null; hd_status?: string | null; hd_video_url?: string | null };
+          if (row.hd_status === 'SUCCESS' && row.hd_video_url) {
+            setGeneratedVideoUrl(row.hd_video_url);
+            setVideoStage('hd_ready');
+            setIsGeneratingVideo(false);
+            setVideoGenProgress(null);
+            setBgJobNotice(null);
+            autoSaveVideoToAssets(row.hd_video_url);
+          } else if (row.status === 'SUCCESS' && row.video_url) {
+            if (!generatedVideoUrl) {
+              setGeneratedVideoUrl(row.video_url);
+              setVideoStage('draft_ready');
+              setIsGeneratingVideo(false);
+              setVideoGenProgress(null);
+              setBgJobNotice(null);
+              autoSaveVideoToAssets(row.video_url);
+            }
+          }
+        },
+      )
+      .subscribe();
+
+    bgVideoChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      bgVideoChannelRef.current = null;
+    };
+  }, [scan, generatedVideoUrl, activePlatform]);
 
   // Realtime subscription for async analysis job completion
   useEffect(() => {
@@ -2783,6 +2860,15 @@ export default function ResultScreen() {
                 {videoGenProgress?.message ?? 'AI 영상 생성 중...'}
                 {videoGenProgress?.elapsedSec ? ` (${videoGenProgress.elapsedSec}초)` : ''}
               </Text>
+            </View>
+          )}
+          {bgJobNotice && !isGeneratingVideo && (
+            <View style={styles.bgJobBanner}>
+              <Clock size={13} color={theme.colors.accent[300]} strokeWidth={2} />
+              <Text style={styles.bgJobText}>{bgJobNotice}</Text>
+              <TouchableOpacity onPress={() => setBgJobNotice(null)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
+              </TouchableOpacity>
             </View>
           )}
           {isGeneratingImage && targetMediaType === 'image' && (
@@ -5047,6 +5133,25 @@ iconButton: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.primary[300],
+  },
+  bgJobBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent[500] + '12',
+    borderWidth: 1,
+    borderColor: theme.colors.accent[400] + '30',
+    marginBottom: 4,
+  },
+  bgJobText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.accent[300],
+    lineHeight: 16,
   },
   imageGenProgressContainer: {
     paddingHorizontal: 12,

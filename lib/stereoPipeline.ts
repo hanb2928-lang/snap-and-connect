@@ -109,21 +109,22 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
   const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
   const scanId = await saveManualScan(imageUrl);
 
-  const additionalShots = sorted.slice(1);
+  const additionalShots = sorted.slice(1).filter((s) => s.base64);
+  const uploadResults = await Promise.allSettled(
+    additionalShots.map((shot) => uploadImage(shot.base64!, shot.mimeType || 'image/jpeg')),
+  );
   const additionalUrls: string[] = [];
   let uploadFailures = 0;
-  for (const shot of additionalShots) {
-    if (!shot.base64) continue;
-    try {
-      const url = await uploadImage(shot.base64, shot.mimeType || 'image/jpeg');
-      additionalUrls.push(url);
+  for (const result of uploadResults) {
+    if (result.status === 'fulfilled') {
+      additionalUrls.push(result.value);
       uploadFailures = 0;
-    } catch {
+    } else {
       uploadFailures++;
-      if (uploadFailures >= 2) {
-        throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
-      }
     }
+  }
+  if (uploadFailures >= 2) {
+    throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
   }
   if (additionalUrls.length > 0) {
     await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
@@ -147,7 +148,7 @@ export async function runStereoPipeline(
   if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
 
   steps[0].status = 'active';
-  steps[0].detail = '5각도 이미지 전송 및 3D 볼륨 복원 중...';
+  steps[0].detail = '5각도 이미지 병렬 분석 및 3D 볼륨 복원 중...';
   report(0, 0.05);
 
   let scanId: string;
@@ -178,18 +179,19 @@ export async function runStereoPipeline(
       orderIndex: s.orderIndex,
     }));
 
-  const localSynthesis = runSynthesis(angleInputs, '');
+  // Run local synthesis and cloud stereo analysis in parallel — local synthesis
+  // is CPU-only and doesn't depend on the upload, so it can overlap with the
+  // cloud call to cut total latency to max(local, cloud) instead of local + cloud.
+  steps[0].detail = '로컬 3D 분석 + 클라우드 GPU 볼륨 복원 동시 처리 중...';
+  report(0, 0.15);
+  const [localSynthesis, cloudResultRaw] = await Promise.all([
+    Promise.resolve(runSynthesis(angleInputs, '')),
+    invokeStereoCutAuto(anglePayloads, '', '', scanId).catch(() => null),
+  ]);
 
-  let cloudResult: CloudPipelineResult | null = null;
-  try {
-    steps[0].detail = '클라우드 GPU에서 3D 볼륨 복원 및 보간 진행 중...';
-    report(0, 0.15);
-    cloudResult = await invokeStereoCutAuto(anglePayloads, '', '', scanId);
-    if (!cloudResult?.synthesis?.spatialDepthHint) {
-      cloudResult = null;
-    }
-  } catch {
-    // Offline fallback — use local synthesis result
+  let cloudResult: CloudPipelineResult | null = cloudResultRaw;
+  if (cloudResult && !cloudResult?.synthesis?.spatialDepthHint) {
+    cloudResult = null;
   }
 
   const synthesisSummary = cloudResult

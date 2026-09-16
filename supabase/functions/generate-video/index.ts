@@ -151,7 +151,8 @@ async function handleSubmit(body: GenerateVideoRequest, runwayKey: string): Prom
   }
 
   const isDraft = body.draft === true;
-  const durationSec = isDraft ? 3 : Math.min(body.durationSec ?? 5, 5);
+  const requestedDuration = Math.min(Math.max(Math.round(body.durationSec ?? 5), 2), 10);
+  const durationSec = isDraft ? Math.min(requestedDuration, 3) : requestedDuration;
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
 
