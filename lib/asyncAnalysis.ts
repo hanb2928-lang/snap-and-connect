@@ -93,8 +93,15 @@ export async function startAsyncAnalysis(
   if (cached?.analysis_result) {
     // Cache hit — upload image for the scan record, then create scan with full data
     const imageUrl = await uploadImage(base64, mimeType);
+    const cacheUploadedPath = extractStoragePath(imageUrl);
     const analysis = cached.analysis_result as unknown as AnalysisResult;
-    const scanId = await createScanWithAnalysis(imageUrl, analysis, [], mode, imageHash);
+    let scanId: string;
+    try {
+      scanId = await createScanWithAnalysis(imageUrl, analysis, [], mode, imageHash);
+    } catch (err) {
+      if (cacheUploadedPath) await rollbackUploads([cacheUploadedPath]);
+      throw err;
+    }
 
     // Bump hit count (fire-and-forget)
     supabase.rpc('increment_analysis_cache_hit', { p_hash: imageHash }).then(() => {}, () => {});
