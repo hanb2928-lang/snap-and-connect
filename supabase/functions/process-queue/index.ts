@@ -44,6 +44,7 @@ interface RenderJob {
   attempts: number;
   priority?: number;
   scan_id?: string;
+  consecutive_failures?: number;
 }
 
 interface FailureRecord {
@@ -117,7 +118,9 @@ Deno.serve(async (req: Request) => {
 
     const queueDepth = await checkQueuedJobsRaw();
     const activeWorkers = await fetchActiveWorkerCount();
-    const batchSize = computeBatchSize(queueDepth, activeWorkers);
+    const autoscaleConfig = await fetchAutoscaleConfig();
+    const workerConcurrency = autoscaleConfig?.worker_concurrency ?? 8;
+    const batchSize = computeBatchSize(queueDepth, activeWorkers, workerConcurrency);
 
     const jobs = requestedJobTypes
       ? await dequeueBatchJobsByType(requestedJobTypes, batchSize, MAX_ATTEMPTS)
@@ -151,7 +154,7 @@ Deno.serve(async (req: Request) => {
           recordFailure();
           const errorMsg = err instanceof Error ? err.message : "Unknown error";
           const newAttempts = job.attempts + 1;
-          const newConsecutiveFailures = (await getConsecutiveFailures(job.id)) + 1;
+          const newConsecutiveFailures = (job.consecutive_failures ?? 0) + 1;
 
           if (newAttempts >= MAX_ATTEMPTS) {
             await markJobError(job.id, newAttempts, errorMsg, newConsecutiveFailures);
@@ -218,14 +221,16 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function computeBatchSize(queueDepth: number, activeWorkers: number): number {
+function computeBatchSize(queueDepth: number, activeWorkers: number, workerConcurrency: number): number {
   if (queueDepth === 0) return MIN_BATCH_SIZE;
   // Each worker should process roughly queueDepth / activeWorkers jobs,
-  // capped to MIN/MAX_BATCH_SIZE bounds. With the higher MAX_BATCH_SIZE,
-  // a single worker can claim more jobs when the queue is deep and few
-  // workers are active, maximizing throughput per worker invocation.
+  // capped to MIN/MAX_BATCH_SIZE bounds. When worker_concurrency is
+  // configured (> 0), scale the ideal batch by the per-worker concurrency
+  // capacity so a single worker can claim more jobs when the queue is deep
+  // and few workers are active, maximizing throughput per worker invocation.
+  const concurrency = Math.max(workerConcurrency, 1);
   const ideal = activeWorkers > 0
-    ? Math.ceil(queueDepth / Math.max(activeWorkers, 1))
+    ? Math.ceil((queueDepth / Math.max(activeWorkers, 1)) * Math.min(concurrency / 4, 2))
     : Math.min(queueDepth, MAX_BATCH_SIZE);
   return Math.max(MIN_BATCH_SIZE, Math.min(ideal, MAX_BATCH_SIZE));
 }
@@ -252,17 +257,17 @@ async function fetchActiveWorkerCount(): Promise<number> {
   }
 }
 
-async function getConsecutiveFailures(jobId: string): Promise<number> {
+async function fetchAutoscaleConfig(): Promise<{ worker_concurrency: number } | null> {
   try {
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/render_jobs?select=consecutive_failures&id=eq.${jobId}`,
+      `${supabaseUrl}/rest/v1/gpu_autoscale_config?select=worker_concurrency&id=eq.1`,
       { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } },
     );
-    if (!resp.ok) return 0;
-    const rows = await resp.json() as Array<{ consecutive_failures: number }>;
-    return rows.length > 0 ? (rows[0].consecutive_failures ?? 0) : 0;
+    if (!resp.ok) return null;
+    const rows = await resp.json() as Array<{ worker_concurrency: number }>;
+    return rows.length > 0 ? rows[0] : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -386,6 +391,7 @@ async function dequeueBatchJobs(maxCount: number, maxAttempts: number): Promise<
     attempts: (job.attempts as number) ?? 0,
     priority: job.priority as number | undefined,
     scan_id: job.scan_id as string | undefined,
+    consecutive_failures: (job.consecutive_failures as number) ?? 0,
   }));
 }
 
@@ -426,6 +432,7 @@ async function dequeueBatchJobsByType(
     attempts: (job.attempts as number) ?? 0,
     priority: job.priority as number | undefined,
     scan_id: job.scan_id as string | undefined,
+    consecutive_failures: (job.consecutive_failures as number) ?? 0,
   }));
 }
 
