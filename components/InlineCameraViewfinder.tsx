@@ -65,7 +65,7 @@ export const InlineCameraViewfinder = forwardRef<
     setError(null);
     try {
       const constraints: MediaStreamConstraints = {
-        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: facing, width: { ideal: 1080 }, height: { ideal: 1920 } },
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);

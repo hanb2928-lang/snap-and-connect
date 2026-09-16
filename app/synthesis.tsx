@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -106,6 +106,16 @@ export default function SynthesisScreen() {
     setModelImage({ id: `model-${Date.now()}`, uri: url });
     e.target.value = '';
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    return () => {
+      productImages.forEach((img) => {
+        if (img.uri.startsWith('blob:')) URL.revokeObjectURL(img.uri);
+      });
+      if (modelImage?.uri.startsWith('blob:')) URL.revokeObjectURL(modelImage.uri);
+    };
+  }, [productImages, modelImage]);
 
   const handleGenerate = useCallback(() => {
     if (productImages.length < 3) {

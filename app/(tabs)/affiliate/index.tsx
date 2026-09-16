@@ -347,6 +347,13 @@ export default function AffiliateScreen() {
   const [showUploadConfirm, setShowUploadConfirm] = useState<string | null>(null);
   const [pendingUploadPlatform, setPendingUploadPlatform] = useState<string | null>(null);
   const [importedMedia, setImportedMedia] = useState<{ uri: string; type: 'video' | 'image'; name: string } | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    return () => {
+      if (importedMedia?.uri.startsWith('blob:')) URL.revokeObjectURL(importedMedia.uri);
+    };
+  }, [importedMedia]);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [galleryVisible, setGalleryVisible] = useState(false);

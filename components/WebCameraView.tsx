@@ -95,8 +95,8 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: face,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1080 },
+          height: { ideal: 1920 },
         },
         audio: false,
       };

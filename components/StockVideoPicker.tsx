@@ -190,7 +190,7 @@ export function StockVideoPicker({
     setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: face, width: { ideal: 1080 }, height: { ideal: 1920 } },
         audio: false,
       });
       if (!cameraMountedRef.current || gen !== streamGenRef.current) {
