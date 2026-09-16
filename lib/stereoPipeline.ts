@@ -220,8 +220,8 @@ export async function runStereoPipeline(
   }
 
   const editPlan = cleanMode
-    ? buildShortFormEditPlan('youtube', '', 'curiosity_gap', '', undefined, undefined, true, undefined, undefined)
-    : buildShortFormEditPlan('youtube', synthesisSummary, 'curiosity_gap', productName, undefined, undefined, true, undefined, undefined);
+    ? buildShortFormEditPlan('youtube', '', null, '', undefined, undefined, true, undefined, undefined)
+    : buildShortFormEditPlan('youtube', synthesisSummary, null, productName, undefined, undefined, true, undefined, undefined);
 
   const directingPlan = buildDirectingPlan(
     editPlan.segments,
