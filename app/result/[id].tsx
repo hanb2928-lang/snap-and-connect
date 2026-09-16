@@ -435,6 +435,7 @@ export default function ResultScreen() {
   const [draftVideoUrl, setDraftVideoUrl] = useState<string | null>(null);
   const [hdUpgradeProgress, setHdUpgradeProgress] = useState<string | null>(null);
   const hdUnsubRef = useRef<(() => void) | null>(null);
+  const videoGenLockRef = useRef(false);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
@@ -615,7 +616,9 @@ export default function ResultScreen() {
   }, [scan, activePlatform]);
 
   const handleAiVideoGenerate = useCallback(async () => {
-    if (!scan || isGeneratingVideo) return;
+    if (!scan || isGeneratingVideo || videoGenLockRef.current) return;
+    videoGenLockRef.current = true;
+    if (hdUnsubRef.current) { hdUnsubRef.current(); hdUnsubRef.current = null; }
     setIsGeneratingVideo(true);
     setVideoGenError(null);
     setVideoGenProgress({ phase: 'submitting', progress: 0.05, message: 'AI 실사 비디오 생성 요청 중...', elapsedSec: 0 });
@@ -632,6 +635,7 @@ export default function ResultScreen() {
           setVideoGenProgress(null);
           setVideoGenError(null);
         }
+        videoGenLockRef.current = false;
         return;
       }
       if (recovered?.status === 'FAILED') {
@@ -834,11 +838,7 @@ export default function ResultScreen() {
       }
     }
 
-    // Safety net: if we somehow reach here without having shown the draft
-    if (mountedRef.current && videoStage !== 'draft_ready' && videoStage !== 'hd_upgrading') {
-      setIsGeneratingVideo(false);
-      setVideoGenProgress(null);
-    }
+    videoGenLockRef.current = false;
   }, [scan, isGeneratingVideo, inlineEdit.aiPrompt, inlineEdit.bgmMood, inlineEdit.captionText, inlineEdit.hookEffect, narrativeVariation, productVision, targetPlatform, videoGenMode, manualHook, manualKeywords, isCleanVideoMode, promptStrength, negativePrompt, bgStyle, outfitIntensity, zoomSpeed, cameraRotation, transitionEffect, targetMediaType, imageAspectRatio, stylePreset, detailRestoration, hdUpscale, selectedDurationMs, triggerTtsGeneration, ttsUrl, videoStage]);
 
   const handleAiImageGenerate = useCallback(async () => {
@@ -1065,6 +1065,7 @@ export default function ResultScreen() {
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      videoGenLockRef.current = false;
       if (hdUnsubRef.current) hdUnsubRef.current();
     };
   }, []);
@@ -1115,7 +1116,7 @@ export default function ResultScreen() {
 
   // Resume polling for in-progress video generation jobs on mount
   useEffect(() => {
-    if (!scan || generatedVideoUrl) return;
+    if (!scan || generatedVideoUrl || isGeneratingVideo) return;
     let cancelled = false;
     let intervalId: ReturnType<typeof setTimeout> | null = null;
 
@@ -1151,6 +1152,27 @@ export default function ResultScreen() {
 
         if (jobRow.status === 'PENDING' || jobRow.status === 'RUNNING' || jobRow.status === 'THROTTLED') {
           const taskId = jobRow.task_id as string;
+
+          // Zombie job guard: if the job has been stuck for over 5 minutes, don't resume
+          const { data: fullJob } = await supabase
+            .from('video_jobs')
+            .select('created_at')
+            .eq('scan_id', scan.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (fullJob?.created_at) {
+            const jobAgeMs = Date.now() - new Date(fullJob.created_at).getTime();
+            if (jobAgeMs > 300000) {
+              if (mountedRef.current) {
+                setVideoGenError('이전 영상 생성 작업이 시간 초과로 실패했습니다. 다시 시도해주세요.');
+                setVideoStage('failed');
+              }
+              return;
+            }
+          }
+
           setIsGeneratingVideo(true);
           setVideoGenProgress({ phase: 'generating', progress: 0.1, message: '이전 영상 생성 작업을 이어받는 중...', elapsedSec: 0 });
 
@@ -1236,7 +1258,7 @@ export default function ResultScreen() {
       cancelled = true;
       if (intervalId) clearTimeout(intervalId);
     };
-  }, [scan, generatedVideoUrl]);
+  }, [scan, generatedVideoUrl, isGeneratingVideo]);
 
   // Background realtime subscription: watch video_jobs for this scan so that
   // even if the user navigated away and came back, the completed video is

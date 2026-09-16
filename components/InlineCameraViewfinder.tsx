@@ -10,6 +10,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform, ViewStyle } from 'r
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { Camera, Image as ImageIcon, Loader, ShieldAlert, RotateCcw } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { useCameraVisibilityRecovery } from '@/hooks/useCameraVisibilityRecovery';
 
 export interface InlineViewfinderHandle {
   capture: () => Promise<{ base64: string; mimeType: string } | null>;
@@ -90,6 +91,15 @@ export const InlineCameraViewfinder = forwardRef<
       }
     }
   }, [facing, stopStream]);
+
+  const getStream = useCallback(() => streamRef.current, []);
+
+  useCameraVisibilityRecovery({
+    getStream,
+    isActive,
+    restartStream: () => startWebStream(),
+    stopStream,
+  });
 
   useEffect(() => {
     mountedRef.current = true;

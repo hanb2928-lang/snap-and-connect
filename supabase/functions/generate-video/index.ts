@@ -64,6 +64,7 @@ const RETRY_DELAY_MS = 1500;
 const RUNWAY_SUBMIT_TIMEOUT_MS = 20000;
 const RUNWAY_POLL_TIMEOUT_MS = 10000;
 const EDGE_WALL_CLOCK_BUDGET_MS = 120000;
+const ZOMBIE_JOB_TIMEOUT_MS = 300000; // 5 minutes — jobs stuck in PENDING/PROCESSING are considered dead
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -399,7 +400,7 @@ async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ st
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&select=status,error_message,video_url`,
+      `${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&select=status,error_message,video_url,created_at`,
       {
         headers: {
           apikey: serviceRoleKey,
@@ -410,12 +411,19 @@ async function checkVideoJobStatus(scanId: string, taskId: string): Promise<{ st
     );
     clearTimeout(timeoutId);
     if (resp.ok) {
-      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null }>;
+      const rows = await resp.json() as Array<{ status: string; error_message: string | null; video_url: string | null; created_at: string }>;
       if (rows.length > 0) {
+        const row = rows[0];
+        const isZombie = (row.status === 'PENDING' || row.status === 'PROCESSING' || row.status === 'RUNNING' || row.status === 'THROTTLED')
+          && Date.now() - new Date(row.created_at).getTime() > ZOMBIE_JOB_TIMEOUT_MS;
+        if (isZombie) {
+          await markVideoJobFailed(scanId, taskId, '영상 생성이 5분 이상 진행 중 상태로 멈춰 있어 좀비 작업으로 분류되었습니다. 다시 시도해주세요.');
+          return { status: 'FAILED', error: '영상 생성 작업이 시간 초과로 실패했습니다. 다시 시도해주세요.' };
+        }
         return {
-          status: rows[0].status,
-          error: rows[0].error_message ?? undefined,
-          videoUrl: rows[0].video_url ?? undefined,
+          status: row.status,
+          error: row.error_message ?? undefined,
+          videoUrl: row.video_url ?? undefined,
         };
       }
     }
@@ -470,6 +478,7 @@ async function saveVideoJob(scanId: string, taskId: string, isDraft: boolean, is
         scan_id: scanId,
         task_id: taskId,
         status: "PENDING",
+        step: "rendering",
         is_draft: isDraft,
         is_hd: isHd,
       }),
@@ -494,7 +503,7 @@ async function markVideoJobComplete(scanId: string, taskId: string, videoUrl: st
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({ status: "SUCCESS", video_url: videoUrl, completed_at: new Date().toISOString() }),
+      body: JSON.stringify({ status: "SUCCESS", step: "completed", video_url: videoUrl, completed_at: new Date().toISOString() }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -516,7 +525,7 @@ async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({ status: "FAILED", error_message: errMsg.slice(0, 500) }),
+      body: JSON.stringify({ status: "FAILED", step: "failed", error_message: errMsg.slice(0, 500) }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

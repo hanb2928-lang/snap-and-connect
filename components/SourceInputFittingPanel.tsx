@@ -1,4 +1,5 @@
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useRef, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ViewStyle } from 'react-native';
 import { Plus, Check, Upload, UserSquare2, Link2, AlertCircle } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
@@ -43,6 +44,7 @@ function SourceInputFittingPanelInner({
     for (let i = 0; i < Math.min(files.length, remaining); i++) {
       const file = files[i];
       const url = URL.createObjectURL(file);
+      createdUrlsRef.current.push(url);
       newImages.push({
         id: `prod-${Date.now()}-${i}`,
         uri: url,
@@ -58,9 +60,20 @@ function SourceInputFittingPanelInner({
     if (!files || files.length === 0) return;
     const file = files[0];
     const url = URL.createObjectURL(file);
+    createdUrlsRef.current.push(url);
     onModelImageSet({ id: `model-${Date.now()}`, uri: url });
     e.target.value = '';
   }, [onModelImageSet]);
+
+  const createdUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    return () => {
+    if (Platform.OS === 'web') {
+      for (const url of createdUrlsRef.current) URL.revokeObjectURL(url);
+    }
+    createdUrlsRef.current = [];
+    };
+  }, []);
 
   const needsMoreImages = productImages.length < MIN_PRODUCT_IMAGES;
 

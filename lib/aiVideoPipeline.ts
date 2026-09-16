@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { ProductVisionResult } from './productVision';
+import { isOnline } from '@/hooks/useNetworkStatus';
 
 export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error' | 'hd_upgrading' | 'hd_completed';
 
@@ -76,6 +77,62 @@ function computeBackoffDelay(attempt: number): number {
   return Math.min(Math.round(base), POLL_MAX_INTERVAL_MS);
 }
 
+const OFFLINE_POLL_MS = 1000;
+const OFFLINE_WAIT_MAX_MS = 30000;
+
+function waitForOnline(): Promise<boolean> {
+  if (isOnline()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const deadline = Date.now() + OFFLINE_WAIT_MAX_MS;
+    const check = () => {
+      if (isOnline() || Date.now() >= deadline) {
+        resolve(isOnline());
+        return;
+      }
+      setTimeout(check, OFFLINE_POLL_MS);
+    };
+    check();
+  });
+}
+
+function isNetworkError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('abort');
+  }
+  return false;
+}
+
+async function invokeWithNetworkRetry(
+  fnName: string,
+  body: Record<string, unknown>,
+  maxRetries: number,
+  onRetry?: (attempt: number, reason: string) => void,
+): Promise<{ data: unknown; error: unknown }> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries && isNetworkError(err)) {
+        if (!isOnline()) {
+          onRetry?.(attempt + 1, '네트워크 연결 대기 중...');
+          const recovered = await waitForOnline();
+          if (!recovered) throw err;
+        }
+        onRetry?.(attempt + 1, '네트워크 재시도 중...');
+        await delay(SUBMIT_RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 
 export async function generateAiVideo(
   prompt: string,
@@ -103,8 +160,9 @@ export async function generateAiVideo(
 
   for (let attempt = 0; attempt <= SUBMIT_MAX_RETRIES; attempt++) {
     try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: {
+      const result = await invokeWithNetworkRetry(
+        'generate-video',
+        {
           mode: 'submit',
           prompt,
           durationSec: options.durationSec ?? 5,
@@ -134,18 +192,18 @@ export async function generateAiVideo(
           resolution: options.resolution ?? (options.hdUpscale ? '1080p' : '720p'),
           fps: options.fps ?? (options.hdUpscale ? 30 : 24),
         },
-      });
+        0,
+        (retryAttempt) => report('submitting', 0.05 + retryAttempt * 0.02, `네트워크 복구 후 재시도 중 (${retryAttempt}/${SUBMIT_MAX_RETRIES})...`),
+      );
 
-      if (error) {
-        throw await buildVideoFunctionError(error);
-      }
+      const data = result.data as { taskId?: string; motionPrompt?: string; durationSec?: number; aspectRatio?: string; variationSeed?: number } | null;
 
       if (!data || typeof data !== 'object' || typeof data.taskId !== 'string') {
         throw new Error('서버가 작업 ID를 반환하지 않았습니다.');
       }
 
       submitData = {
-        taskId: data.taskId as string,
+        taskId: data.taskId,
         motionPrompt: data.motionPrompt as string,
         durationSec: data.durationSec as number,
         aspectRatio: data.aspectRatio as string,
@@ -155,6 +213,11 @@ export async function generateAiVideo(
     } catch (err) {
       lastSubmitErr = err instanceof Error ? err : new Error(String(err));
       if (attempt < SUBMIT_MAX_RETRIES) {
+        if (!isOnline()) {
+          report('submitting', 0.05 + attempt * 0.02, '네트워크 연결을 기다리는 중...');
+          const recovered = await waitForOnline();
+          if (!recovered) break;
+        }
         report('submitting', 0.05 + attempt * 0.02, `생성 요청 재시도 중 (${attempt + 1}/${SUBMIT_MAX_RETRIES})...`);
         await delay(SUBMIT_RETRY_DELAY_MS * (attempt + 1));
       }
@@ -240,6 +303,7 @@ function delay(ms: number): Promise<void> {
 
 interface VideoJobRow {
   status: string;
+  step?: string | null;
   video_url: string | null;
   error_message: string | null;
   hd_status?: string | null;
@@ -314,7 +378,7 @@ function waitForVideoCompletion(
       try {
         const { data, error } = await supabase
           .from('video_jobs')
-          .select('status, video_url, error_message')
+          .select('status, step, video_url, error_message')
           .eq('scan_id', scanId)
           .eq('task_id', submitData.taskId)
           .maybeSingle();
@@ -724,7 +788,7 @@ export async function recoverVideoJob(
   try {
     const { data, error } = await supabase
       .from('video_jobs')
-      .select('status, video_url, error_message, is_hd, hd_status, hd_video_url')
+      .select('status, step, video_url, error_message, is_hd, hd_status, hd_video_url')
       .eq('scan_id', scanId)
       .order('created_at', { ascending: false })
       .limit(1)

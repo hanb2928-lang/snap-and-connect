@@ -1,5 +1,6 @@
 import { supabaseAnonKey } from '@/lib/supabase';
 import { getCached, setCached, getStaleCached } from '@/lib/offlineCache';
+import { isOnline } from '@/hooks/useNetworkStatus';
 
 interface SafeFetchOptions extends RequestInit {
   timeoutMs?: number;
@@ -10,6 +11,23 @@ interface SafeFetchOptions extends RequestInit {
 
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 800;
+const OFFLINE_POLL_MS = 1000;
+const OFFLINE_WAIT_MAX_MS = 30000;
+
+function waitForOnline(): Promise<boolean> {
+  if (isOnline()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const deadline = Date.now() + OFFLINE_WAIT_MAX_MS;
+    const check = () => {
+      if (isOnline() || Date.now() >= deadline) {
+        resolve(isOnline());
+        return;
+      }
+      setTimeout(check, OFFLINE_POLL_MS);
+    };
+    check();
+  });
+}
 
 const inflightGets = new Map<string, Promise<Response>>();
 
@@ -147,6 +165,12 @@ async function doFetch(
       }
 
       if (attempt < retries && isRetryableError(lastError)) {
+        if (!isOnline()) {
+          const recovered = await waitForOnline();
+          if (!recovered) {
+            throw new ApiError('네트워크 연결이 끊겨 재시도할 수 없습니다. 인터넷 연결을 확인해주세요.', 0);
+          }
+        }
         await new Promise((r) => setTimeout(r, backoffDelay(attempt)));
         continue;
       }
@@ -186,6 +210,12 @@ export async function safeSupabaseCall<T>(
       );
 
       if (isNetwork && attempt < retries) {
+        if (!isOnline()) {
+          const recovered = await waitForOnline();
+          if (!recovered) {
+            throw new ApiError('네트워크 연결이 끊겨 재시도할 수 없습니다. 인터넷 연결을 확인해주세요.', 0);
+          }
+        }
         await new Promise((r) => setTimeout(r, BASE_BACKOFF_MS * Math.pow(2, attempt)));
         continue;
       }

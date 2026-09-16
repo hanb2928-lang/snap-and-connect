@@ -5,6 +5,7 @@ import { theme } from '@/lib/theme';
 import { Camera, RotateCcw, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
+import { useCameraVisibilityRecovery } from '@/hooks/useCameraVisibilityRecovery';
 
 export type CaptureModeType = 'single' | 'video';
 
@@ -127,7 +128,16 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
         setErrorKind('generic');
       }
     }
-  }, [stopStream]);
+  }, [stopStream, facing]);
+
+  const getStream = useCallback(() => streamRef.current, []);
+
+  useCameraVisibilityRecovery({
+    getStream,
+    isActive,
+    restartStream: () => startStream(facing),
+    stopStream,
+  });
 
   useEffect(() => {
     if (isActive && !previewBase64) {

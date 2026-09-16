@@ -274,7 +274,7 @@ export function PostCaptureWorkflow({
   const derivedProductName = customPrompt.trim().split(/[,.]/)[0]?.trim() || undefined;
   const hookOptions = useMemo(() => generateHookOptions(customPrompt, derivedProductName), [customPrompt, derivedProductName]);
   const selectedHook = useMemo(
-    () => hookOptions.find((h) => h.id === selectedHookId) ?? hookOptions[0] ?? null,
+    () => hookOptions.find((h) => h.id === selectedHookId) ?? hookOptions[0] ?? { id: 0, text: '이거 보면 무조건 클릭', psychology: '호기심', emotion: 'curiosity' as const },
     [hookOptions, selectedHookId],
   );
 
@@ -320,8 +320,8 @@ export function PostCaptureWorkflow({
   );
 
   const publishPlans = useMemo(
-    () => buildMultiPlatformPublishPlans(customPrompt.trim() || '이 제품', synthesisResult.contextMatch.context),
-    [customPrompt, synthesisResult.contextMatch.context],
+    () => buildMultiPlatformPublishPlans(customPrompt.trim() || derivedProductName || '이 제품', synthesisResult.contextMatch.context),
+    [customPrompt, synthesisResult.contextMatch.context, derivedProductName],
   );
 
   const handleSaveToGallery = useCallback(async () => {

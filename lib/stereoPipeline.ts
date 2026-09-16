@@ -7,7 +7,45 @@ import { buildDirectingPlan, getDirectingSummary, type DirectingPlan } from './d
 import { buildMultiPlatformPublishPlans, type PublishPlan } from './publishManager';
 import { getDeepLink } from './platformUpload';
 import * as Linking from 'expo-linking';
+import { isOnline } from '@/hooks/useNetworkStatus';
 import type { AngleShot } from '@/components/MultiAngleCaptureGuide';
+
+const UPLOAD_MAX_RETRIES = 2;
+const UPLOAD_RETRY_DELAY_MS = 1500;
+
+function waitForOnline(): Promise<boolean> {
+  if (isOnline()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const deadline = Date.now() + 30000;
+    const check = () => {
+      if (isOnline() || Date.now() >= deadline) {
+        resolve(isOnline());
+        return;
+      }
+      setTimeout(check, 1000);
+    };
+    check();
+  });
+}
+
+async function uploadWithRetry(base64: string, mimeType: string): Promise<string> {
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt <= UPLOAD_MAX_RETRIES; attempt++) {
+    try {
+      return await uploadImage(base64, mimeType);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < UPLOAD_MAX_RETRIES) {
+        if (!isOnline()) {
+          const recovered = await waitForOnline();
+          if (!recovered) break;
+        }
+        await new Promise((r) => setTimeout(r, UPLOAD_RETRY_DELAY_MS * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('이미지 업로드 실패');
+}
 
 export interface AngleImagePayload {
   key: string;
@@ -155,8 +193,36 @@ export async function runStereoPipeline(
   if (existingScanId) {
     scanId = existingScanId;
   } else {
-    const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
+    const imageUrl = await uploadWithRetry(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
     scanId = await saveManualScan(imageUrl);
+  }
+
+  // Upload additional angle images to storage so they persist beyond this session.
+  // Use Promise.allSettled with consecutive-failure guard to avoid losing all
+  // angles when one upload fails.
+  const additionalShots = sorted.slice(1).filter((s) => s.base64);
+  const additionalUploadResults = await Promise.allSettled(
+    additionalShots.map((shot) => uploadWithRetry(shot.base64!, shot.mimeType || 'image/jpeg')),
+  );
+  const additionalUrls: string[] = [];
+  let consecutiveUploadFailures = 0;
+  for (const result of additionalUploadResults) {
+    if (result.status === 'fulfilled') {
+      additionalUrls.push(result.value);
+      consecutiveUploadFailures = 0;
+    } else {
+      consecutiveUploadFailures++;
+      if (consecutiveUploadFailures >= 2) {
+        throw new Error('추가 각도 이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+      }
+    }
+  }
+  if (additionalUrls.length > 0) {
+    try {
+      await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
+    } catch {
+      // non-fatal — angles are still used for in-memory synthesis
+    }
   }
 
   const anglePayloads: AngleImagePayload[] = sorted
@@ -205,9 +271,13 @@ export async function runStereoPipeline(
   steps[0].detail = synthesisSummary;
   report(0, 0.25);
 
-  const productName = cloudResult?.synthesis?.contextMatch?.label
-    ? `${cloudResult.synthesis.contextMatch.label} 제품`
+  const cloudLabel = cloudResult?.synthesis?.contextMatch?.label?.trim();
+  const productName = cloudLabel
+    ? `${cloudLabel} 제품`
     : '프리미엄 추천 상품';
+  const productContext = cloudLabel
+    ? `${cloudLabel} 제품 — ${synthesisSummary}`
+    : synthesisSummary;
 
   if (cleanMode) {
     steps[1].status = 'done';
@@ -221,7 +291,7 @@ export async function runStereoPipeline(
 
   const editPlan = cleanMode
     ? buildShortFormEditPlan('youtube', '', null, '', undefined, undefined, true, undefined, undefined)
-    : buildShortFormEditPlan('youtube', synthesisSummary, null, productName, undefined, undefined, true, undefined, undefined);
+    : buildShortFormEditPlan('youtube', productContext, null, productName, undefined, undefined, true, undefined, undefined);
 
   const directingPlan = buildDirectingPlan(
     editPlan.segments,

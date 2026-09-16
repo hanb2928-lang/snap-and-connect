@@ -815,6 +815,20 @@ export function MultiPlatformExport({
     return () => { mounted = false; };
   }, []);
 
+  // Revoke any remaining blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (Platform.OS === 'web') {
+        setResults((prev) => {
+          for (const r of prev) {
+            if (r.url.startsWith('blob:')) URL.revokeObjectURL(r.url);
+          }
+          return prev;
+        });
+      }
+    };
+  }, []);
+
   // ── Web: canvas-based generation ──────────────────────────────────────
   const handleGenerateWeb = useCallback(async () => {
     setState('generating');
