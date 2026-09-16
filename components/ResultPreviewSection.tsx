@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react-native';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
+import { VideoGenStepTracker } from '@/components/VideoGenStepTracker';
 import { theme } from '@/lib/theme';
 import { getThumbnailUrl } from '@/lib/imageUtils';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
@@ -116,13 +117,7 @@ export function ResultPreviewSection({
         </View>
       )}
       {isGeneratingVideo && mediaType === 'video' && (
-        <View style={styles.regenBanner}>
-          <RotatingLoader size={14} color={theme.colors.primary[300]} />
-          <Text style={styles.regenBannerText}>
-            {videoGenProgress?.message ?? 'AI 영상 생성 중...'}
-            {videoGenProgress?.elapsedSec ? ` (${videoGenProgress.elapsedSec}초)` : ''}
-          </Text>
-        </View>
+        <VideoGenStepTracker progress={videoGenProgress} variant="inline" />
       )}
       {bgJobNotice && !isGeneratingVideo && (
         <View style={styles.bgJobBanner}>

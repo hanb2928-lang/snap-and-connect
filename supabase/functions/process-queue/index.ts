@@ -10,8 +10,14 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_ATTEMPTS = 3;
-const MAX_JOBS_PER_RUN = 1;
+const MIN_BATCH_SIZE = 2;
+const MAX_BATCH_SIZE = 10;
 const JOB_TIMEOUT_MS = 200000;
+
+// Sliding window failure backoff
+const FAILURE_WINDOW_MS = 60_000;
+const FAILURE_THRESHOLD = 3;
+const BACKOFF_DELAY_MS = 5_000;
 
 const WORKER_ID = `w-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -36,6 +42,34 @@ interface RenderJob {
   job_type: string;
   payload: Record<string, unknown>;
   attempts: number;
+  priority?: number;
+  scan_id?: string;
+}
+
+interface FailureRecord {
+  timestamp: number;
+}
+
+const failureWindow: FailureRecord[] = [];
+
+function recordFailure(): void {
+  const now = Date.now();
+  failureWindow.push({ timestamp: now });
+  while (failureWindow.length > 0 && now - failureWindow[0].timestamp > FAILURE_WINDOW_MS) {
+    failureWindow.shift();
+  }
+}
+
+function getRecentFailureCount(): number {
+  const now = Date.now();
+  while (failureWindow.length > 0 && now - failureWindow[0].timestamp > FAILURE_WINDOW_MS) {
+    failureWindow.shift();
+  }
+  return failureWindow.length;
+}
+
+function shouldBackoff(): boolean {
+  return getRecentFailureCount() >= FAILURE_THRESHOLD;
 }
 
 Deno.serve(async (req: Request) => {
@@ -51,33 +85,100 @@ Deno.serve(async (req: Request) => {
   try {
     const processed: Array<{ id: string; status: string; error?: string }> = [];
 
+    // Optional job-type filter: when the caller provides `jobTypes`, the worker
+    // only claims jobs of those types, enabling specialized worker routing.
+    let requestedJobTypes: string[] | null = null;
+    try {
+      const body = await req.json();
+      if (Array.isArray(body?.jobTypes) && body.jobTypes.length > 0) {
+        requestedJobTypes = body.jobTypes;
+      }
+    } catch { /* no body or invalid JSON — ignore, use default dequeue */ }
+
+    if (shouldBackoff()) {
+      const backoffSeconds = Math.ceil(BACKOFF_DELAY_MS / 1000);
+      await new Promise((r) => setTimeout(r, BACKOFF_DELAY_MS));
+      await markWorkerDone();
+      return new Response(
+        JSON.stringify({
+          processed,
+          count: 0,
+          workerId: WORKER_ID,
+          backoff: true,
+          reason: `sliding_window_backoff (${getRecentFailureCount()} recent failures in ${FAILURE_WINDOW_MS / 1000}s)`,
+          backoffSeconds,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     await registerWorker();
     await recoverStaleJobs();
 
-    for (let i = 0; i < MAX_JOBS_PER_RUN; i++) {
-      const job = await dequeueJob();
-      if (!job) break;
+    const queueDepth = await checkQueuedJobsRaw();
+    const activeWorkers = await fetchActiveWorkerCount();
+    const batchSize = computeBatchSize(queueDepth, activeWorkers);
 
-      try {
-        const result = await processJob(job);
-        try {
-          await markJobDone(job.id, result);
-        } catch (markErr) {
-          console.error('markJobDone failed for job', job.id, markErr);
-        }
-        processed.push({ id: job.id, status: "done" });
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        const newAttempts = job.attempts + 1;
-        if (newAttempts >= MAX_ATTEMPTS) {
-          await markJobError(job.id, newAttempts, errorMsg);
-          processed.push({ id: job.id, status: "error", error: errorMsg });
-        } else {
-          await requeueJob(job.id, newAttempts, errorMsg);
-          processed.push({ id: job.id, status: "requeued" });
-        }
-      }
+    const jobs = requestedJobTypes
+      ? await dequeueBatchJobsByType(requestedJobTypes, batchSize, MAX_ATTEMPTS)
+      : await dequeueBatchJobs(batchSize, MAX_ATTEMPTS);
+    if (jobs.length === 0) {
+      await markWorkerDone();
+      return new Response(
+        JSON.stringify({
+          processed,
+          count: 0,
+          workerId: WORKER_ID,
+          queueDepth,
+          activeWorkers,
+          batchSize,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
+
+    await Promise.all(
+      jobs.map(async (job) => {
+        try {
+          const result = await processJob(job);
+          try {
+            await markJobDone(job.id, result);
+          } catch (markErr) {
+            console.error('markJobDone failed for job', job.id, markErr);
+          }
+          processed.push({ id: job.id, status: "done" });
+        } catch (err) {
+          recordFailure();
+          const errorMsg = err instanceof Error ? err.message : "Unknown error";
+          const newAttempts = job.attempts + 1;
+          const newConsecutiveFailures = (await getConsecutiveFailures(job.id)) + 1;
+
+          if (newAttempts >= MAX_ATTEMPTS) {
+            await markJobError(job.id, newAttempts, errorMsg, newConsecutiveFailures);
+            processed.push({ id: job.id, status: "error", error: errorMsg });
+          } else {
+            const backoffMultiplier = Math.min(newConsecutiveFailures, 4);
+            const requeueDelay = BACKOFF_DELAY_MS * backoffMultiplier;
+            await requeueJob(job.id, newAttempts, errorMsg, newConsecutiveFailures);
+            processed.push({ id: job.id, status: "requeued", error: errorMsg });
+            // Fire-and-forget trigger after delay to retry the requeued job
+            if (requeueDelay > 0) {
+              setTimeout(() => {
+                fetch(`${supabaseUrl}/functions/v1/process-queue`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${serviceRoleKey}`,
+                    apikey: serviceRoleKey,
+                  },
+                  body: JSON.stringify({ trigger: true, retry: true }),
+                }).catch(() => {});
+              }, requeueDelay);
+            }
+          }
+        }
+      }),
+    );
 
     const hasRequeued = processed.some((p) => p.status === "requeued");
     const hasRemaining = processed.length > 0 ? await checkQueuedJobs() : false;
@@ -98,7 +199,15 @@ Deno.serve(async (req: Request) => {
 
     await markWorkerDone();
     return new Response(
-      JSON.stringify({ processed, count: processed.length, workerId: WORKER_ID }),
+      JSON.stringify({
+        processed,
+        count: processed.length,
+        workerId: WORKER_ID,
+        queueDepth,
+        activeWorkers,
+        batchSize,
+        recentFailures: getRecentFailureCount(),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
@@ -108,6 +217,54 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+function computeBatchSize(queueDepth: number, activeWorkers: number): number {
+  if (queueDepth === 0) return MIN_BATCH_SIZE;
+  // Each worker should process roughly queueDepth / activeWorkers jobs,
+  // capped to MIN/MAX_BATCH_SIZE bounds. With the higher MAX_BATCH_SIZE,
+  // a single worker can claim more jobs when the queue is deep and few
+  // workers are active, maximizing throughput per worker invocation.
+  const ideal = activeWorkers > 0
+    ? Math.ceil(queueDepth / Math.max(activeWorkers, 1))
+    : Math.min(queueDepth, MAX_BATCH_SIZE);
+  return Math.max(MIN_BATCH_SIZE, Math.min(ideal, MAX_BATCH_SIZE));
+}
+
+async function fetchActiveWorkerCount(): Promise<number> {
+  try {
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/rpc/count_active_workers`,
+      {
+        method: "POST",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_timeout_sec: 60 }),
+      },
+    );
+    if (!resp.ok) return 0;
+    const data = await resp.json();
+    return typeof data === "number" ? data : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function getConsecutiveFailures(jobId: string): Promise<number> {
+  try {
+    const resp = await fetch(
+      `${supabaseUrl}/rest/v1/render_jobs?select=consecutive_failures&id=eq.${jobId}`,
+      { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } },
+    );
+    if (!resp.ok) return 0;
+    const rows = await resp.json() as Array<{ consecutive_failures: number }>;
+    return rows.length > 0 ? (rows[0].consecutive_failures ?? 0) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 async function registerWorker(): Promise<void> {
   try {
@@ -200,9 +357,9 @@ async function checkQueuedJobs(): Promise<boolean> {
   return rows.length > 0;
 }
 
-async function dequeueJob(): Promise<RenderJob | null> {
+async function dequeueBatchJobs(maxCount: number, maxAttempts: number): Promise<RenderJob[]> {
   const resp = await fetch(
-    `${supabaseUrl}/rest/v1/rpc/dequeue_render_job`,
+    `${supabaseUrl}/rest/v1/rpc/dequeue_render_jobs`,
     {
       method: "POST",
       headers: {
@@ -210,26 +367,66 @@ async function dequeueJob(): Promise<RenderJob | null> {
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ max_attempts: MAX_ATTEMPTS }),
+      body: JSON.stringify({ p_max_count: maxCount, p_max_attempts: maxAttempts }),
     },
   );
 
   if (!resp.ok) {
     const errText = await resp.text().catch(() => "");
-    throw new Error(`Dequeue RPC failed: ${resp.status} ${errText}`);
+    throw new Error(`Batch dequeue RPC failed: ${resp.status} ${errText}`);
   }
 
   const data = await resp.json();
-  if (!data || (Array.isArray(data) && data.length === 0)) return null;
-  const job = Array.isArray(data) ? data[0] : data;
-  if (!job || !job.id) return null;
+  if (!data || !Array.isArray(data)) return [];
 
-  return {
-    id: job.id,
-    job_type: job.job_type,
-    payload: job.payload,
-    attempts: job.attempts ?? 0,
-  };
+  return data.map((job: Record<string, unknown>) => ({
+    id: job.id as string,
+    job_type: job.job_type as string,
+    payload: job.payload as Record<string, unknown>,
+    attempts: (job.attempts as number) ?? 0,
+    priority: job.priority as number | undefined,
+    scan_id: job.scan_id as string | undefined,
+  }));
+}
+
+async function dequeueBatchJobsByType(
+  jobTypes: string[],
+  maxCount: number,
+  maxAttempts: number,
+): Promise<RenderJob[]> {
+  const resp = await fetch(
+    `${supabaseUrl}/rest/v1/rpc/dequeue_render_jobs_by_type`,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_job_types: jobTypes,
+        p_max_count: maxCount,
+        p_max_attempts: maxAttempts,
+      }),
+    },
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Type-aware dequeue RPC failed: ${resp.status} ${errText}`);
+  }
+
+  const data = await resp.json();
+  if (!data || !Array.isArray(data)) return [];
+
+  return data.map((job: Record<string, unknown>) => ({
+    id: job.id as string,
+    job_type: job.job_type as string,
+    payload: job.payload as Record<string, unknown>,
+    attempts: (job.attempts as number) ?? 0,
+    priority: job.priority as number | undefined,
+    scan_id: job.scan_id as string | undefined,
+  }));
 }
 
 async function markJobDone(jobId: string, result: Record<string, unknown>): Promise<void> {
@@ -245,12 +442,18 @@ async function markJobDone(jobId: string, result: Record<string, unknown>): Prom
       result: result,
       completed_at: new Date().toISOString(),
       error_message: null,
+      consecutive_failures: 0,
     }),
   });
   if (!resp.ok) throw new Error(`Mark done failed: ${resp.status}`);
 }
 
-async function markJobError(jobId: string, attempts: number, errorMsg: string): Promise<void> {
+async function markJobError(
+  jobId: string,
+  attempts: number,
+  errorMsg: string,
+  consecutiveFailures: number,
+): Promise<void> {
   const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
@@ -262,6 +465,7 @@ async function markJobError(jobId: string, attempts: number, errorMsg: string): 
       status: "error",
       error_message: errorMsg,
       attempts: attempts,
+      consecutive_failures: consecutiveFailures,
       completed_at: new Date().toISOString(),
     }),
   });
@@ -270,7 +474,12 @@ async function markJobError(jobId: string, attempts: number, errorMsg: string): 
   }
 }
 
-async function requeueJob(jobId: string, attempts: number, errorMsg: string): Promise<void> {
+async function requeueJob(
+  jobId: string,
+  attempts: number,
+  errorMsg: string,
+  consecutiveFailures: number,
+): Promise<void> {
   const resp = await fetch(`${supabaseUrl}/rest/v1/render_jobs?id=eq.${jobId}&status=eq.processing`, {
     method: "PATCH",
     headers: {
@@ -282,6 +491,7 @@ async function requeueJob(jobId: string, attempts: number, errorMsg: string): Pr
       status: "queued",
       attempts: attempts,
       error_message: errorMsg,
+      consecutive_failures: consecutiveFailures,
     }),
   });
   if (!resp.ok) {

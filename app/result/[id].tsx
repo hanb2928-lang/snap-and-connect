@@ -89,6 +89,7 @@ import { createShortLink } from '@/lib/shortUrl';
 import { recommendStickerStyle, recommendStickerSize, getCardStyleForPlatform } from '@/lib/stickerRecommend';
 import { urlToDataUrl } from '@/lib/base64';
 import { getImageSize, prepareImageForApi } from '@/lib/imageEdit';
+import { compressForEdgeFunction } from '@/lib/parallelImageCompress';
 import { fetchMatchedTrendingHashtags, getTrendingSuggestions } from '@/lib/trendingHashtags';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { friendlyError } from '@/lib/errors';
@@ -919,7 +920,10 @@ export default function ResultScreen() {
               const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
               binary += String.fromCharCode(...chunk);
             }
-            referenceImageBase64 = btoa(binary);
+            const rawBase64 = btoa(binary);
+            const rawDataUrl = `data:image/jpeg;base64,${rawBase64}`;
+            const compressed = await compressForEdgeFunction(rawDataUrl);
+            referenceImageBase64 = compressed.base64;
           }
         } catch {
           // If fetch fails, proceed without reference image

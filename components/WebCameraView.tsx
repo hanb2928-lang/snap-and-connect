@@ -2,9 +2,11 @@ import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHand
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import Animated, { useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { theme } from '@/lib/theme';
-import { Camera, RotateCcw, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert } from 'lucide-react-native';
+import { Camera, RotateCcw, Zap, X, Image as ImageIcon, Sparkles, Check, ShieldAlert, Video, Square } from 'lucide-react-native';
 import { cleanBase64, getMimeTypeFromDataUrl } from '@/lib/base64';
 import { prepareImageForApi } from '@/lib/imageEdit';
+import { startVideoRecording, stopVideoRecording, blobToBase64, type VideoRecordingResult } from '@/lib/videoRecorder';
+import { getSafeVideoConstraints, clampCaptureDimensions, CAPTURE_MAX_WIDTH } from '@/lib/captureConstraints';
 import { useCameraVisibilityRecovery } from '@/hooks/useCameraVisibilityRecovery';
 
 export type CaptureModeType = 'single' | 'video';
@@ -12,6 +14,9 @@ export type CaptureModeType = 'single' | 'video';
 export interface WebCameraHandle {
   captureFrame: () => Promise<{ base64: string; mimeType: string } | null>;
   isReady: () => boolean;
+  startRecording: () => Promise<boolean>;
+  stopRecording: () => Promise<{ base64: string; mimeType: string } | null>;
+  isRecording: () => boolean;
 }
 
 interface WebCameraViewProps {
@@ -71,6 +76,11 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   const [capturing, setCapturing] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string>('image/jpeg');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingPromiseRef = useRef<Promise<VideoRecordingResult> | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseScale = useSharedValue(1);
 
   const stopStream = useCallback(() => {
@@ -85,7 +95,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
     onCameraReady?.(false);
   }, [onCameraReady]);
 
-  const startStream = useCallback(async (face: Facing) => {
+  const startStream = useCallback(async (face: Facing, withAudio = false) => {
     if (Platform.OS !== 'web') return;
     stopStream();
     const gen = ++streamGenRef.current;
@@ -93,12 +103,8 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
     setCameraReady(false);
     try {
       const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: face,
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
-        },
-        audio: false,
+        video: getSafeVideoConstraints(face),
+        audio: withAudio,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (!mountedRef.current || gen !== streamGenRef.current) {
@@ -155,6 +161,13 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        stopVideoRecording(recorderRef.current);
+      }
       stopStream();
     };
   }, [stopStream]);
@@ -165,7 +178,18 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
     setError(null);
     setErrorKind('generic');
     setGridVisible(false);
-  }, [captureMode]);
+    if (isRecording && recorderRef.current) {
+      stopVideoRecording(recorderRef.current);
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    recorderRef.current = null;
+    recordingPromiseRef.current = null;
+  }, [captureMode, isRecording]);
 
   const captureFrame = useCallback(async (): Promise<string | null> => {
     if (!videoRef.current || !cameraReady) return null;
@@ -174,10 +198,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       const video = videoRef.current;
       const rawW = video.videoWidth || 1080;
       const rawH = video.videoHeight || 1920;
-      const maxDim = 1080;
-      const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
-      const w = Math.round(rawW * scale);
-      const h = Math.round(rawH * scale);
+      const { width: w, height: h } = clampCaptureDimensions(rawW, rawH, CAPTURE_MAX_WIDTH);
       const canvas = canvasRef.current ?? document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
@@ -192,7 +213,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       canvas.width = 0;
       canvas.height = 0;
-      const compressed = await prepareImageForApi(dataUrl, 1080, 0.7);
+      const compressed = await prepareImageForApi(dataUrl, 1280, 0.85);
       const b64 = cleanBase64(compressed);
       const mime = getMimeTypeFromDataUrl(compressed);
       return `${mime}|${b64}`;
@@ -204,6 +225,59 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
     }
   }, [cameraReady, facing]);
 
+  const startRecording = useCallback(async (): Promise<boolean> => {
+    if (!cameraReady || isRecording || Platform.OS !== 'web') return false;
+    const stream = streamRef.current;
+    if (!stream) return false;
+    const hasAudio = stream.getAudioTracks().length > 0;
+    if (!hasAudio) {
+      stopStream();
+      await startStream(facing, true);
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    const currentStream = streamRef.current;
+    if (!currentStream) return false;
+    const result = startVideoRecording(currentStream, {
+      maxDurationMs: 30000,
+      videoBitsPerSecond: 4_000_000,
+    });
+    if (!result) return false;
+    recorderRef.current = result.recorder;
+    recordingPromiseRef.current = result.promise;
+    setIsRecording(true);
+    setRecordingDuration(0);
+    const startTime = Date.now();
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingDuration(Date.now() - startTime);
+    }, 100);
+    return true;
+  }, [cameraReady, isRecording, facing, startStream, stopStream]);
+
+  const stopRecording = useCallback(async (): Promise<{ base64: string; mimeType: string } | null> => {
+    if (!isRecording || !recorderRef.current || !recordingPromiseRef.current) return null;
+    stopVideoRecording(recorderRef.current);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      const result = await recordingPromiseRef.current;
+      const { base64, mimeType } = await blobToBase64(result.blob);
+      setIsRecording(false);
+      setRecordingDuration(0);
+      recorderRef.current = null;
+      recordingPromiseRef.current = null;
+      return { base64, mimeType };
+    } catch {
+      setIsRecording(false);
+      setRecordingDuration(0);
+      recorderRef.current = null;
+      recordingPromiseRef.current = null;
+      setError('비디오 녹화 저장에 실패했습니다.');
+      return null;
+    }
+  }, [isRecording]);
+
   useImperativeHandle(ref, () => ({
     captureFrame: async () => {
       const result = await captureFrame();
@@ -212,7 +286,22 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       return { base64, mimeType };
     },
     isReady: () => cameraReady,
-  }), [captureFrame, cameraReady]);
+    startRecording,
+    stopRecording,
+    isRecording: () => isRecording,
+  }), [captureFrame, cameraReady, startRecording, stopRecording, isRecording]);
+
+  const handleVideoCapture = useCallback(async () => {
+    if (!cameraReady || autoSaving) return;
+    if (isRecording) {
+      const result = await stopRecording();
+      if (result) {
+        onCapture(result.base64, result.mimeType);
+      }
+    } else {
+      await startRecording();
+    }
+  }, [cameraReady, autoSaving, isRecording, startRecording, stopRecording, onCapture]);
 
   const handleCapture = useCallback(async () => {
     if (!cameraReady || capturing || autoSaving) return;
@@ -220,11 +309,15 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       onMultiAnglePress();
       return;
     }
+    if (captureMode === 'video') {
+      await handleVideoCapture();
+      return;
+    }
     const result = await captureFrame();
     if (!result) return;
     const [mime, b64] = result.split('|');
     onCapture(b64, mime);
-  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress]);
+  }, [cameraReady, capturing, autoSaving, captureMode, captureFrame, onCapture, onMultiAnglePress, handleVideoCapture]);
 
   const handleConfirm = useCallback(() => {
     if (previewBase64) {
@@ -403,11 +496,18 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
             )}
           </View>
 
-          {/* Top bar: flip only */}
+          {/* Top bar: flip + recording indicator */}
           {!simplified && (
             <View style={[styles.topBar, { top: safeTop + 8 }]}>
               <View style={styles.topBarLeft}>
-                <View style={styles.topBtnPlaceholder} />
+                {isRecording && (
+                  <View style={styles.recordingIndicator}>
+                    <View style={styles.recordingDot} />
+                    <Text style={styles.recordingTimer}>
+                      {Math.floor(recordingDuration / 60000)}:{String(Math.floor((recordingDuration % 60000) / 1000)).padStart(2, '0')}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.topBarRight}>
                 <TouchableOpacity style={styles.topBtn} onPress={handleFlip} activeOpacity={0.7} disabled={!cameraReady}>
@@ -459,12 +559,19 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                     styles.shutterBtn,
                     !cameraReady && styles.shutterBtnDisabled,
                     (capturing || autoSaving) && styles.shutterBtnCapturing,
+                    isRecording && styles.shutterBtnRecording,
                   ]}
                   onPress={handleCapture}
                   disabled={!cameraReady || capturing || autoSaving}
                   activeOpacity={0.85}
                 >
-                  <Camera size={30} color="#fff" strokeWidth={2.5} />
+                  {captureMode === 'video' && isRecording ? (
+                    <Square size={28} color="#fff" strokeWidth={2.5} />
+                  ) : captureMode === 'video' ? (
+                    <Video size={28} color="#fff" strokeWidth={2.5} />
+                  ) : (
+                    <Camera size={30} color="#fff" strokeWidth={2.5} />
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -472,6 +579,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
                 {autoSaving ? 'AI 자동 분석 중...' :
                  capturing ? '촬영 중...' :
                  captureMode === 'single' ? '정면·좌측·우측·후면·상부 순차 촬영' :
+                 isRecording ? '녹화 중 — 버튼을 눌러 정지' :
                  '촬영 버튼을 눌러주세요'}
               </Text>
             </View>
@@ -721,6 +829,30 @@ const styles = StyleSheet.create({
   },
   shutterBtnCapturing: {
     opacity: 0.6,
+  },
+  shutterBtnRecording: {
+    backgroundColor: theme.colors.error[500],
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.full,
+    backgroundColor: 'rgba(220, 38, 38, 0.25)',
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error[400],
+  },
+  recordingTimer: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   shutterHint: {
     fontSize: 12,

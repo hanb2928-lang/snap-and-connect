@@ -7,12 +7,16 @@ import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
 import { deductCredits } from '@/lib/credits';
 import { compressBase64ForUpload } from '@/lib/imageEdit';
+import { compressForEdgeFunction, compressBase64ArrayForEdgeFunction } from '@/lib/parallelImageCompress';
+import { aiCachedCall } from '@/lib/aiCache';
+import { hashObject } from '@/lib/contentHash';
+import { cleanBase64 } from '@/lib/base64';
 
 export async function uploadImage(
   base64: string,
   mimeType: string,
 ): Promise<string> {
-  // Compress before upload: resize to max 1920px, convert to WebP at quality 0.8
+  // Compress before upload: resize to max 1280px, convert to WebP at quality 0.75
   const { base64: compressedBase64, mimeType: compressedMime } = await compressBase64ForUpload(base64, mimeType);
 
   const uploadMime = compressedMime || 'image/jpeg';
@@ -29,6 +33,23 @@ export async function uploadImage(
   return urlData.publicUrl;
 }
 
+export async function uploadImageBlob(
+  blob: Blob,
+  mimeType: string,
+): Promise<string> {
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const fileName = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('scans')
+    .upload(fileName, blob, { contentType: mimeType, cacheControl: '360000' });
+
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const { data: urlData } = supabase.storage.from('scans').getPublicUrl(fileName);
+  return urlData.publicUrl;
+}
+
 export async function analyzeImage(
   imageDataUrl: string,
   fileName: string,
@@ -37,25 +58,37 @@ export async function analyzeImage(
 ): Promise<AnalysisResult> {
   await deductCredits('photo_analysis');
 
-  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+  const compressed = await compressForEdgeFunction(imageDataUrl);
+  const b64 = cleanBase64(compressed.dataUrl);
+  const cacheInput = { task: 'analyze-photo', mode, imageHash: hashObject({ b64 }).slice(0, 16) };
+
+  const { data } = await aiCachedCall<AnalysisResult>(
+    'analyze-photo',
+    cacheInput,
+    async () => {
+      const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode }),
-    timeoutMs: 115000,
-  });
+      body: JSON.stringify({ imageDataUrl: compressed.dataUrl, fileName, mimeType: compressed.mimeType, mode }),
+      timeoutMs: 115000,
+    });
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
-    throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
-  }
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
+      throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
+    }
 
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
+    const respData = await response.json();
+    if (respData.error) throw new Error(respData.error);
 
-  return normalizeAnalysis(data);
+    return normalizeAnalysis(respData);
+  },
+    'gpt-4o',
+  );
+  return data;
 }
 
 export async function analyzeMultiShot(
@@ -64,27 +97,39 @@ export async function analyzeMultiShot(
 ): Promise<AnalysisResult> {
   await deductCredits('multi_shot_analysis');
 
-  const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
+  const dataUrls = await compressBase64ArrayForEdgeFunction(base64Images, 'image/jpeg');
+  const cacheInput = {
+    task: 'multi-shot',
+    imageHashes: dataUrls.map((url) => hashObject({ b64: cleanBase64(url) }).slice(0, 16)),
+  };
 
-  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseAnonKey}`,
+  const { data } = await aiCachedCall<AnalysisResult>(
+    'multi-shot',
+    cacheInput,
+    async () => {
+      const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ images: dataUrls, fileName, mode: 'multi-shot' }),
+        timeoutMs: 115000,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'AI 다각도 분석 서버 오류가 발생했습니다.' }));
+        throw new Error(errData.error || `AI 다각도 분석 실패 (${response.status})`);
+      }
+
+      const respData = await response.json();
+      if (respData.error) throw new Error(respData.error);
+
+      return normalizeAnalysis(respData);
     },
-    body: JSON.stringify({ images: dataUrls, fileName, mode: 'multi-shot' }),
-    timeoutMs: 115000,
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({ error: 'AI 다각도 분석 서버 오류가 발생했습니다.' }));
-    throw new Error(errData.error || `AI 다각도 분석 실패 (${response.status})`);
-  }
-
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-
-  return normalizeAnalysis(data);
+    'gpt-4o',
+  );
+  return data;
 }
 
 function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {
@@ -307,25 +352,42 @@ export async function analyzeImageWithProductContext(
 ): Promise<AnalysisResult> {
   await deductCredits('photo_analysis');
 
-  const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${supabaseAnonKey}`,
+  const compressed = await compressForEdgeFunction(imageDataUrl);
+  const b64 = cleanBase64(compressed.dataUrl);
+  const cacheInput = {
+    task: 'analyze-photo-context',
+    mode,
+    imageHash: hashObject({ b64 }).slice(0, 16),
+    productContext: productContext || {},
+  };
+
+  const { data } = await aiCachedCall<AnalysisResult>(
+    'analyze-photo-context',
+    cacheInput,
+    async () => {
+      const response = await safeFetch(ANALYSIS_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ imageDataUrl: compressed.dataUrl, fileName, mimeType: compressed.mimeType, mode, productContext }),
+        timeoutMs: 115000,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
+        throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
+      }
+
+      const respData = await response.json();
+      if (respData.error) throw new Error(respData.error);
+
+      return normalizeAnalysis(respData);
     },
-    body: JSON.stringify({ imageDataUrl, fileName, mimeType, mode, productContext }),
-    timeoutMs: 115000,
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({ error: 'AI 분석 서버 오류가 발생했습니다.' }));
-    throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
-  }
-
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-
-  return normalizeAnalysis(data);
+    'gpt-4o',
+  );
+  return data;
 }
 
 export async function extractProductMeta(
@@ -377,16 +439,33 @@ export async function analyzeImageQueued(
 ): Promise<AnalysisResult> {
   await deductCredits('photo_analysis');
 
-  const result = await enqueueAndWait<Record<string, unknown>>(
-    'analyze-photo',
-    { imageDataUrl, fileName, mimeType, mode, ...(preferredStyle ? { preferredStyle } : {}) },
-    { timeoutMs: 115000 },
-  );
+  const compressed = await compressForEdgeFunction(imageDataUrl);
+  const b64 = cleanBase64(compressed.dataUrl);
+  const cacheInput = {
+    task: 'analyze-photo-queued',
+    mode,
+    imageHash: hashObject({ b64 }).slice(0, 16),
+    preferredStyle: preferredStyle || '',
+  };
 
-  if (!result.success || !result.result) {
-    throw new Error(result.error ?? 'AI 분석 작업이 실패했습니다.');
-  }
-  return normalizeAnalysis(result.result);
+  const { data } = await aiCachedCall<AnalysisResult>(
+    'analyze-photo-queued',
+    cacheInput,
+    async () => {
+      const result = await enqueueAndWait<Record<string, unknown>>(
+        'analyze-photo',
+        { imageDataUrl: compressed.dataUrl, fileName, mimeType: compressed.mimeType, mode, ...(preferredStyle ? { preferredStyle } : {}) },
+        { timeoutMs: 115000 },
+      );
+
+      if (!result.success || !result.result) {
+        throw new Error(result.error ?? 'AI 분석 작업이 실패했습니다.');
+      }
+      return normalizeAnalysis(result.result);
+    },
+    'gpt-4o',
+  );
+  return data;
 }
 
 export async function analyzeMultiShotQueued(
@@ -395,15 +474,28 @@ export async function analyzeMultiShotQueued(
 ): Promise<AnalysisResult> {
   await deductCredits('multi_shot_analysis');
 
-  const dataUrls = base64Images.map((b64) => buildDataUrl(b64, 'image/jpeg'));
-  const result = await enqueueAndWait<Record<string, unknown>>(
-    'analyze-photo',
-    { images: dataUrls, fileName, mode: 'multi-shot' },
-    { timeoutMs: 115000 },
-  );
+  const dataUrls = await compressBase64ArrayForEdgeFunction(base64Images, 'image/jpeg');
+  const cacheInput = {
+    task: 'multi-shot-queued',
+    imageHashes: dataUrls.map((url) => hashObject({ b64: cleanBase64(url) }).slice(0, 16)),
+  };
 
-  if (!result.success || !result.result) {
-    throw new Error(result.error ?? 'AI 다각도 분석 작업이 실패했습니다.');
-  }
-  return normalizeAnalysis(result.result);
+  const { data } = await aiCachedCall<AnalysisResult>(
+    'multi-shot-queued',
+    cacheInput,
+    async () => {
+      const result = await enqueueAndWait<Record<string, unknown>>(
+        'analyze-photo',
+        { images: dataUrls, fileName, mode: 'multi-shot' },
+        { timeoutMs: 115000 },
+      );
+
+      if (!result.success || !result.result) {
+        throw new Error(result.error ?? 'AI 다각도 분석 작업이 실패했습니다.');
+      }
+      return normalizeAnalysis(result.result);
+    },
+    'gpt-4o',
+  );
+  return data;
 }

@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { theme } from '@/lib/theme';
 import { getThumbnailUrl } from '@/lib/imageUtils';
 import { StockVideoClip, searchStockVideos } from '@/lib/pexelsVideo';
+import { getSafeVideoConstraints, clampCaptureDimensions } from '@/lib/captureConstraints';
 
 interface StockVideoPickerProps {
   productName?: string;
@@ -191,7 +192,7 @@ export function StockVideoPicker({
     setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: face, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: getSafeVideoConstraints(face),
         audio: false,
       });
       if (!cameraMountedRef.current || gen !== streamGenRef.current) {
@@ -249,10 +250,7 @@ export function StockVideoPicker({
       const video = videoRef.current;
       const rawW = video.videoWidth || 1080;
       const rawH = video.videoHeight || 1920;
-      const maxDim = 1080;
-      const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
-      const w = Math.round(rawW * scale);
-      const h = Math.round(rawH * scale);
+      const { width: w, height: h } = clampCaptureDimensions(rawW, rawH, 1080);
       const canvas = captureCanvasRef.current ?? document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;

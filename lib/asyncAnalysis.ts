@@ -5,6 +5,7 @@ import { uploadImage } from '@/lib/analysis';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
 import { buildDataUrl } from '@/lib/base64';
+import { hashImage } from '@/lib/contentHash';
 
 const SUPABASE_TIMEOUT_MS = 30000;
 
@@ -34,26 +35,6 @@ function withSupabaseTimeout<T>(
     },
   );
   return Promise.race([Promise.resolve(operation()), timeout]).finally(() => clearTimeout(timer));
-}
-
-/**
- * Lightweight hash of image base64 for cache keying.
- * Uses a simple polynomial rolling hash — not cryptographic, just for dedup.
- */
-function hashImage(base64: string): string {
-  let h1 = 0xdeadbeef;
-  let h2 = 0x41c6ce57;
-  const len = base64.length;
-  // Sample to avoid hashing every char of a potentially huge string
-  const step = Math.max(1, Math.floor(len / 4096));
-  for (let i = 0; i < len; i += step) {
-    const ch = base64.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
 }
 
 export interface AsyncAnalysisResult {

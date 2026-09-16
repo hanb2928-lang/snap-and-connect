@@ -11,6 +11,8 @@
 
 import type { EmotionPhase } from './psychologyEngine';
 import type { HookOption } from './shortFormEditEngine';
+import { aiCachedCall } from './aiCache';
+import { hashObject } from './contentHash';
 
 export type HookVariant = 'stimulus' | 'curiosity' | 'benefit';
 
@@ -152,6 +154,29 @@ function generateHookCandidate(
 }
 
 export function autoSelectHook(input: ProductAnalysisInput): AutoHookResult {
+  // Synchronous computation — caching is applied in the async wrapper below.
+  return computeAutoHook(input);
+}
+
+export async function autoSelectHookCached(input: ProductAnalysisInput): Promise<AutoHookResult> {
+  const cacheInput: Record<string, unknown> = {
+    productName: input.productName || '',
+    productCategory: input.productCategory || '',
+    productMood: input.productMood || '',
+    priceEstimate: input.priceEstimate || '',
+    targetAudience: input.targetAudience || '',
+    customPrompt: input.customPrompt || '',
+  };
+  const { data } = await aiCachedCall<AutoHookResult>(
+    'auto-hook',
+    cacheInput,
+    () => Promise.resolve(computeAutoHook(input)),
+    'local-heuristic',
+  );
+  return data;
+}
+
+function computeAutoHook(input: ProductAnalysisInput): AutoHookResult {
   const productName = input.productName?.trim() || '이 제품';
   const nameShort = productName.length > 10 ? productName.slice(0, 10) + '...' : productName;
   const category = detectCategory(input.productCategory || '', productName, input.customPrompt || '');

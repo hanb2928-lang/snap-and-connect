@@ -1,5 +1,6 @@
 import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
-import { safeFetch, friendlyApiError } from '@/lib/apiClient';
+import { safeFetch } from '@/lib/apiClient';
+import { aiCachedCall } from '@/lib/aiCache';
 
 export interface CutSegment {
   startSec: number;
@@ -56,26 +57,42 @@ export async function fetchVideoEditPlan(params: {
   oneLiner?: string;
   psychologyPreset?: PsychologyPreset;
 }): Promise<EditPlan> {
-  try {
-    const resp = await safeFetch(EDIT_PLAN_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      body: JSON.stringify(params),
-      timeoutMs: 30000,
-    });
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({ error: '편집 계획 생성에 실패했습니다.' }));
-      throw new Error(errData.error || `요청 실패 (${resp.status})`);
-    }
-    const data = (await resp.json()) as EditPlanResponse;
-    if (!data.plan) {
-      throw new Error('편집 계획을 불러오지 못했습니다.');
-    }
-    return data.plan;
-  } catch (err) {
-    throw new Error(friendlyApiError(err, '편집 계획 생성 중 오류가 발생했습니다.'));
-  }
+  const cacheInput: Record<string, unknown> = {
+    task: 'video-edit-plan',
+    productName: params.productName || '',
+    productCategory: params.productCategory || '',
+    videoDuration: params.videoDuration,
+    platform: params.platform || '',
+    accentColor: params.accentColor || '',
+    hook: params.hook || '',
+    oneLiner: params.oneLiner || '',
+    psychologyPreset: params.psychologyPreset || 'auto',
+  };
+
+  const { data } = await aiCachedCall<EditPlan>(
+    'video-edit-plan',
+    cacheInput,
+    async () => {
+      const resp = await safeFetch(EDIT_PLAN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify(params),
+        timeoutMs: 30000,
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({ error: '편집 계획 생성에 실패했습니다.' }));
+        throw new Error(errData.error || `요청 실패 (${resp.status})`);
+      }
+      const respData = (await resp.json()) as EditPlanResponse;
+      if (!respData.plan) {
+        throw new Error('편집 계획을 불러오지 못했습니다.');
+      }
+      return respData.plan;
+    },
+    'gpt-4o',
+  );
+  return data;
 }

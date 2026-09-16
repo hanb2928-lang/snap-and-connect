@@ -10,10 +10,12 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform, ViewStyle } from 'r
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { Camera, Image as ImageIcon, Loader, ShieldAlert, RotateCcw } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { compressCaptureFrameToBlob } from '@/lib/imageEdit';
+import { getSafeVideoConstraints, clampCaptureDimensions } from '@/lib/captureConstraints';
 import { useCameraVisibilityRecovery } from '@/hooks/useCameraVisibilityRecovery';
 
 export interface InlineViewfinderHandle {
-  capture: () => Promise<{ base64: string; mimeType: string } | null>;
+  capture: () => Promise<{ base64: string; mimeType: string; blob?: Blob } | null>;
   isReady: () => boolean;
 }
 
@@ -65,7 +67,7 @@ export const InlineCameraViewfinder = forwardRef<
     setError(null);
     try {
       const constraints: MediaStreamConstraints = {
-        video: { facingMode: facing, width: { ideal: 1080 }, height: { ideal: 1920 } },
+        video: getSafeVideoConstraints(facing),
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -140,10 +142,7 @@ export const InlineCameraViewfinder = forwardRef<
       const video = videoRef.current;
       const rawW = video.videoWidth || 1080;
       const rawH = video.videoHeight || 1920;
-      const maxDim = 1080;
-      const scale = Math.min(1, maxDim / Math.max(rawW, rawH));
-      const w = Math.round(rawW * scale);
-      const h = Math.round(rawH * scale);
+      const { width: w, height: h } = clampCaptureDimensions(rawW, rawH, 1080);
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
@@ -155,10 +154,10 @@ export const InlineCameraViewfinder = forwardRef<
       }
       ctx.drawImage(video, 0, 0, w, h);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      const base64 = dataUrl.split(',')[1];
+      const rawBase64 = dataUrl.split(',')[1];
       canvas.width = 0;
       canvas.height = 0;
-      return { base64, mimeType: 'image/jpeg' };
+      return await compressCaptureFrameToBlob(rawBase64, 'image/jpeg');
     } catch {
       return null;
     }
@@ -173,7 +172,7 @@ export const InlineCameraViewfinder = forwardRef<
         shutterSound: false,
       });
       if (photo?.base64) {
-        return { base64: photo.base64, mimeType: 'image/jpeg' };
+        return await compressCaptureFrameToBlob(photo.base64, 'image/jpeg');
       }
       return null;
     } catch {

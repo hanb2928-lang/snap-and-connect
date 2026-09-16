@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-import { uploadImage, saveManualScan } from './analysis';
+import { uploadImage, uploadImageBlob, saveManualScan } from './analysis';
+import { compressCaptureFrameToBlob } from './imageEdit';
 import { supabase } from './supabase';
 import { runSynthesis, getSynthesisSummary, type AngleInput } from './aiSynthesisEngine';
 import { buildShortFormEditPlan, type ShortFormPlatform } from './shortFormEditEngine';
@@ -12,6 +13,7 @@ import type { AngleShot } from '@/components/MultiAngleCaptureGuide';
 
 const UPLOAD_MAX_RETRIES = 2;
 const UPLOAD_RETRY_DELAY_MS = 1500;
+const UPLOAD_CONCURRENCY = 3;
 
 function extractStoragePath(publicUrl: string): string | null {
   const marker = '/storage/v1/object/public/scans/';
@@ -44,7 +46,8 @@ async function uploadWithRetry(base64: string, mimeType: string): Promise<string
   let lastErr: unknown = null;
   for (let attempt = 0; attempt <= UPLOAD_MAX_RETRIES; attempt++) {
     try {
-      return await uploadImage(base64, mimeType);
+      const { blob, mimeType: compressedMime } = await compressCaptureFrameToBlob(base64, mimeType);
+      return await uploadImageBlob(blob, compressedMime);
     } catch (err) {
       lastErr = err;
       if (attempt < UPLOAD_MAX_RETRIES) {
@@ -57,6 +60,42 @@ async function uploadWithRetry(base64: string, mimeType: string): Promise<string
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error('이미지 업로드 실패');
+}
+
+interface ParallelUploadResult {
+  url: string;
+  shot: AngleShot;
+}
+
+async function uploadAngleShotsConcurrently(
+  shots: AngleShot[],
+  concurrency: number,
+): Promise<{ results: ParallelUploadResult[]; failures: number; uploadedPaths: string[] }> {
+  const results: ParallelUploadResult[] = [];
+  let failures = 0;
+  const uploadedPaths: string[] = [];
+  let cursor = 0;
+
+  async function processNext(): Promise<void> {
+    while (cursor < shots.length) {
+      const idx = cursor++;
+      const shot = shots[idx];
+      try {
+        const url = await uploadWithRetry(shot.base64!, shot.mimeType || 'image/jpeg');
+        results.push({ url, shot });
+        const p = extractStoragePath(url);
+        if (p) uploadedPaths.push(p);
+      } catch {
+        failures++;
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, shots.length) }, () => processNext());
+  await Promise.all(workers);
+
+  results.sort((a, b) => a.shot.orderIndex - b.shot.orderIndex);
+  return { results, failures, uploadedPaths };
 }
 
 export interface AngleImagePayload {
@@ -154,13 +193,23 @@ async function invokeStereoCutAuto(
 
 export async function createScanFromAngleShots(shots: AngleShot[]): Promise<string> {
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
-  if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
+  const allShots = sorted.filter((s) => s.base64);
+  if (allShots.length === 0) throw new Error('촬영된 이미지가 없습니다.');
 
-  const uploadedPaths: string[] = [];
+  const { results, failures, uploadedPaths } = await uploadAngleShotsConcurrently(allShots, UPLOAD_CONCURRENCY);
 
-  const imageUrl = await uploadImage(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-  const p = extractStoragePath(imageUrl);
-  if (p) uploadedPaths.push(p);
+  if (results.length === 0) {
+    await rollbackUploads(uploadedPaths);
+    throw new Error('이미지 업로드에 실패했습니다. 네트워크 연결을 확인 후 다시 시도해주세요.');
+  }
+
+  if (failures >= 2) {
+    await rollbackUploads(uploadedPaths);
+    throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+  }
+
+  const imageUrl = results[0].url;
+  const additionalUrls = results.slice(1).map((r) => r.url);
 
   let scanId: string;
   try {
@@ -170,26 +219,6 @@ export async function createScanFromAngleShots(shots: AngleShot[]): Promise<stri
     throw err;
   }
 
-  const additionalShots = sorted.slice(1).filter((s) => s.base64);
-  const uploadResults = await Promise.allSettled(
-    additionalShots.map((shot) => uploadImage(shot.base64!, shot.mimeType || 'image/jpeg')),
-  );
-  const additionalUrls: string[] = [];
-  let uploadFailures = 0;
-  for (const result of uploadResults) {
-    if (result.status === 'fulfilled') {
-      additionalUrls.push(result.value);
-      const ap = extractStoragePath(result.value);
-      if (ap) uploadedPaths.push(ap);
-      uploadFailures = 0;
-    } else {
-      uploadFailures++;
-    }
-  }
-  if (uploadFailures >= 2) {
-    await rollbackUploads(uploadedPaths);
-    throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
-  }
   if (additionalUrls.length > 0) {
     try {
       await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);
@@ -214,21 +243,32 @@ export async function runStereoPipeline(
   };
 
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
-  if (!sorted[0]?.base64) throw new Error('촬영된 이미지가 없습니다.');
+  const allShots = sorted.filter((s) => s.base64);
+  if (allShots.length === 0) throw new Error('촬영된 이미지가 없습니다.');
 
   steps[0].status = 'active';
-  steps[0].detail = '5각도 이미지 병렬 분석 및 3D 볼륨 복원 중...';
+  steps[0].detail = `${allShots.length}각도 이미지 병렬 업로드 (동시 ${UPLOAD_CONCURRENCY}건)...`;
   report(0, 0.05);
 
-  const uploadedPaths: string[] = [];
+  const { results: uploadResults, failures, uploadedPaths } = await uploadAngleShotsConcurrently(allShots, UPLOAD_CONCURRENCY);
+
+  if (uploadResults.length === 0) {
+    await rollbackUploads(uploadedPaths);
+    throw new Error('이미지 업로드에 실패했습니다. 네트워크 연결을 확인 후 다시 시도해주세요.');
+  }
+
+  if (failures >= 2) {
+    await rollbackUploads(uploadedPaths);
+    throw new Error('이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
+  }
+
+  const imageUrl = uploadResults[0].url;
+  const additionalUrls = uploadResults.slice(1).map((r) => r.url);
 
   let scanId: string;
   if (existingScanId) {
     scanId = existingScanId;
   } else {
-    const imageUrl = await uploadWithRetry(sorted[0].base64, sorted[0].mimeType || 'image/jpeg');
-    const p = extractStoragePath(imageUrl);
-    if (p) uploadedPaths.push(p);
     try {
       scanId = await saveManualScan(imageUrl);
     } catch (err) {
@@ -237,29 +277,6 @@ export async function runStereoPipeline(
     }
   }
 
-  // Upload additional angle images to storage so they persist beyond this session.
-  // Use Promise.allSettled with consecutive-failure guard to avoid losing all
-  // angles when one upload fails.
-  const additionalShots = sorted.slice(1).filter((s) => s.base64);
-  const additionalUploadResults = await Promise.allSettled(
-    additionalShots.map((shot) => uploadWithRetry(shot.base64!, shot.mimeType || 'image/jpeg')),
-  );
-  const additionalUrls: string[] = [];
-  let consecutiveUploadFailures = 0;
-  for (const result of additionalUploadResults) {
-    if (result.status === 'fulfilled') {
-      additionalUrls.push(result.value);
-      const ap = extractStoragePath(result.value);
-      if (ap) uploadedPaths.push(ap);
-      consecutiveUploadFailures = 0;
-    } else {
-      consecutiveUploadFailures++;
-      if (consecutiveUploadFailures >= 2) {
-        await rollbackUploads(uploadedPaths);
-        throw new Error('추가 각도 이미지 업로드 중 네트워크 연결이 불안정합니다. 다시 시도해주세요.');
-      }
-    }
-  }
   if (additionalUrls.length > 0) {
     try {
       await supabase.from('scans').update({ additional_image_urls: additionalUrls }).eq('id', scanId);

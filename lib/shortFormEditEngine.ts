@@ -2,6 +2,7 @@ import { PLATFORM_SPECS, getPlatformSpec, type PlatformSpec, type SafeZoneRect }
 import { getDisclosureForPlatforms, getDisclosureShortForPlatforms } from '@/lib/disclosure';
 import { type EmotionPhase } from '@/lib/psychologyEngine';
 import { getBgmTemplateForMood, type BgmCategory } from '@/lib/bgmEngine';
+import { aiCachedCall } from '@/lib/aiCache';
 
 export type ShortFormPlatform = 'instagram' | 'tiktok' | 'youtube' | 'naver_clip';
 
@@ -333,6 +334,50 @@ function buildSegmentTexts(
 }
 
 export function buildShortFormEditPlan(
+  platform: ShortFormPlatform | string,
+  customPrompt: string,
+  selectedHook: string | null,
+  productName?: string,
+  affiliatePlatforms: string[] = [],
+  autoDisclosure = true,
+  disclosureEnabled = false,
+  customSpec?: PlatformSpec,
+  bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
+): ShortFormEditPlan {
+  return computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride);
+}
+
+export async function buildShortFormEditPlanCached(
+  platform: ShortFormPlatform | string,
+  customPrompt: string,
+  selectedHook: string | null,
+  productName?: string,
+  affiliatePlatforms: string[] = [],
+  autoDisclosure = true,
+  disclosureEnabled = false,
+  customSpec?: PlatformSpec,
+  bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
+): Promise<ShortFormEditPlan> {
+  const cacheInput: Record<string, unknown> = {
+    platform,
+    customPrompt,
+    selectedHook,
+    productName: productName || '',
+    affiliatePlatforms: [...affiliatePlatforms].sort(),
+    autoDisclosure,
+    disclosureEnabled,
+    bgmOverride: bgmOverride ? JSON.stringify(bgmOverride) : '',
+  };
+  const { data } = await aiCachedCall<ShortFormEditPlan>(
+    'edit-plan',
+    cacheInput,
+    () => Promise.resolve(computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride)),
+    'local-heuristic',
+  );
+  return data;
+}
+
+function computeEditPlan(
   platform: ShortFormPlatform | string,
   customPrompt: string,
   selectedHook: string | null,

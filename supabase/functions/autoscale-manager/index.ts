@@ -19,6 +19,7 @@ interface AutoscaleConfig {
   scale_cooldown_sec: number;
   heartbeat_timeout_sec: number;
   enabled: boolean;
+  worker_concurrency: number;
 }
 
 Deno.serve(async (req: Request) => {
@@ -182,11 +183,18 @@ function computeTarget(
   }
 
   if (queueDepth >= config.scale_up_threshold) {
-    const proportional = Math.ceil(queueDepth / 2);
+    // Target enough workers to drain the queue in one parallel wave,
+    // where each worker handles worker_concurrency jobs concurrently.
+    const concurrency = Math.max(config.worker_concurrency, 1);
+    const proportional = Math.ceil(queueDepth / concurrency);
     return Math.min(proportional, config.max_workers);
   }
 
-  return Math.max(config.min_workers, Math.min(queueDepth, config.max_workers));
+  // Between thresholds: scale proportionally with the queue depth,
+  // accounting for per-worker concurrency capacity.
+  const concurrency = Math.max(config.worker_concurrency, 1);
+  const needed = Math.ceil(queueDepth / concurrency);
+  return Math.max(config.min_workers, Math.min(needed, config.max_workers));
 }
 
 async function spawnWorkers(

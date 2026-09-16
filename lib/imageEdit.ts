@@ -97,8 +97,27 @@ export async function compressImage(uri: string, maxWidth = 1080, quality = 0.8)
   return result.uri;
 }
 
-const UPLOAD_MAX_DIMENSION = 1920;
-const UPLOAD_QUALITY = 0.8;
+const UPLOAD_MAX_DIMENSION = 1280;
+const UPLOAD_QUALITY = 0.75;
+const CAPTURE_MAX_DIMENSION = 1280;
+const CAPTURE_QUALITY = 0.85;
+
+export async function compressCaptureFrameToBlob(
+  base64: string,
+  mimeType: string,
+): Promise<{ blob: Blob; base64: string; mimeType: string }> {
+  const dataUrl = `data:${mimeType};base64,${base64}`;
+  try {
+    const compressed = await prepareImageForApi(dataUrl, CAPTURE_MAX_DIMENSION, CAPTURE_QUALITY);
+    const compressedMime = compressed.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+    const compressedBase64 = cleanBase64(compressed);
+    const blob = base64ToBlob(compressedBase64, compressedMime);
+    return { blob, base64: compressedBase64, mimeType: compressedMime };
+  } catch {
+    const blob = base64ToBlob(base64, mimeType);
+    return { blob, base64, mimeType };
+  }
+}
 
 export async function compressBase64ForUpload(
   base64: string,

@@ -1,0 +1,117 @@
+import { supabase } from '@/lib/supabase';
+import { getCached, setCached } from '@/lib/offlineCache';
+import { hashObject } from '@/lib/contentHash';
+
+const L1_TTL_MS = 5 * 60 * 1000;
+const L2_TTL_DAYS = 30;
+const L2_TTL_MS = L2_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+export interface AiCacheEntry<T> {
+  data: T;
+  cached: boolean;
+  source: 'l1' | 'l2' | 'miss';
+}
+
+export function buildCacheKey(taskType: string, inputHash: string): string {
+  return `${taskType}:${inputHash}`;
+}
+
+async function getL1<T>(key: string): Promise<T | null> {
+  return getCached<T>(`ai:${key}`);
+}
+
+async function setL1<T>(key: string, data: T): Promise<void> {
+  await setCached(`ai:${key}`, data);
+}
+
+async function getL2<T>(cacheKey: string): Promise<T | null> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_content_cache')
+      .select('result, expires_at')
+      .eq('cache_key', cacheKey)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const expiresAt = new Date(data.expires_at as string).getTime();
+    if (Date.now() > expiresAt) return null;
+
+    supabase
+      .from('ai_content_cache')
+      .update({ hit_count: (data as { hit_count?: number }).hit_count ?? 0 + 1, updated_at: new Date().toISOString() })
+      .eq('cache_key', cacheKey)
+      .then(() => {}, () => {});
+
+    return data.result as T;
+  } catch {
+    return null;
+  }
+}
+
+async function setL2<T>(cacheKey: string, taskType: string, inputHash: string, result: T, modelUsed = 'unknown'): Promise<void> {
+  try {
+    await supabase
+      .from('ai_content_cache')
+      .upsert({
+        cache_key: cacheKey,
+        task_type: taskType,
+        input_hash: inputHash,
+        result: result as unknown as Record<string, unknown>,
+        model_used: modelUsed,
+        expires_at: new Date(Date.now() + L2_TTL_MS).toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'cache_key' });
+  } catch {
+    // best-effort
+  }
+}
+
+export async function aiCacheGet<T>(
+  taskType: string,
+  inputHash: string,
+): Promise<AiCacheEntry<T> | null> {
+  const key = buildCacheKey(taskType, inputHash);
+
+  const l1 = await getL1<T>(key);
+  if (l1) return { data: l1, cached: true, source: 'l1' };
+
+  const l2 = await getL2<T>(key);
+  if (l2) {
+    await setL1(key, l2);
+    return { data: l2, cached: true, source: 'l2' };
+  }
+
+  return null;
+}
+
+export async function aiCacheSet<T>(
+  taskType: string,
+  inputHash: string,
+  data: T,
+  modelUsed?: string,
+): Promise<void> {
+  const key = buildCacheKey(taskType, inputHash);
+  await Promise.all([
+    setL1(key, data),
+    setL2(key, taskType, inputHash, data, modelUsed),
+  ]);
+}
+
+export async function aiCachedCall<T>(
+  taskType: string,
+  input: Record<string, unknown>,
+  fetcher: () => Promise<T>,
+  modelUsed?: string,
+): Promise<{ data: T; cached: boolean }> {
+  const inputHash = hashObject(input);
+
+  const cached = await aiCacheGet<T>(taskType, inputHash);
+  if (cached) return { data: cached.data, cached: true };
+
+  const fresh = await fetcher();
+  await aiCacheSet(taskType, inputHash, fresh, modelUsed);
+  return { data: fresh, cached: false };
+}
+
+export { L1_TTL_MS, L2_TTL_DAYS };

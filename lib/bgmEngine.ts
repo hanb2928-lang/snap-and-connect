@@ -7,6 +7,9 @@ import {
   bundledTrackToBgmTemplate,
   type BundledBgmTrack,
 } from './bundledBgm';
+import { aiCachedCall } from './aiCache';
+import { hashObject } from './contentHash';
+import { cleanBase64 } from './base64';
 
 /**
  * Web Audio API BGM engine — supports both bundled audio files and FM synthesis fallback.
@@ -765,14 +768,25 @@ const FALLBACK_RECOMMENDATION: BgmRecommendation = { category: 'hightension', te
 const MOOD_DESCRIPTIONS: Record<BgmCategory, string> = { cinematic: '웅장하고 드라마틱한 오케스트라 빌드업 — 제품 집중, 네이버 클립에 최적', hightension: '빠르고 에너제틱한 일렉트로닉 비트 — 틱톡/쇼츠 FYP 진입용', asmr: '차분하고 미니멀한 앰비언트 — 제품 디테일 어필, 광고 전환용', emotional: '따뜻하고 감성적인 피아노/스트링 — 인스타 릴스 스토리텔링용', lofi: '편안한 로파이 비트 — 카페/일상/힐링 콘텐츠에 최적' };
 
 export async function fetchBgmRecommendation(imageDataUrl: string, mimeType: string = 'image/jpeg'): Promise<BgmRecommendation> {
+  const b64 = cleanBase64(imageDataUrl);
+  const cacheInput = { task: 'bgm-recommend', imageHash: hashObject({ b64 }).slice(0, 16), mimeType };
+
   try {
-    const { supabase } = await import('@/lib/supabase');
-    const { data, error } = await supabase.functions.invoke('recommend-bgm', { body: { imageDataUrl, mimeType } });
-    if (error || !data) return FALLBACK_RECOMMENDATION;
-    const raw = data as Record<string, unknown>;
-    const rawCategory = String(raw.category ?? raw.templateId ?? '');
-    const mappedCategory: BgmCategory = moodLabelToCategory(rawCategory);
-    return { category: mappedCategory, templateId: mappedCategory, label: MOOD_CONFIGS[mappedCategory].label, description: String(raw.description ?? MOOD_DESCRIPTIONS[mappedCategory]), bpm: Number(raw.bpm ?? MOOD_CONFIGS[mappedCategory].bpm), reason: String(raw.reason ?? `${MOOD_CONFIGS[mappedCategory].label} 무드를 추천했습니다.`), highlightStartSec: Number(raw.highlightStartSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightStartSec), highlightDurationSec: Number(raw.highlightDurationSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightDurationSec), energyCurve: Array.isArray(raw.energyCurve) ? raw.energyCurve as number[] : MOOD_CONFIGS[mappedCategory].energyCurve };
+    const { data } = await aiCachedCall<BgmRecommendation>(
+      'bgm-recommend',
+      cacheInput,
+      async () => {
+        const { supabase } = await import('@/lib/supabase');
+        const { data, error } = await supabase.functions.invoke('recommend-bgm', { body: { imageDataUrl, mimeType } });
+        if (error || !data) return FALLBACK_RECOMMENDATION;
+        const raw = data as Record<string, unknown>;
+        const rawCategory = String(raw.category ?? raw.templateId ?? '');
+        const mappedCategory: BgmCategory = moodLabelToCategory(rawCategory);
+        return { category: mappedCategory, templateId: mappedCategory, label: MOOD_CONFIGS[mappedCategory].label, description: String(raw.description ?? MOOD_DESCRIPTIONS[mappedCategory]), bpm: Number(raw.bpm ?? MOOD_CONFIGS[mappedCategory].bpm), reason: String(raw.reason ?? `${MOOD_CONFIGS[mappedCategory].label} 무드를 추천했습니다.`), highlightStartSec: Number(raw.highlightStartSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightStartSec), highlightDurationSec: Number(raw.highlightDurationSec ?? MOOD_CONFIGS[mappedCategory].tracks[0].highlightDurationSec), energyCurve: Array.isArray(raw.energyCurve) ? raw.energyCurve as number[] : MOOD_CONFIGS[mappedCategory].energyCurve };
+      },
+      'gpt-4o',
+    );
+    return data;
   } catch { return FALLBACK_RECOMMENDATION; }
 }
 

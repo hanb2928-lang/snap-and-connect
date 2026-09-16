@@ -1,4 +1,7 @@
 import { supabase } from './supabase';
+import { aiCachedCall } from './aiCache';
+import { hashObject } from './contentHash';
+import { compressImagesInParallel } from './parallelImageCompress';
 
 export interface ProductVisionResult {
   productName: string;
@@ -23,6 +26,35 @@ const VISION_MAX_RETRIES = 2;
 const VISION_TIMEOUT_MS = 120_000;
 
 export async function analyzeProductVision(
+  images: string[],
+  productName?: string,
+  scanId?: string,
+): Promise<ProductVisionResult> {
+  const cacheInput: Record<string, unknown> = {
+    task: 'product-vision',
+    imageCount: images.length,
+    imageHashes: images.map((img) => {
+      const dataIdx = img.indexOf(',');
+      const b64 = dataIdx >= 0 ? img.slice(dataIdx + 1) : img;
+      return hashObject({ b64 }).slice(0, 16);
+    }),
+    productName: productName || '',
+  };
+
+  const { data, cached } = await aiCachedCall<ProductVisionResult>(
+    'product-vision',
+    cacheInput,
+    async () => {
+      const compressed = await compressImagesInParallel(images);
+      return fetchVisionFromApi(compressed.map((c) => c.dataUrl), productName, scanId);
+    },
+    'gpt-4o',
+  );
+  void cached;
+  return data;
+}
+
+async function fetchVisionFromApi(
   images: string[],
   productName?: string,
   scanId?: string,
