@@ -53,7 +53,7 @@ export const InlineCameraViewfinder = forwardRef<
       streamRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      try { videoRef.current.srcObject = null; } catch { /* element may be detached */ }
     }
     setCameraReady(false);
   }, []);
@@ -76,8 +76,20 @@ export const InlineCameraViewfinder = forwardRef<
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-        if (mountedRef.current && gen === streamGenRef.current) setCameraReady(true);
+        await videoRef.current.play().catch((playErr: unknown) => {
+          if (playErr instanceof DOMException && playErr.name === 'AbortError') return;
+        });
+        if (
+          mountedRef.current &&
+          gen === streamGenRef.current &&
+          videoRef.current &&
+          videoRef.current.srcObject === stream
+        ) {
+          setCameraReady(true);
+        } else {
+          stream.getTracks().forEach((t) => t.stop());
+          if (streamRef.current === stream) streamRef.current = null;
+        }
       }
     } catch (err) {
       if (!mountedRef.current || gen !== streamGenRef.current) return;
