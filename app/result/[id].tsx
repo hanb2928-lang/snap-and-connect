@@ -116,6 +116,7 @@ import { MicroEditSlot } from '@/components/MicroEditSlot';
 import { OriginalityScoreCard } from '@/components/OriginalityScoreCard';
 import type { InlineEditState, HookEffectType } from '@/components/AIProcessAccordion';
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
+import { ResultPreviewSection } from '@/components/ResultPreviewSection';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
 import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { getBgmTemplateForMood } from '@/lib/bgmEngine';
@@ -2944,158 +2945,37 @@ export default function ResultScreen() {
           </View>
         )}
         {/* === 1순위: 미리보기 (동영상: 자동 완성 영상 / 이미지: 대형 프리뷰 + 썸네일 스트립) === */}
-        <View style={styles.previewSection}>
-          {isRegenerating && (
-            <View style={styles.regenBanner}>
-              <Sparkles size={14} color={theme.colors.primary[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>AI가 새로운 비주얼 생성 중...</Text>
-            </View>
-          )}
-          {isGeneratingVideo && targetMediaType === 'video' && (
-            <View style={styles.regenBanner}>
-              <RotatingLoader size={14} color={theme.colors.primary[300]} />
-              <Text style={styles.regenBannerText}>
-                {videoGenProgress?.message ?? 'AI 영상 생성 중...'}
-                {videoGenProgress?.elapsedSec ? ` (${videoGenProgress.elapsedSec}초)` : ''}
-              </Text>
-            </View>
-          )}
-          {bgJobNotice && !isGeneratingVideo && (
-            <View style={styles.bgJobBanner}>
-              <Clock size={13} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.bgJobText}>{bgJobNotice}</Text>
-              <TouchableOpacity onPress={() => setBgJobNotice(null)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={14} color={theme.colors.dark.textDim} strokeWidth={2} />
-              </TouchableOpacity>
-            </View>
-          )}
-          {isGeneratingImage && targetMediaType === 'image' && (
-            <View style={styles.imageGenProgressContainer}>
-              <View style={styles.imageGenProgressHeader}>
-                <RotatingLoader size={14} color={theme.colors.accent[300]} />
-                <Text style={styles.regenBannerText}>
-                  {imageGenProgress?.message ?? '5장 옴니버스 이미지 병렬 생성 중...'}
-                </Text>
-                <Text style={styles.imageGenProgressPercent}>
-                  {imageGenProgress ? `${Math.round(imageGenProgress.progress * 100)}%` : '0%'}
-                </Text>
-              </View>
-              <View style={styles.imageGenProgressBarTrack}>
-                <View
-                  style={[
-                    styles.imageGenProgressBarFill,
-                    {
-                      width: `${(imageGenProgress?.progress ?? 0) * 100}%`,
-                      backgroundColor: imageGenProgress?.phase === 'error'
-                        ? theme.colors.error[400]
-                        : theme.colors.accent[400],
-                    },
-                  ]}
-                />
-              </View>
-              {imageGenProgress && imageGenProgress.totalCount > 0 && (
-                <Text style={styles.imageGenProgressCount}>
-                  {imageGenProgress.completedCount}/{imageGenProgress.totalCount}장 완료
-                </Text>
-              )}
-            </View>
-          )}
-          {visionAnalyzing && (
-            <View style={styles.regenBanner}>
-              <Sparkles size={14} color={theme.colors.accent[300]} strokeWidth={2} />
-              <Text style={styles.regenBannerText}>Vision AI가 제품을 분석하는 중...</Text>
-            </View>
-          )}
-          {videoGenError && targetMediaType === 'video' && (
-            <View style={styles.videoErrorToast}>
-              <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
-              <Text style={styles.videoErrorToastText} numberOfLines={5}>AI 영상 생성 실패: {videoGenError}</Text>
-              <View style={styles.videoErrorActions}>
-                <TouchableOpacity onPress={() => handleAiVideoGenerate()} activeOpacity={0.7}>
-                  <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setVideoGenError(null); }} activeOpacity={0.7}>
-                  <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          {imageGenError && targetMediaType === 'image' && (
-            <View style={styles.videoErrorToast}>
-              <AlertCircleIcon size={13} color={theme.colors.error[400]} strokeWidth={2} />
-              <Text style={styles.videoErrorToastText} numberOfLines={5}>{imageGenError}</Text>
-              <View style={styles.videoErrorActions}>
-                <TouchableOpacity onPress={() => handleAiImageGenerate()} activeOpacity={0.7}>
-                  <RotateCcw size={14} color={theme.colors.error[400]} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setImageGenError(null); }} activeOpacity={0.7}>
-                  <X size={13} color={theme.colors.dark.textDim} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {targetMediaType === 'video' ? (
-            <ShortFormPreviewPlayer
-              editPlan={previewEditPlan}
-              videoUri={generatedVideoUrl}
-              narrativePlan={narrativePlan}
-              videoGenProgress={videoGenProgress}
-              bgmVolume={bgmVolume}
-              copyOverlays={copyOverlaysForPreview}
-              narrationActive={narrationPlaying}
-              ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
-            />
-          ) : (
-            generatedImages.length > 0 ? (
-              <View style={styles.imageHeroContainer}>
-                <TouchableOpacity
-                  style={styles.imageHeroView}
-                  onPress={() => { setImageViewerIndex(selectedImageIndex); setImageViewerVisible(true); }}
-                  activeOpacity={0.95}
-                >
-                  <Image
-                    source={{ uri: generatedImages[selectedImageIndex] ?? generatedImages[0] }}
-                    style={styles.imageHeroImg}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-                {generatedImages.length > 1 && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.imageThumbStrip}
-                    contentContainerStyle={styles.imageThumbStripContent}
-                  >
-                    {generatedImages.map((imgUri, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        onPress={() => setSelectedImageIndex(idx)}
-                        activeOpacity={0.85}
-                      >
-                        <Image
-                          source={{ uri: imgUri }}
-                          style={[
-                            styles.imageThumbItem,
-                            idx === selectedImageIndex && styles.imageThumbItemActive,
-                          ]}
-                          resizeMode="cover"
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            ) : (
-              <View style={styles.imageHeroPlaceholder}>
-                <ImageIcon size={32} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
-                <Text style={styles.imageHeroPlaceholderText}>
-                  이미지 모드 — AI 자동 생성을 눌러 5장 이미지를 만들어보세요
-                </Text>
-              </View>
-            )
-          )}
-        </View>
+        <ResultPreviewSection
+          mediaUrl={generatedVideoUrl}
+          mediaType={targetMediaType}
+          generatedImages={generatedImages}
+          selectedImageIndex={selectedImageIndex}
+          onSelectImage={setSelectedImageIndex}
+          onOpenImageViewer={(idx) => { setImageViewerIndex(idx); setImageViewerVisible(true); }}
+          isProcessing={isGeneratingVideo || isGeneratingImage}
+          progressMessage={videoGenProgress?.message ?? imageGenProgress?.message ?? ''}
+          isGeneratingVideo={isGeneratingVideo}
+          isGeneratingImage={isGeneratingImage}
+          isRegenerating={isRegenerating}
+          visionAnalyzing={visionAnalyzing}
+          videoGenProgress={videoGenProgress}
+          imageGenProgress={imageGenProgress}
+          bgJobNotice={bgJobNotice}
+          onDismissBgJobNotice={() => setBgJobNotice(null)}
+          videoGenError={videoGenError}
+          imageGenError={imageGenError}
+          onRetryVideo={() => handleAiVideoGenerate()}
+          onRetryImage={() => handleAiImageGenerate()}
+          onDismissVideoError={() => setVideoGenError(null)}
+          onDismissImageError={() => setImageGenError(null)}
+          previewEditPlan={previewEditPlan}
+          narrativePlan={narrativePlan}
+          bgmVolume={bgmVolume}
+          copyOverlays={copyOverlaysForPreview}
+          narrationActive={narrationPlaying}
+          ttsUrl={ttsUrl ?? scan?.tts_url ?? null}
+          onDownload={handleSaveVideo}
+        />
 
         {/* === 2순위: 플랫폼 선택 === */}
         <View style={styles.targetPlatformSection}>

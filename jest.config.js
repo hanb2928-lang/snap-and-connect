@@ -9,5 +9,6 @@ module.exports = {
   testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', '/dist/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^jsr:.*$': '<rootDir>/supabase/tests/__mocks__/empty-module.js',
   },
 };
