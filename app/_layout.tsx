@@ -20,6 +20,7 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AffiliateToastProvider } from '@/components/AffiliateToast';
 import { NetworkBanner } from '@/components/NetworkBanner';
+import { VideoJobRecoveryToast } from '@/components/VideoJobRecoveryToast';
 import { I18nProvider, useI18n } from '@/hooks/useI18n';
 import { AppThemeProvider } from '@/hooks/useAppTheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -167,6 +168,7 @@ export default function RootLayout() {
                 <Stack.Screen name="+not-found" />
               </Stack>
               <NetworkBanner />
+              <VideoJobRecoveryToast />
               <StatusBar style="light" />
             </GestureHandlerRootView>
           </SafeAreaProvider>
