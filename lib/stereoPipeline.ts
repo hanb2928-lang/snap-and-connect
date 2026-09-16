@@ -226,8 +226,12 @@ export async function runStereoPipeline(
   steps[1].detail = '초반 3초 패러독스 훅 + 비트 싱크 설계 중...';
   report(1, 0.3);
 
+  const productName = cloudResult?.synthesis?.contextMatch?.label
+    ? `${cloudResult.synthesis.contextMatch.label} 제품`
+    : '프리미엄 추천 상품';
+
   const editPlan = buildShortFormEditPlan(
-    'youtube', '', 'curiosity_gap', '', undefined, undefined, true, undefined, undefined,
+    'youtube', synthesisSummary, 'curiosity_gap', productName, undefined, undefined, true, undefined, undefined,
   );
 
   const directingPlan = buildDirectingPlan(
@@ -249,7 +253,7 @@ export async function runStereoPipeline(
   steps[2].detail = '9:16 H.264 렌더링 코덱 적용 & 메타데이터 생성 중...';
   report(2, 0.55);
 
-  const publishPlans = buildMultiPlatformPublishPlans('', context, ['youtube', 'instagram', 'tiktok']);
+  const publishPlans = buildMultiPlatformPublishPlans(productName, context, ['youtube', 'instagram', 'tiktok']);
 
   const publishTargets = PUBLISH_TARGETS.map(({ key, label }) => {
     const dl = getDeepLink(key);
@@ -288,6 +292,42 @@ export async function runStereoPipeline(
     publishPlans,
     publishTargets,
   };
+
+  // Save generated hooks/captions back to the scan record so the result page
+  // can display them. Without this, the result page sees empty template_data
+  // and all hooks/captions appear blank.
+  const hookText = editPlan.selectedHook || '';
+  const captionText = editPlan.segments.map((s) => s.textOverlay).filter(Boolean).join('\n') || '';
+  const templateData = {
+    priceLabel: '',
+    oneLiner: hookText,
+    category: cloudResult?.synthesis?.contextMatch?.label || '',
+    accentColor: '#2f9dff',
+    hook: hookText,
+    hashtags: publishPlans[0]?.metadata?.hashtags || [],
+    productAdvantages: [],
+    caption: captionText,
+    psychologyInsight: null as unknown,
+    platformVariants: publishPlans.reduce<Record<string, { hook?: string; caption?: string; hashtags?: string[] }>>((acc, p) => {
+      acc[p.target] = {
+        hook: p.metadata.title,
+        caption: p.metadata.description,
+        hashtags: p.metadata.hashtags,
+      };
+      return acc;
+    }, {}),
+  };
+
+  try {
+    await supabase.from('scans').update({
+      product_name: productName,
+      summary: synthesisSummary,
+      one_liner: hookText,
+      template_data: templateData,
+    }).eq('id', scanId);
+  } catch {
+    // non-fatal — pipeline result is still returned in-memory
+  }
 
   steps[4].status = 'done';
   steps[4].detail = '파이프라인 완료 · 편집 화면으로 이동 가능';
