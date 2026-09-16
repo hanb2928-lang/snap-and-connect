@@ -509,8 +509,13 @@ async function requeueJob(
 async function recoverStaleJobs(): Promise<void> {
   const staleThreshold = new Date(Date.now() - JOB_TIMEOUT_MS).toISOString();
   try {
+    // Requeue stale jobs that still have retries left. The attempt count
+    // stays as-is — the next dequeue will pick it up, and if it fails again
+    // the normal failure path increments attempts. This avoids infinite
+    // stale-recovery loops where a perpetually crashing worker keeps
+    // requeuing the same job without advancing the attempt counter.
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/render_jobs?status=eq.processing&started_at=lt.${staleThreshold}`,
+      `${supabaseUrl}/rest/v1/render_jobs?status=eq.processing&started_at=lt.${staleThreshold}&attempts=lt.${MAX_ATTEMPTS}`,
       {
         method: "PATCH",
         headers: {
@@ -522,7 +527,29 @@ async function recoverStaleJobs(): Promise<void> {
       },
     );
     if (!resp.ok) {
-      console.warn(`recoverStaleJobs PATCH failed: ${resp.status}`);
+      console.warn(`recoverStaleJobs requeue PATCH failed: ${resp.status}`);
+    }
+
+    // Mark stale jobs that have exhausted retries as error so
+    // they don't block the queue indefinitely.
+    const errResp = await fetch(
+      `${supabaseUrl}/rest/v1/render_jobs?status=eq.processing&started_at=lt.${staleThreshold}&attempts=gte.${MAX_ATTEMPTS}`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "error",
+          error_message: "Job timed out and exceeded max retry attempts",
+          completed_at: new Date().toISOString(),
+        }),
+      },
+    );
+    if (!errResp.ok) {
+      console.warn(`recoverStaleJobs error PATCH failed: ${errResp.status}`);
     }
   } catch (err) {
     console.warn('recoverStaleJobs error', err instanceof Error ? err.message : String(err));
