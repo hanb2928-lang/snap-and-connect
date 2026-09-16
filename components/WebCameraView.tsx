@@ -112,6 +112,15 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
         return;
       }
       streamRef.current = stream;
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          if (streamRef.current === stream) {
+            streamRef.current = null;
+            setCameraReady(false);
+            onCameraReady?.(false);
+          }
+        });
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
@@ -134,7 +143,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
         setErrorKind('generic');
       }
     }
-  }, [stopStream, facing]);
+  }, [stopStream, onCameraReady]);
 
   const getStream = useCallback(() => streamRef.current, []);
 
@@ -267,6 +276,12 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       setRecordingDuration(0);
       recorderRef.current = null;
       recordingPromiseRef.current = null;
+      // Restart stream without audio to release the microphone track,
+      // preventing audio hardware from staying active after recording.
+      const hadAudio = streamRef.current?.getAudioTracks().length ?? 0;
+      if (hadAudio > 0) {
+        await startStream(facing, false);
+      }
       return { base64, mimeType };
     } catch {
       setIsRecording(false);
@@ -276,7 +291,7 @@ export const WebCameraView = forwardRef<WebCameraHandle, WebCameraViewProps>(fun
       setError('비디오 녹화 저장에 실패했습니다.');
       return null;
     }
-  }, [isRecording]);
+  }, [isRecording, facing, startStream]);
 
   useImperativeHandle(ref, () => ({
     captureFrame: async () => {

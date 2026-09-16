@@ -17,7 +17,8 @@ export interface ResultPollingOptions {
 const POLL_INTERVAL_MS = 5000;
 const SOFT_WARN_MS = 120_000;
 const HARD_TIMEOUT_MS = 300_000;
-const MAX_CONSECUTIVE_ERRORS = 8;
+const POLL_ERROR_WINDOW_MS = 60_000;
+const MAX_POLL_ERRORS_IN_WINDOW = 8;
 
 /**
  * Encapsulates Runway direct polling and DB force-sync for a video job.
@@ -79,7 +80,7 @@ export function useResultPolling(
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let softWarnTimer: ReturnType<typeof setTimeout> | null = null;
-    let consecutiveErrors = 0;
+    const pollErrorWindow: number[] = [];
 
     const cleanup = () => {
       cancelled = true;
@@ -150,7 +151,11 @@ export function useResultPolling(
         });
 
         if (!cancelled && pollData && typeof pollData === 'object') {
-          consecutiveErrors = 0;
+          // Do NOT reset the error window on a successful edge function response.
+          // On a flaky network, sporadic successes would keep the count below
+          // the threshold, trapping the user in an infinite loading state.
+          // The sliding window expires errors naturally by time, so only
+          // actual failures are counted.
           const status = pollData.status as string;
 
           if (status === 'SUCCESS' && pollData.videoUrl) {
@@ -166,8 +171,12 @@ export function useResultPolling(
           }
         }
       } catch {
-        consecutiveErrors++;
-        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        const now = Date.now();
+        pollErrorWindow.push(now);
+        while (pollErrorWindow.length > 0 && now - pollErrorWindow[0] > POLL_ERROR_WINDOW_MS) {
+          pollErrorWindow.shift();
+        }
+        if (pollErrorWindow.length >= MAX_POLL_ERRORS_IN_WINDOW) {
           // Force-sync DB as a last resort before giving up.
           const dbResult = await forceSyncDb();
           if (!dbResult) {
@@ -185,8 +194,9 @@ export function useResultPolling(
         }
       }
 
-      // Fallback: also try DB force-sync if we haven't resolved yet.
-      if (!cancelled && !settledRef.current && consecutiveErrors > 0) {
+      // Fallback: also try DB force-sync if we haven't resolved yet and
+      // the poll failed (but hasn't hit the threshold yet).
+      if (!cancelled && !settledRef.current && pollErrorWindow.length > 0) {
         const dbResult = await forceSyncDb();
         if (dbResult) {
           handleResult(dbResult.status, dbResult.videoUrl);

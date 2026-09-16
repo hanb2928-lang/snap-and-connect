@@ -76,6 +76,16 @@ export const InlineCameraViewfinder = forwardRef<
         return;
       }
       streamRef.current = stream;
+      // Detect hardware-level track termination (another app grabs camera,
+      // USB disconnect, device sleep) so we don't keep a dead stream.
+      stream.getVideoTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          if (streamRef.current === stream) {
+            streamRef.current = null;
+            setCameraReady(false);
+          }
+        });
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch((playErr: unknown) => {

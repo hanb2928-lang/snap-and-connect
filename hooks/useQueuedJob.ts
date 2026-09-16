@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { Platform } from 'react-native';
 import { enqueueJob, subscribeToJob, getJob, type RenderJob, type JobType, type JobStatus } from '@/lib/jobQueue';
 
 interface QueuedJobState {
@@ -22,6 +23,7 @@ export function useQueuedJob() {
   const subRef = useRef<{ unsubscribe: () => void } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onlineCleanupRef = useRef<(() => void) | null>(null);
   const submitIdRef = useRef(0);
 
   const clearAll = useCallback(() => {
@@ -36,6 +38,10 @@ export function useQueuedJob() {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+    if (onlineCleanupRef.current) {
+      onlineCleanupRef.current();
+      onlineCleanupRef.current = null;
     }
   }, []);
 
@@ -109,29 +115,62 @@ export function useQueuedJob() {
 
     const pollErrorTimestamps: number[] = [];
     const POLL_ERROR_WINDOW_MS = 30000;
+    let pollingPaused = false;
 
-    pollRef.current = setInterval(() => {
-      if (mySubmitId !== submitIdRef.current) return;
-      getJob(jobId).then((job) => {
+    const startPolling = () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => {
         if (mySubmitId !== submitIdRef.current) return;
-        if (job) handleUpdate(job);
-      }).catch(() => {
-        const now = Date.now();
-        pollErrorTimestamps.push(now);
-        while (pollErrorTimestamps.length > 0 && now - pollErrorTimestamps[0] > POLL_ERROR_WINDOW_MS) {
-          pollErrorTimestamps.shift();
-        }
-        if (pollErrorTimestamps.length >= MAX_POLL_ERRORS) {
+        getJob(jobId).then((job) => {
           if (mySubmitId !== submitIdRef.current) return;
-          clearAll();
-          setState((prev) => ({
-            ...prev,
-            status: 'error',
-            error: '네트워크 연결이 불안정합니다. 다시 시도해주세요.',
-          }));
-        }
-      });
-    }, POLL_INTERVAL_MS);
+          pollingPaused = false;
+          if (job) handleUpdate(job);
+        }).catch(() => {
+          const now = Date.now();
+          pollErrorTimestamps.push(now);
+          while (pollErrorTimestamps.length > 0 && now - pollErrorTimestamps[0] > POLL_ERROR_WINDOW_MS) {
+            pollErrorTimestamps.shift();
+          }
+          if (pollErrorTimestamps.length >= MAX_POLL_ERRORS) {
+            // Pause polling instead of permanently erroring — the network
+            // may recover. We'll resume on the 'online' event.
+            if (pollRef.current) {
+              clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            pollingPaused = true;
+            setState((prev) => ({
+              ...prev,
+              error: '네트워크 연결이 불안정합니다. 연결이 복구되면 자동으로 재개됩니다.',
+            }));
+          }
+        });
+      }, POLL_INTERVAL_MS);
+    };
+
+    startPolling();
+
+    // Resume polling when the network comes back online after a pause
+    const handleOnline = () => {
+      if (mySubmitId !== submitIdRef.current) return;
+      if (pollingPaused) {
+        pollErrorTimestamps.length = 0;
+        pollingPaused = false;
+        setState((prev) => ({
+          ...prev,
+          error: null,
+          status: prev.status === 'error' ? 'queued' : prev.status,
+        }));
+        startPolling();
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      onlineCleanupRef.current = () => {
+        window.removeEventListener('online', handleOnline);
+      };
+    }
 
     return jobId;
   }, [clearAll]);

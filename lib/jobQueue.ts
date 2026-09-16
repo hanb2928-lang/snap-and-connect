@@ -255,8 +255,29 @@ async function triggerQueueProcessor(): Promise<void> {
       await resp.text().catch(() => '');
     }
   } catch {
-    // network error — queue will retry on next trigger
+    // Network error — register a one-time retry on network recovery.
+    // Without this, a job enqueued during a brief outage sits idle until
+    // another trigger fires (e.g. a new insert), which could be never.
+    registerTriggerRetryOnRecovery();
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+let triggerRetryRegistered = false;
+function registerTriggerRetryOnRecovery(): void {
+  if (triggerRetryRegistered) return;
+  triggerRetryRegistered = true;
+
+  const retry = () => {
+    triggerRetryRegistered = false;
+    triggerQueueProcessor().catch(() => {});
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', retry, { once: true });
+  } else {
+    // On native, retry after a short delay since we can't listen to 'online'
+    setTimeout(retry, 5000);
   }
 }
