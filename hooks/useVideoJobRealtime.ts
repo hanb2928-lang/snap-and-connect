@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { saveActiveVideoJob, clearActiveVideoJob } from '@/lib/videoJobPersistence';
 
 type VideoJobStatus = 'idle' | 'processing' | 'completed' | 'failed';
 
@@ -39,12 +40,14 @@ export function useVideoJobRealtime({ jobId, onCompleted, onError }: UseVideoJob
       setStatus('completed');
       if (url) setResultUrl(url);
       if (url) callbacksRef.current.onCompleted?.(url);
+      clearActiveVideoJob();
     } else if (s === 'failed') {
       settledRef.current = true;
       setStatus('failed');
       const msg = err ?? '비디오 생성에 실패했습니다.';
       setErrorMsg(msg);
       callbacksRef.current.onError?.(msg);
+      clearActiveVideoJob();
     } else {
       setStatus(s);
     }
@@ -56,6 +59,7 @@ export function useVideoJobRealtime({ jobId, onCompleted, onError }: UseVideoJob
     setStatus('processing');
     setResultUrl(null);
     setErrorMsg(null);
+    saveActiveVideoJob(jobId, 'uploading');
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;

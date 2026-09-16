@@ -19,6 +19,7 @@ import { theme } from '@/lib/theme';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AffiliateToastProvider } from '@/components/AffiliateToast';
+import { NetworkBanner } from '@/components/NetworkBanner';
 import { I18nProvider, useI18n } from '@/hooks/useI18n';
 import { AppThemeProvider } from '@/hooks/useAppTheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -165,6 +166,7 @@ export default function RootLayout() {
                 <Stack.Screen name="auth/callback" options={{ headerShown: false, animation: 'fade' }} />
                 <Stack.Screen name="+not-found" />
               </Stack>
+              <NetworkBanner />
               <StatusBar style="light" />
             </GestureHandlerRootView>
           </SafeAreaProvider>
