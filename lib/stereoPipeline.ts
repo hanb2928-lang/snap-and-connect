@@ -175,14 +175,20 @@ export function makeInitialProgress(): StereoPipelineProgress {
 }
 
 async function invokeStereoCutAuto(
-  _payloads: AngleImagePayload[],
-  _context: string,
-  _style: string,
+  payloads: AngleImagePayload[],
+  context: string,
+  style: string,
   scanId: string,
 ): Promise<CloudPipelineResult | null> {
   try {
     const { data, error } = await supabase.functions.invoke('stereo-cut-auto', {
-      body: { scanId, angles: _payloads },
+      body: {
+        scanId,
+        angles: payloads,
+        customPrompt: context,
+        productName: style === 'studio' ? '프리미엄 스튜디오 제품' : '프리미엄 추천 상품',
+        targetPlatforms: ['youtube', 'instagram', 'tiktok'],
+      },
     });
     if (error || !data) return null;
     return data as CloudPipelineResult;

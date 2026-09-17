@@ -53,6 +53,9 @@ interface GenerateVideoRequest {
   qualityTier?: 'standard' | 'pro';
   resolution?: string;
   fps?: number;
+  stylePreset?: string;
+  detailRestoration?: boolean;
+  durationSec?: number;
   // webhook fields (sent by Runway callback)
   status?: string;
   output?: string[] | { url?: string } | string;
@@ -201,14 +204,15 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     hasProductVision: !!body.productVision,
   }));
 
-  let effectivePrompt = body.prompt ?? "";
-  if (effectivePrompt.trim().length === 0) {
-    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText, body.isCleanVideoMode === true);
-  }
-
   const isDraft = body.draft === true;
   const requestedDuration = Math.min(Math.max(Math.round(body.durationSec ?? 5), 2), 10);
   const durationSec = isDraft ? Math.min(requestedDuration, 3) : requestedDuration;
+
+  let effectivePrompt = body.prompt ?? "";
+  if (effectivePrompt.trim().length === 0) {
+    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText, body.isCleanVideoMode === true, requestedDuration);
+  }
+
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
 
@@ -1078,7 +1082,7 @@ async function submitRunwayTask(
     const endpoint = hasImage ? "image_to_video" : "text_to_video";
     const model = "gen4.5";
     const ratioValue = ratioMap[aspectRatio] ?? "720:1280";
-    const safePrompt = prompt.trim().slice(0, 500);
+    const safePrompt = prompt.trim().slice(0, 1000);
 
     const payload: Record<string, unknown> = {
       model,
@@ -1286,6 +1290,7 @@ function buildAutoPrompt(
   vision: ProductVisionData | null,
   captionText: string | undefined,
   isCleanVideoMode: boolean,
+  durationSec: number,
 ): string {
   const parts: string[] = [];
 
@@ -1293,15 +1298,6 @@ function buildAutoPrompt(
 
   if (isCleanVideoMode) {
     parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
-    if (vision) {
-      if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
-      if (vision.visualFeatures.length > 0) parts.push(`key features: ${vision.visualFeatures.slice(0, 4).join(", ")}`);
-      if (vision.shapeDescription) parts.push(`shape: ${vision.shapeDescription}`);
-      if (vision.materialGuess) parts.push(`material: ${vision.materialGuess}`);
-      if (vision.textureDescription) parts.push(`texture: ${vision.textureDescription}`);
-      if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
-      if (vision.orbitalFocusPoint) parts.push(`focal point: ${vision.orbitalFocusPoint}`);
-    }
     parts.push("professional 3-point studio lighting with softboxes, rim light for edge definition, macro detail of surface texture, smooth gimbal camera movement, shallow depth of field, color-graded filmic look, no text overlays, no captions, no marketing elements, pure luxury product cinematography");
     return parts.join(". ");
   }
@@ -1309,13 +1305,6 @@ function buildAutoPrompt(
   parts.push(`Raw smartphone-style unboxing review for ${name}, shot on phone, handheld shaky cam, natural lighting`);
 
   if (vision) {
-    if (vision.productCategory) parts.push(`category: ${vision.productCategory}`);
-    if (vision.visualFeatures.length > 0) parts.push(`key features: ${vision.visualFeatures.slice(0, 4).join(", ")}`);
-    if (vision.marketingPoints.length > 0) parts.push(`marketing angles: ${vision.marketingPoints.slice(0, 2).join(" / ")}`);
-    if (vision.shapeDescription) parts.push(`shape: ${vision.shapeDescription}`);
-    if (vision.materialGuess) parts.push(`material: ${vision.materialGuess}`);
-    if (vision.textureDescription) parts.push(`texture: ${vision.textureDescription}`);
-    if (vision.colorPalette.length > 0) parts.push(`colors: ${vision.colorPalette.slice(0, 4).join(", ")}`);
     const copy = vision.suggestedCopyLayers;
     if (copy.primary || copy.secondary || copy.tertiary) {
       parts.push(`copy layers — hook: "${copy.primary}", benefit: "${copy.secondary}", CTA: "${copy.tertiary}"`);
@@ -1326,7 +1315,7 @@ function buildAutoPrompt(
     parts.push(`caption context: "${captionText.slice(0, 100)}"`);
   }
 
-  parts.push("10-second vertical short-form, raw unboxing aesthetic, handheld phone camera, imperfect framing, natural room lighting, no studio setup, loss-aversion hook, before/after problem-solution contrast, social-proof urgency CTA");
+  parts.push(`${durationSec}-second vertical short-form, raw unboxing aesthetic, handheld phone camera, imperfect framing, natural room lighting, no studio setup, loss-aversion hook, before/after problem-solution contrast, social-proof urgency CTA`);
 
   return parts.join(". ");
 }

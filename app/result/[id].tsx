@@ -611,8 +611,8 @@ export default function ResultScreen() {
     const tdDirect = scan?.template_data as { hook?: string; platformVariants?: Record<string, { hook?: string }> } | undefined;
     const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
     const dp0 = scan?.detected_products?.[0] as { templateData?: { hook?: string }; oneLiner?: string; productName?: string } | undefined;
-    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || '시선 집중! 지금 바로 확인하세요';
-    if (!hookText) return false;
+    const sharedCaption = inlineEdit.captionText || activeHookRef.current || scan?.summary || '시선 집중! 지금 바로 확인하세요';
+    const hookText = platformHook || tdDirect?.hook || sharedCaption || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || sharedCaption;
     try {
       await triggerTTS(scanId, hookText);
       return true;
@@ -674,6 +674,7 @@ export default function ResultScreen() {
     }
 
     // Build prompt: manual mode uses user-edited hook + keywords; auto mode uses AI-generated content
+    const requestedDurationSec = Math.max(Math.round(selectedDurationMs / 1000), 3);
     let videoPromptText: string;
     if (isCleanVideoMode) {
       const cleanParts: string[] = [];
@@ -695,10 +696,10 @@ export default function ResultScreen() {
       const parts: string[] = [];
       if (manualHook.trim()) parts.push(manualHook.trim());
       if (manualKeywords.trim()) parts.push(`Keywords: ${manualKeywords.trim()}`);
-      parts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
+      parts.push(`${requestedDurationSec}s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA`);
       videoPromptText = parts.join('. ');
     } else {
-      const baseFallback = activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || '프리미엄 추천 상품. 15-second vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA.';
+      const baseFallback = activeHookRef.current || scan.summary || scan.one_liner || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary} ${visionData.suggestedCopyLayers.tertiary}` : '') || scan.product_name || `프리미엄 추천 상품. ${requestedDurationSec}-second vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA.`;
       videoPromptText = inlineEdit.aiPrompt.trim()
         ? `${inlineEdit.aiPrompt.trim()}. ${baseFallback}`
         : baseFallback;
@@ -717,12 +718,12 @@ export default function ResultScreen() {
         if (copy.primary) visionParts.push(`hook: "${copy.primary}"`);
         if (copy.secondary) visionParts.push(`benefit: "${copy.secondary}"`);
         if (copy.tertiary) visionParts.push(`CTA: "${copy.tertiary}"`);
-        visionParts.push('15s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA');
+        visionParts.push(`${requestedDurationSec}s vertical short-form with loss-aversion hook, before/after contrast, social-proof urgency CTA`);
         videoPromptText = visionParts.join('. ');
       } else if (scan.product_name) {
-        videoPromptText = `Cinematic 3D commercial for ${scan.product_name}. 15-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.`;
+        videoPromptText = `Cinematic 3D commercial for ${scan.product_name}. ${requestedDurationSec}-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.`;
       } else {
-        videoPromptText = 'Cinematic 3D product commercial. 15-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.';
+        videoPromptText = `Cinematic 3D product commercial. ${requestedDurationSec}-second vertical short-form with loss-aversion hook, before/after problem-solution contrast, and social-proof urgency CTA.`;
       }
     }
 
