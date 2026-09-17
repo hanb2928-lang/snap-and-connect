@@ -43,7 +43,11 @@ export default function SynthesisScreen() {
   const [mood, setMood] = useState<ProductMood>('studio_premium');
   const [productImages, setProductImages] = useState<SourceImage[]>([]);
   const [modelImage, setModelImage] = useState<SourceImage | null>(null);
-  const [genMode, setGenMode] = useState<GenMode>('auto');
+  const [genMode, setGenMode] = useState<GenMode>('auto_3d');
+  const [enableOrbit360, setEnableOrbit360] = useState(true);
+  const [enableCaustics, setEnableCaustics] = useState(true);
+  const [enableVirtualFitting, setEnableVirtualFitting] = useState(true);
+  const [enableFabricPhysics, setEnableFabricPhysics] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [resultImageUrl, setResultImageUrl] = useState<string | null>(null);
@@ -122,10 +126,22 @@ export default function SynthesisScreen() {
       setError('제품 사진을 최소 3컷 등록해주세요.');
       return;
     }
+    if (genMode === 'universal_synthesis' && !modelImage) {
+      setError('AI 범용 합성 모드에서는 모델 사진이 필요합니다.');
+      return;
+    }
     setError(null);
     setIsGenerating(true);
     setResultImageUrl(null);
     setResultVideoUrl(null);
+
+    const modeLabel = genMode === 'auto_3d' ? '입체컷 오토' : genMode === 'universal_synthesis' ? 'AI 범용 합성' : '수동';
+    console.log(`[Synthesis] Generating with mode: ${modeLabel}`, {
+      orbit360: enableOrbit360,
+      caustics: enableCaustics,
+      virtualFitting: enableVirtualFitting,
+      fabricPhysics: enableFabricPhysics,
+    });
 
     setTimeout(() => {
       setIsGenerating(false);
@@ -135,7 +151,7 @@ export default function SynthesisScreen() {
         setResultVideoUrl(productImages[0]?.uri ?? null);
       }
     }, 2000);
-  }, [productImages, outputMode]);
+  }, [productImages, outputMode, genMode, modelImage, enableOrbit360, enableCaustics, enableVirtualFitting, enableFabricPhysics]);
 
   const handleDownload = useCallback(() => {
     setIsExporting(true);
@@ -149,6 +165,42 @@ export default function SynthesisScreen() {
   }, []);
 
   const autoDetectedMood: ProductMood | null = productImages.length >= 3 ? mood : null;
+
+  const modeOptions = genMode === 'auto_3d'
+    ? [
+        {
+          key: 'orbit360',
+          label: '360° 궤도 회전',
+          description: '제품 주위를 회전하는 입체 카메라 무빙',
+          enabled: enableOrbit360,
+          onToggle: () => setEnableOrbit360((v) => !v),
+        },
+        {
+          key: 'caustics',
+          label: '주얼리 광채 강화',
+          description: '보석·금속의 빛 반사와 굴절 효과 극대화',
+          enabled: enableCaustics,
+          onToggle: () => setEnableCaustics((v) => !v),
+        },
+      ]
+    : genMode === 'universal_synthesis'
+    ? [
+        {
+          key: 'virtualFitting',
+          label: '가상 피팅',
+          description: '모델에게 제품을 자연스럽게 착용시키는 합성',
+          enabled: enableVirtualFitting,
+          onToggle: () => setEnableVirtualFitting((v) => !v),
+        },
+        {
+          key: 'fabricPhysics',
+          label: '원단 물리 엔진',
+          description: '의류 원단의 주름과 흐름을 실사 수준으로 시뮬레이션',
+          enabled: enableFabricPhysics,
+          onToggle: () => setEnableFabricPhysics((v) => !v),
+        },
+      ]
+    : [];
 
   return (
     <View style={styles.container}>
@@ -226,6 +278,7 @@ export default function SynthesisScreen() {
           onTtsSyncOffsetChange={setTtsSyncOffset}
           captionText={captionText}
           onCaptionTextChange={setCaptionText}
+          modeOptions={modeOptions}
         />
 
         <PreviewExportTray

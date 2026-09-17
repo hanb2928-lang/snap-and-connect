@@ -1,9 +1,17 @@
 import { memo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ViewStyle } from 'react-native';
-import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2 } from 'lucide-react-native';
+import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
-export type GenMode = 'auto' | 'manual';
+export type GenMode = 'auto_3d' | 'universal_synthesis' | 'manual';
+
+interface ModeOptionToggle {
+  key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}
 
 interface Props {
   mode: GenMode;
@@ -18,6 +26,7 @@ interface Props {
   onTtsSyncOffsetChange: (offset: number) => void;
   captionText: string;
   onCaptionTextChange: (text: string) => void;
+  modeOptions: ModeOptionToggle[];
 }
 
 function GenerationModePanelInner({
@@ -33,6 +42,7 @@ function GenerationModePanelInner({
   onTtsSyncOffsetChange,
   captionText,
   onCaptionTextChange,
+  modeOptions,
 }: Props) {
   const [manualExpanded, setManualExpanded] = useState(false);
 
@@ -47,22 +57,54 @@ function GenerationModePanelInner({
 
       <View style={styles.modeTabs}>
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'auto' && styles.modeTabActive]}
-          onPress={() => onModeChange('auto')}
+          style={[styles.modeTab, mode === 'auto_3d' && styles.modeTabActive]}
+          onPress={() => onModeChange('auto_3d')}
           activeOpacity={0.7}
         >
-          <Zap size={16} color={mode === 'auto' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={[styles.modeTabText, mode === 'auto' && styles.modeTabTextActive]}>AI 자동생성</Text>
+          <Zap size={14} color={mode === 'auto_3d' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+          <Text style={[styles.modeTabText, mode === 'auto_3d' && styles.modeTabTextActive]}>입체컷 오토</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, mode === 'universal_synthesis' && styles.modeTabActive]}
+          onPress={() => onModeChange('universal_synthesis')}
+          activeOpacity={0.7}
+        >
+          <Sparkles size={14} color={mode === 'universal_synthesis' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+          <Text style={[styles.modeTabText, mode === 'universal_synthesis' && styles.modeTabTextActive]}>AI 범용 합성</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeTab, mode === 'manual' && styles.modeTabActive]}
           onPress={() => onModeChange('manual')}
           activeOpacity={0.7}
         >
-          <Wrench size={16} color={mode === 'manual' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={[styles.modeTabText, mode === 'manual' && styles.modeTabTextActive]}>수동 모드</Text>
+          <Wrench size={14} color={mode === 'manual' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
+          <Text style={[styles.modeTabText, mode === 'manual' && styles.modeTabTextActive]}>수동</Text>
         </TouchableOpacity>
       </View>
+
+      {(mode === 'auto_3d' || mode === 'universal_synthesis') && modeOptions.length > 0 && (
+        <View style={styles.modeOptionsPanel}>
+          <Text style={styles.modeOptionsTitle}>
+            {mode === 'auto_3d' ? '입체컷 오토 전용 옵션' : 'AI 범용 합성 전용 옵션'}
+          </Text>
+          {modeOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={styles.optionRow}
+              onPress={opt.onToggle}
+              activeOpacity={0.7}
+            >
+              <View style={styles.optionTextWrap}>
+                <Text style={styles.optionLabel}>{opt.label}</Text>
+                <Text style={styles.optionDesc}>{opt.description}</Text>
+              </View>
+              <View style={[styles.toggle, opt.enabled && styles.toggleActive]}>
+                <View style={[styles.toggleKnob, opt.enabled && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {mode === 'manual' && (
         <View style={styles.manualPanel}>
@@ -163,7 +205,7 @@ function GenerationModePanelInner({
           <Zap size={20} color="#fff" strokeWidth={2.5} />
         )}
         <Text style={styles.generateBtnText}>
-          {isGenerating ? '생성 중...' : mode === 'auto' ? '원클릭 AI 자동생성' : '수동 설정으로 생성'}
+          {isGenerating ? '생성 중...' : mode === 'auto_3d' ? '입체컷 자동 생성' : mode === 'universal_synthesis' ? 'AI 범용 합성 생성' : '수동 설정으로 생성'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -339,5 +381,60 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
+  },
+  modeOptionsPanel: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm,
+    gap: 6,
+  },
+  modeOptionsTitle: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.textDim,
+    marginBottom: 2,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  optionTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  optionLabel: {
+    fontSize: 13,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.dark.text,
+  },
+  optionDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  toggle: {
+    width: 36,
+    height: 20,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleActive: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  toggleKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.textDim,
+    alignSelf: 'flex-start',
+  },
+  toggleKnobActive: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
   },
 });
