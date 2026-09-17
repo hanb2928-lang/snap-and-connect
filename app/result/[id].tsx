@@ -352,6 +352,36 @@ const TARGET_TO_UPLOAD_PLATFORM: Partial<Record<TargetPlatformKey, string>> = {
   smartstore: 'naver_blog',
 };
 
+const VIDEO_UNKNOWN_PATTERNS = [
+  /알\s*수\s*없/gi,
+  /알수없/gi,
+  /unknown/gi,
+  /미확인/gi,
+  /미상/gi,
+  /unidentified/gi,
+  /not\s*identified/gi,
+];
+
+function sanitizeVideoProductName(name: string | undefined): string {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '프리미엄 추천 상품';
+  for (const pattern of VIDEO_UNKNOWN_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return '프리미엄 추천 상품';
+    }
+  }
+  return trimmed;
+}
+
+function sanitizeVideoText(text: string | undefined | null): string {
+  if (!text || !text.trim()) return '';
+  let result = text;
+  for (const pattern of VIDEO_UNKNOWN_PATTERNS) {
+    result = result.replace(pattern, '시선 집중! 지금 바로 확인하세요');
+  }
+  return result;
+}
+
 
 function RotatingLoader({ size, color, strokeWidth = 2 }: { size: number; color: string; strokeWidth?: number }) {
   const rotate = useRef(new Animated.Value(0)).current;
@@ -612,7 +642,7 @@ export default function ResultScreen() {
     const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
     const dp0 = scan?.detected_products?.[0] as { templateData?: { hook?: string }; oneLiner?: string; productName?: string } | undefined;
     const sharedCaption = inlineEdit.captionText || activeHookRef.current || scan?.summary || '시선 집중! 지금 바로 확인하세요';
-    const hookText = platformHook || tdDirect?.hook || sharedCaption || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || sharedCaption;
+    const hookText = sanitizeVideoText(platformHook || tdDirect?.hook || sharedCaption || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || sharedCaption) || sharedCaption;
     try {
       await triggerTTS(scanId, hookText);
       return true;
@@ -750,11 +780,11 @@ export default function ResultScreen() {
         {
           durationSec: requestedDurationSec,
           aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
-          productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
+          productName: sanitizeVideoProductName(scan.product_name || activeProductName || '프리미엄 추천 상품'),
           scanId: scan.id,
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
-          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '시선 집중! 지금 바로 확인하세요',
+          captionText: sanitizeVideoText(inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '시선 집중! 지금 바로 확인하세요'),
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
@@ -836,11 +866,11 @@ export default function ResultScreen() {
           upgradeVideoToHd(scan.id, submitResult.taskId, videoPromptText, {
             durationSec: requestedDurationSec,
             aspectRatio: (targetMediaType === 'video' ? '9:16' : imageAspectRatio) as '9:16' | '16:9' | '1:1' | '4:5',
-            productName: scan.product_name || activeProductName || '프리미엄 추천 상품',
+            productName: sanitizeVideoProductName(scan.product_name || activeProductName || '프리미엄 추천 상품'),
             scanId: scan.id,
             variationSeed: narrativeVariation + 1,
             bgmMood: inlineEdit.bgmMood,
-            captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '시선 집중! 지금 바로 확인하세요',
+            captionText: sanitizeVideoText(inlineEdit.captionText || activeHookRef.current || scan.summary || '시선 집중! 지금 바로 확인하세요'),
             platform: targetPlatform,
             hookCategory: inlineEdit.hookEffect || 'curiosity',
             productVision: visionData,
@@ -932,8 +962,8 @@ export default function ResultScreen() {
     const presetConfig = stylePresetMap[stylePreset] ?? stylePresetMap['clean-studio'];
     const quality = hdUpscale ? 'hd' : presetConfig.quality;
 
-    const basePrompt = inlineEdit.aiPrompt.trim() || activeHookRef.current || scan.summary || scan.product_name || '프리미엄 상품 상업용 이미지';
-    const productName = scan.product_name || '프리미엄 추천 상품';
+    const basePrompt = sanitizeVideoText(inlineEdit.aiPrompt.trim() || activeHookRef.current || scan.summary || scan.product_name) || '프리미엄 상품 상업용 이미지';
+    const productName = sanitizeVideoProductName(scan.product_name || '프리미엄 추천 상품');
 
     const seeds = [101, 202, 303, 404, 505];
 

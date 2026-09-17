@@ -21,6 +21,7 @@ export interface ManualSettingsPanelProps {
   onMovementChange: (val: string) => void;
   transitionEffect: string;
   onTransitionChange: (val: string) => void;
+  disabled?: boolean;
 }
 
 const CAMERA_MOVEMENTS = [
@@ -49,15 +50,17 @@ export function ManualSettingsPanel({
   onMovementChange,
   transitionEffect,
   onTransitionChange,
+  disabled = false,
 }: ManualSettingsPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        style={styles.header}
+        style={[styles.header, disabled && styles.headerDisabled]}
         onPress={() => setExpanded((v) => !v)}
         activeOpacity={0.7}
+        disabled={disabled}
       >
         <View style={styles.headerLeft}>
           <View style={styles.headerIconWrap}>
@@ -81,9 +84,10 @@ export function ManualSettingsPanel({
               <Text style={styles.hint}>최종 결과물 선명도·해상도 향상</Text>
             </View>
             <TouchableOpacity
-              style={[styles.toggleSwitch, hdUpscale && styles.toggleSwitchActive]}
+              style={[styles.toggleSwitch, hdUpscale && styles.toggleSwitchActive, disabled && styles.controlDisabled]}
               onPress={() => onHdToggleChange(!hdUpscale)}
               activeOpacity={0.7}
+              disabled={disabled}
             >
               <View style={[styles.toggleKnob, hdUpscale && styles.toggleKnobActive]} />
             </TouchableOpacity>
@@ -99,9 +103,10 @@ export function ManualSettingsPanel({
               {CAMERA_MOVEMENTS.map((motion) => (
                 <TouchableOpacity
                   key={motion}
-                  style={[styles.chipPill, cameraMovement === motion && styles.chipPillActive]}
+                  style={[styles.chipPill, cameraMovement === motion && styles.chipPillActive, disabled && styles.controlDisabled]}
                   onPress={() => onMovementChange(motion)}
                   activeOpacity={0.7}
+                  disabled={disabled}
                 >
                   <Text style={[styles.chipPillText, cameraMovement === motion && styles.chipPillTextActive]}>
                     {motion}
@@ -121,9 +126,10 @@ export function ManualSettingsPanel({
               {TRANSITION_EFFECTS.map((eff) => (
                 <TouchableOpacity
                   key={eff}
-                  style={[styles.chipPill, transitionEffect === eff && styles.chipPillActive]}
+                  style={[styles.chipPill, transitionEffect === eff && styles.chipPillActive, disabled && styles.controlDisabled]}
                   onPress={() => onTransitionChange(eff)}
                   activeOpacity={0.7}
+                  disabled={disabled}
                 >
                   <Text style={[styles.chipPillText, transitionEffect === eff && styles.chipPillTextActive]}>
                     {eff}
@@ -251,5 +257,11 @@ const styles = StyleSheet.create({
   chipPillTextActive: {
     color: '#fff',
     fontFamily: theme.typography.fontFamily.semiBold,
+  },
+  headerDisabled: {
+    opacity: 0.5,
+  },
+  controlDisabled: {
+    opacity: 0.5,
   },
 });

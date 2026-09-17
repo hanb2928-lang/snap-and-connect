@@ -81,6 +81,38 @@ const SERVER_POLL_SELF_INVOKE_TIMEOUT_MS = 15000; // AbortController timeout for
 const JITTER_MAX_MS = 2000; // Random jitter added to each backoff delay to desynchronize concurrent polls
 const VIDEO_DAILY_LIMIT = 10; // Max AI video generations per IP per day
 
+const VIDEO_UNKNOWN_PATTERNS = [
+  /알\s*수\s*없/gi,
+  /알수없/gi,
+  /unknown/gi,
+  /미확인/gi,
+  /미상/gi,
+  /unidentified/gi,
+  /not\s*identified/gi,
+];
+const VIDEO_FALLBACK_PRODUCT_NAME = "지금 가장 핫한 추천 아이템";
+const VIDEO_FALLBACK_CAPTION = "시선 집중! 지금 바로 확인하세요";
+
+function sanitizeVideoProductName(name: string | undefined): string {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return VIDEO_FALLBACK_PRODUCT_NAME;
+  for (const pattern of VIDEO_UNKNOWN_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return VIDEO_FALLBACK_PRODUCT_NAME;
+    }
+  }
+  return trimmed;
+}
+
+function sanitizeVideoText(text: string | undefined): string {
+  if (!text || !text.trim()) return "";
+  let result = text;
+  for (const pattern of VIDEO_UNKNOWN_PATTERNS) {
+    result = result.replace(pattern, VIDEO_FALLBACK_CAPTION);
+  }
+  return result;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -220,15 +252,18 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
   const requestedDuration = Math.min(Math.max(Math.round(body.durationSec ?? 5), 2), 10);
   const durationSec = isDraft ? Math.min(requestedDuration, 3) : requestedDuration;
 
+  const sanitizedProductName = sanitizeVideoProductName(body.productName);
+  const sanitizedCaptionText = sanitizeVideoText(body.captionText);
+
   let effectivePrompt = body.prompt ?? "";
   if (effectivePrompt.trim().length === 0) {
-    effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText, body.isCleanVideoMode === true, requestedDuration);
+    effectivePrompt = buildAutoPrompt(sanitizedProductName, body.productVision, sanitizedCaptionText, body.isCleanVideoMode === true, requestedDuration);
   }
-  const resolvedProductName = body.productName || body.productVision?.productName || "";
+  const resolvedProductName = sanitizedProductName || body.productVision?.productName || "";
   if (!resolvedProductName) {
     console.log("[generate-video] Fallback guard: productName was empty, using ecommerce fallback copy '지금 가장 핫한 추천 아이템'");
   }
-  const resolvedCaption = body.captionText && body.captionText.trim() ? body.captionText : "";
+  const resolvedCaption = sanitizedCaptionText && sanitizedCaptionText.trim() ? sanitizedCaptionText : "";
   if (!resolvedCaption) {
     console.log("[generate-video] Fallback guard: captionText was empty, frontend will use '시선 집중! 지금 바로 확인하세요'");
   }
@@ -243,11 +278,11 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
 
   const runwayPrompt = buildCompactRunwayPrompt({
     userPrompt: effectivePrompt,
-    productName: body.productName,
+    productName: sanitizedProductName,
     aspectRatio,
     variationSeed,
     bgmMood: body.bgmMood,
-    captionText: body.captionText,
+    captionText: sanitizedCaptionText,
     platform: body.platform ?? "shorts",
     hookCategory: body.hookCategory ?? "curiosity",
     productVision: body.productVision ?? null,
@@ -1320,7 +1355,7 @@ function buildAutoPrompt(
 ): string {
   const parts: string[] = [];
 
-  const name = productName || vision?.productName || "지금 가장 핫한 추천 아이템";
+  const name = sanitizeVideoProductName(productName) || sanitizeVideoProductName(vision?.productName) || VIDEO_FALLBACK_PRODUCT_NAME;
 
   if (isCleanVideoMode) {
     parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
@@ -1653,7 +1688,7 @@ function buildModeRenderingTokens(
 }
 
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
-  const name = p.productName || p.productVision?.productName || "지금 가장 핫한 추천 아이템";
+  const name = sanitizeVideoProductName(p.productName) || sanitizeVideoProductName(p.productVision?.productName) || VIDEO_FALLBACK_PRODUCT_NAME;
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
 
   // Prompt strength: 1-10 scale, default 7. Higher = more literal prompt adherence.

@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import type { FlatList as FlatListType } from 'react-native';
-import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3, Camera } from 'lucide-react-native';
+import { FolderOpen, Trash2, Download, Film, Image as ImageIcon, X, Calendar, Youtube, Instagram, FileText, Smartphone, Share2, CircleCheck as CheckCircle2, Clock, CircleDashed, Link2, Crop, Rocket, TrendingUp, Repeat2, ListFilter as Filter, ArrowDownUp, Music2, Sparkles, ArrowRight, Pin, Copy, Check, Zap, Lightbulb, Users, Volume2, Type, Flame, ChevronDown, ChevronUp, Hash, QrCode, Store, Settings, ChartBar as BarChart3 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -515,20 +515,9 @@ export default function AssetsScreen() {
 
       {assets.length === 0 ? (
         <View style={styles.emptyState}>
-          <FolderOpen size={56} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
+          <FolderOpen size={48} color={theme.colors.dark.textFaint} strokeWidth={1.5} />
           <Text style={styles.emptyTitle}>{t('assets.empty')}</Text>
           <Text style={styles.emptyText}>{t('assets.emptyDesc')}</Text>
-          <Text style={styles.emptyGuide}>
-            아직 저장된 제작물이 없습니다.{'\n'}카메라를 눌러 첫 숏폼을 만들어보세요!
-          </Text>
-          <TouchableOpacity
-            style={styles.emptyCtaBtn}
-            onPress={() => router.push('/(tabs)/index' as never)}
-            activeOpacity={0.8}
-          >
-            <Camera size={18} color="#fff" strokeWidth={2} />
-            <Text style={styles.emptyCtaText}>카메라로 이동</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -998,12 +987,9 @@ const styles = StyleSheet.create({
   sortBtnActive: { borderColor: theme.colors.primary[400], backgroundColor: theme.colors.primary[500] + '12' },
   sortBtnText: { fontSize: 11, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textFaint },
   sortBtnTextActive: { color: theme.colors.primary[300], fontFamily: theme.typography.fontFamily.semiBold },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.xl, gap: theme.spacing.md },
-  emptyTitle: { fontSize: theme.typography.heading, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.text, marginTop: theme.spacing.md },
-  emptyText: { fontSize: theme.typography.body, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, textAlign: 'center', lineHeight: 24 },
-  emptyGuide: { fontSize: 14, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.text, textAlign: 'center', lineHeight: 22, marginTop: theme.spacing.sm },
-  emptyCtaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 28, borderRadius: theme.radius.lg, backgroundColor: theme.colors.primary[500], marginTop: theme.spacing.md },
-  emptyCtaText: { fontSize: 15, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.xl, gap: theme.spacing.sm },
+  emptyTitle: { fontSize: theme.typography.heading, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.dark.text, marginTop: theme.spacing.sm },
+  emptyText: { fontSize: theme.typography.body, fontFamily: theme.typography.fontFamily.regular, color: theme.colors.dark.textDim, textAlign: 'center', lineHeight: 22 },
   listContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
   columnWrapper: { gap: CARD_GAP, marginBottom: CARD_GAP },
   card: { width: CARD_WIDTH, backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.lg, overflow: 'hidden', ...theme.shadows.card },

@@ -173,11 +173,12 @@ function GenerationModePanelInner({
       </View>
 
       {mode === 'manual' && (
-        <View style={styles.manualPanel}>
+        <View style={[styles.manualPanel, isGen && styles.modeCardDisabled]}>
           <TouchableOpacity
             style={styles.manualToggle}
             onPress={() => setManualExpanded((v) => !v)}
             activeOpacity={0.7}
+            disabled={isGen}
           >
             <Text style={styles.manualToggleText}>상세 편집 패널</Text>
             {manualExpanded ? (
@@ -192,13 +193,14 @@ function GenerationModePanelInner({
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>프롬프트</Text>
                 <TextInput
-                  style={styles.promptInput}
+                  style={[styles.promptInput, isGen && styles.inputDisabled]}
                   value={manualPrompt}
                   onChangeText={onManualPromptChange}
                   placeholder="AI에게 전달할 제작 지시사항을 입력하세요"
                   placeholderTextColor={theme.colors.dark.textFaint}
                   multiline
                   numberOfLines={3}
+                  editable={!isGen}
                 />
               </View>
 
@@ -215,6 +217,7 @@ function GenerationModePanelInner({
                       style={[styles.sliderTick, cameraSpeed === val && styles.sliderTickActive]}
                       onPress={() => onCameraSpeedChange(val)}
                       activeOpacity={0.7}
+                      disabled={isGen}
                     >
                       <Text style={styles.sliderTickLabel}>{val.toFixed(1)}</Text>
                     </TouchableOpacity>
@@ -235,6 +238,7 @@ function GenerationModePanelInner({
                       style={[styles.sliderTick, ttsSyncOffset === val && styles.sliderTickActive]}
                       onPress={() => onTtsSyncOffsetChange(val)}
                       activeOpacity={0.7}
+                      disabled={isGen}
                     >
                       <Text style={styles.sliderTickLabel}>{val > 0 ? `+${val}` : val}</Text>
                     </TouchableOpacity>
@@ -245,13 +249,14 @@ function GenerationModePanelInner({
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>자막 텍스트</Text>
                 <TextInput
-                  style={styles.captionInput}
+                  style={[styles.captionInput, isGen && styles.inputDisabled]}
                   value={captionText}
                   onChangeText={onCaptionTextChange}
                   placeholder="화면에 표시할 자막"
                   placeholderTextColor={theme.colors.dark.textFaint}
                   multiline
                   numberOfLines={2}
+                  editable={!isGen}
                 />
               </View>
             </View>
@@ -471,6 +476,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.regular,
     color: theme.colors.dark.text,
     minHeight: 40,
+  },
+  inputDisabled: {
+    opacity: 0.5,
   },
   sliderHeader: {
     flexDirection: 'row',

@@ -695,19 +695,28 @@ const UNKNOWN_PRODUCT_NAMES = new Set([
 const FALLBACK_PRODUCT_NAME = "지금 가장 핫한 추천 아이템";
 const FALLBACK_COMMERCE_PHRASE = "시선 집중! 지금 바로 확인하세요";
 
+const UNKNOWN_PATTERNS = [
+  /알\s*수\s*없/gi,
+  /알수없/gi,
+  /unknown/gi,
+  /미확인/gi,
+  /미상/gi,
+  /unidentified/gi,
+  /not\s*identified/gi,
+];
+
 function normalizeProductName(raw: Record<string, unknown>): string {
   const name = String(raw.productName || raw.product_name || "").trim();
   if (UNKNOWN_PRODUCT_NAMES.has(name.toLowerCase())) {
     return FALLBACK_PRODUCT_NAME;
   }
+  for (const pattern of UNKNOWN_PATTERNS) {
+    if (pattern.test(name)) {
+      return FALLBACK_PRODUCT_NAME;
+    }
+  }
   return name;
 }
-
-const UNKNOWN_PATTERNS = [
-  /알\s*수\s*없음/gi,
-  /알수없음/gi,
-  /unknown/gi,
-];
 
 function sanitizeText(value: string): string {
   if (!value) return value;
