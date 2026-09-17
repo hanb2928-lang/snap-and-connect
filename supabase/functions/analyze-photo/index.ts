@@ -366,7 +366,7 @@ async function analyzeWithOpenAI(
     toneDirective;
 
   const contextHint = productContext?.productName || productContext?.description
-    ? `\n\n사용자가 제공한 제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "알 수 없음"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "알 수 없음"}\n- 브랜드: ${productContext.brand || ""}\n- 플랫폼: ${productContext.platform || ""}\n이 정보를 사진 분석과 마케팅 문구 생성에 적극 활용해. 사진의 상품과 링크 정보가 일치하면 정확한 상품명과 가격을 반영하고, 링크의 핵심 셀링 포인트를 후킹과 caption에 자연스럽게 녹여내.`
+    ? `\n\n사용자가 제공한 제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "(추출되지 않음 — 사진에서 직접 식별)"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "(가격 미확인)"}\n- 브랜드: ${productContext.brand || ""}\n- 플랫폼: ${productContext.platform || ""}\n이 정보를 사진 분석과 마케팅 문구 생성에 적극 활용해. 사진의 상품과 링크 정보가 일치하면 정확한 상품명과 가격을 반영하고, 링크의 핵심 셀링 포인트를 후킹과 caption에 자연스럽게 녹여내.`
     : "";
 
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
@@ -451,7 +451,7 @@ async function analyzeMultiShotWithOpenAI(
   const userContent: Array<{ type: string; text?: string; image_url?: { url: string; detail: string } }> = [
     {
       type: "text",
-      text: `These ${imageDataUrls.length} photos show the SAME product from different angles. Analyze all of them together to identify the product comprehensively, then generate viral marketing copy, hashtags, and short-form template data for this single product.` + (productContext?.productName || productContext?.description ? `\n\n제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "알 수 없음"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "알 수 없음"}\n이 정보를 마케팅 문구에 적극 반영해.` : ""),
+      text: `These ${imageDataUrls.length} photos show the SAME product from different angles. Analyze all of them together to identify the product comprehensively, then generate viral marketing copy, hashtags, and short-form template data for this single product.` + (productContext?.productName || productContext?.description ? `\n\n제휴 링크에서 추출된 상품 정보:\n- 상품명: ${productContext.productName || "(추출되지 않음 — 사진에서 직접 식별)"}\n- 설명: ${productContext.description || ""}\n- 가격: ${productContext.price || "(가격 미확인)"}\n이 정보를 마케팅 문구에 적극 반영해.` : ""),
     },
     ...imageDataUrls.map((url) => ({
       type: "image_url",
@@ -682,8 +682,28 @@ function normalizePlatformVariants(
   return result;
 }
 
+const UNKNOWN_PRODUCT_NAMES = new Set([
+  "",
+  "알 수 없음",
+  "알수없음",
+  "unknown",
+  "unknown product",
+  "identified product",
+  "product captured",
+]);
+
+const FALLBACK_PRODUCT_NAME = "지금 가장 핫한 추천 아이템";
+
+function normalizeProductName(raw: Record<string, unknown>): string {
+  const name = String(raw.productName || raw.product_name || "").trim();
+  if (UNKNOWN_PRODUCT_NAMES.has(name.toLowerCase())) {
+    return FALLBACK_PRODUCT_NAME;
+  }
+  return name;
+}
+
 function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
-  const productName = String(raw.productName || raw.product_name || "");
+  const productName = normalizeProductName(raw);
   const productCategory = String(raw.productCategory || raw.product_category || "product");
   const priceEstimate = String(raw.priceEstimate || raw.price_estimate || "");
   const oneLiner = String(raw.oneLiner || raw.one_liner || "");
@@ -737,7 +757,7 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
       }))
     : [{
         id: "product-1",
-        productName,
+        productName: normalizeProductName(raw),
         productCategory,
         priceEstimate,
         oneLiner,

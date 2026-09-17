@@ -176,8 +176,9 @@ Respond in Korean for all text fields except colorPalette and materialGuess.`;
       }
     }
 
+    const rawCopyLayers = parsed.suggestedCopyLayers ?? { primary: "", secondary: "", tertiary: "" };
     return {
-      productName: parsed.productName ?? "",
+      productName: parsed.productName || "지금 가장 핫한 추천 아이템",
       productCategory: parsed.productCategory ?? "",
       visualFeatures: parsed.visualFeatures ?? [],
       marketingPoints: parsed.marketingPoints ?? [],
@@ -188,7 +189,11 @@ Respond in Korean for all text fields except colorPalette and materialGuess.`;
       keyAngles: parsed.keyAngles ?? [],
       orbitalFocusPoint: parsed.orbitalFocusPoint ?? "",
       parallaxDepthLayers: parsed.parallaxDepthLayers ?? [],
-      suggestedCopyLayers: parsed.suggestedCopyLayers ?? { primary: "", secondary: "", tertiary: "" },
+      suggestedCopyLayers: {
+        primary: rawCopyLayers.primary || "시선 집중! 지금 바로 확인하세요",
+        secondary: rawCopyLayers.secondary || "왜 다들 이걸 찾는지 알겠더라고요",
+        tertiary: rawCopyLayers.tertiary || "지금 확인하고 놓치지 마세요",
+      },
     };
   } finally {
     clearTimeout(timeoutId);

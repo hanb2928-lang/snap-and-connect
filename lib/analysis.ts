@@ -159,13 +159,33 @@ export async function analyzeMultiShot(
   return data;
 }
 
+const UNKNOWN_PRODUCT_NAMES = new Set([
+  '',
+  '알 수 없음',
+  '알수없음',
+  'unknown',
+  'unknown product',
+  'identified product',
+  'product captured',
+]);
+const FALLBACK_PRODUCT_NAME = '지금 가장 핫한 추천 아이템';
+
+function normalizeProductName(name: string | undefined): string {
+  const trimmed = (name || '').trim();
+  if (UNKNOWN_PRODUCT_NAMES.has(trimmed.toLowerCase())) {
+    return FALLBACK_PRODUCT_NAME;
+  }
+  return trimmed;
+}
+
 function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {
+  const productName = normalizeProductName(data.productName as string);
   return {
     title: (data.title as string) || 'Product Captured',
     summary: (data.summary as string) || '',
     contacts: Array.isArray(data.contacts) ? data.contacts : [],
     tags: Array.isArray(data.tags) ? data.tags : [],
-    productName: (data.productName as string) || '',
+    productName,
     productCategory: (data.productCategory as string) || 'product',
     priceEstimate: (data.priceEstimate as string) || '',
     oneLiner: (data.oneLiner as string) || '',

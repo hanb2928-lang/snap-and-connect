@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { ProductVisionResult } from './productVision';
 import { isOnline } from '@/hooks/useNetworkStatus';
 import { getMultiAngleCache, setMultiAngleCache } from './aiCache';
+import { stepToProgress } from './videoGenSteps';
 
 export type VideoGenPhase = 'submitting' | 'generating' | 'completed' | 'error' | 'hd_upgrading' | 'hd_completed';
 
@@ -356,6 +357,21 @@ interface VideoJobRow {
   hd_task_id?: string | null;
 }
 
+const STEP_LABELS: Record<string, string> = {
+  idle: '대기 중',
+  analyzing: '다각도 컷 분석 중',
+  hooking: '훅 문구 추출 중',
+  planning: '편집 플랜 구성 중',
+  submitting: 'AI 렌더링 요청 중',
+  rendering: '영상 렌더링 중',
+  finalizing: '최종 자막 합성 중',
+  pending: '대기 중',
+  processing: '영상 렌더링 중',
+  running: '영상 렌더링 중',
+  throttled: '렌더링 대기 중 (서버 혼잡)',
+  queued: '큐 대기 중',
+};
+
 /**
  * Subscribe to the video_jobs table via Supabase Realtime and resolve when the
  * job transitions to SUCCESS or FAILED. A low-frequency DB poll runs in parallel
@@ -413,6 +429,16 @@ function waitForVideoCompletion(
         report('error', 0, msg);
         finish(() => reject(new Error(msg)));
         return true;
+      }
+      // Non-terminal row: map the backend step to a progress value
+      // so the UI reflects actual pipeline progress instead of a timer.
+      const mapped = stepToProgress(row.step);
+      if (mapped != null && mapped > 0) {
+        const phase: VideoGenPhase = mapped >= 1.0 ? 'completed' : mapped >= 0.35 ? 'generating' : 'submitting';
+        const stepLabel = row.step
+          ? STEP_LABELS[row.step.toLowerCase()] ?? row.step
+          : '처리 중';
+        report(phase, mapped, `${stepLabel}...`);
       }
       return false;
     };

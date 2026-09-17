@@ -2159,15 +2159,19 @@ export default function ResultScreen() {
   const copyOverlaysForPreview: CopyOverlayTimeline[] | null = useMemo(() => {
     if (isCleanVideoMode) return null;
     if (productVision) {
+      const layers = productVision.suggestedCopyLayers;
+      const primary = layers?.primary || activeHook || activeOneLiner || scan?.summary || '시선 집중! 지금 바로 확인하세요';
+      const secondary = layers?.secondary || scan?.one_liner || '왜 다들 이걸 찾는지 알겠더라고요';
+      const tertiary = layers?.tertiary || (shortUrl ? `자세히 보기 ${shortUrl}` : '지금 확인하고 놓치 마세요');
       return buildCopyOverlayTimeline({
-        title: productVision.suggestedCopyLayers.primary,
-        hookCopy: productVision.suggestedCopyLayers.primary,
-        featureCopy: productVision.visualFeatures.slice(0, 3).join(' · '),
-        ctaCopy: productVision.suggestedCopyLayers.tertiary,
-        subtitleCopy: productVision.suggestedCopyLayers.secondary,
+        title: primary,
+        hookCopy: primary,
+        featureCopy: productVision.visualFeatures.slice(0, 3).join(' · ') || secondary,
+        ctaCopy: tertiary,
+        subtitleCopy: secondary,
       });
     }
-    const hookText = activeHook || activeOneLiner || scan?.summary || scan?.product_name || scan?.one_liner || '';
+    const hookText = activeHook || activeOneLiner || scan?.summary || scan?.product_name || scan?.one_liner || '시선 집중! 지금 바로 확인하세요';
     const ctaText = shortUrl ? `자세히 보기 ${shortUrl}` : '지금 확인하세요';
     const featureText = activeCaption || inlineEdit.captionText || scan?.one_liner || '';
     if (!hookText && !featureText) return null;
@@ -3053,19 +3057,23 @@ export default function ResultScreen() {
         </View>
         <View style={styles.dualActionRow}>
           <TouchableOpacity
-            style={[styles.dualActionBtn, styles.dualActionPrimary, ((targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) || !scan) && styles.dualActionDisabled]}
+            style={[styles.dualActionBtn, styles.dualActionPrimary, ((targetMediaType === 'video' ? (isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') : isGeneratingImage) || !scan) && styles.dualActionDisabled]}
             onPress={() => targetMediaType === 'video' ? handleAiVideoGenerate() : handleAiImageGenerate()}
-            disabled={(targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) || !scan}
+            disabled={(targetMediaType === 'video' ? (isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') : isGeneratingImage) || !scan}
             activeOpacity={0.7}
           >
-            {(targetMediaType === 'video' ? isGeneratingVideo : isGeneratingImage) ? (
+            {(targetMediaType === 'video' ? (isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') : isGeneratingImage) ? (
               <RotatingLoader size={18} color="#fff" />
             ) : (
               <ZapIcon size={18} color="#fff" strokeWidth={2} />
             )}
             <Text style={styles.dualActionBtnText} numberOfLines={1}>
               {targetMediaType === 'video'
-                ? (isGeneratingVideo ? (videoGenProgress?.phase === 'submitting' ? '요청 중...' : '렌더링 중...') : 'AI 자동 생성')
+                ? ((isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading')
+                  ? (videoGenProgress?.phase === 'submitting' ? '요청 중...'
+                    : videoStage === 'hd_upgrading' ? '고화질 업그레이드 중...'
+                    : generatedVideoUrl ? '고화질 대기 중...' : '렌더링 중...')
+                  : 'AI 자동 생성')
                 : (isGeneratingImage ? (imageGenProgress ? `${Math.round(imageGenProgress.progress * 100)}% 생성 중...` : '5장 생성 중...') : 'AI 자동 생성 (5장)')}
             </Text>
           </TouchableOpacity>
@@ -3722,18 +3730,20 @@ export default function ResultScreen() {
             textAlignVertical="top"
           />
           <TouchableOpacity
-            style={[styles.promptGenBtn, (isGeneratingVideo || !scan) && styles.dualActionDisabled]}
+            style={[styles.promptGenBtn, ((isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') || !scan) && styles.dualActionDisabled]}
             onPress={() => handleAiVideoGenerate()}
-            disabled={isGeneratingVideo || !scan}
+            disabled={(isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') || !scan}
             activeOpacity={0.7}
           >
-            {isGeneratingVideo ? (
+            {(isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading') ? (
               <RotatingLoader size={18} color="#fff" />
             ) : (
               <SparklesIcon size={18} color="#fff" strokeWidth={2} />
             )}
             <Text style={styles.promptGenBtnText} numberOfLines={1}>
-              {isGeneratingVideo ? 'AI 영상 생성 중...' : 'AI 자동 생성'}
+              {(isGeneratingVideo || videoStage === 'drafting' || videoStage === 'hd_upgrading')
+                ? (videoStage === 'hd_upgrading' ? '고화질 업그레이드 중...' : 'AI 영상 생성 중...')
+                : 'AI 자동 생성'}
             </Text>
           </TouchableOpacity>
           </>

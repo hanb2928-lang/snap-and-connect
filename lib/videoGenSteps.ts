@@ -10,6 +10,44 @@ export interface VideoGenStep {
   status: VideoGenStepStatus;
 }
 
+/**
+ * Maps a backend video_jobs.step value (or Runway API status) to a
+ * frontend progress value that aligns with the 6-step UI thresholds.
+ *
+ * Backend step values are written by the generate-video edge function
+ * and the server-poll path. When a Realtime event arrives with a
+ * non-terminal step, this mapping lets the progress bar jump to the
+ * correct position instead of relying on the time-based fallback.
+ */
+const STEP_TO_PROGRESS: Record<string, number> = {
+  // Backend step values (written to video_jobs.step)
+  idle: 0.05,
+  analyzing: 0.05,
+  hooking: 0.15,
+  planning: 0.25,
+  submitting: 0.35,
+  rendering: 0.50,
+  finalizing: 0.95,
+  completed: 1.0,
+  failed: 0,
+
+  // Runway API status values (from pollRunwayTask) — lowercased
+  pending: 0.35,
+  processing: 0.50,
+  running: 0.50,
+  throttled: 0.45,
+  queued: 0.38,
+  success: 1.0,
+  succeeded: 1.0,
+  canceled: 0,
+};
+
+export function stepToProgress(step: string | null | undefined): number | null {
+  if (!step) return null;
+  const key = step.toLowerCase();
+  return STEP_TO_PROGRESS[key] ?? null;
+}
+
 export const VIDEO_GEN_STEPS: readonly Omit<VideoGenStep, 'status'>[] = [
   {
     id: 'analyze',

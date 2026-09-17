@@ -636,7 +636,12 @@ async function handleServerPoll(body: GenerateVideoRequest, runwayKey: string): 
     );
   }
 
-  // Still PROCESSING — schedule the next poll via self-reinvocation
+  // Still PROCESSING — update the step field so the frontend's
+  // Realtime subscription can map it to the correct UI progress step.
+  const runwayStep = RUNWAY_STATUS_TO_STEP[status.status] ?? "rendering";
+  await updateVideoJobStep(scanId, internalJobId, runwayStep);
+
+  // Schedule the next poll via self-reinvocation
   // Exponential backoff with full jitter to desynchronize concurrent jobs
   const baseDelay = Math.min(SERVER_POLL_INITIAL_DELAY_MS * Math.pow(1.5, attempt), SERVER_POLL_MAX_DELAY_MS);
   const jitter = Math.random() * JITTER_MAX_MS;
@@ -967,6 +972,36 @@ async function markVideoJobFailed(scanId: string, taskId: string, errMsg: string
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ status: "FAILED", step: "failed", error_message: errMsg.slice(0, 500) }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+  } catch {
+    // non-fatal
+  }
+}
+
+const RUNWAY_STATUS_TO_STEP: Record<string, string> = {
+  PENDING: "submitting",
+  PROCESSING: "rendering",
+  RUNNING: "rendering",
+  THROTTLED: "rendering",
+  QUEUED: "submitting",
+};
+
+async function updateVideoJobStep(scanId: string, taskId: string, step: string): Promise<void> {
+  if (!supabaseUrl || !serviceRoleKey) return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${supabaseUrl}/rest/v1/video_jobs?scan_id=eq.${scanId}&task_id=eq.${taskId}&status=not.in.(SUCCESS,FAILED)`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ step }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
