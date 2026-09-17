@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 test('사용자 5각도 촬영부터 결과 페이지 폴링 및 HD 토글 제어까지의 핵심 플로우', async ({ page }) => {
   // 1. 메인 앱 진입
   await page.goto('/');
-  // 2. 카메라 뷰파인더 열기 및 캡처 시뮬레이션 (모바일 뷰포트 고정)
+  // 2. 모드 카드 클릭으로 캡처 시작
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByText('카메라 시작')).toBeVisible();
+  await expect(page.getByText('입체컷 오토')).toBeVisible();
   // 3. 멀티파트 업로드 및 큐 진입 확인
-  await page.getByTestId('start-capture-btn').click();
+  await page.getByText('입체컷 오토').click();
   // 4. 결과 페이지 진입 및 폴링 상태 머신 / HD Upscale 토글 동작 확인
   await page.waitForURL(/\/result\/.+/);
   const hdToggle = page.getByTestId('hd-upscale-toggle').first();
