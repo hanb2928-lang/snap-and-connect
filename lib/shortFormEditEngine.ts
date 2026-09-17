@@ -3,6 +3,9 @@ import { getDisclosureForPlatforms, getDisclosureShortForPlatforms } from '@/lib
 import { type EmotionPhase } from '@/lib/psychologyEngine';
 import { getBgmTemplateForMood, type BgmCategory } from '@/lib/bgmEngine';
 import { aiCachedCall } from '@/lib/aiCache';
+import type { ProductVisionResult } from '@/lib/productVision';
+
+export type ContentTone = 'casual' | 'professional' | 'emotional' | 'humorous' | 'studio_premium' | 'raw_trigger';
 
 export type ShortFormPlatform = 'instagram' | 'tiktok' | 'youtube' | 'naver_clip';
 
@@ -182,6 +185,8 @@ export interface EditSegment {
   position: 'top' | 'center' | 'bottom';
   storyPhase: StoryPhase;
   narrationCue: string;
+  emotionalBenefitText?: string;
+  ttsNarrationText?: string;
 }
 
 export function getPlatformInfo(platform: ShortFormPlatform | string, customSpec?: PlatformSpec) {
@@ -215,6 +220,110 @@ const BENEFIT_TEMPLATES: Record<EmotionPhase, string[]> = {
   desire: ['간편하지만 확실한 효과', '이거 하나면 해결됨', '경험해보면 차이 느껴짐'],
   action: ['주문 전에 미리 확인하셈', '누구나 만족하는 선택임', '같이 확인해보셈'],
 };
+
+const EMOTIONAL_BENEFIT_TEMPLATES: Record<string, string[]> = {
+  jewelry: [
+    '데일리 룩에 특별한 무드를 더하는 나만의 시크릿 아이템',
+    '어제 입은 옷과 오늘 입은 옷, 차이는 단 하나의 포인트',
+    '평범한 일상이 한순간 특별해지는 기분, 그게 이거의 힘',
+    '아무 옷이나 입어도 완성되는 건 이 하나가 있어서',
+  ],
+  fashion: [
+    '매일 아침 옷장 앞에서 고민 10분 줄여주는 단 하나의 선택',
+    '입는 순간 기분이 달라져요, 오늘 하루가 좀 더 특별하게',
+    '아무나 소화할 수 있는데 아무나 못 사는 그 퀄리티',
+    '계절이 바뀌어도 계속 손이 가는, 그래서 벌써 인생템',
+  ],
+  beauty: [
+    '쓰는 순간부터 하루가 다르게 느껴지는 피부의 변화',
+    '거울 앞에 설 때마다 자신감이 올라가는 그 경험',
+    '3초면 끝나는 루틴인데 효과는 하루 종일 가는 비밀',
+    '처음엔 반신반의했는데 한 번 쓰면 못 빠져나오는 느낌',
+  ],
+  home: [
+    '집에 들어오는 순간, 오늘 하루의 피로가 녹아내리는 공간',
+    '작은 변화 하나가 집 전체의 분위기를 바꾸는 마법',
+    '누군가 놀러 왔을 때 자랑하고 싶은 그 포인트',
+    '매일 쓰는 거라서 더 아껴야 하는데, 오히려 매일이 특별해짐',
+  ],
+  tech: [
+    '하루에 30분 아껴주는 단 하나의 아이템, 그게 진짜 가성비',
+    '귀찮았던 반복 작업이 1초 만에 끝나는 쾌감을 알면 돌아갈 수 없음',
+    '처음엔 몰랐는데 쓰고 나서야 알게 된, 삶의 효율이 달라지는 기준점',
+    '작은 디테일 하나가 하루의 질을 확 바꿔버림',
+  ],
+  food: [
+    '한 입 베어 무는 순간, 오늘 하루의 스트레스가 녹아내림',
+    '매일 먹어도 질리지 않는 그 맛, 그래서 이미 인생템',
+    '평범한 한 끼가 특별해지는 순간, 그게 이거의 힘',
+    '처음 맛본 그 감동을 매일 다시 느끼는 소확행',
+  ],
+  default: [
+    '데일리 룩에 특별한 무드를 더하는 나만의 시크릿 아이템',
+    '쓰는 순간 실감, 왜 진작 몰랐을까 하는 아쉬움',
+    '하루의 작은 기준이 바뀌는 경험, 그게 이거의 진짜 가치',
+    '없을 때는 몰랐는데 있고 나니 다르게 느껴지는 하루',
+  ],
+};
+
+const TTS_NARRATION_TEMPLATES: Record<string, string[]> = {
+  jewelry: [
+    '이거 하나만 있으면, 평범한 날도 반짝이는 날이 됩니다. 진짜 그런 거예요.',
+    '매일 아침, 거울 앞에서 이걸 착용하는 순간, 오늘 하루의 시작이 달라 보여요.',
+    '어떤 옷을 입든, 이 하나면 나만의 분위기가 완성돼요. 한 번쯤 경험해 보세요.',
+  ],
+  fashion: [
+    '아침마다 옷장 앞에서 10분 고민하던 게, 이걸 입으면 끝나요. 그게 진짜 혁신이에요.',
+    '입는 순간 기분이 바뀌어요. 옷이 사람을 입는 게 아니라, 사람이 옷을 입는 느낌.',
+    '계절이 바뀌어도 계속 손이 가요. 그게 진짜 인생템의 조건 아닐까요?',
+  ],
+  beauty: [
+    '거울 앞에 설 때마다 달라진 피부를 보면, 그게 진짜 자신감이에요.',
+    '3초면 끝나는 루틴인데 효과는 하루 종일. 바쁜 아침에 이거면 충분해요.',
+    '한 번 쓰고 나면 다른 걸로 돌아가기 힘들어요. 그 정도로 확 다릅니다.',
+  ],
+  home: [
+    '집에 들어오는 순간, 공간이 달라 보여요. 하루의 피로가 녹아내리는 그 기분.',
+    '작은 변화 하나인데, 집 전체의 분위기가 바뀌어요. 그게 이거의 매력이에요.',
+    '매일 쓰는 거라 더 특별해요. 일상이 곧 힐링이 되는 공간.',
+  ],
+  tech: [
+    '하루에 30분을 아껴줘요. 그 30분이 모이면 한 달에 15시간이에요.',
+    '귀찮았던 반복 작업이 1초 만에 끝나요. 이걸 경험하면 돌아갈 수 없어요.',
+    '작은 디테일 하나가 하루의 질을 바꿔요. 그게 진짜 기술의 힘이에요.',
+  ],
+  food: [
+    '한 입 베어 무는 순간, 오늘 하루의 스트레스가 녹아내려요. 진짜예요.',
+    '매일 먹어도 질리지 않아요. 그래서 이미 제 인생템이 됐어요.',
+    '평범한 한 끼가 특별해지는 순간. 그게 이거의 힘이에요.',
+  ],
+  default: [
+    '데일리 룩에 특별한 무드를 더하는 나만의 시크릿 아이템, 한 번 경험해 보세요.',
+    '없을 때는 몰랐는데, 있고 나니 하루가 다르게 느껴져요. 그게 진짜 가치예요.',
+    '쓰는 순간 왜 진작 몰랐을까 하는 아쉬움. 그만큼 삶이 달라져요.',
+  ],
+};
+
+function detectBenefitCategory(category: string, productName: string, vision: ProductVisionResult | undefined): string {
+  const hint = `${category} ${productName} ${vision?.materialGuess ?? ''} ${vision?.textureDescription ?? ''}`.toLowerCase();
+  if (hint.includes('다이아') || hint.includes('보석') || hint.includes('주얼') || hint.includes('necklace') || hint.includes('ring') || hint.includes('diamond') || hint.includes('jewel') || hint.includes('크리스탈')) return 'jewelry';
+  if (hint.includes('의류') || hint.includes('옷') || hint.includes('신발') || hint.includes('fashion') || hint.includes('silk') || hint.includes('leather') || hint.includes('dress') || hint.includes('가죽') || hint.includes('실크')) return 'fashion';
+  if (hint.includes('뷰티') || hint.includes('화장') || hint.includes('스킨') || hint.includes('beauty') || hint.includes('cosmetic')) return 'beauty';
+  if (hint.includes('홈') || hint.includes('인테리어') || hint.includes('가구') || hint.includes('home') || hint.includes('조명') || hint.includes('living')) return 'home';
+  if (hint.includes('테크') || hint.includes('전자') || hint.includes('가전') || hint.includes('tech') || hint.includes('gadget') || hint.includes('it')) return 'tech';
+  if (hint.includes('식품') || hint.includes('먹거리') || hint.includes('카페') || hint.includes('food') || hint.includes('디저트')) return 'food';
+  return 'default';
+}
+
+function pickEmotionalBenefit(benefitCategory: string, emotion: EmotionPhase, seed: number): string {
+  const pool = EMOTIONAL_BENEFIT_TEMPLATES[benefitCategory] ?? EMOTIONAL_BENEFIT_TEMPLATES.default;
+  return pool[seed % pool.length];
+}
+
+function pickTtsNarration(benefitCategory: string, seed: number): string {
+  const pool = TTS_NARRATION_TEMPLATES[benefitCategory] ?? TTS_NARRATION_TEMPLATES.default;
+  return pool[seed % pool.length];
+}
 
 const CTA_TEMPLATES: Record<EmotionPhase, string[]> = {
   curiosity: ['여기서 샀더니 편하더라', '링크 남겨둠 — 알아서들', '이거 진짜였음 진짜'],
@@ -264,6 +373,165 @@ const STORY_CTA: string[] = [
   '이 경험, 직접 확인하세요',
   '다음은 당신의 차례입니다',
 ];
+
+const TONE_STORY_OVERRIDES: Record<string, {
+  gazeHooks: string[];
+  needDiscovery: string[];
+  transformation: string[];
+  cta: string[];
+}> = {
+  studio_premium: {
+    gazeHooks: [
+      '정교한 디테일을 가까이에서 확인해 보세요',
+      '시그니처 디자인, 그 존재감을 직접 느껴보세요',
+      '섬세한 마감이 말해주는 품질의 기준',
+    ],
+    needDiscovery: [
+      '일상의 한 끝을 완성하는 한 가지',
+      '평범한 하루에 우아함을 더하는 선택',
+      '같은 것도 다르게, 그 차이를 경험하세요',
+    ],
+    transformation: [
+      '그 한 가지가 만든 격이 다른 일상',
+      '품격 있는 라이프스타일의 시작',
+      '선택이 달라지면 하루가 달라집니다',
+    ],
+    cta: [
+      '지금, 당신의 일상에 한 단계 높은 품격을',
+      '이 경험이 당신의 기준을 높입니다',
+      '더 섬세한 일상을 원하신다면, 지금 확인하세요',
+    ],
+  },
+  raw_trigger: {
+    gazeHooks: [
+      '왜 다들 이걸 찾는지 알겠더라고요',
+      '이거 쓰는 사람들 진짜 있어요? 후기 공유',
+      '솔직히 말하면 이거 없으면 손해인 거',
+    ],
+    needDiscovery: [
+      '왜 다들 이걸 찾는지 알겠더라고요',
+      '이거 쓰기 전에 이런 거 몰랐던 거 실화?',
+      '이거 안 쓰면 손해인 이유, 진짜임',
+    ],
+    transformation: [
+      '왜 다들 이걸 찾는지 알겠더라고요',
+      '이거 사고 나서 진짜 달라짐, 실화',
+      '이거 쓰는 사람들 리얼 후기 맞음',
+    ],
+    cta: [
+      '여기서 샀더니 편하더라고요',
+      '이거 진짜였음, 링크 남겨둘게요',
+      '왜 다들 이걸 찾는지 이제 알겠죠',
+    ],
+  },
+};
+
+const TONE_BENEFIT_OVERRIDES: Record<string, Record<string, string[]>> = {
+  studio_premium: {
+    jewelry: [
+      '섬세한 광택이 일상에 우아함을 더하는 한 가지',
+      '어떤 순간에도 격을 잃지 않는, 당신만의 시그니처',
+    ],
+    fashion: [
+      '편안함과 품격을 동시에, 그래서 매일 선택하는 옷',
+      '계절이 바뀌어도 변하지 않는 당신의 기준',
+    ],
+    beauty: [
+      '매일 아침, 거울 앞에서 만나는 더 나은 피부',
+      '3초의 시간으로 하루의 자신감을 완성하는 우아함',
+    ],
+    home: [
+      '공간이 품는 따뜻함, 일상이 쉼이 되는 곳',
+      '섬세한 디테일이 만드는 격이 다른 인테리어',
+    ],
+    tech: [
+      '여유로워진 하루, 그것이 진짜 기술이 주는 가치',
+      '불필요한 시간을 줄이고, 중요한 순간에 집중하게',
+    ],
+    food: [
+      '한 입의 감동, 일상이 특별해지는 순간',
+      '매일 맛봐도 질리지 않는, 그래서 인생템',
+    ],
+    default: [
+      '섬세한 경험이 일상의 기준을 높입니다',
+      '품격 있는 선택, 그 차이를 경험하세요',
+    ],
+  },
+  raw_trigger: {
+    jewelry: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 진짜 예쁨',
+      '이거 하나면 아무 옷이나 입어도 완성됨, 실화',
+    ],
+    fashion: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 핏이 미쳤음',
+      '아침마다 옷장 앞에서 10분 고민하던 게 끝남',
+    ],
+    beauty: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 피부가 달라짐',
+      '이거 쓰는 사람들 진짜 있어요? 후기 공유',
+    ],
+    home: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 집이 달라 보임',
+      '이거 사고 나서 집에 들어오는 게 좋아짐, 진짜',
+    ],
+    tech: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 시간 아껴줌',
+      '이거 안 쓰면 손해인 거, 진짜임',
+    ],
+    food: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 진짜 맛있음',
+      '이거 먹고 나서 다른 거 못 먹겠더라고요',
+    ],
+    default: [
+      '왜 다들 이걸 찾는지 알겠더라고요, 진짜임',
+      '이거 안 쓰면 손해인 거, 링크 남겨둘게요',
+    ],
+  },
+};
+
+const TONE_TTS_OVERRIDES: Record<string, Record<string, string[]>> = {
+  studio_premium: {
+    default: [
+      '섬세한 경험이 일상의 기준을 높입니다. 한 번 경험해 보시기를 권합니다.',
+      '품격 있는 선택이 만드는 차이, 그것을 직접 느껴보세요.',
+    ],
+  },
+  raw_trigger: {
+    default: [
+      '왜 다들 이걸 찾는지 알겠더라고요. 진짜 그런 거예요.',
+      '이거 안 쓰면 손해인 거, 진짜임. 한 번 써보세요.',
+    ],
+  },
+};
+
+function applyToneToStory(story: StoryNarrative, tone: ContentTone): StoryNarrative {
+  const overrides = TONE_STORY_OVERRIDES[tone];
+  if (!overrides) return story;
+  const pick = (pool: string[], original: string) => pool[Math.abs(original.length) % pool.length] || original;
+  return {
+    ...story,
+    gazeHook: pick(overrides.gazeHooks, story.gazeHook),
+    needDiscovery: pick(overrides.needDiscovery, story.needDiscovery),
+    transformation: pick(overrides.transformation, story.transformation),
+    ctaCall: pick(overrides.cta, story.ctaCall),
+  };
+}
+
+function applyToneToBenefit(benefit: string, tts: string, tone: ContentTone, benefitCategory: string, seed: number): { benefit: string; tts: string } {
+  const benefitOverrides = TONE_BENEFIT_OVERRIDES[tone];
+  const ttsOverrides = TONE_TTS_OVERRIDES[tone];
+  let adjustedBenefit = benefit;
+  let adjustedTts = tts;
+  if (benefitOverrides) {
+    const pool = benefitOverrides[benefitCategory] ?? benefitOverrides.default;
+    if (pool && pool.length > 0) adjustedBenefit = pool[seed % pool.length];
+  }
+  if (ttsOverrides) {
+    const pool = ttsOverrides[benefitCategory] ?? ttsOverrides.default;
+    if (pool && pool.length > 0) adjustedTts = pool[seed % pool.length];
+  }
+  return { benefit: adjustedBenefit, tts: adjustedTts };
+}
 
 const NARRATION_CUES = {
   gazeHook: 'VO: 스마트폰으로 대충 찍은 듯한 거친 비주얼로 시작 — 0~3초, 언박싱 또는 실제 사용 환경으로 경계심 허물기. 자연스러운 구어체로 손실 회피 자극 멘트',
@@ -343,8 +611,10 @@ export function buildShortFormEditPlan(
   disclosureEnabled = false,
   customSpec?: PlatformSpec,
   bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
+  productVision?: ProductVisionResult,
+  contentTone?: ContentTone,
 ): ShortFormEditPlan {
-  return computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride);
+  return computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride, productVision, contentTone);
 }
 
 export async function buildShortFormEditPlanCached(
@@ -357,6 +627,8 @@ export async function buildShortFormEditPlanCached(
   disclosureEnabled = false,
   customSpec?: PlatformSpec,
   bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
+  productVision?: ProductVisionResult,
+  contentTone?: ContentTone,
 ): Promise<ShortFormEditPlan> {
   const cacheInput: Record<string, unknown> = {
     platform,
@@ -367,11 +639,13 @@ export async function buildShortFormEditPlanCached(
     autoDisclosure,
     disclosureEnabled,
     bgmOverride: bgmOverride ? JSON.stringify(bgmOverride) : '',
+    productVisionCategory: productVision?.productCategory ?? '',
+    contentTone: contentTone ?? 'casual',
   };
   const { data } = await aiCachedCall<ShortFormEditPlan>(
     'edit-plan',
     cacheInput,
-    () => Promise.resolve(computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride)),
+    () => Promise.resolve(computeEditPlan(platform, customPrompt, selectedHook, productName, affiliatePlatforms, autoDisclosure, disclosureEnabled, customSpec, bgmOverride, productVision, contentTone)),
     'local-heuristic',
   );
   return data;
@@ -387,6 +661,8 @@ function computeEditPlan(
   disclosureEnabled = false,
   customSpec?: PlatformSpec,
   bgmOverride?: { templateId: string; label: string; mood: string; bpm: number; reason?: string; highlightStartSec?: number; highlightDurationSec?: number; energyCurve?: number[] },
+  productVision?: ProductVisionResult,
+  contentTone: ContentTone = 'casual',
 ): ShortFormEditPlan {
   const { label, spec, safeZone } = getPlatformInfo(platform, customSpec);
   const totalDurationSec = 15;
@@ -395,8 +671,16 @@ function computeEditPlan(
   const hook = selectedHook || fallbackHook;
   const matchedHook = hookOptions.find((h) => h.text === hook);
   const emotion: EmotionPhase = matchedHook?.emotion ?? 'curiosity';
-  const story = buildStoryNarrative(hook, emotion, productName);
+  const story = applyToneToStory(buildStoryNarrative(hook, emotion, productName), contentTone);
   const segmentTexts = buildSegmentTexts(hook, hookOptions, customPrompt, productName);
+
+  const productCategory = productVision?.productCategory ?? '';
+  const benefitCategory = detectBenefitCategory(productCategory, productName ?? '', productVision);
+  const benefitSeed = Math.abs((productName ?? '').length + (customPrompt ?? '').length) % 4;
+  const rawBenefit = pickEmotionalBenefit(benefitCategory, emotion, benefitSeed);
+  const rawTts = pickTtsNarration(benefitCategory, benefitSeed);
+  const { benefit: emotionalBenefit, tts: ttsNarration } = applyToneToBenefit(rawBenefit, rawTts, contentTone, benefitCategory, benefitSeed);
+  const visionFeatureHint = productVision?.visualFeatures?.slice(0, 2).join(' · ') ?? '';
 
   const segments: EditSegment[] = [
     {
@@ -420,6 +704,8 @@ function computeEditPlan(
       position: 'top',
       storyPhase: 'need_discovery',
       narrationCue: story.narrationCues.needDiscovery,
+      emotionalBenefitText: emotionalBenefit,
+      ttsNarrationText: ttsNarration,
     },
     {
       index: 2,
@@ -427,10 +713,12 @@ function computeEditPlan(
       endSec: 11,
       label: '변화·몰입',
       purpose: '사용 후 일상적 변화를 감성적으로 전달, 디테일 클로즈업 전환',
-      textOverlay: story.transformation,
+      textOverlay: visionFeatureHint || story.transformation,
       position: 'center',
       storyPhase: 'transformation',
       narrationCue: story.narrationCues.transformation,
+      emotionalBenefitText: emotionalBenefit,
+      ttsNarrationText: ttsNarration,
     },
     {
       index: 3,

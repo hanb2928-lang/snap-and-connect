@@ -1851,6 +1851,8 @@ export default function SettingsScreen() {
               { key: 'professional', label: t('settings.captionToneProfessional') },
               { key: 'emotional', label: t('settings.captionToneEmotional') },
               { key: 'humorous', label: t('settings.captionToneHumorous') },
+              { key: 'studio_premium', label: t('settings.captionToneStudioPremium') },
+              { key: 'raw_trigger', label: t('settings.captionToneRawTrigger') },
             ] as const).map((tone) => (
               <TouchableOpacity
                 key={tone.key}

@@ -1533,6 +1533,68 @@ function buildBeautySmoothTag(materialGuess: string, category: string): string {
   return "";
 }
 
+const SENSORY_HOOK_TABLE: Array<{ match: RegExp; hooks: string[] }> = [
+  { match: /diamond|다이아|gem|보석|crystal|크리스탈|jewel|주얼/i, hooks: [
+    "영롱한 0.5캐럿의 빛, 당신의 목선을 완성하다",
+    "손끝 만져보는 순간, 보석과의 마지막 대화",
+    "각도마다 수박게 빛나는 페이싱, 그 순간의 마법",
+    "유별된 반사, 보석이 말하는 순간",
+  ]},
+  { match: /necklace|목걸이|chain|체인|pendant|펜더트/i, hooks: [
+    "목덜미에 닿는 가느다란 체인, 걸을 때마다 옅게 울리는 소리",
+    "목선을 따라 흐르는 빛, 이걸 보는 순간 멈춰선다",
+    "목덜미에 닿는 체인의 무게, 피부 위를 걷는 감각",
+    "체인이 부드럽게 흘러내리는 순간, 그 미세한 움직임",
+  ]},
+  { match: /ring|반지|bracelet|팔찌|earring|귀걸이|watch|시계/i, hooks: [
+    "손가락에 감기는 빛, 반지 하나가 만드는 무게감",
+    "손목 위에 닿는 순간, 이 반지가 말하는 시간",
+    "손목을 감싸는 안정감, 명품의 존재감이 느껴진다",
+    "손등 위로 빛이 흐르는 순간, 반지가 만드는 마법",
+  ]},
+  { match: /silk|실크|새틴|satin|chiffon|드레스|dress|치마|skirt|스카프/i, hooks: [
+    "바람에 출렁이는 실크, 빛이 통과하는 순간의 감각",
+    "만지면 물처럼 흐르는 새틴, 그 자체의 무게감",
+    "피부에 닿는 실크, 하나의 동작이 만드는 드라마",
+    "입을 때 허락하는 우아함, 그 바탕의 유혹이 실리다",
+  ]},
+  { match: /leather|가죽|스웨이드|jacket|재킷|boots|부츠|bag|가방|shoe|신발/i, hooks: [
+    "가죽 결이 말하는 순간, 손끝에 닿는 날개의 무게",
+    "이 가죽의 질감, 손금이 대신 말해줄 것이다",
+    "가방의 무게가 어깨에 닿는 순간, 그 안에 담긴 이야기",
+    "부츠가 바닥을 걷는 소리, 그 무게와 논을 들어라",
+  ]},
+  { match: /gold|골드|silver|실버|brass|황동|copper|구리|metal|금속/i, hooks: [
+    "만지면 수박게 빛나는 골드, 그 자체가 말하는 빛",
+    "메탈 박막의 반사, 눈이 보고 만드는 완벽함",
+    "날개마다 빛이 겹는 메탈, 저가운 마법의 순간",
+    "만져보면 더 빛나는 메탈, 그 무게와 묵직의 대화",
+  ]},
+  { match: /cotton|코튼|면|linen|린넨|셔츠|shirt|wool|울|니트|knit|코트|coat|denim|데님/i, hooks: [
+    "입었다 닿지 않는 경첩, 면 소리가 말하는 순간",
+    "울 속에 쏟아지는 담요, 명품의 무게가 느껴진다",
+    "니트의 결이 만드는 무늬, 그 온기의 정체",
+    "데님의 무게, 입은 순간 만든 논이 흘러나온다",
+  ]},
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷/i, hooks: [
+    "이 옷이 만드는 시간, 텍스처 대신 말해줄 것이다",
+    "입었다 닿지 않는 경첩, 그 이음이 말하는 순간",
+    "경첩이 만드는 성박, 이 명품의 자기주장",
+    "옷과 강을 걷히는 순간, 모도 내인 눈추드를 보라",
+  ]},
+];
+
+function buildSensoryHook(v: ProductVisionData, hookCategory: string, variationSeed: number): string {
+  const combined = `${v.materialGuess} ${v.productCategory} ${v.productName}`.trim();
+  for (const { match, hooks } of SENSORY_HOOK_TABLE) {
+    if (match.test(combined)) {
+      return hooks[variationSeed % hooks.length];
+    }
+  }
+  const fallback = HOOK_TEXTS[hookCategory] ?? HOOK_TEXTS.curiosity;
+  return fallback[variationSeed % fallback.length];
+}
+
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
@@ -1617,7 +1679,10 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const style = PLATFORM_STYLE[p.platform] ?? PLATFORM_STYLE.shorts;
   const mood = MOOD_GRADE[p.bgmMood ?? ""] ?? MOOD_GRADE["하이텐션"];
   const hooks = HOOK_TEXTS[p.hookCategory] ?? HOOK_TEXTS.curiosity;
-  const hook = hooks[p.variationSeed % hooks.length];
+  const genericHook = hooks[p.variationSeed % hooks.length];
+  const hook = p.productVision
+    ? buildSensoryHook(p.productVision, p.hookCategory, p.variationSeed)
+    : genericHook;
 
   const tokens: string[] = [
     `raw smartphone review ${name} ${orientation}`,

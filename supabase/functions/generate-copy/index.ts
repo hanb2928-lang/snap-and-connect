@@ -157,6 +157,7 @@ interface CopyRequest {
   count: number;
   localStoreInfo?: LocalStoreInfo | null;
   brandPersona?: string | null;
+  contentTone?: string | null;
 }
 
 interface CopyGroup {
@@ -196,6 +197,7 @@ Deno.serve(async (req: Request) => {
       count: Math.min(Math.max(Number(raw?.count) || 3, 1), 5),
       localStoreInfo: raw?.localStoreInfo ?? null,
       brandPersona: raw?.brandPersona ? String(raw.brandPersona).slice(0, 1000) : null,
+      contentTone: raw?.contentTone ? String(raw.contentTone).slice(0, 50) : null,
     };
 
     if (!body.productName) {
@@ -472,6 +474,11 @@ async function generateWithOpenAI(
     "상품 스펙 나열 금지. 치명적인 귀찮음 해결, 1초 만에 해결되는 쾌감을 보여라.\n" +
     "카피에서는 역심리, 역설, 충격적 고백으로 후킹하라. 예: '이거 사지 마세요... 아니 꼭 사세요'\n" +
     "CTA는 기업 명령이 아니라 내부자 꿀팁처럼. 예: '링크 남겨둠 — 알아서들', '여기서 샀더니 편하더라'\n" +
+    (data.contentTone === 'studio_premium'
+      ? "\n## 브랜드 톤앤매너: 스튜디오 프리미엄\n어휘 수준을 고급스럽고 우아하게 가져가. 정중하고 격식 있는 표현 사용.\n'~입니다', '~합니다', '~하십시오' 등 정중한 존댓말 유지.\n날것 표현(ㅋㅋ, ~임, ~드라고) 완전 배제. 세련되고 절제된 어휘 선택.\n예: '섬세한 디테일이 일상에 우아함을 더합니다', '품격 있는 선택, 그 차이를 경험하세요'\n"
+      : data.contentTone === 'raw_trigger'
+      ? "\n## 브랜드 톤앤매너: 로우 심리 자극\n직접적이고 친근한 또래간 대화 톤. 공감 유발 표현 적극 활용.\n'~드라고요', '~거든요', '왜 다들 이걸 찾는지 알겠더라고요' 등 친숙한 구어체.\n스마트폰으로 대충 찍은 듯한 날것의 진정성 최우선. 광고 느낌 완전 배제.\n예: '왜 다들 이걸 찾는지 알겠더라고요, 진짜임', '이거 안 쓰면 손해인 거, 링크 남겨둘게요'\n"
+      : "") +
     archetypeInjection +
     `\"${typeLabel(data.copyType)}\" 스타일로 ${platformLabel(data.platform)}에 맞게 ${count}개 변형을 만들어.\n` +
     `${platformTone(data.platform)}\n` +

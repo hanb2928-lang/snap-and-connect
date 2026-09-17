@@ -30,6 +30,7 @@ interface CopyWriterProps {
   productAdvantages: string[];
   platform: PlatformKey;
   brandPersona?: string | null;
+  contentTone?: string | null;
 }
 
 const VERSION_TABS: { key: CopyType; label: string; icon: typeof Heart; color: string; short: string }[] = [
@@ -58,6 +59,7 @@ export function CopyWriter({
   productAdvantages,
   platform,
   brandPersona,
+  contentTone,
 }: CopyWriterProps) {
   const [count, setCount] = useState(3);
   const [groups, setGroups] = useState<CopyGroup[] | null>(null);
@@ -99,6 +101,7 @@ export function CopyWriter({
           count,
           brandPersona: brandPersona || undefined,
           customPrompt: customPrompt.trim() || undefined,
+          contentTone: contentTone || undefined,
         }),
         timeoutMs: 115000,
       });
@@ -118,7 +121,7 @@ export function CopyWriter({
       setError(true);
     }
     setGenerating(false);
-  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count, brandPersona, customPrompt]);
+  }, [productName, productCategory, priceEstimate, oneLiner, productAdvantages, platform, count, brandPersona, customPrompt, contentTone]);
 
   const handleCopy = useCallback(async (item: CopyItem, cardKey: string) => {
     const text = `${item.hook}\n\n${item.caption}\n\n${item.hashtags.map((h) => `#${h}`).join(' ')}`;

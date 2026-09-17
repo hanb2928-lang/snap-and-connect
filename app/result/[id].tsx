@@ -120,7 +120,7 @@ import type { InlineEditState, HookEffectType } from '@/components/AIProcessAcco
 import { ShortFormPreviewPlayer } from '@/components/ShortFormPreviewPlayer';
 import { ResultPreviewSection } from '@/components/ResultPreviewSection';
 import { AiSoloDirectorCard } from '@/components/AiSoloDirectorCard';
-import { buildShortFormEditPlan } from '@/lib/shortFormEditEngine';
+import { buildShortFormEditPlan, type ContentTone } from '@/lib/shortFormEditEngine';
 import { getBgmTemplateForMood } from '@/lib/bgmEngine';
 import { buildNarrativePlan, getNarrativeSummary, type NarrativePlan } from '@/lib/humanRealityNarrativeEngine';
 import { submitVideoJobAsync, subscribeVideoJob, upgradeVideoToHd, subscribeHdUpgrade, recoverVideoJob, type VideoGenProgress } from '@/lib/aiVideoPipeline';
@@ -2074,9 +2074,11 @@ export default function ResultScreen() {
         false,
         undefined,
         bgmOverride,
+        productVision ?? undefined,
+        (settings?.default_caption_tone as ContentTone) ?? 'casual',
       );
     },
-    [targetPlatform, inlineEdit.aiPrompt, inlineEdit.bgmMood, activeOneLiner, scan?.summary, activeHook, activeProductName, affiliatePlatforms],
+    [targetPlatform, inlineEdit.aiPrompt, inlineEdit.bgmMood, activeOneLiner, scan?.summary, activeHook, activeProductName, affiliatePlatforms, productVision, settings?.default_caption_tone],
   );
 
   const disclosureText = getDisclosureForPlatforms(affiliatePlatforms);
@@ -2598,6 +2600,7 @@ export default function ResultScreen() {
               productAdvantages={td?.productAdvantages || []}
               platform={activePlatform}
               brandPersona={settings?.brand_persona}
+              contentTone={settings?.default_caption_tone}
             />
           ),
         },
