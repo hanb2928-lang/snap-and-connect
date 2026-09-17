@@ -1384,6 +1384,155 @@ const TRANSITION_MAP: Record<string, string> = {
   "슬로우 모션": "slow-motion ramps",
 };
 
+const MATERIAL_PHYSICS: Array<{ match: RegExp; tag: string }> = [
+  { match: /silk|실크|샤틴|satin|chiffon/i, tag: "material_physics=silk twill micro-weave visible, light-dependent fluid sheen, subsurface scattering, draping folds with anisotropic specular highlights" },
+  { match: /denim|데님|캔버스|canvas|twill/i, tag: "material_physics=structured denim weave, visible warp-weft threads, rigid fold creases, diffused specular on indigo fibers" },
+  { match: /cotton|코튼|면|linen|린넨/i, tag: "material_physics=cotton micro-fiber matte surface, soft diffuse reflection, natural fabric wrinkling, breathability texture" },
+  { match: /wool|울|캐시미어|cashmere|니트|knit/i, tag: "material_physics=wool fiber density, micro-fuzz surface, warm diffuse absorption, knitted loop structure visible" },
+  { match: /leather|가죽| suede|스웨이드/i, tag: "material_physics=leather grain pore structure, edge burnishing, anisotropic gloss on creases, natural hide texture variation" },
+  { match: /metal|금속|steel|스틸|aluminum|알루미늄|titanium|티타늄|gold|골드|silver|실버/i, tag: "material_physics=brushed metal micro-scratches, anisotropic specular reflection, fresnel rim glow, cold metallic sheen with environment reflection" },
+  { match: /gold|골드|brass|황동|copper|구리/i, tag: "material_physics=precious metal warm luster, micro-polish marks, environment map reflection, subtle patina edge variation" },
+  { match: /gem|보석|diamond|다이아|crystal|크리스탈|jewel|주얼/i, tag: "material_physics=faceted gemstone caustics, dispersion rainbow refraction, dynamic light-splitting on facet edges, shadow dispersion interacting with skin tones" },
+  { match: /glass|유리|borosilicate/i, tag: "material_physics=glass refraction index bending, edge chromatic aberration, transparent subsurface, caustic light pooling on surfaces" },
+  { match: /plastic|플라스틱|polymer|acrylic|아크릴/i, tag: "material_physics=plastic glossy surface micro-reflection, injection mold parting line, soft specular bloom, pigment depth" },
+  { match: /ceramic|세라믹|porcelain|도자기/i, tag: "material_physics=ceramic glaze micro-bubbling, smooth high-gloss reflection, kiln-fired color depth, cool touch diffuse" },
+  { match: /wood|나무|원목|oak|walnut|bamboo|대나무/i, tag: "material_physics=wood grain ring pattern, open-pore surface texture, warm tinted oil finish, natural fiber direction visible" },
+  { match: /rubber|고무|silicone|실리콘/i, tag: "material_physics=rubber matte surface, micro-parting line, soft diffuse with slight friction sheen, compression deformation hints" },
+  { match: /paper|종이|kraft|크라프트|cardboard|종이박스/i, tag: "material_physics=paper fiber matrix visible, edge deckle, matte diffuse, subtle embossing and fold memory" },
+  { match: /fabric|패브릭|textile|텍스타일/i, tag: "material_physics=textile micro-weave structure, thread directionality, fabric draping physics, ambient occlusion in fold creases" },
+];
+
+function buildMaterialPhysicsTag(materialGuess: string): string {
+  const guess = materialGuess.trim();
+  if (!guess) return "";
+  for (const { match, tag } of MATERIAL_PHYSICS) {
+    if (match.test(guess)) return tag;
+  }
+  return `material_physics=${guess} surface micro-detail, realistic texture rendering under scene lighting`;
+}
+
+const FABRIC_KINETICS: Array<{ match: RegExp; tag: string }> = [
+  { match: /silk|실크|샤틴|satin|chiffon|치마|skirt|드레스|dress/i, tag: "fabric_physics=silk skirt hem flares with centrifugal force on rotation, fluid fabric ripples follow body momentum with 2-frame delay, gravity-aware drape recovery, organically settling folds" },
+  { match: /denim|데님|캔버스|canvas|twill/i, tag: "fabric_physics=rigid denim resists deformation, stiff fold memory, minimal ripple on motion, weighty hem swing with sharp settle, visible crease recovery" },
+  { match: /cotton|코튼|면|linen|린넨|셔츠|shirt/i, tag: "fabric_physics=cotton fabric light ripple on movement, soft fold oscillation with quick gravity settle, breathable drape following body contour, natural wrinkling on bending" },
+  { match: /wool|울|캐시미어|cashmere|니트|knit|코트|coat/i, tag: "fabric_physics=wool coat heavy swing with momentum lag, structured shoulder drape, gravity-dependent lapel settling, thick fabric folds compress and slowly expand" },
+  { match: /leather|가죽|스웨이드|suede|재킷|jacket/i, tag: "fabric_physics=leather jacket rigid flap with inertia, panel edges swing with weighted delay, crease memory on bending, smooth gloss shift as panels move" },
+  { match: /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이/i, tag: "accessory_physics=jewelry chain links swing with pendulum physics, natural weight-delay on rotation, gravity pulls pendant to rest position, momentum carries swing past settle point with damping oscillation" },
+  { match: /ring|반지|watch|시계|bangle|방망이/i, tag: "accessory_physics=rigid accessory weight shifts with wrist/finger motion, metallic glint sweeps as orientation changes, centrifugal displacement on rapid rotation" },
+  { match: /scarf|스카프|shawl|숄|veil|베일/i, tag: "fabric_physics=scarf trails with air resistance, fabric catches wind current, rippling wave propagation along length, gravity-aware settling with floating drift" },
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷/i, tag: "fabric_physics=fabric layers ripple organically with body motion, gravity-aware drape, momentum inertia causes delayed fabric follow, fold creases form and relax naturally" },
+];
+
+function buildFabricPhysicsTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined) return "";
+  for (const { match, tag } of FABRIC_KINETICS) {
+    if (match.test(combined)) return tag;
+  }
+  return "";
+}
+
+const COLLISION_GUARDRAILS: Array<{ match: RegExp; tag: string }> = [
+  { match: /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계/i, tag: "collision_guard=strict collision detection between jewelry and body mesh + hair strands, necklace chains must not intersect skin surface or clip through hair, earrings maintain separation from neck/ear, bracelets rotate around wrist without penetrating forearm mesh, dynamic boundary repulsion enforces minimum 2mm clearance" },
+  { match: /silk|실크|샤틴|satin|chiffon|치마|skirt|드레스|dress|scarf|스카프|shawl|숄|veil|베일/i, tag: "collision_guard=strict collision detection between flowing fabric and body mesh, skirt hem must not intersect legs or ground, dress layers maintain separation without self-penetration, fabric boundary repulsion prevents skin clipping at armholes and neckline, hair strands must not pass through fabric layers" },
+  { match: /denim|데님|캔버스|canvas|twill|cotton|코튼|면|linen|린넨|셔츠|shirt|wool|울|니트|knit|코트|coat|leather|가죽|재킷|jacket/i, tag: "collision_guard=strict collision detection between structured garment and body mesh, jacket panels must not intersect torso or arms, collar maintains clearance around neck, sleeves prevent forearm penetration, overlapping fabric layers enforce boundary separation without clipping artifacts" },
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷/i, tag: "collision_guard=strict collision detection between fitted garment and character body mesh, fabric must not intersect skin surface, overlapping layers maintain boundary separation, hair strands must not clip through clothing, dynamic boundary repulsion prevents all penetration artifacts" },
+];
+
+function buildCollisionTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined) return "";
+  for (const { match, tag } of COLLISION_GUARDRAILS) {
+    if (match.test(combined)) return tag;
+  }
+  return "";
+}
+
+const SKIN_MUSCLE_RESPONSE: Array<{ match: RegExp; tag: string }> = [
+  { match: /belt|벨트|waist|허리|코르셋|corset|가들렛|garter/i, tag: "skin_response=subtle skin compression beneath waist belt, soft tissue displacement visible at belt edges, natural muscle tension shift in abdominal wall under compression, skin surface micro-deformation where belt meets torso, authentic pressure gradient from tight to relaxed zones" },
+  { match: /bodice|보디스|tight|타이트|슬림핏|slim| fitted|핏|legging|레깅스|스키니|skinny/i, tag: "skin_response=natural muscle tension visible beneath tight bodice, fabric-to-skin pressure creates subtle contour mapping, skin micro-compression at seam lines, muscle definition shifts organically with body movement under fitted garment, authentic tension release when fabric stretches" },
+  { match: /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계/i, tag: "skin_response=subtle skin indentation beneath jewelry weight, wrist compression visible under bracelet pressure, finger skin contour deforms slightly around ring band, earlobe slight displacement under earring weight, authentic skin-to-accessory contact pressure response" },
+  { match: /silk|실크|샤틴|satin|chiffon|드레스|dress|셔츠|shirt|blouse|블라우스/i, tag: "skin_response=fabric-to-skin pressure response at contact zones, gentle skin compression where fabric drapes against body, natural skin texture visible through sheer fabric layers, muscle tension shifts subtly under lightweight garment movement, authentic skin surface deformation at fabric edges" },
+  { match: /leather|가죽|재킷|jacket|boots|부츠|gloves|장갑/i, tag: "skin_response=firm skin compression under rigid leather, visible pressure contour at leather-to-skin boundary, muscle tension adapts to structured garment shape, skin micro-indentation at seam and zipper lines, authentic firmness response where leather grips body" },
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷/i, tag: "skin_response=authentic fabric-to-skin pressure interaction, subtle skin compression at garment contact zones, muscle tension shifts naturally under fitted apparel, skin surface micro-deformation where garment edges meet body, organic pressure response between clothing and skin" },
+];
+
+function buildSkinResponseTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined) return "";
+  for (const { match, tag } of SKIN_MUSCLE_RESPONSE) {
+    if (match.test(combined)) return tag;
+  }
+  return "";
+}
+
+const ENV_LIGHTING_MAP: Record<string, string> = {
+  "스튜디오": "env_light=key light 5500K overhead-left 45deg, fill light 5000K right 30deg, rim light 4200K back-top, softbox diffusion wrapping subject evenly, controlled intensity gradient from key to shadow zone, studio color temperature consistency across all surfaces",
+  "야외": "env_light=primary sun 3200K low-angle 15deg golden hour, sky fill 6500K ambient dome, warm sunset glow wrapping subject from left-back, long shadow projection on ground, atmospheric scattering on skin, color temperature shift from warm highlight to cool shadow",
+  "빈티지": "env_light=primary tungsten 2800K warm front-left 40deg, soft window fill 4500K right, faded warm wash across subject, nostalgic amber glow on skin tones, reduced contrast ratio for retro fading, color temperature intentionally shifted warm",
+  "미니멀": "env_light=flat daylight 6000K top-down 80deg, soft ambient bounce 5500K all directions, even wrap-around illumination minimizing shadows, clean white bounce filling creases, high-key lighting ratio, neutral color temperature across entire scene",
+  "카페": "env_light=warm pendant 2700K overhead 60deg, window fill 5000K left 20deg, cozy amber ambient bounce on subject, intimate low-key lighting with soft falloff, warm color temperature pooling on skin, multiple small specular highlights from pendant fixtures",
+  "도시": "env_light=street lamp 4000K front-left 35deg, neon sign bounce varying 3000K-7000K from surrounding signage, cool sky ambient 7000K top, mixed color temperature reflections on subject, urban light pollution haze, dynamic specular shifts from passing vehicles",
+};
+
+function buildEnvLightingTag(bgStyle: string | undefined): string {
+  if (!bgStyle) return "";
+  return ENV_LIGHTING_MAP[bgStyle] ? ENV_LIGHTING_MAP[bgStyle] : "";
+}
+
+const SHADOW_REFLECTION_TABLE: Array<{ match: RegExp; tag: string }> = [
+  { match: /metal|금속|steel|스틸|gold|골드|silver|실버|brass|황동|copper|구리|jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|ring|반지|watch|시계/i, tag: "shadow_reflect=contact shadow beneath feet with soft penumbra gradient, environment reflections ray-traced on metallic jewelry surfaces with real-time probe sampling, polished gemstone caustic reflections cast onto adjacent skin, ambient occlusion pooling in garment fold creases and jewelry undercut areas, studio reflector bounce highlights visible on curved metal surfaces, reflection intensity modulated by surface roughness map" },
+  { match: /leather|가죽|스웨이드|suede|shoe|신발|boots|부츠|bag|가방/i, tag: "shadow_reflect=contact shadow beneath footwear and bag with ground-plane occlusion, leather surface catches environment reflections with anisotropic gloss, soft ambient occlusion at stitching and panel junctions, subtle floor reflection visible on polished leather toes, reflector bounce highlights sweep across curved leather surfaces with motion" },
+  { match: /silk|실크|샤틴|satin|chiffon|드레스|dress|skirt|치마|scarf|스카프/i, tag: "shadow_reflect=soft contact shadow beneath garment hem with diffusion falloff, silk surface reflects environment with fluid sheen rippling, ambient occlusion in fabric fold interiors, subtle floor reflection caught on glossy satin panels, dynamic shadow casting from fabric draping onto skin and ground" },
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷|cotton|코튼|wool|울|knit|니트|denim|데님/i, tag: "shadow_reflect=contact shadow where garment meets floor with gradient penumbra, fabric surface ambient occlusion in fold creases and layer overlaps, soft environment bounce light reflected onto matte fabric, shadow intensity varies with fabric opacity and drape, ground-plane shadow follows body silhouette with garment extension" },
+  { match: /gem|보석|diamond|다이아|crystal|크리스탈|glass|유리/i, tag: "shadow_reflect=caustic light pattern cast by gemstone onto skin and floor, transparent gem internal reflection and dispersion visible, contact shadow beneath setting with sharp penumbra, environment reflection ray-traced through facets with chromatic aberration, ambient occlusion under prong settings and bezel edges" },
+];
+
+function buildShadowReflectionTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined) return "";
+  for (const { match, tag } of SHADOW_REFLECTION_TABLE) {
+    if (match.test(combined)) return tag;
+  }
+  return "";
+}
+
+const DOF_FOCUS_MAP: Record<string, string> = {
+  "스튜디오": "dof_focus=focal plane locked on subject at 2.5m, shallow bokeh f/1.8 with smooth circular highlight rendition, background studio backdrop falls into creamy bokeh blur, foreground product edges remain razor-sharp, depth integration matches studio camera optics, no synthetic cutout edge sharpness mismatch",
+  "야외": "dof_focus=focal plane on subject at 4m, medium bokeh f/2.8 with natural lens falloff, background foliage and sky dissolve into organic bokeh circles, golden hour haze softens background to foreground transition, foreground subject sharpness matches outdoor ambient blur gradient, spatial depth seamlessly integrated",
+  "빈티지": "dof_focus=focal plane on subject at 3m, vintage lens bokeh f/2.0 with swirly rendition and slight chromatic aberration at bokeh edges, background fades with nostalgic softness, vintage lens character imperfections match across subject and background, depth blur intentionally imperfect for retro authenticity",
+  "미니멀": "dof_focus=focal plane on subject at 3m, clean bokeh f/2.8 with minimal highlight distraction, white background dissolves into smooth gradient blur, subject edges crisp against soft minimal backdrop, depth falloff clean and uniform, no bokeh artifacts to break minimalist aesthetic",
+  "카페": "dof_focus=focal plane on subject at 2m, intimate bokeh f/2.0 with warm specular highlights from pendant lights, background cafe interior blurs into cozy light orbs, foreground subject sharpness integrates with ambient warm blur, shallow depth enhances intimate atmosphere without cutout separation",
+  "도시": "dof_focus=focal plane on subject at 5m, deeper bokeh f/4.0 for urban context retention, background city lights blur into distinct neon bokeh circles, street-level depth maintains environment context while subject stays sharp, depth integration preserves urban atmosphere without synthetic edge mismatch",
+};
+
+function buildDofFocusTag(bgStyle: string | undefined, isCleanMode: boolean): string {
+  if (!bgStyle) return "";
+  const base = DOF_FOCUS_MAP[bgStyle];
+  if (!base) return "";
+  if (isCleanMode) {
+    return base + ", luxury cinema lens shallow DOF enhanced for premium product isolation";
+  }
+  return base;
+}
+
+const BEAUTY_SMOOTHING_TABLE: Array<{ match: RegExp; tag: string }> = [
+  { match: /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계|gem|보석|diamond|다이아|crystal|크리스탈/i, tag: "beauty_smooth=balanced skin smoothing on exposed zones face neck and hands, tone-evening filter evens skin redness and blemish softening without plastic look, skin pores and micro-texture preserved for realism, jewelry and gemstone edges remain razor-sharp with full micro-detail retention, smoothing intensity self-limits at jewelry-skin boundary to maximize accessory contrast, no smoothing applied to metal or gem surfaces" },
+  { match: /silk|실크|샤틴|satin|chiffon|드레스|dress|skirt|치마|scarf|스카프|blouse|블라우스/i, tag: "beauty_smooth=balanced skin smoothing on exposed face neck decolletage and arms, skin tone-evening for uniform complexion, blemish softening preserves natural skin micro-texture and pore detail, fabric weave and thread micro-detail remain fully sharp, smoothing boundary stops at fabric-skin edge to maximize textile contrast, sheer fabric areas retain skin visibility without double-smoothing artifacts" },
+  { match: /leather|가죽|재킷|jacket|boots|부츠|gloves|장갑|bag|가방|shoe|신발/i, tag: "beauty_smooth=balanced skin smoothing on exposed face and hands, tone-evening on visible skin zones, blemish softening retains natural skin texture and edge fidelity, leather grain pores and stitching micro-detail remain fully sharp, smoothing intensity reduces at leather-skin boundary to maximize material contrast, no smoothing on leather or hardware surfaces" },
+  { match: /cotton|코튼|면|linen|린넨|셔츠|shirt|wool|울|니트|knit|코트|coat|denim|데님/i, tag: "beauty_smooth=balanced skin smoothing on exposed face neck and hands, skin tone-evening for natural complexion uniformity, blemish softening without losing skin micro-detail, fabric thread weave and texture remain fully sharp, smoothing boundary respects fabric-skin edge to maximize garment contrast, no smoothing applied to fabric surface" },
+  { match: /fabric|패브릭|textile|텍스타일|의류|clothing|옷/i, tag: "beauty_smooth=balanced skin smoothing on exposed skin zones, tone-evening filter for uniform complexion, blemish softening preserves natural skin micro-texture and pore detail, fabric and accessory micro-details remain fully sharp, smoothing self-limits at garment-skin boundary to maximize product contrast, no smoothing on fabric or accessory surfaces" },
+];
+
+function buildBeautySmoothTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined) return "";
+  for (const { match, tag } of BEAUTY_SMOOTHING_TABLE) {
+    if (match.test(combined)) return tag;
+  }
+  return "";
+}
+
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
@@ -1433,8 +1582,28 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
       if (v.textureDescription) tokens.push(`texture=${v.textureDescription}`);
+      const matTag = buildMaterialPhysicsTag(v.materialGuess);
+      if (matTag) tokens.push(matTag);
+      const fabTag = buildFabricPhysicsTag(v.materialGuess, v.productCategory);
+      if (fabTag) tokens.push(fabTag);
+      const colTag = buildCollisionTag(v.materialGuess, v.productCategory);
+      if (colTag) tokens.push(colTag);
+      const skinTag = buildSkinResponseTag(v.materialGuess, v.productCategory);
+      if (skinTag) tokens.push(skinTag);
     }
     if (bgTag) tokens.push(bgTag);
+    const envLightTag = buildEnvLightingTag(p.bgStyle);
+    if (envLightTag) tokens.push(envLightTag);
+    if (v) {
+      const shadowTag = buildShadowReflectionTag(v.materialGuess, v.productCategory);
+      if (shadowTag) tokens.push(shadowTag);
+    }
+    const dofTag = buildDofFocusTag(p.bgStyle, true);
+    if (dofTag) tokens.push(dofTag);
+    if (v) {
+      const beautyTag = buildBeautySmoothTag(v.materialGuess, v.productCategory);
+      if (beautyTag) tokens.push(beautyTag);
+    }
     if (outfitTag) tokens.push(outfitTag);
     if (zoomTag) tokens.push(zoomTag);
     if (rotTag) tokens.push(rotTag);
@@ -1466,6 +1635,14 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     const v = p.productVision;
     const feats = v.visualFeatures.slice(0, 2).join(",");
     tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
+    const matTag = buildMaterialPhysicsTag(v.materialGuess);
+    if (matTag) tokens.push(matTag);
+    const fabTag = buildFabricPhysicsTag(v.materialGuess, v.productCategory);
+    if (fabTag) tokens.push(fabTag);
+    const colTag = buildCollisionTag(v.materialGuess, v.productCategory);
+    if (colTag) tokens.push(colTag);
+    const skinTag = buildSkinResponseTag(v.materialGuess, v.productCategory);
+    if (skinTag) tokens.push(skinTag);
   }
 
   if (p.captionText && p.captionText.trim()) {
@@ -1473,6 +1650,18 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   }
 
   if (bgTag) tokens.push(bgTag);
+  const envLightTag = buildEnvLightingTag(p.bgStyle);
+  if (envLightTag) tokens.push(envLightTag);
+  if (p.productVision) {
+    const shadowTag = buildShadowReflectionTag(p.productVision.materialGuess, p.productVision.productCategory);
+    if (shadowTag) tokens.push(shadowTag);
+  }
+  const dofTag = buildDofFocusTag(p.bgStyle, false);
+  if (dofTag) tokens.push(dofTag);
+  if (p.productVision) {
+    const beautyTag = buildBeautySmoothTag(p.productVision.materialGuess, p.productVision.productCategory);
+    if (beautyTag) tokens.push(beautyTag);
+  }
   if (outfitTag) tokens.push(outfitTag);
   if (zoomTag) tokens.push(zoomTag);
   if (rotTag) tokens.push(rotTag);
