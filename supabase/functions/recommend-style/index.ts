@@ -151,7 +151,7 @@ async function recommendWithOpenAI(
     "Return ONLY valid JSON, no markdown.";
 
   const userText = [
-    `상품명: ${productName || "알 수 없음"}`,
+    `상품명: ${productName || "추천 상품"}`,
     `카테고리: ${productCategory}`,
     `액센트 컬러: ${accentColor}`,
     hook ? `훅: ${hook}` : "",

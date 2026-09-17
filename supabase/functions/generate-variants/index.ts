@@ -172,7 +172,7 @@ async function generateVariantsWithOpenAI(data: VariantRequest, apiKey: string):
   const userPrompt =
     `제품명: ${data.productName}\n` +
     `카테고리: ${data.productCategory}\n` +
-    `가격: ${data.priceEstimate || "알 수 없음"}\n` +
+    (data.priceEstimate ? `가격: ${data.priceEstimate}\n` : "") +
     `한 줄 소개: ${data.oneLiner || ""}\n` +
     `장점: ${(data.productAdvantages || []).join(', ')}\n` +
     `기존 후킹: ${data.hook || ""}\n` +

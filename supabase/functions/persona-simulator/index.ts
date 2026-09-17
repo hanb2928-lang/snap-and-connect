@@ -147,7 +147,7 @@ async function simulateWithOpenAI(
   const userPrompt =
     `제품명: ${data.productName}\n` +
     `카테고리: ${data.productCategory}\n` +
-    `가격: ${data.priceEstimate || "알 수 없음"}\n` +
+    (data.priceEstimate ? `가격: ${data.priceEstimate}\n` : "") +
     `한 줄 소개: ${data.oneLiner || ""}\n` +
     `장점: ${(data.productAdvantages || []).join(", ") || "없음"}\n` +
     `현재 후킹 문구: ${data.hook || "없음"}`;
