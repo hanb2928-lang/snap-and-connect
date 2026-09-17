@@ -115,7 +115,7 @@ export function ScrollableTabBar({ state, navigation, badges }: BottomTabBarProp
 const styles = StyleSheet.create({
   container: {
     backgroundColor: theme.colors.dark.surface,
-    borderTopColor: theme.colors.dark.border,
+    borderTopColor: 'rgba(76, 125, 255, 0.12)',
     borderTopWidth: 1,
     paddingTop: 10,
     paddingBottom: 8,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
   },
   iconWrapActive: {
-    backgroundColor: theme.colors.primary[500] + '2E',
+    backgroundColor: 'rgba(76, 125, 255, 0.18)',
   },
   tabBadgeDot: {
     position: 'absolute',

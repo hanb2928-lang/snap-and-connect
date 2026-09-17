@@ -16,6 +16,7 @@ export interface ColorRamp {
 export interface ThemePresetColors {
   primary: ColorRamp;
   accent: ColorRamp;
+  gold: ColorRamp;
   dark: ColorPalette;
   light: ColorPalette;
   glass: typeof theme.glass;
@@ -27,29 +28,41 @@ export interface ThemePresetColors {
 export const theme = {
   colors: {
     primary: {
-      50: '#eef9ff',
-      100: '#d9f0ff',
-      200: '#bce6ff',
-      300: '#8ed6ff',
-      400: '#59bdff',
-      500: '#2f9dff',
-      600: '#167ef5',
-      700: '#1267e8',
-      800: '#1454d4',
-      900: '#1648a8',
-      950: '#112c6f',
+      50: '#eef3ff',
+      100: '#d9e6ff',
+      200: '#bcd0ff',
+      300: '#8eb0ff',
+      400: '#6a97ff',
+      500: '#4C7DFF',
+      600: '#3a66e8',
+      700: '#2f52cc',
+      800: '#2845a8',
+      900: '#233a82',
+      950: '#1a2a5c',
     },
     accent: {
-      50: '#ecfdff',
-      100: '#cff7fe',
-      200: '#a4eefc',
-      300: '#6de1f8',
-      400: '#22ccec',
-      500: '#06b3d4',
-      600: '#0892b2',
-      700: '#0d748f',
-      800: '#155e75',
-      900: '#164e63',
+      50: '#e6fbf7',
+      100: '#ccf6ee',
+      200: '#a4ecdd',
+      300: '#6dddc8',
+      400: '#2DD4BF',
+      500: '#2DD4BF',
+      600: '#1ab5a3',
+      700: '#149083',
+      800: '#127268',
+      900: '#0f5b53',
+    },
+    gold: {
+      50: '#fdf9ec',
+      100: '#faf0cf',
+      200: '#f3dfa0',
+      300: '#ecca6e',
+      400: '#D4AF37',
+      500: '#D4AF37',
+      600: '#b8932b',
+      700: '#967923',
+      800: '#7a6120',
+      900: '#5f4d1e',
     },
     success: {
       50: '#ecfdf5',
@@ -88,13 +101,13 @@ export const theme = {
       950: '#020617',
     },
     dark: {
-      bg: '#0a0f1e',
-      surface: '#131a2e',
-      surfaceLight: '#1e2740',
-      border: '#2a3454',
-      text: '#f1f5f9',
-      textDim: '#94a3b8',
-      textFaint: '#64748b',
+      bg: '#040B1B',
+      surface: '#121C38',
+      surfaceLight: '#1A2848',
+      border: '#1E2D4F',
+      text: '#FFFFFF',
+      textDim: '#A6B0CF',
+      textFaint: '#6B7BA0',
     },
     light: {
       bg: '#f0f4fa',
@@ -138,26 +151,26 @@ export const theme = {
     card: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.12,
+      shadowOpacity: 0.20,
       shadowRadius: 12,
       elevation: 4,
     },
     elevated: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.18,
+      shadowOpacity: 0.25,
       shadowRadius: 24,
       elevation: 8,
     },
     glowPrimary: _isLowEnd ? _noGlow : {
-      shadowColor: '#59bdff',
+      shadowColor: '#4C7DFF',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.35,
       shadowRadius: 12,
       elevation: 0,
     },
     glowAccent: _isLowEnd ? _noGlow : {
-      shadowColor: '#22ccec',
+      shadowColor: '#2DD4BF',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.3,
       shadowRadius: 10,
@@ -180,26 +193,26 @@ export const theme = {
   },
   glass: _isLowEnd
     ? {
-        surface: '#131a2e',
-        surfaceLight: '#1e2740',
-        border: '#2a3454',
+        surface: '#121C38',
+        surfaceLight: '#1A2848',
+        border: '#1E2D4F',
         borderActive: '#2a4a6b',
-        highlight: '#1e2740',
+        highlight: '#1A2848',
       }
     : _isWeb
       ? {
-          surface: 'rgba(19, 26, 46, 0.72)',
-          surfaceLight: 'rgba(30, 39, 64, 0.6)',
+          surface: 'rgba(18, 28, 56, 0.72)',
+          surfaceLight: 'rgba(26, 40, 72, 0.6)',
           border: 'rgba(255, 255, 255, 0.08)',
-          borderActive: 'rgba(89, 189, 255, 0.25)',
+          borderActive: 'rgba(76, 125, 255, 0.25)',
           highlight: 'rgba(255, 255, 255, 0.04)',
         }
       : {
-          surface: '#131a2e',
-          surfaceLight: '#1e2740',
-          border: '#2a3454',
+          surface: '#121C38',
+          surfaceLight: '#1A2848',
+          border: '#1E2D4F',
           borderActive: '#2a4a6b',
-          highlight: '#1e2740',
+          highlight: '#1A2848',
         },
   glassLight: _isLowEnd
     ? {
@@ -234,6 +247,7 @@ export const theme = {
 const presetCinematicDark: ThemePresetColors = {
   primary: theme.colors.primary,
   accent: theme.colors.accent,
+  gold: theme.colors.gold,
   dark: theme.colors.dark,
   light: theme.colors.light,
   glass: theme.glass,
@@ -253,6 +267,7 @@ const presetStudioLight: ThemePresetColors = {
     400: '#22ccec', 500: '#06b3d4', 600: '#0892b2', 700: '#0d748f',
     800: '#155e75', 900: '#164e63',
   },
+  gold: theme.colors.gold,
   dark: {
     bg: '#1a1a1a', surface: '#242424', surfaceLight: '#2e2e2e',
     border: '#3a3a3a', text: '#f5f5f5', textDim: '#a0a0a0', textFaint: '#6b6b6b',
@@ -286,6 +301,7 @@ const presetTrendyViral: ThemePresetColors = {
     400: '#22c5f5', 500: '#06a8e0', 600: '#0888b8', 700: '#0d6e96',
     800: '#155a7a', 900: '#164a66',
   },
+  gold: theme.colors.gold,
   dark: {
     bg: '#0d0a1a', surface: '#181225', surfaceLight: '#221a35',
     border: '#2e2545', text: '#f0e6ff', textDim: '#9888b8', textFaint: '#6a5a8a',

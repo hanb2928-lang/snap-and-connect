@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ViewStyle } from 'react-native';
-import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2, Sparkles, Camera, Layers } from 'lucide-react-native';
+import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2, Orbit, Layers } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 export type GenMode = 'auto_3d' | 'universal_synthesis' | 'manual';
@@ -72,7 +72,7 @@ function GenerationModePanelInner({
         >
           <View style={styles.modeCardHeader}>
             <View style={[styles.modeIconWrap, mode === 'auto_3d' && styles.modeIconWrapActive]}>
-              <Camera size={18} color={mode === 'auto_3d' ? '#fff' : MODE_ACCENT.auto_3d} strokeWidth={2} />
+              <Orbit size={18} color={mode === 'auto_3d' ? '#fff' : MODE_ACCENT.auto_3d} strokeWidth={2} />
             </View>
             <View style={styles.modeCardTextWrap}>
               <Text style={[styles.modeCardTitle, mode === 'auto_3d' && styles.modeCardTitleActive]}>
@@ -115,7 +115,7 @@ function GenerationModePanelInner({
         >
           <View style={styles.modeCardHeader}>
             <View style={[styles.modeIconWrap, mode === 'universal_synthesis' && styles.modeIconWrapActiveAccent]}>
-              <Sparkles size={18} color={mode === 'universal_synthesis' ? '#fff' : MODE_ACCENT.universal_synthesis} strokeWidth={2} />
+              <Layers size={18} color={mode === 'universal_synthesis' ? '#fff' : MODE_ACCENT.universal_synthesis} strokeWidth={2} />
             </View>
             <View style={styles.modeCardTextWrap}>
               <Text style={[styles.modeCardTitle, mode === 'universal_synthesis' && styles.modeCardTitleActive]}>
@@ -307,8 +307,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   modeCards: {
     gap: theme.spacing.xs,
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     padding: theme.spacing.sm + 2,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: 'rgba(76, 125, 255, 0.10)',
     gap: 8,
   },
   modeCardActive: {
@@ -354,7 +355,8 @@ const styles = StyleSheet.create({
   modeCardTitle: {
     fontSize: 14,
     fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   modeCardTitleActive: {
     color: theme.colors.primary[300],
@@ -362,7 +364,7 @@ const styles = StyleSheet.create({
   modeCardDesc: {
     fontSize: 11,
     fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
+    color: '#A6B0CF',
     lineHeight: 16,
   },
   modeOptionsPanel: {
@@ -371,6 +373,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.sm,
     gap: 4,
     borderWidth: 1,
+    borderColor: 'rgba(76, 125, 255, 0.10)',
   },
   optionRow: {
     flexDirection: 'row',
@@ -518,6 +521,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: theme.spacing.md + 2,
     borderRadius: theme.radius.lg,
+    ...theme.shadows.glowPrimary,
   },
   generateBtnDisabled: {
     opacity: 0.6,

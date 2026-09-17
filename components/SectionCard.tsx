@@ -63,6 +63,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.dark.surface,
     borderRadius: theme.radius.lg,
     marginVertical: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 125, 255, 0.15)',
     ...theme.shadows.card,
     overflow: 'hidden',
   },
@@ -77,7 +79,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primary[500] + '15',
+    backgroundColor: 'rgba(76, 125, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -91,11 +93,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.text,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   badge: {
-    backgroundColor: theme.colors.accent[500] + '20',
+    backgroundColor: 'rgba(45, 212, 191, 0.15)',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -108,7 +111,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
+    color: '#A6B0CF',
     marginTop: 3,
   },
   chevron: {
@@ -122,6 +125,6 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
     paddingTop: theme.spacing.xs,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.dark.border,
+    borderTopColor: 'rgba(76, 125, 255, 0.12)',
   },
 });

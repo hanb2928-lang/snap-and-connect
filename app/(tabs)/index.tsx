@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Flame, Gem } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Flame, Gem, Orbit, Layers } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -616,14 +616,14 @@ export default function CameraScreen() {
 
         <View style={styles.modeCardsWrap}>
           <ModeCard
-            icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
+            icon={<Orbit size={28} color="#fff" strokeWidth={2} />}
             title="입체컷 오토"
             desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
             onPress={() => handleModeSelect('single')}
           />
           <ModeCard
-            icon={<Camera size={32} color="#fff" strokeWidth={2.5} />}
+            icon={<Layers size={28} color="#fff" strokeWidth={2} />}
             title="AI 범용 합성"
             desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
             color={theme.colors.accent[500]}
@@ -1312,7 +1312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md + 2,
     borderWidth: 1.5,
-    borderColor: theme.colors.dark.border,
+    borderColor: 'rgba(76, 125, 255, 0.15)',
   },
   modeCardIcon: {
     width: 50,
@@ -1326,15 +1326,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   modeCardTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.dark.text,
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
   },
   modeCardDesc: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textDim,
-    lineHeight: 18,
+    color: '#A6B0CF',
+    lineHeight: 17,
   },
   modeSelectErrorInline: {
     marginHorizontal: theme.spacing.lg,
