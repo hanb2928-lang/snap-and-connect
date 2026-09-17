@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Platform,
   Image,
   Modal,
@@ -539,7 +540,7 @@ export default function CameraScreen() {
   // ─── Mode Selection Screen ───
   if (screenPhase === 'mode_select') {
     return (
-      <View style={styles.modeSelectContainer}>
+      <ScrollView style={styles.modeSelectContainer} contentContainerStyle={styles.modeSelectContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.modeSelectHeader, { paddingTop: safeTop + theme.spacing.lg }]}>
           <View style={{ width: 80 }} />
           <View style={{ flex: 1 }} />
@@ -547,6 +548,23 @@ export default function CameraScreen() {
         </View>
 
         <TriggerBanner />
+
+        <View style={styles.modeCardsWrap}>
+          <ModeCard
+            icon={<Orbit size={28} color="#fff" strokeWidth={2} />}
+            title="입체컷 오토"
+            desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
+            color={theme.colors.primary[600]}
+            onPress={() => handleModeSelect('single')}
+          />
+          <ModeCard
+            icon={<Layers size={28} color="#fff" strokeWidth={2} />}
+            title="AI 범용 합성"
+            desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
+            color={theme.colors.accent[500]}
+            onPress={() => handleModeSelect('fitting')}
+          />
+        </View>
 
         <View style={styles.toneSelectorWrap}>
           <Text style={styles.toneSelectorLabel}>콘텐츠 톤앤매너</Text>
@@ -614,23 +632,6 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.modeCardsWrap}>
-          <ModeCard
-            icon={<Orbit size={28} color="#fff" strokeWidth={2} />}
-            title="입체컷 오토"
-            desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
-            color={theme.colors.primary[600]}
-            onPress={() => handleModeSelect('single')}
-          />
-          <ModeCard
-            icon={<Layers size={28} color="#fff" strokeWidth={2} />}
-            title="AI 범용 합성"
-            desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
-            color={theme.colors.accent[500]}
-            onPress={() => handleModeSelect('fitting')}
-          />
-        </View>
-
         <CreditPurchaseModal
           visible={creditModalVisible}
           onClose={() => setCreditModalVisible(false)}
@@ -641,7 +642,7 @@ export default function CameraScreen() {
             <Text style={styles.modeSelectErrorText}>{error}</Text>
           </View>
         )}
-      </View>
+      </ScrollView>
     );
   }
 
@@ -1148,10 +1149,14 @@ interface ModeCardProps {
 
 function ModeCard({ icon, title, desc, color, onPress }: ModeCardProps) {
   return (
-    <TouchableOpacity
-      style={styles.modeCard}
+    <Pressable
+      style={({ pressed }) => [
+        styles.modeCard,
+        { borderColor: color + '40' },
+        pressed && styles.modeCardPressed,
+      ]}
       onPress={onPress}
-      activeOpacity={0.85}
+      android_ripple={{ color: color + '15', radius: 200 }}
     >
       <View style={[styles.modeCardIcon, { backgroundColor: color }]}>
         {icon}
@@ -1160,8 +1165,8 @@ function ModeCard({ icon, title, desc, color, onPress }: ModeCardProps) {
         <Text style={styles.modeCardTitle}>{title}</Text>
         <Text style={styles.modeCardDesc}>{desc}</Text>
       </View>
-      <ArrowRight size={22} color={theme.colors.dark.textDim} strokeWidth={2} />
-    </TouchableOpacity>
+      <ArrowRight size={20} color={theme.colors.dark.textDim} strokeWidth={2} />
+    </Pressable>
   );
 }
 
@@ -1175,17 +1180,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.dark.bg,
   },
+  modeSelectContent: {
+    paddingBottom: theme.spacing.xxl,
+  },
   modeSelectHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   modeCardsWrap: {
-    flex: 1,
     paddingHorizontal: theme.spacing.lg,
     gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   cleanModeWrap: {
     flexDirection: 'row',
@@ -1311,12 +1319,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.xl,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md + 2,
-    borderWidth: 1.5,
-    borderColor: 'rgba(76, 125, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  modeCardPressed: {
+    borderColor: 'rgba(76, 125, 255, 0.5)',
   },
   modeCardIcon: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
     borderRadius: theme.radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
