@@ -56,6 +56,11 @@ interface GenerateVideoRequest {
   stylePreset?: string;
   detailRestoration?: boolean;
   durationSec?: number;
+  selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual';
+  enableOrbit360?: boolean;
+  enableCaustics?: boolean;
+  enableVirtualFitting?: boolean;
+  enableFabricPhysics?: boolean;
   // webhook fields (sent by Runway callback)
   status?: string;
   output?: string[] | { url?: string } | string;
@@ -242,6 +247,11 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     qualityTier,
     resolution,
     fps,
+    selectedMode: body.selectedMode,
+    enableOrbit360: body.enableOrbit360,
+    enableCaustics: body.enableCaustics,
+    enableVirtualFitting: body.enableVirtualFitting,
+    enableFabricPhysics: body.enableFabricPhysics,
   });
 
   // Generate internal job ID immediately — no waiting for Runway API
@@ -1341,6 +1351,11 @@ type CompactPromptParams = {
   qualityTier: string;
   resolution: string;
   fps: number;
+  selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual';
+  enableOrbit360?: boolean;
+  enableCaustics?: boolean;
+  enableVirtualFitting?: boolean;
+  enableFabricPhysics?: boolean;
 };
 
 const PLATFORM_STYLE: Record<string, { camera: string; lighting: string; grade: string }> = {
@@ -1595,6 +1610,32 @@ function buildSensoryHook(v: ProductVisionData, hookCategory: string, variationS
   return fallback[variationSeed % fallback.length];
 }
 
+function buildModeRenderingTokens(
+  selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual',
+  enableOrbit360?: boolean,
+  enableCaustics?: boolean,
+  enableVirtualFitting?: boolean,
+  enableFabricPhysics?: boolean,
+): string[] {
+  const tokens: string[] = [];
+  if (selectedMode === 'auto_3d') {
+    if (enableOrbit360) {
+      tokens.push('orbit_camera=360-degree smooth horizontal orbit around product core, continuous circular camera path maintaining focal lock on product centroid, parallax depth shift across orbit arc');
+    }
+    if (enableCaustics) {
+      tokens.push('ray_traced_caustics=dynamic light dispersion and specular reflections shifting across facets and metallic surfaces during rotation, real-time caustic pooling on adjacent surfaces, dispersion rainbow refraction on crystal and gem facets, anisotropic specular sweep on polished metal during orbit');
+    }
+  } else if (selectedMode === 'universal_synthesis') {
+    if (enableVirtualFitting) {
+      tokens.push('virtual_fitting=volumetric body mapping and 3D draping simulation, skeletal mesh alignment for natural garment fit, body-aware cloth wrapping with anatomically correct tension distribution, realistic garment-to-body contact zones with pressure-based deformation');
+    }
+    if (enableFabricPhysics) {
+      tokens.push('fabric_physics_engine=real-time gravity simulation with momentum inertia, boundary collision checks preventing clipping artifacts between garment layers and human skin, fabric ripple propagation with body motion delay, gravity-aware drape recovery, fold crease formation and relaxation, self-collision detection between overlapping fabric layers');
+    }
+  }
+  return tokens;
+}
+
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   const name = p.productName || p.productVision?.productName || "the product";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
@@ -1628,6 +1669,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
 
   // Transition effect
   const transTag = p.transitionEffect && TRANSITION_MAP[p.transitionEffect] ? `transitions=${TRANSITION_MAP[p.transitionEffect]}` : "";
+
+  const modeTokens = buildModeRenderingTokens(p.selectedMode, p.enableOrbit360, p.enableCaustics, p.enableVirtualFitting, p.enableFabricPhysics);
 
   if (p.isCleanVideoMode) {
     const v = p.productVision;
@@ -1670,6 +1713,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     if (zoomTag) tokens.push(zoomTag);
     if (rotTag) tokens.push(rotTag);
     if (transTag) tokens.push(transTag);
+    for (const mt of modeTokens) tokens.push(mt);
     tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
     tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
     if (negTag) tokens.push(negTag);
@@ -1731,6 +1775,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   if (zoomTag) tokens.push(zoomTag);
   if (rotTag) tokens.push(rotTag);
   if (transTag) tokens.push(transTag);
+  for (const mt of modeTokens) tokens.push(mt);
   if (negTag) tokens.push(negTag);
 
   tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production");

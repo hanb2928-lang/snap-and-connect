@@ -54,6 +54,11 @@ interface GenerateAiVideoOptions {
   fps?: number;
   imageHash?: string;
   contentTone?: string;
+  selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual';
+  enableOrbit360?: boolean;
+  enableCaustics?: boolean;
+  enableVirtualFitting?: boolean;
+  enableFabricPhysics?: boolean;
 }
 
 
@@ -215,6 +220,11 @@ export async function generateAiVideo(
           qualityTier: options.hdUpscale ? 'pro' : (options.qualityTier ?? 'standard'),
           resolution: options.resolution ?? (options.hdUpscale ? '1080p' : '720p'),
           fps: options.fps ?? (options.hdUpscale ? 30 : 24),
+          selectedMode: options.selectedMode,
+          enableOrbit360: options.enableOrbit360,
+          enableCaustics: options.enableCaustics,
+          enableVirtualFitting: options.enableVirtualFitting,
+          enableFabricPhysics: options.enableFabricPhysics,
         },
         0,
         (retryAttempt) => report('submitting', 0.05 + retryAttempt * 0.02, `네트워크 복구 후 재시도 중 (${retryAttempt}/${SUBMIT_MAX_RETRIES})...`),
@@ -695,6 +705,11 @@ export async function submitVideoJobAsync(
       qualityTier: options.hdUpscale ? 'pro' : (options.qualityTier ?? 'standard'),
       resolution: options.resolution ?? (options.hdUpscale ? '1080p' : '720p'),
       fps: options.fps ?? (options.hdUpscale ? 30 : 24),
+      selectedMode: options.selectedMode,
+      enableOrbit360: options.enableOrbit360,
+      enableCaustics: options.enableCaustics,
+      enableVirtualFitting: options.enableVirtualFitting,
+      enableFabricPhysics: options.enableFabricPhysics,
     },
   });
 
@@ -886,6 +901,11 @@ export async function upgradeVideoToHd(
       qualityTier: 'pro',
       resolution: options.resolution ?? '1080p',
       fps: options.fps ?? 30,
+      selectedMode: options.selectedMode,
+      enableOrbit360: options.enableOrbit360,
+      enableCaustics: options.enableCaustics,
+      enableVirtualFitting: options.enableVirtualFitting,
+      enableFabricPhysics: options.enableFabricPhysics,
     },
   });
 

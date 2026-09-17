@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ViewStyle } from 'react-native';
-import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react-native';
+import { Zap, Wrench, Sliders, ChevronDown, ChevronUp, Loader2, Sparkles, Camera, Layers } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
 export type GenMode = 'auto_3d' | 'universal_synthesis' | 'manual';
@@ -29,6 +29,12 @@ interface Props {
   modeOptions: ModeOptionToggle[];
 }
 
+const MODE_ACCENT = {
+  auto_3d: theme.colors.primary[400],
+  universal_synthesis: theme.colors.accent[400],
+  manual: theme.colors.dark.textDim,
+};
+
 function GenerationModePanelInner({
   mode,
   onModeChange,
@@ -45,6 +51,7 @@ function GenerationModePanelInner({
   modeOptions,
 }: Props) {
   const [manualExpanded, setManualExpanded] = useState(false);
+  const accent = MODE_ACCENT[mode] ?? theme.colors.primary[400];
 
   return (
     <View style={styles.container}>
@@ -55,56 +62,110 @@ function GenerationModePanelInner({
         <Text style={styles.title}>제작 모드 &amp; 실행</Text>
       </View>
 
-      <View style={styles.modeTabs}>
+      {/* Mode selection cards */}
+      <View style={styles.modeCards}>
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'auto_3d' && styles.modeTabActive]}
+          style={[styles.modeCard, mode === 'auto_3d' && styles.modeCardActive]}
           onPress={() => onModeChange('auto_3d')}
           activeOpacity={0.7}
         >
-          <Zap size={14} color={mode === 'auto_3d' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={[styles.modeTabText, mode === 'auto_3d' && styles.modeTabTextActive]}>입체컷 오토</Text>
+          <View style={styles.modeCardHeader}>
+            <View style={[styles.modeIconWrap, mode === 'auto_3d' && styles.modeIconWrapActive]}>
+              <Camera size={18} color={mode === 'auto_3d' ? '#fff' : MODE_ACCENT.auto_3d} strokeWidth={2} />
+            </View>
+            <View style={styles.modeCardTextWrap}>
+              <Text style={[styles.modeCardTitle, mode === 'auto_3d' && styles.modeCardTitleActive]}>
+                입체컷 오토
+              </Text>
+              <Text style={styles.modeCardDesc}>
+                정면·좌측·우측·상부를 순차 촬영해 AI 입체적 숏폼 완성
+              </Text>
+            </View>
+          </View>
+
+          {mode === 'auto_3d' && modeOptions.length > 0 && (
+            <View style={[styles.modeOptionsPanel, { borderColor: MODE_ACCENT.auto_3d + '30' }]}>
+              {modeOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.optionRow}
+                  onPress={opt.onToggle}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionTextWrap}>
+                    <Text style={styles.optionLabel}>{opt.label}</Text>
+                    <Text style={styles.optionDesc}>{opt.description}</Text>
+                  </View>
+                  <View style={[styles.toggle, opt.enabled && styles.toggleActive]}>
+                    <View style={[styles.toggleKnob, opt.enabled && styles.toggleKnobActive]} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'universal_synthesis' && styles.modeTabActive]}
+          style={[styles.modeCard, mode === 'universal_synthesis' && styles.modeCardActive]}
           onPress={() => onModeChange('universal_synthesis')}
           activeOpacity={0.7}
         >
-          <Sparkles size={14} color={mode === 'universal_synthesis' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={[styles.modeTabText, mode === 'universal_synthesis' && styles.modeTabTextActive]}>AI 범용 합성</Text>
+          <View style={styles.modeCardHeader}>
+            <View style={[styles.modeIconWrap, mode === 'universal_synthesis' && styles.modeIconWrapActiveAccent]}>
+              <Sparkles size={18} color={mode === 'universal_synthesis' ? '#fff' : MODE_ACCENT.universal_synthesis} strokeWidth={2} />
+            </View>
+            <View style={styles.modeCardTextWrap}>
+              <Text style={[styles.modeCardTitle, mode === 'universal_synthesis' && styles.modeCardTitleActive]}>
+                AI 범용 합성
+              </Text>
+              <Text style={styles.modeCardDesc}>
+                최소 3컷부터 다각도 촬영 컷으로 제품을 배경·모델에 자연스럽게 합성
+              </Text>
+            </View>
+          </View>
+
+          {mode === 'universal_synthesis' && modeOptions.length > 0 && (
+            <View style={[styles.modeOptionsPanel, { borderColor: MODE_ACCENT.universal_synthesis + '30' }]}>
+              {modeOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={styles.optionRow}
+                  onPress={opt.onToggle}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionTextWrap}>
+                    <Text style={styles.optionLabel}>{opt.label}</Text>
+                    <Text style={styles.optionDesc}>{opt.description}</Text>
+                  </View>
+                  <View style={[styles.toggle, opt.enabled && styles.toggleActiveAccent]}>
+                    <View style={[styles.toggleKnob, opt.enabled && styles.toggleKnobActive]} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.modeTab, mode === 'manual' && styles.modeTabActive]}
+          style={[styles.modeCard, mode === 'manual' && styles.modeCardActive]}
           onPress={() => onModeChange('manual')}
           activeOpacity={0.7}
         >
-          <Wrench size={14} color={mode === 'manual' ? '#fff' : theme.colors.dark.textDim} strokeWidth={2} />
-          <Text style={[styles.modeTabText, mode === 'manual' && styles.modeTabTextActive]}>수동</Text>
+          <View style={styles.modeCardHeader}>
+            <View style={[styles.modeIconWrap, mode === 'manual' && styles.modeIconWrapActive]}>
+              <Wrench size={18} color={mode === 'manual' ? '#fff' : MODE_ACCENT.manual} strokeWidth={2} />
+            </View>
+            <View style={styles.modeCardTextWrap}>
+              <Text style={[styles.modeCardTitle, mode === 'manual' && styles.modeCardTitleActive]}>
+                수동 모드
+              </Text>
+              <Text style={styles.modeCardDesc}>
+                프롬프트·카메라·TTS 싱크를 직접 제어하는 상세 편집
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
       </View>
-
-      {(mode === 'auto_3d' || mode === 'universal_synthesis') && modeOptions.length > 0 && (
-        <View style={styles.modeOptionsPanel}>
-          <Text style={styles.modeOptionsTitle}>
-            {mode === 'auto_3d' ? '입체컷 오토 전용 옵션' : 'AI 범용 합성 전용 옵션'}
-          </Text>
-          {modeOptions.map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              style={styles.optionRow}
-              onPress={opt.onToggle}
-              activeOpacity={0.7}
-            >
-              <View style={styles.optionTextWrap}>
-                <Text style={styles.optionLabel}>{opt.label}</Text>
-                <Text style={styles.optionDesc}>{opt.description}</Text>
-              </View>
-              <View style={[styles.toggle, opt.enabled && styles.toggleActive]}>
-                <View style={[styles.toggleKnob, opt.enabled && styles.toggleKnobActive]} />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       {mode === 'manual' && (
         <View style={styles.manualPanel}>
@@ -194,7 +255,7 @@ function GenerationModePanelInner({
       )}
 
       <TouchableOpacity
-        style={[styles.generateBtn, isGenerating && styles.generateBtnDisabled]}
+        style={[styles.generateBtn, { backgroundColor: accent }, isGenerating && styles.generateBtnDisabled]}
         onPress={onGenerate}
         disabled={isGenerating}
         activeOpacity={0.8}
@@ -244,33 +305,110 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semiBold,
     color: theme.colors.dark.text,
   },
-  modeTabs: {
-    flexDirection: 'row',
+  modeCards: {
     gap: theme.spacing.xs,
+  },
+  modeCard: {
     backgroundColor: theme.colors.dark.bg,
     borderRadius: theme.radius.md,
-    padding: 4,
+    padding: theme.spacing.sm + 2,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    gap: 8,
   },
-  modeTab: {
+  modeCardActive: {
+    borderColor: theme.colors.primary[500],
+    backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  modeCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  modeIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeIconWrapActive: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  modeIconWrapActiveAccent: {
+    backgroundColor: theme.colors.accent[400],
+  },
+  modeCardTextWrap: {
     flex: 1,
+    gap: 3,
+  },
+  modeCardTitle: {
+    fontSize: 14,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: theme.colors.dark.text,
+  },
+  modeCardTitleActive: {
+    color: theme.colors.primary[300],
+  },
+  modeCardDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+    lineHeight: 16,
+  },
+  modeOptionsPanel: {
+    backgroundColor: theme.colors.dark.bg,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm,
+    gap: 4,
+    borderWidth: 1,
+  },
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: theme.radius.sm,
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
-  modeTabActive: {
-    backgroundColor: theme.colors.primary[600],
+  optionTextWrap: {
+    flex: 1,
+    gap: 2,
   },
-  modeTabText: {
+  optionLabel: {
     fontSize: 13,
     fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.textDim,
+    color: theme.colors.dark.text,
   },
-  modeTabTextActive: {
-    color: '#fff',
-    fontFamily: theme.typography.fontFamily.semiBold,
+  optionDesc: {
+    fontSize: 11,
+    fontFamily: theme.typography.fontFamily.regular,
+    color: theme.colors.dark.textFaint,
+  },
+  toggle: {
+    width: 36,
+    height: 20,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.surfaceLight,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleActive: {
+    backgroundColor: theme.colors.primary[500],
+  },
+  toggleActiveAccent: {
+    backgroundColor: theme.colors.accent[400],
+  },
+  toggleKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.dark.textDim,
+    alignSelf: 'flex-start',
+  },
+  toggleKnobActive: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
   },
   manualPanel: {
     gap: theme.spacing.xs,
@@ -372,7 +510,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: theme.spacing.md + 2,
     borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary[600],
   },
   generateBtnDisabled: {
     opacity: 0.6,
@@ -381,60 +518,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: theme.typography.fontFamily.bold,
     color: '#fff',
-  },
-  modeOptionsPanel: {
-    backgroundColor: theme.colors.dark.bg,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm,
-    gap: 6,
-  },
-  modeOptionsTitle: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.semiBold,
-    color: theme.colors.dark.textDim,
-    marginBottom: 2,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  optionTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  optionLabel: {
-    fontSize: 13,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.dark.text,
-  },
-  optionDesc: {
-    fontSize: 11,
-    fontFamily: theme.typography.fontFamily.regular,
-    color: theme.colors.dark.textFaint,
-  },
-  toggle: {
-    width: 36,
-    height: 20,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.surfaceLight,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleActive: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  toggleKnob: {
-    width: 16,
-    height: 16,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.dark.textDim,
-    alignSelf: 'flex-start',
-  },
-  toggleKnobActive: {
-    backgroundColor: '#fff',
-    alignSelf: 'flex-end',
   },
 });
