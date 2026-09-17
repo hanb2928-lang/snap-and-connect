@@ -16,7 +16,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeTop } from '@/hooks/useSafeTop';
 import { useTabBarHeight } from '@/hooks/useTabBarHeight';
-import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Flame, Gem, Orbit, Layers } from 'lucide-react-native';
+import { Camera, RotateCcw, X, Check, Sparkles, Image as ImageIcon, AlertCircle, ArrowRight, Flame, Gem, Orbit, Layers, Diamond, Zap } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -574,17 +575,21 @@ export default function CameraScreen() {
 
         <View style={styles.modeCardsWrap}>
           <ModeCard
-            icon={<Orbit size={28} color="#fff" strokeWidth={2} />}
+            icon={<Orbit size={28} color="#040B1B" strokeWidth={2.2} />}
             title="입체컷 오토"
             desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
-            color={theme.colors.primary[600]}
+            gradientColors={['rgba(252, 211, 77, 0.9)', '#D4AF37']}
+            glowColor="rgba(212, 175, 55, 0.25)"
+            rippleColor="rgba(212, 175, 55, 0.15)"
             onPress={() => handleModeCardPress('single')}
           />
           <ModeCard
-            icon={<Layers size={28} color="#fff" strokeWidth={2} />}
+            icon={<Layers size={28} color="#FFFFFF" strokeWidth={2.2} />}
             title="AI 범용 합성"
             desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
-            color={theme.colors.accent[500]}
+            gradientColors={['#5A8AFF', '#3A66E8']}
+            glowColor="rgba(76, 125, 255, 0.25)"
+            rippleColor="rgba(76, 125, 255, 0.15)"
             onPress={() => handleModeCardPress('fitting')}
           />
         </View>
@@ -618,8 +623,17 @@ export default function CameraScreen() {
               activeOpacity={0.8}
             >
               <View style={styles.toneSegmentHeader}>
-                <View style={[styles.toneIconBadge, contentTone === 'studio' && styles.toneIconBadgeActive]}>
-                  <Gem size={18} color={contentTone === 'studio' ? '#fff' : theme.colors.primary[400]} strokeWidth={2.2} />
+                <View style={[
+                  styles.toneIconBadge,
+                  contentTone === 'studio' && styles.toneIconBadgeActive,
+                  contentTone === 'studio' && styles.toneIconBadgeGoldGlow,
+                ]}>
+                  <Diamond size={18} color={contentTone === 'studio' ? '#FCD33C' : theme.colors.primary[400]} strokeWidth={2.2} />
+                  {contentTone === 'studio' && (
+                    <View style={styles.toneSparkleOverlay}>
+                      <Sparkles size={8} color="#FCD33C" strokeWidth={2.5} />
+                    </View>
+                  )}
                 </View>
                 <Text
                   style={[
@@ -640,8 +654,12 @@ export default function CameraScreen() {
               activeOpacity={0.8}
             >
               <View style={styles.toneSegmentHeader}>
-                <View style={[styles.toneIconBadge, contentTone === 'raw' && styles.toneIconBadgeActiveRaw]}>
-                  <Flame size={18} color={contentTone === 'raw' ? '#fff' : theme.colors.accent[400]} strokeWidth={2.2} />
+                <View style={[
+                  styles.toneIconBadge,
+                  contentTone === 'raw' && styles.toneIconBadgeActiveRaw,
+                  contentTone === 'raw' && styles.toneIconBadgeBlueGlow,
+                ]}>
+                  <Zap size={18} color={contentTone === 'raw' ? '#2DD4BF' : theme.colors.accent[400]} strokeWidth={2.2} />
                 </View>
                 <Text
                   style={[
@@ -1186,24 +1204,30 @@ interface ModeCardProps {
   icon: React.ReactNode;
   title: string;
   desc: string;
-  color: string;
+  gradientColors: [string, string];
+  glowColor: string;
+  rippleColor: string;
   onPress: () => void;
 }
 
-function ModeCard({ icon, title, desc, color, onPress }: ModeCardProps) {
+function ModeCard({ icon, title, desc, gradientColors, glowColor, rippleColor, onPress }: ModeCardProps) {
   return (
     <Pressable
       style={({ pressed }) => [
         styles.modeCard,
-        { borderColor: color + '40' },
         pressed && styles.modeCardPressed,
       ]}
       onPress={onPress}
-      android_ripple={{ color: color + '15', radius: 200 }}
+      android_ripple={{ color: rippleColor, radius: 200 }}
     >
-      <View style={[styles.modeCardIcon, { backgroundColor: color }]}>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[styles.modeCardIcon, { shadowColor: glowColor }]}
+      >
         {icon}
-      </View>
+      </LinearGradient>
       <View style={styles.modeCardTextWrap}>
         <Text style={styles.modeCardTitle}>{title}</Text>
         <Text style={styles.modeCardDesc}>{desc}</Text>
@@ -1322,6 +1346,25 @@ const styles = StyleSheet.create({
   toneIconBadgeActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
+  toneIconBadgeGoldGlow: {
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 0,
+  },
+  toneIconBadgeBlueGlow: {
+    shadowColor: '#4C7DFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 0,
+  },
+  toneSparkleOverlay: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+  },
   toneIconBadgeActiveRaw: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
@@ -1374,6 +1417,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 0,
   },
   modeCardTextWrap: {
     flex: 1,
