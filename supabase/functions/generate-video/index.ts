@@ -1439,6 +1439,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       "quality=top 1% commercial, ultra-premium, high-end brand film",
       `prompt_strength=${strength}/10, ${strengthTag}`,
     ];
+    if (userDirectiveTag) tokens.push(userDirectiveTag);
     if (v) {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
@@ -1452,7 +1453,6 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
     tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
     if (negTag) tokens.push(negTag);
-    if (userDirectiveTag) tokens.push(userDirectiveTag);
     return tokens.join(" ").slice(0, 1000);
   }
 
@@ -1470,6 +1470,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     `aesthetic=raw,imperfect,handheld,no-studio`,
     `prompt_strength=${strength}/10, ${strengthTag}`,
   ];
+
+  if (userDirectiveTag) tokens.push(userDirectiveTag);
 
   if (p.productVision) {
     const v = p.productVision;
@@ -1491,7 +1493,6 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production");
   tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
 
-  if (userDirectiveTag) tokens.push(userDirectiveTag);
   return tokens.join(" ").slice(0, 1000);
 }
 
