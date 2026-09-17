@@ -1402,6 +1402,10 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   // Prompt strength: 1-10 scale, default 7. Higher = more literal prompt adherence.
   const strength = p.promptStrength ?? 7;
   const strengthTag = strength >= 8 ? "strict prompt adherence, literal interpretation" : strength <= 4 ? "creative interpretation, loose prompt guidance, artistic freedom" : "balanced prompt adherence";
+  const userDirective = p.userPrompt.trim().replace(/\s+/g, " ").slice(0, 320);
+  const userDirectiveTag = userDirective
+    ? `USER DIRECTIVE — follow this visual instruction: "${userDirective}"`
+    : "";
 
   // Negative prompt: user-specified elements to exclude
   const negTag = p.negativePrompt && p.negativePrompt.trim() ? `neg=[${p.negativePrompt.trim().slice(0, 80)}]` : "";
@@ -1435,6 +1439,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       "quality=top 1% commercial, ultra-premium, high-end brand film",
       `prompt_strength=${strength}/10, ${strengthTag}`,
     ];
+    if (userDirectiveTag) tokens.push(userDirectiveTag);
     if (v) {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
@@ -1465,6 +1470,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     `aesthetic=raw,imperfect,handheld,no-studio`,
     `prompt_strength=${strength}/10, ${strengthTag}`,
   ];
+
+  if (userDirectiveTag) tokens.push(userDirectiveTag);
 
   if (p.productVision) {
     const v = p.productVision;
