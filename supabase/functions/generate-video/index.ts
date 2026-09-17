@@ -224,6 +224,14 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
   if (effectivePrompt.trim().length === 0) {
     effectivePrompt = buildAutoPrompt(body.productName, body.productVision, body.captionText, body.isCleanVideoMode === true, requestedDuration);
   }
+  const resolvedProductName = body.productName || body.productVision?.productName || "";
+  if (!resolvedProductName) {
+    console.log("[generate-video] Fallback guard: productName was empty, using ecommerce fallback copy '지금 가장 핫한 추천 아이템'");
+  }
+  const resolvedCaption = body.captionText && body.captionText.trim() ? body.captionText : "";
+  if (!resolvedCaption) {
+    console.log("[generate-video] Fallback guard: captionText was empty, frontend will use '시선 집중! 지금 바로 확인하세요'");
+  }
 
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
@@ -1312,7 +1320,7 @@ function buildAutoPrompt(
 ): string {
   const parts: string[] = [];
 
-  const name = productName || vision?.productName || "제품";
+  const name = productName || vision?.productName || "지금 가장 핫한 추천 아이템";
 
   if (isCleanVideoMode) {
     parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
@@ -1645,7 +1653,7 @@ function buildModeRenderingTokens(
 }
 
 function buildCompactRunwayPrompt(p: CompactPromptParams): string {
-  const name = p.productName || p.productVision?.productName || "the product";
+  const name = p.productName || p.productVision?.productName || "지금 가장 핫한 추천 아이템";
   const orientation = p.aspectRatio === "9:16" ? "vertical" : p.aspectRatio === "16:9" ? "horizontal" : "square";
 
   // Prompt strength: 1-10 scale, default 7. Higher = more literal prompt adherence.

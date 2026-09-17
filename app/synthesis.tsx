@@ -178,7 +178,7 @@ export default function SynthesisScreen() {
         aspectRatio,
         productName,
         scanId: scanData.id,
-        captionText: captionText || undefined,
+        captionText: captionText || '시선 집중! 지금 바로 확인하세요',
         platform: platform === 'shortform' ? 'shorts' : platform,
         isCleanVideoMode: genMode === 'auto_3d',
         selectedMode: genMode,

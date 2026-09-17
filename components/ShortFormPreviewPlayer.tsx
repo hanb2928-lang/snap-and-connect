@@ -701,7 +701,7 @@ useEffect(() => {
                 ]}
                 numberOfLines={2}
               >
-                {activeCopyOverlay.text}
+                {activeCopyOverlay.text || '시선 집중! 지금 바로 확인하세요'}
               </Text>
             </View>
           )}
