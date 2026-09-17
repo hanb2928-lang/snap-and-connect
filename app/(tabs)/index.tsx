@@ -40,6 +40,7 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot, type AngleGuide } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
+import { StudioPremiumAccordion } from '@/components/StudioPremiumPanel';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
@@ -108,6 +109,8 @@ const FITTING_GUIDES: AngleGuide[] = [
   { id: 'detail', label: '추가 디테일', hint: '제품의 클로즈업이나 텍스처 사진으로 합성 품질을 높이세요', emoji: '✨' },
 ];
 
+type PanelMode = 'auto-3d' | 'ai-blend' | null;
+
 export default function CameraScreen() {
   const router = useRouter();
   const safeTop = useSafeTop();
@@ -142,6 +145,7 @@ export default function CameraScreen() {
   const [captureMode, setCaptureMode] = useState<CaptureMode>('single');
   const [contentTone, setContentTone] = useState<ContentTone>('raw');
   const [cleanMode, setCleanMode] = useState(false);
+  const [studioMode, setStudioMode] = useState<PanelMode>(null);
 
   // Virtual fitting state
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
@@ -159,6 +163,7 @@ export default function CameraScreen() {
   const handleContentToneChange = useCallback((tone: ContentTone) => {
     setContentTone(tone);
     setItem('content_tone', tone);
+    if (tone !== 'studio') setStudioMode(null);
   }, []);
 
   const startAutoSaveAnimation = useCallback(() => {
@@ -529,6 +534,7 @@ export default function CameraScreen() {
   const handleModeSelect = useCallback((mode: CaptureMode) => {
     setCaptureMode(mode);
     setError(null);
+    setStudioMode(null);
     if (mode === 'single') {
       setScreenPhase('camera');
     } else if (mode === 'fitting') {
@@ -536,6 +542,23 @@ export default function CameraScreen() {
       setScreenPhase('fitting_capture');
     }
   }, []);
+
+  const handleModeCardPress = useCallback((mode: CaptureMode) => {
+    if (contentTone === 'studio') {
+      const panelMode: PanelMode = mode === 'single' ? 'auto-3d' : 'ai-blend';
+      setStudioMode((prev) => (prev === panelMode ? null : panelMode));
+    } else {
+      handleModeSelect(mode);
+    }
+  }, [contentTone, handleModeSelect]);
+
+  const handleModeConfirm = useCallback(() => {
+    if (studioMode === 'auto-3d') {
+      handleModeSelect('single');
+    } else if (studioMode === 'ai-blend') {
+      handleModeSelect('fitting');
+    }
+  }, [studioMode, handleModeSelect]);
 
   // ─── Mode Selection Screen ───
   if (screenPhase === 'mode_select') {
@@ -555,16 +578,36 @@ export default function CameraScreen() {
             title="입체컷 오토"
             desc="정면·좌측·우측·후면·상부를 순차 촬영해 AI 입체적인 숏폼 완성"
             color={theme.colors.primary[600]}
-            onPress={() => handleModeSelect('single')}
+            onPress={() => handleModeCardPress('single')}
           />
           <ModeCard
             icon={<Layers size={28} color="#fff" strokeWidth={2} />}
             title="AI 범용 합성"
             desc="최소 3컷부터 최대 5컷까지 다각도 촬영으로 제품을 배경·모델에 자연스럽게 합성"
             color={theme.colors.accent[500]}
-            onPress={() => handleModeSelect('fitting')}
+            onPress={() => handleModeCardPress('fitting')}
           />
         </View>
+
+        <StudioPremiumAccordion
+          visible={contentTone === 'studio' && studioMode !== null}
+          mode={studioMode === 'ai-blend' ? 'ai-blend' : 'auto-3d'}
+        />
+
+        {contentTone === 'studio' && studioMode !== null && (
+          <View style={styles.modeConfirmWrap}>
+            <TouchableOpacity
+              style={styles.modeConfirmBtn}
+              onPress={handleModeConfirm}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.modeConfirmText}>
+                {studioMode === 'auto-3d' ? '입체컷 오토 시작' : 'AI 범용 합성 시작'}
+              </Text>
+              <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.toneSelectorWrap}>
           <Text style={styles.toneSelectorLabel}>콘텐츠 톤앤매너</Text>
@@ -1355,6 +1398,26 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  modeConfirmWrap: {
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+  },
+  modeConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.primary[600],
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
+    ...theme.shadows.glowPrimary,
+  },
+  modeConfirmText: {
+    fontSize: 15,
+    fontFamily: theme.typography.fontFamily.semiBold,
+    color: '#fff',
   },
   modeSelectErrorText: {
     fontSize: 12,
