@@ -441,6 +441,7 @@ export default function ResultScreen() {
   const hdUnsubRef = useRef<(() => void) | null>(null);
   const videoUnsubRef = useRef<(() => void) | null>(null);
   const videoGenLockRef = useRef(false);
+  const draftProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showAdvancedCamera, setShowAdvancedCamera] = useState(false);
   const [showAdvancedCaption, setShowAdvancedCaption] = useState(false);
   const [showAdvancedAudio, setShowAdvancedAudio] = useState(false);
@@ -770,11 +771,30 @@ export default function ResultScreen() {
 
       if (!mountedRef.current) return;
 
-      // Job submitted — immediately free the user. Show toast and let them navigate.
-      setIsGeneratingVideo(false);
-      setVideoGenProgress(null);
+      // Job submitted — switch to drafting phase. Keep the progress UI alive
+      // so the user sees continuous feedback while the backend renders.
+      // The user can still navigate away; the realtime subscription and
+      // background polling will deliver the result on return.
       setVideoStage('drafting');
+      setVideoGenProgress({ phase: 'generating', progress: 0.08, message: 'AI가 영상을 렌더링하고 있어요', elapsedSec: 0 });
       setBgJobNotice('영상이 접수되었습니다! 완료 시 알림을 보내드릴게요. 다른 메뉴를 이용하셔도 됩니다.');
+
+      // Background progress simulator: incrementally advance progress while
+      // the backend job runs, so the UI never freezes in a blank state.
+      const draftStartTime = Date.now();
+      const draftProgressTimer = setInterval(() => {
+        if (!mountedRef.current) return;
+        const elapsed = Math.round((Date.now() - draftStartTime) / 1000);
+        // Asymptotic progress curve — approaches 0.92 but never reaches 1.0
+        const simulated = Math.min(0.08 + 0.84 * (1 - Math.exp(-elapsed / 45)), 0.92);
+        setVideoGenProgress({
+          phase: 'generating',
+          progress: simulated,
+          message: `AI가 영상을 렌더링하고 있어요${elapsed > 5 ? ` (${Math.round(simulated * 100)}%)` : ''}`,
+          elapsedSec: elapsed,
+        });
+      }, 2000);
+      draftProgressTimerRef.current = draftProgressTimer;
 
       // Optimal push permission timing: ask after the user submits their first video generation.
       // This is the moment they have the highest intent to know when the result is ready.
@@ -782,15 +802,25 @@ export default function ResultScreen() {
         setPushPromptVisible(true);
       }
 
+      const clearDraftProgress = () => {
+        if (draftProgressTimerRef.current) {
+          clearInterval(draftProgressTimerRef.current);
+          draftProgressTimerRef.current = null;
+        }
+      };
+
       // Subscribe to the video job via Realtime — non-blocking.
       // When the draft completes, show it immediately. If HD was requested,
       // kick off the HD upgrade in the background after the draft is ready.
       videoUnsubRef.current = subscribeVideoJob(scan.id, submitResult.taskId, (result) => {
         if (!mountedRef.current) return;
+        clearDraftProgress();
         if (result.status === 'SUCCESS' && result.videoUrl) {
           setDraftVideoUrl(result.videoUrl);
           setGeneratedVideoUrl(result.videoUrl);
           setVideoStage('draft_ready');
+          setIsGeneratingVideo(false);
+          setVideoGenProgress(null);
           setBgJobNotice('백그라운드에서 계속 진행 중입니다. 다른 메뉴를 이용해도 완성본은 보관함에 자동 저장됩니다.');
 
           // Stage 2: Kick off HD upgrade in the background (only when PRO mode is enabled)
@@ -830,9 +860,13 @@ export default function ResultScreen() {
                 setDraftVideoUrl(null);
                 setVideoStage('hd_ready');
                 setHdUpgradeProgress(null);
+                setIsGeneratingVideo(false);
+                setVideoGenProgress(null);
               } else if (hdResult.status === 'FAILED') {
                 setVideoStage('draft_ready');
                 setHdUpgradeProgress(null);
+                setIsGeneratingVideo(false);
+                setVideoGenProgress(null);
                 setVideoGenError(prev => prev ? `${prev}\n고화질 업그레이드 실패 (초안 유지)` : '고화질 업그레이드 실패 (초안 유지)');
               }
             });
@@ -840,12 +874,16 @@ export default function ResultScreen() {
             if (mountedRef.current) {
               setVideoStage('draft_ready');
               setHdUpgradeProgress(null);
+              setIsGeneratingVideo(false);
+              setVideoGenProgress(null);
             }
           });
         } else if (result.status === 'FAILED') {
           const msg = result.error ?? 'AI 영상 생성에 실패했습니다.';
           setVideoGenError(msg);
           setVideoStage('failed');
+          setIsGeneratingVideo(false);
+          setVideoGenProgress(null);
         }
       });
     } catch (err) {
@@ -853,6 +891,12 @@ export default function ResultScreen() {
         const msg = err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.';
         setVideoGenError(msg);
         setVideoStage('failed');
+        setIsGeneratingVideo(false);
+        setVideoGenProgress(null);
+      }
+      if (draftProgressTimerRef.current) {
+        clearInterval(draftProgressTimerRef.current);
+        draftProgressTimerRef.current = null;
       }
     }
 
@@ -1089,6 +1133,10 @@ export default function ResultScreen() {
       videoGenLockRef.current = false;
       if (hdUnsubRef.current) hdUnsubRef.current();
       if (videoUnsubRef.current) videoUnsubRef.current();
+      if (draftProgressTimerRef.current) {
+        clearInterval(draftProgressTimerRef.current);
+        draftProgressTimerRef.current = null;
+      }
     };
   }, []);
 

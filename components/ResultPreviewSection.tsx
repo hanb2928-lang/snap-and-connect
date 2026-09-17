@@ -119,7 +119,7 @@ export function ResultPreviewSection({
       {isGeneratingVideo && mediaType === 'video' && (
         <VideoGenStepTracker progress={videoGenProgress} variant="inline" />
       )}
-      {bgJobNotice && !isGeneratingVideo && (
+      {bgJobNotice && mediaType === 'video' && (
         <View style={styles.bgJobBanner}>
           <Clock size={13} color={theme.colors.accent[300]} strokeWidth={2} />
           <Text style={styles.bgJobText}>{bgJobNotice}</Text>
