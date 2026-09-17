@@ -32,6 +32,10 @@ import {
   type GenMode,
 } from '@/components/GenerationModePanel';
 import { PreviewExportTray } from '@/components/PreviewExportTray';
+import { submitVideoJobAsync, type VideoGenProgress } from '@/lib/aiVideoPipeline';
+import { useResultPolling } from '@/hooks/useResultPolling';
+import { VideoGenStepTracker } from '@/components/VideoGenStepTracker';
+import { supabase } from '@/lib/supabase';
 
 export default function SynthesisScreen() {
   const router = useRouter();
@@ -57,6 +61,9 @@ export default function SynthesisScreen() {
   const [ttsSyncOffset, setTtsSyncOffset] = useState(0);
   const [captionText, setCaptionText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [videoProgress, setVideoProgress] = useState<VideoGenProgress | null>(null);
+  const scanIdRef = useRef<string | null>(null);
+  const genStartRef = useRef<number>(0);
 
   const productInputRef = useRef<HTMLInputElement | null>(null);
   const modelInputRef = useRef<HTMLInputElement | null>(null);
@@ -121,7 +128,9 @@ export default function SynthesisScreen() {
     };
   }, [productImages, modelImage]);
 
-  const handleGenerate = useCallback(() => {
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  const handleGenerate = useCallback(async () => {
     if (productImages.length < 3) {
       setError('제품 사진을 최소 3컷 등록해주세요.');
       return;
@@ -134,24 +143,94 @@ export default function SynthesisScreen() {
     setIsGenerating(true);
     setResultImageUrl(null);
     setResultVideoUrl(null);
+    setVideoProgress({ phase: 'submitting', progress: 0.05, message: '준비 중...', elapsedSec: 0 });
+    genStartRef.current = Date.now();
 
     const modeLabel = genMode === 'auto_3d' ? '입체컷 오토' : genMode === 'universal_synthesis' ? 'AI 범용 합성' : '수동';
-    console.log(`[Synthesis] Generating with mode: ${modeLabel}`, {
-      orbit360: enableOrbit360,
-      caustics: enableCaustics,
-      virtualFitting: enableVirtualFitting,
-      fabricPhysics: enableFabricPhysics,
-    });
 
-    setTimeout(() => {
-      setIsGenerating(false);
-      if (outputMode === 'image') {
-        setResultImageUrl(productImages[0]?.uri ?? null);
-      } else {
-        setResultVideoUrl(productImages[0]?.uri ?? null);
+    const productName = '프리미엄 추천 상품';
+    const aspectRatio = (outputMode === 'video' ? '9:16' : '1:1') as '9:16' | '16:9' | '1:1' | '4:5';
+    const promptText = genMode === 'manual' && manualPrompt.trim()
+      ? manualPrompt.trim()
+      : `Cinematic ${modeLabel} product showcase. ${captionText || '시선 집중! 지금 바로 확인하세요'}`;
+
+    try {
+      const { data: scanData, error: scanError } = await supabase
+        .from('scans')
+        .insert({
+          image_url: productImages[0]?.uri ?? '',
+          scan_source: 'multi',
+          product_name: productName,
+          additional_image_urls: productImages.slice(1).map((img) => img.uri),
+        })
+        .select('id')
+        .single();
+
+      if (scanError || !scanData) {
+        throw new Error('스캔 레코드 생성에 실패했습니다.');
       }
-    }, 2000);
-  }, [productImages, outputMode, genMode, modelImage, enableOrbit360, enableCaustics, enableVirtualFitting, enableFabricPhysics]);
+      scanIdRef.current = scanData.id;
+
+      setVideoProgress({ phase: 'submitting', progress: 0.08, message: 'AI 렌더링 요청 전송 중...', elapsedSec: 0 });
+
+      const submitResult = await submitVideoJobAsync(promptText, {
+        durationSec: 5,
+        aspectRatio,
+        productName,
+        scanId: scanData.id,
+        captionText: captionText || undefined,
+        platform: platform === 'shortform' ? 'shorts' : platform,
+        isCleanVideoMode: genMode === 'auto_3d',
+        selectedMode: genMode,
+        enableOrbit360: genMode === 'auto_3d' ? enableOrbit360 : undefined,
+        enableCaustics: genMode === 'auto_3d' ? enableCaustics : undefined,
+        enableVirtualFitting: genMode === 'universal_synthesis' ? enableVirtualFitting : undefined,
+        enableFabricPhysics: genMode === 'universal_synthesis' ? enableFabricPhysics : undefined,
+        draft: true,
+      });
+      setJobId(submitResult.taskId);
+      setVideoProgress({ phase: 'generating', progress: 0.12, message: 'AI가 영상을 렌더링하고 있어요...', elapsedSec: 0 });
+    } catch (err) {
+      setIsGenerating(false);
+      setVideoProgress(null);
+      setError(err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.');
+    }
+  }, [productImages, outputMode, genMode, modelImage, enableOrbit360, enableCaustics, enableVirtualFitting, enableFabricPhysics, manualPrompt, captionText, platform]);
+
+  const polling = useResultPolling(jobId, {
+    scanId: scanIdRef.current,
+    onCompleted: (videoUrl) => {
+      setIsGenerating(false);
+      setVideoProgress((prev) => prev ? { ...prev, phase: 'completed', progress: 1.0, message: '영상 생성 완료' } : null);
+      if (outputMode === 'image') {
+        setResultImageUrl(videoUrl);
+      } else {
+        setResultVideoUrl(videoUrl);
+      }
+    },
+    onError: (errMsg) => {
+      setIsGenerating(false);
+      setVideoProgress((prev) => prev ? { ...prev, phase: 'error', progress: 0, message: errMsg } : null);
+      setError(errMsg);
+    },
+  });
+
+  useEffect(() => {
+    if (!isGenerating) return;
+    const timer = setInterval(() => {
+      const elapsed = Math.round((Date.now() - genStartRef.current) / 1000);
+      setVideoProgress((prev) => {
+        if (!prev) return prev;
+        const pctMatch = polling.progressMessage.match(/\((\d+)%\)/);
+        const polledProgress = pctMatch ? parseInt(pctMatch[1], 10) / 100 : null;
+        const baseProgress = prev.progress;
+        const timeBasedProgress = Math.min(0.9, 0.12 + elapsed * 0.005);
+        const nextProgress = polledProgress ?? Math.max(baseProgress, timeBasedProgress);
+        return { ...prev, message: polling.progressMessage || prev.message, elapsedSec: elapsed, progress: nextProgress };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isGenerating, polling.progressMessage]);
 
   const handleDownload = useCallback(() => {
     setIsExporting(true);
@@ -289,6 +368,10 @@ export default function SynthesisScreen() {
           onShare={handleShare}
           isExporting={isExporting}
         />
+
+        {isGenerating && videoProgress && (
+          <VideoGenStepTracker progress={videoProgress} variant="inline" />
+        )}
 
         {error && (
           <View style={styles.errorBanner}>

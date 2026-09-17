@@ -38,7 +38,7 @@ const MODE_ACCENT = {
 function GenerationModePanelInner({
   mode,
   onModeChange,
-  isGenerating,
+  isGenerating: isGen,
   onGenerate,
   manualPrompt,
   onManualPromptChange,
@@ -65,9 +65,10 @@ function GenerationModePanelInner({
       {/* Mode selection cards */}
       <View style={styles.modeCards}>
         <TouchableOpacity
-          style={[styles.modeCard, mode === 'auto_3d' && styles.modeCardActive]}
+          style={[styles.modeCard, mode === 'auto_3d' && styles.modeCardActive, isGen && styles.modeCardDisabled]}
           onPress={() => onModeChange('auto_3d')}
           activeOpacity={0.7}
+          disabled={isGen}
         >
           <View style={styles.modeCardHeader}>
             <View style={[styles.modeIconWrap, mode === 'auto_3d' && styles.modeIconWrapActive]}>
@@ -91,6 +92,7 @@ function GenerationModePanelInner({
                   style={styles.optionRow}
                   onPress={opt.onToggle}
                   activeOpacity={0.7}
+                  disabled={isGen}
                 >
                   <View style={styles.optionTextWrap}>
                     <Text style={styles.optionLabel}>{opt.label}</Text>
@@ -106,9 +108,10 @@ function GenerationModePanelInner({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.modeCard, mode === 'universal_synthesis' && styles.modeCardActive]}
+          style={[styles.modeCard, mode === 'universal_synthesis' && styles.modeCardActive, isGen && styles.modeCardDisabled]}
           onPress={() => onModeChange('universal_synthesis')}
           activeOpacity={0.7}
+          disabled={isGen}
         >
           <View style={styles.modeCardHeader}>
             <View style={[styles.modeIconWrap, mode === 'universal_synthesis' && styles.modeIconWrapActiveAccent]}>
@@ -132,6 +135,7 @@ function GenerationModePanelInner({
                   style={styles.optionRow}
                   onPress={opt.onToggle}
                   activeOpacity={0.7}
+                  disabled={isGen}
                 >
                   <View style={styles.optionTextWrap}>
                     <Text style={styles.optionLabel}>{opt.label}</Text>
@@ -147,9 +151,10 @@ function GenerationModePanelInner({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.modeCard, mode === 'manual' && styles.modeCardActive]}
+          style={[styles.modeCard, mode === 'manual' && styles.modeCardActive, isGen && styles.modeCardDisabled]}
           onPress={() => onModeChange('manual')}
           activeOpacity={0.7}
+          disabled={isGen}
         >
           <View style={styles.modeCardHeader}>
             <View style={[styles.modeIconWrap, mode === 'manual' && styles.modeIconWrapActive]}>
@@ -255,18 +260,18 @@ function GenerationModePanelInner({
       )}
 
       <TouchableOpacity
-        style={[styles.generateBtn, { backgroundColor: accent }, isGenerating && styles.generateBtnDisabled]}
+        style={[styles.generateBtn, { backgroundColor: accent }, isGen && styles.generateBtnDisabled]}
         onPress={onGenerate}
-        disabled={isGenerating}
+        disabled={isGen}
         activeOpacity={0.8}
       >
-        {isGenerating ? (
+        {isGen ? (
           <Loader2 size={20} color="#fff" strokeWidth={2.5} />
         ) : (
           <Zap size={20} color="#fff" strokeWidth={2.5} />
         )}
         <Text style={styles.generateBtnText}>
-          {isGenerating ? '생성 중...' : mode === 'auto_3d' ? '입체컷 자동 생성' : mode === 'universal_synthesis' ? 'AI 범용 합성 생성' : '수동 설정으로 생성'}
+          {isGen ? '생성 중...' : mode === 'auto_3d' ? '입체컷 자동 생성' : mode === 'universal_synthesis' ? 'AI 범용 합성 생성' : '수동 설정으로 생성'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -319,6 +324,9 @@ const styles = StyleSheet.create({
   modeCardActive: {
     borderColor: theme.colors.primary[500],
     backgroundColor: theme.colors.dark.surfaceLight,
+  },
+  modeCardDisabled: {
+    opacity: 0.5,
   },
   modeCardHeader: {
     flexDirection: 'row',

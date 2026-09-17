@@ -199,6 +199,7 @@ Deno.serve(async (req: Request) => {
 });
 
 async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
+  const modeTokens = buildModeRenderingTokens(body.selectedMode, body.enableOrbit360, body.enableCaustics, body.enableVirtualFitting, body.enableFabricPhysics);
   console.log("[generate-video] Submit payload:", JSON.stringify({
     promptLength: body.prompt?.length ?? 0,
     durationSec: body.durationSec,
@@ -207,6 +208,12 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     scanId: body.scanId,
     variationSeed: body.variationSeed,
     hasProductVision: !!body.productVision,
+    selectedMode: body.selectedMode ?? 'none',
+    enableOrbit360: body.enableOrbit360 === true,
+    enableCaustics: body.enableCaustics === true,
+    enableVirtualFitting: body.enableVirtualFitting === true,
+    enableFabricPhysics: body.enableFabricPhysics === true,
+    injectedModeTokens: modeTokens,
   }));
 
   const isDraft = body.draft === true;
@@ -253,6 +260,7 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     enableVirtualFitting: body.enableVirtualFitting,
     enableFabricPhysics: body.enableFabricPhysics,
   });
+  console.log("[generate-video] Final runway prompt length:", runwayPrompt.length, "| mode tokens injected:", modeTokens.length, "| prompt preview:", runwayPrompt.slice(0, 200));
 
   // Generate internal job ID immediately — no waiting for Runway API
   const internalJobId = crypto.randomUUID();
