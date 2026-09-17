@@ -169,6 +169,22 @@ const UNKNOWN_PRODUCT_NAMES = new Set([
   'product captured',
 ]);
 const FALLBACK_PRODUCT_NAME = '지금 가장 핫한 추천 아이템';
+const FALLBACK_COMMERCE_PHRASE = '시선 집중! 지금 바로 확인하세요';
+
+const UNKNOWN_PATTERNS = [
+  /알\s*수\s*없음/gi,
+  /알수없음/gi,
+  /unknown/gi,
+];
+
+function sanitizeText(value: string): string {
+  if (!value) return value;
+  let result = value;
+  for (const pattern of UNKNOWN_PATTERNS) {
+    result = result.replace(pattern, FALLBACK_COMMERCE_PHRASE);
+  }
+  return result;
+}
 
 function normalizeProductName(name: string | undefined): string {
   const trimmed = (name || '').trim();
@@ -180,25 +196,30 @@ function normalizeProductName(name: string | undefined): string {
 
 function normalizeAnalysis(data: Record<string, unknown>): AnalysisResult {
   const productName = normalizeProductName(data.productName as string);
+  const rawOneLiner = sanitizeText((data.oneLiner as string) || '');
+  const rawSummary = sanitizeText((data.summary as string) || '');
+  const rawTitle = sanitizeText((data.title as string) || 'Product Captured');
+  const rawHook = sanitizeText((data.hook as string) || '');
+  const rawCaption = sanitizeText((data.caption as string) || '');
   return {
-    title: (data.title as string) || 'Product Captured',
-    summary: (data.summary as string) || '',
+    title: rawTitle,
+    summary: rawSummary,
     contacts: Array.isArray(data.contacts) ? data.contacts : [],
     tags: Array.isArray(data.tags) ? data.tags : [],
     productName,
     productCategory: (data.productCategory as string) || 'product',
     priceEstimate: (data.priceEstimate as string) || '',
-    oneLiner: (data.oneLiner as string) || '',
+    oneLiner: rawOneLiner,
     shoppingMatches: Array.isArray(data.shoppingMatches) ? data.shoppingMatches : [],
     templateData: (data.templateData as AnalysisResult['templateData']) || {
       priceLabel: (data.priceEstimate as string) || '',
-      oneLiner: (data.oneLiner as string) || '',
+      oneLiner: rawOneLiner,
       category: (data.productCategory as string) || '',
       accentColor: '#2f9dff',
-      hook: (data.hook as string) || '',
+      hook: rawHook,
       hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
       productAdvantages: Array.isArray(data.productAdvantages) ? data.productAdvantages : [],
-      caption: (data.caption as string) || '',
+      caption: rawCaption,
       psychologyInsight: null,
     },
     detectedProducts: Array.isArray(data.detectedProducts) ? data.detectedProducts : [],

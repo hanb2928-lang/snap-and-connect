@@ -613,17 +613,17 @@ function normalizeTemplate(raw: Record<string, unknown> | undefined, fallback: P
   const td = (raw || {}) as Record<string, unknown>;
   return {
     priceLabel: String(td.priceLabel || fallback.priceLabel || ""),
-    oneLiner: String(td.oneLiner || fallback.oneLiner || ""),
+    oneLiner: sanitizeText(String(td.oneLiner || fallback.oneLiner || "")),
     category: String(td.category || fallback.category || ""),
     accentColor: String(td.accentColor || fallback.accentColor || "#2f9dff"),
-    hook: String(td.hook || fallback.hook || ""),
+    hook: sanitizeText(String(td.hook || fallback.hook || "")),
     hashtags: Array.isArray(td.hashtags) ? td.hashtags.map(String) : (Array.isArray(fallback.hashtags) ? fallback.hashtags : []),
     productAdvantages: Array.isArray(td.productAdvantages) ? td.productAdvantages.map(String).filter(Boolean) : (Array.isArray(fallback.productAdvantages) ? fallback.productAdvantages : []),
-    caption: String(td.caption || fallback.caption || ""),
+    caption: sanitizeText(String(td.caption || fallback.caption || "")),
     psychologyInsight: normalizePsychologyInsight(td.psychologyInsight),
     platformVariants: normalizePlatformVariants(td.platformVariants, {
-      hook: String(td.hook || fallback.hook || ""),
-      caption: String(td.caption || fallback.caption || ""),
+      hook: sanitizeText(String(td.hook || fallback.hook || "")),
+      caption: sanitizeText(String(td.caption || fallback.caption || "")),
       hashtags: Array.isArray(td.hashtags) ? td.hashtags.map(String) : (Array.isArray(fallback.hashtags) ? fallback.hashtags : []),
     }),
   };
@@ -693,6 +693,7 @@ const UNKNOWN_PRODUCT_NAMES = new Set([
 ]);
 
 const FALLBACK_PRODUCT_NAME = "지금 가장 핫한 추천 아이템";
+const FALLBACK_COMMERCE_PHRASE = "시선 집중! 지금 바로 확인하세요";
 
 function normalizeProductName(raw: Record<string, unknown>): string {
   const name = String(raw.productName || raw.product_name || "").trim();
@@ -700,6 +701,21 @@ function normalizeProductName(raw: Record<string, unknown>): string {
     return FALLBACK_PRODUCT_NAME;
   }
   return name;
+}
+
+const UNKNOWN_PATTERNS = [
+  /알\s*수\s*없음/gi,
+  /알수없음/gi,
+  /unknown/gi,
+];
+
+function sanitizeText(value: string): string {
+  if (!value) return value;
+  let result = value;
+  for (const pattern of UNKNOWN_PATTERNS) {
+    result = result.replace(pattern, FALLBACK_COMMERCE_PHRASE);
+  }
+  return result;
 }
 
 function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
@@ -734,10 +750,10 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
   const detectedProducts: DetectedProduct[] = rawProducts.length > 0
     ? rawProducts.slice(0, 4).map((p, i) => ({
         id: String(p.id || `product-${i + 1}`),
-        productName: String(p.productName || p.product_name || ""),
+        productName: sanitizeText(String(p.productName || p.product_name || "")),
         productCategory: String(p.productCategory || p.product_category || "product"),
         priceEstimate: String(p.priceEstimate || p.price_estimate || ""),
-        oneLiner: String(p.oneLiner || p.one_liner || ""),
+        oneLiner: sanitizeText(String(p.oneLiner || p.one_liner || "")),
         shoppingMatches: Array.isArray(p.shoppingMatches) ? (p.shoppingMatches as ShoppingMatch[]).slice(0, 1).map((m) => {
           const url = String(m?.url || "");
           return {
@@ -766,14 +782,14 @@ function normalizeResult(raw: Record<string, unknown>): AnalysisResult {
       }];
 
   return {
-    title: String(raw.title || "Product Captured"),
-    summary: String(raw.summary || ""),
+    title: sanitizeText(String(raw.title || "Product Captured")),
+    summary: sanitizeText(String(raw.summary || "")),
     contacts: Array.isArray(raw.contacts) ? raw.contacts as ContactInfo[] : [],
     tags: Array.isArray(raw.tags) ? raw.tags as string[] : [],
     productName,
     productCategory,
     priceEstimate,
-    oneLiner,
+    oneLiner: sanitizeText(oneLiner),
     shoppingMatches,
     templateData,
     detectedProducts,
@@ -842,8 +858,8 @@ function normalizeHybridMapping(raw: unknown): HybridMapping | null {
     visualSearchMatches,
     o2oCuration,
     verifiedBadge,
-    combinedHook: String(obj.combinedHook || ""),
-    combinedCaption: String(obj.combinedCaption || ""),
+    combinedHook: sanitizeText(String(obj.combinedHook || "")),
+    combinedCaption: sanitizeText(String(obj.combinedCaption || "")),
     qrCouponText: String(obj.qrCouponText || "QR 스캔시 할인쿠폰 + 온라인 주문 링크"),
   };
 }

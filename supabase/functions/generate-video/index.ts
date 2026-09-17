@@ -1402,7 +1402,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   // Prompt strength: 1-10 scale, default 7. Higher = more literal prompt adherence.
   const strength = p.promptStrength ?? 7;
   const strengthTag = strength >= 8 ? "strict prompt adherence, literal interpretation" : strength <= 4 ? "creative interpretation, loose prompt guidance, artistic freedom" : "balanced prompt adherence";
-  const userDirective = p.userPrompt.trim().replace(/\s+/g, " ").slice(0, 320);
+  const userDirective = p.userPrompt.trim().replace(/\s+/g, " ").slice(0, 600);
   const userDirectiveTag = userDirective
     ? `USER DIRECTIVE — follow this visual instruction: "${userDirective}"`
     : "";
@@ -1439,7 +1439,6 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       "quality=top 1% commercial, ultra-premium, high-end brand film",
       `prompt_strength=${strength}/10, ${strengthTag}`,
     ];
-    if (userDirectiveTag) tokens.push(userDirectiveTag);
     if (v) {
       const feats = v.visualFeatures.slice(0, 2).join(",");
       tokens.push(`product=${v.shapeDescription},${v.materialGuess}${feats ? "," + feats : ""}`);
@@ -1453,7 +1452,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     tokens.push("no text, no captions, no hooks, no CTA, pure luxury product cinematography, top-tier quality");
     tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
     if (negTag) tokens.push(negTag);
-    return tokens.join(" ").slice(0, 500);
+    if (userDirectiveTag) tokens.push(userDirectiveTag);
+    return tokens.join(" ").slice(0, 1000);
   }
 
   const style = PLATFORM_STYLE[p.platform] ?? PLATFORM_STYLE.shorts;
@@ -1470,8 +1470,6 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     `aesthetic=raw,imperfect,handheld,no-studio`,
     `prompt_strength=${strength}/10, ${strengthTag}`,
   ];
-
-  if (userDirectiveTag) tokens.push(userDirectiveTag);
 
   if (p.productVision) {
     const v = p.productVision;
@@ -1493,7 +1491,8 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   tokens.push("3phase:hook→contrast→cta, raw unboxing vibe, smartphone aesthetic, no polished production");
   tokens.push(`tier=${p.qualityTier}, res=${p.resolution}, fps=${p.fps}`);
 
-  return tokens.join(" ").slice(0, 500);
+  if (userDirectiveTag) tokens.push(userDirectiveTag);
+  return tokens.join(" ").slice(0, 1000);
 }
 
 function parseRunwayError(errText: string): string {

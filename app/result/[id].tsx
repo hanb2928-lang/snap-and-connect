@@ -611,7 +611,7 @@ export default function ResultScreen() {
     const tdDirect = scan?.template_data as { hook?: string; platformVariants?: Record<string, { hook?: string }> } | undefined;
     const platformHook = tdDirect?.platformVariants?.[activePlatform]?.hook;
     const dp0 = scan?.detected_products?.[0] as { templateData?: { hook?: string }; oneLiner?: string; productName?: string } | undefined;
-    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || '';
+    const hookText = platformHook || tdDirect?.hook || activeHookRef.current || scan?.summary || scan?.one_liner || dp0?.templateData?.hook || dp0?.oneLiner || dp0?.productName || scan?.product_name || '시선 집중! 지금 바로 확인하세요';
     if (!hookText) return false;
     try {
       await triggerTTS(scanId, hookText);
@@ -678,6 +678,9 @@ export default function ResultScreen() {
     if (isCleanVideoMode) {
       const cleanParts: string[] = [];
       const name = scan.product_name || visionData?.productName || '제품';
+      if (inlineEdit.aiPrompt.trim()) {
+        cleanParts.push(inlineEdit.aiPrompt.trim());
+      }
       cleanParts.push(`Cinematic 3D product showcase for ${name}, pure visual focus`);
       if (visionData) {
         if (visionData.visualFeatures.length > 0) cleanParts.push(`key features: ${visionData.visualFeatures.slice(0, 4).join(', ')}`);
@@ -750,7 +753,7 @@ export default function ResultScreen() {
           scanId: scan.id,
           variationSeed: narrativeVariation + 1,
           bgmMood: inlineEdit.bgmMood,
-          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '지금 바로 만나보세요',
+          captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '시선 집중! 지금 바로 확인하세요',
           platform: targetPlatform,
           hookCategory: inlineEdit.hookEffect || 'curiosity',
           productVision: visionData,
@@ -836,7 +839,7 @@ export default function ResultScreen() {
             scanId: scan.id,
             variationSeed: narrativeVariation + 1,
             bgmMood: inlineEdit.bgmMood,
-            captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '지금 바로 만나보세요',
+            captionText: inlineEdit.captionText || activeHookRef.current || scan.summary || '시선 집중! 지금 바로 확인하세요',
             platform: targetPlatform,
             hookCategory: inlineEdit.hookEffect || 'curiosity',
             productVision: visionData,
