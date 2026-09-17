@@ -182,11 +182,11 @@ export default function SynthesisScreen() {
         platform: platform === 'shortform' ? 'shorts' : platform,
         isCleanVideoMode: genMode === 'auto_3d',
         selectedMode: genMode,
-        enableOrbit360: genMode === 'auto_3d' ? enableOrbit360 : undefined,
+        enableOrbit360,
         enableCaustics: genMode === 'auto_3d' ? enableCaustics : undefined,
-        orbitSpeed: genMode === 'auto_3d' && enableOrbit360 ? cameraSpeed : undefined,
+        orbitSpeed: enableOrbit360 ? cameraSpeed : undefined,
         enableVirtualFitting: genMode === 'universal_synthesis' ? enableVirtualFitting : undefined,
-        enableFabricPhysics: genMode === 'universal_synthesis' ? enableFabricPhysics : undefined,
+        enableFabricPhysics,
         draft: true,
       });
       setJobId(submitResult.taskId);
@@ -278,6 +278,13 @@ export default function SynthesisScreen() {
           description: '의류 원단의 주름과 흐름을 실사 수준으로 시뮬레이션',
           enabled: enableFabricPhysics,
           onToggle: () => setEnableFabricPhysics((v) => !v),
+        },
+        {
+          key: 'orbit360',
+          label: '360° 궤도 회전',
+          description: '모델과 의류를 360도 회전하며 앞·옆·뒷모습 실루엣 연출',
+          enabled: enableOrbit360,
+          onToggle: () => setEnableOrbit360((v) => !v),
         },
       ]
     : [];

@@ -24,6 +24,7 @@ export interface StudioSliderValues {
 interface StudioPremiumPanelProps {
   mode: PanelMode;
   onValuesChange?: (values: Partial<StudioSliderValues>) => void;
+  productCategory?: string;
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────
@@ -117,11 +118,12 @@ function GoldChip({ label, selected, onPress, icon }: ChipProps) {
 
 // ─── CASE A: auto-3d (입체컷 오토) ──────────────────────────────────
 
-function Auto3DPanel({ onValuesChange }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void }) {
-  const [facetSparkle, setFacetSparkle] = useState(60);
-  const [fabricDetail, setFabricDetail] = useState(45);
+function Auto3DPanel({ onValuesChange, productCategory }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void; productCategory?: string }) {
+  const isJewelry = /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계|gem|보석|diamond|다이아|crystal|크리스탈|pendant|펜던트|bangle/i.test(productCategory ?? "");
+  const [facetSparkle, setFacetSparkle] = useState(isJewelry ? 92 : 60);
+  const [fabricDetail, setFabricDetail] = useState(isJewelry ? 80 : 45);
   const [smartFit, setSmartFit] = useState(true);
-  const [macroShots, setMacroShots] = useState<string[]>(['setting']);
+  const [macroShots, setMacroShots] = useState<string[]>(isJewelry ? ['setting', 'clasp', 'texture'] : ['setting']);
 
   const handleSmartFit = useCallback((v: boolean) => {
     setSmartFit(v);
@@ -224,10 +226,11 @@ const LOOKBOOK_PRESETS = [
   { id: 'terrace', label: '테라스 뷰' },
 ];
 
-function AIBlendPanel({ onValuesChange }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void }) {
-  const [lighting, setLighting] = useState('pin-spot');
-  const [lookbook, setLookbook] = useState<string[]>(['marble']);
-  const [blendStrength, setBlendStrength] = useState(70);
+function AIBlendPanel({ onValuesChange, productCategory }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void; productCategory?: string }) {
+  const isJewelry = /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계|gem|보석|diamond|다이아|crystal|크리스탈|pendant|펜던트|bangle/i.test(productCategory ?? "");
+  const [lighting, setLighting] = useState(isJewelry ? 'pin-spot' : 'pin-spot');
+  const [lookbook, setLookbook] = useState<string[]>(isJewelry ? ['marble'] : ['marble']);
+  const [blendStrength, setBlendStrength] = useState(isJewelry ? 85 : 70);
 
   const handleBlendStrength = useCallback((v: number) => {
     setBlendStrength(v);
@@ -311,7 +314,7 @@ function AIBlendPanel({ onValuesChange }: { onValuesChange?: (values: Partial<St
 
 // ─── Main Panel ──────────────────────────────────────────────────────
 
-export function StudioPremiumPanel({ mode, onValuesChange }: StudioPremiumPanelProps) {
+export function StudioPremiumPanel({ mode, onValuesChange, productCategory }: StudioPremiumPanelProps) {
   return (
     <View style={styles.panelContainer}>
       <View style={styles.panelHeader}>
@@ -320,7 +323,7 @@ export function StudioPremiumPanel({ mode, onValuesChange }: StudioPremiumPanelP
         </View>
         <Text style={styles.panelTitle}>스튜디오 프리미엄 · 패션·주얼리 특화</Text>
       </View>
-      {mode === 'auto-3d' ? <Auto3DPanel onValuesChange={onValuesChange} /> : <AIBlendPanel onValuesChange={onValuesChange} />}
+      {mode === 'auto-3d' ? <Auto3DPanel onValuesChange={onValuesChange} productCategory={productCategory} /> : <AIBlendPanel onValuesChange={onValuesChange} productCategory={productCategory} />}
     </View>
   );
 }
@@ -331,9 +334,10 @@ interface StudioPremiumAccordionProps {
   visible: boolean;
   mode: PanelMode;
   onValuesChange?: (values: Partial<StudioSliderValues>) => void;
+  productCategory?: string;
 }
 
-export function StudioPremiumAccordion({ visible, mode, onValuesChange }: StudioPremiumAccordionProps) {
+export function StudioPremiumAccordion({ visible, mode, onValuesChange, productCategory }: StudioPremiumAccordionProps) {
   const animateLayout = useCallback(() => {
     if (Platform.OS === 'android') return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -344,7 +348,7 @@ export function StudioPremiumAccordion({ visible, mode, onValuesChange }: Studio
       style={[styles.accordionWrap, visible ? styles.accordionOpen : styles.accordionClosed]}
       onLayout={animateLayout}
     >
-      {visible && <StudioPremiumPanel mode={mode} onValuesChange={onValuesChange} />}
+      {visible && <StudioPremiumPanel mode={mode} onValuesChange={onValuesChange} productCategory={productCategory} />}
     </View>
   );
 }

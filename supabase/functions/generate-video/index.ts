@@ -92,6 +92,27 @@ const VIDEO_UNKNOWN_PATTERNS = [
 ];
 const VIDEO_FALLBACK_PRODUCT_NAME = "지금 가장 핫한 추천 아이템";
 const VIDEO_FALLBACK_CAPTION = "시선 집중! 지금 바로 확인하세요";
+const VIDEO_FALLBACK_COPY_LAYERS = {
+  primary: "시선 집중! 하이엔드 럭셔리 컬렉션",
+  secondary: "내 몸에 완벽하게 감기는 핏",
+  tertiary: "지금 바로 확인하세요",
+};
+
+function sanitizeCopyLayers(layers: { primary: string; secondary: string; tertiary: string }): { primary: string; secondary: string; tertiary: string } {
+  const sanitize = (val: string, fallback: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return fallback;
+    for (const pattern of VIDEO_UNKNOWN_PATTERNS) {
+      if (pattern.test(trimmed)) return fallback;
+    }
+    return trimmed;
+  };
+  return {
+    primary: sanitize(layers.primary, VIDEO_FALLBACK_COPY_LAYERS.primary),
+    secondary: sanitize(layers.secondary, VIDEO_FALLBACK_COPY_LAYERS.secondary),
+    tertiary: sanitize(layers.tertiary, VIDEO_FALLBACK_COPY_LAYERS.tertiary),
+  };
+}
 
 function sanitizeVideoProductName(name: string | undefined): string {
   const trimmed = (name || "").trim();
@@ -258,7 +279,7 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
 
   let effectivePrompt = body.prompt ?? "";
   if (effectivePrompt.trim().length === 0) {
-    effectivePrompt = buildAutoPrompt(sanitizedProductName, body.productVision, sanitizedCaptionText, body.isCleanVideoMode === true, requestedDuration, body.enableOrbit360 === true, typeof body.orbitSpeed === 'number' ? body.orbitSpeed : undefined);
+    effectivePrompt = buildAutoPrompt(sanitizedProductName, body.productVision, sanitizedCaptionText, body.isCleanVideoMode === true, requestedDuration, body.enableOrbit360 === true, typeof body.orbitSpeed === 'number' ? body.orbitSpeed : undefined, body.enableFabricPhysics === true);
   }
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
@@ -1347,6 +1368,7 @@ function buildAutoPrompt(
   durationSec: number,
   enableOrbit360?: boolean,
   orbitSpeed?: number,
+  enableFabricPhysics?: boolean,
 ): string {
   const parts: string[] = [];
 
@@ -1356,6 +1378,8 @@ function buildAutoPrompt(
     ? orbitSpeed >= 2.0 ? 'fast' : orbitSpeed <= 0.5 ? 'slow' : 'smooth'
     : 'smooth';
 
+  const safeCopy = vision ? sanitizeCopyLayers(vision.suggestedCopyLayers) : VIDEO_FALLBACK_COPY_LAYERS;
+
   if (isCleanVideoMode) {
     parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
     if (enableOrbit360) {
@@ -1363,6 +1387,14 @@ function buildAutoPrompt(
     } else {
       parts.push("smooth gimbal dolly + gentle macro push-in");
     }
+    if (enableFabricPhysics) {
+      parts.push("real-time fabric physics simulation, gravity-aware drape and fold formation, momentum inertia causing delayed fabric follow on rotation, self-collision detection between overlapping fabric layers, boundary collision preventing clipping artifacts between garment and body mesh");
+    }
+    const jewelryTag = buildJewelryMacroTag(vision?.materialGuess ?? "", vision?.productCategory ?? "");
+    if (jewelryTag) {
+      parts.push(jewelryTag);
+    }
+    parts.push(buildOpeningHookSequenceTag(true, vision));
     parts.push("professional 3-point studio lighting with softboxes, rim light for edge definition, macro detail of surface texture, shallow depth of field, color-graded filmic look, no text overlays, no captions, no marketing elements, pure luxury product cinematography");
     return parts.join(". ");
   }
@@ -1370,16 +1402,14 @@ function buildAutoPrompt(
   parts.push(`Raw smartphone-style unboxing review for ${name}, shot on phone, handheld shaky cam, natural lighting`);
 
   if (vision) {
-    const copy = vision.suggestedCopyLayers;
-    if (copy.primary || copy.secondary || copy.tertiary) {
-      parts.push(`copy layers — hook: "${copy.primary}", benefit: "${copy.secondary}", CTA: "${copy.tertiary}"`);
-    }
+    parts.push(`copy layers — hook: "${safeCopy.primary}", benefit: "${safeCopy.secondary}", CTA: "${safeCopy.tertiary}"`);
   }
 
   if (captionText && captionText.trim()) {
     parts.push(`caption context: "${captionText.slice(0, 100)}"`);
   }
 
+  parts.push(buildOpeningHookSequenceTag(false, vision));
   parts.push(`${durationSec}-second vertical short-form, raw unboxing aesthetic, handheld phone camera, imperfect framing, natural room lighting, no studio setup, loss-aversion hook, before/after problem-solution contrast, social-proof urgency CTA`);
 
   return parts.join(". ");
@@ -1587,6 +1617,27 @@ function buildDofFocusTag(bgStyle: string | undefined, isCleanMode: boolean): st
   return base;
 }
 
+const JEWELRY_CATEGORY_PATTERN = /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계|gem|보석|diamond|다이아|crystal|크리스탈|pendant|펜던트|bangle|방망이/i;
+
+function buildOpeningHookSequenceTag(isCleanMode: boolean, vision: ProductVisionData | null): string {
+  const materialHint = vision?.materialGuess?.trim() ?? "";
+  const textureHint = vision?.textureDescription?.trim() ?? "";
+  const detailSubject = materialHint || textureHint
+    ? `product ${materialHint ? "material: " + materialHint : ""}${materialHint && textureHint ? ", " : ""}${textureHint ? "surface texture: " + textureHint : ""}`
+    : "product surface micro-detail and texture";
+
+  if (isCleanMode) {
+    return `opening_hook_sequence=0-3s extreme close-up macro lock-on on ${detailSubject}, ultra-tight framing revealing micro-texture and craftsmanship detail, shallow DOF with razor-thin focal plane on surface grain, slow rack-focus pull across material texture, 3s mark triggers instant dynamic whip-pan transition to virtual model full-shot wearing product, full-body framing with product contextually integrated, camera continues smooth orbit after transition, scroll-stopping visual contrast between macro intimacy and full-shot grandeur, no lag no fade cut on the beat`;
+  }
+  return `opening_hook_sequence=0-3s extreme close-up on ${detailSubject}, handheld phone macro framing showing real texture and product detail, slight camera shake for authenticity, 3s mark hard cut to model full-shot wearing or holding product, dynamic jump-cut transition with momentum, raw energy contrast between intimate detail and wide context, scroll-stopping before-after visual shift`;
+}
+
+function buildJewelryMacroTag(materialGuess: string, category: string): string {
+  const combined = `${materialGuess} ${category}`.trim();
+  if (!combined || !JEWELRY_CATEGORY_PATTERN.test(combined)) return "";
+  return "jewelry_macro=extreme close-up macro zoom lock-on on gemstone facet and setting detail, minimum 3x macro magnification ratio, focal plane locked on prong/bezel setting with razor-sharp micro-detail retention, glossBoost=high precious metal specular boost with environment map reflection intensity at 90%, facetSpecular=maximum facet edge specular highlight with dispersion rainbow refraction on every facet boundary, anisotropic specular sweep on polished metal surfaces during rotation, micro-caustic pooling on adjacent skin surfaces from gemstone light-splitting, sparkle intensity doubled on facet edges catching key light";
+}
+
 const BEAUTY_SMOOTHING_TABLE: Array<{ match: RegExp; tag: string }> = [
   { match: /jewel|주얼|necklace|목걸이|chain|체인|bracelet|팔찌|earring|귀걸이|ring|반지|watch|시계|gem|보석|diamond|다이아|crystal|크리스탈/i, tag: "beauty_smooth=balanced skin smoothing on exposed zones face neck and hands, tone-evening filter evens skin redness and blemish softening without plastic look, skin pores and micro-texture preserved for realism, jewelry and gemstone edges remain razor-sharp with full micro-detail retention, smoothing intensity self-limits at jewelry-skin boundary to maximize accessory contrast, no smoothing applied to metal or gem surfaces" },
   { match: /silk|실크|샤틴|satin|chiffon|드레스|dress|skirt|치마|scarf|스카프|blouse|블라우스/i, tag: "beauty_smooth=balanced skin smoothing on exposed face neck decolletage and arms, skin tone-evening for uniform complexion, blemish softening preserves natural skin micro-texture and pore detail, fabric weave and thread micro-detail remain fully sharp, smoothing boundary stops at fabric-skin edge to maximize textile contrast, sheer fabric areas retain skin visibility without double-smoothing artifacts" },
@@ -1685,12 +1736,21 @@ function buildModeRenderingTokens(
     if (enableCaustics) {
       tokens.push('ray_traced_caustics=dynamic light dispersion and specular reflections shifting across facets and metallic surfaces during rotation, real-time caustic pooling on adjacent surfaces, dispersion rainbow refraction on crystal and gem facets, anisotropic specular sweep on polished metal during orbit');
     }
+    if (enableFabricPhysics) {
+      tokens.push('fabric_physics_engine=real-time gravity simulation with momentum inertia, boundary collision checks preventing clipping artifacts between garment layers and human skin, fabric ripple propagation with body motion delay, gravity-aware drape recovery, fold crease formation and relaxation, self-collision detection between overlapping fabric layers');
+    }
   } else if (selectedMode === 'universal_synthesis') {
     if (enableVirtualFitting) {
       tokens.push('virtual_fitting=volumetric body mapping and 3D draping simulation, skeletal mesh alignment for natural garment fit, body-aware cloth wrapping with anatomically correct tension distribution, realistic garment-to-body contact zones with pressure-based deformation');
     }
     if (enableFabricPhysics) {
       tokens.push('fabric_physics_engine=real-time gravity simulation with momentum inertia, boundary collision checks preventing clipping artifacts between garment layers and human skin, fabric ripple propagation with body motion delay, gravity-aware drape recovery, fold crease formation and relaxation, self-collision detection between overlapping fabric layers');
+    }
+    if (enableOrbit360) {
+      const speedLabel = orbitSpeed != null
+        ? orbitSpeed >= 2.0 ? 'fast' : orbitSpeed <= 0.5 ? 'slow' : 'smooth'
+        : 'smooth';
+      tokens.push(`orbit_camera=${speedLabel} 360-degree orbit rotation around model and garment, continuous circular camera path revealing front-side-back silhouette, parallax depth shift across orbit arc capturing fabric drape from all angles`);
     }
   }
   return tokens;
@@ -1769,6 +1829,11 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
       const beautyTag = buildBeautySmoothTag(v.materialGuess, v.productCategory);
       if (beautyTag) tokens.push(beautyTag);
     }
+    if (v) {
+      const jewelryMacroTag = buildJewelryMacroTag(v.materialGuess, v.productCategory);
+      if (jewelryMacroTag) tokens.push(jewelryMacroTag);
+    }
+    tokens.push(buildOpeningHookSequenceTag(true, p.productVision ?? null));
     if (outfitTag) tokens.push(outfitTag);
     if (zoomTag) tokens.push(zoomTag);
     if (rotTag) tokens.push(rotTag);
@@ -1831,6 +1896,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
     const beautyTag = buildBeautySmoothTag(p.productVision.materialGuess, p.productVision.productCategory);
     if (beautyTag) tokens.push(beautyTag);
   }
+  tokens.push(buildOpeningHookSequenceTag(false, p.productVision ?? null));
   if (outfitTag) tokens.push(outfitTag);
   if (zoomTag) tokens.push(zoomTag);
   if (rotTag) tokens.push(rotTag);
