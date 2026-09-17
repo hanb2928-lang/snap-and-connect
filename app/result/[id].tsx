@@ -605,7 +605,7 @@ export default function ResultScreen() {
         body: {
           scanId: scan.id,
           platform: activePlatform,
-          productName: scan.product_name || '',
+          productName: activeProductName || scan.product_name || '프리미엄 추천 상품',
           extraPrompt: promptParts.join(' | '),
         },
       });
@@ -870,7 +870,7 @@ export default function ResultScreen() {
             scanId: scan.id,
             variationSeed: narrativeVariation + 1,
             bgmMood: inlineEdit.bgmMood,
-            captionText: sanitizeVideoText(inlineEdit.captionText || activeHookRef.current || scan.summary || '시선 집중! 지금 바로 확인하세요'),
+            captionText: sanitizeVideoText(inlineEdit.captionText || activeHookRef.current || scan.summary || (visionData ? `${visionData.suggestedCopyLayers.primary} ${visionData.suggestedCopyLayers.secondary}` : '') || '시선 집중! 지금 바로 확인하세요'),
             platform: targetPlatform,
             hookCategory: inlineEdit.hookEffect || 'curiosity',
             productVision: visionData,
@@ -1735,7 +1735,7 @@ export default function ResultScreen() {
 
   const td = activeTemplateData;
   const platformVariant = td?.platformVariants?.[activePlatform];
-  const activeHook = hookOverride || platformVariant?.hook || td?.hook || productVision?.suggestedCopyLayers.primary || '';
+  const activeHook = hookOverride || platformVariant?.hook || td?.hook || productVision?.suggestedCopyLayers.primary || '시선 집중! 지금 바로 확인하세요';
   activeHookRef.current = activeHook;
   const activeCaption = inlineEdit.captionText || (autoMarketingCopy || platformVariant?.caption || td?.caption || productVision?.suggestedCopyLayers.secondary || '');
   const activeHashtags = platformVariant?.hashtags || td?.hashtags || [];

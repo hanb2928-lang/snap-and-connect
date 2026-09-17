@@ -56,6 +56,7 @@ interface GenerateAiVideoOptions {
   contentTone?: string;
   selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual';
   enableOrbit360?: boolean;
+  orbitSpeed?: number;
   enableCaustics?: boolean;
   enableVirtualFitting?: boolean;
   enableFabricPhysics?: boolean;
@@ -222,6 +223,7 @@ export async function generateAiVideo(
           fps: options.fps ?? (options.hdUpscale ? 30 : 24),
           selectedMode: options.selectedMode,
           enableOrbit360: options.enableOrbit360,
+          orbitSpeed: options.orbitSpeed,
           enableCaustics: options.enableCaustics,
           enableVirtualFitting: options.enableVirtualFitting,
           enableFabricPhysics: options.enableFabricPhysics,
@@ -707,6 +709,7 @@ export async function submitVideoJobAsync(
       fps: options.fps ?? (options.hdUpscale ? 30 : 24),
       selectedMode: options.selectedMode,
       enableOrbit360: options.enableOrbit360,
+      orbitSpeed: options.orbitSpeed,
       enableCaustics: options.enableCaustics,
       enableVirtualFitting: options.enableVirtualFitting,
       enableFabricPhysics: options.enableFabricPhysics,
@@ -903,6 +906,7 @@ export async function upgradeVideoToHd(
       fps: options.fps ?? 30,
       selectedMode: options.selectedMode,
       enableOrbit360: options.enableOrbit360,
+      orbitSpeed: options.orbitSpeed,
       enableCaustics: options.enableCaustics,
       enableVirtualFitting: options.enableVirtualFitting,
       enableFabricPhysics: options.enableFabricPhysics,

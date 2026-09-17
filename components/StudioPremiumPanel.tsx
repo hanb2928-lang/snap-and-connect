@@ -12,10 +12,18 @@ import {
 import { Sparkles, Diamond, Shirt, Aperture, Sun, Layers, Check } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
 
-type PanelMode = 'auto-3d' | 'ai-blend';
+export type PanelMode = 'auto-3d' | 'ai-blend';
+
+export interface StudioSliderValues {
+  facetSparkle: number;
+  fabricDetail: number;
+  blendStrength: number;
+  smartFit: boolean;
+}
 
 interface StudioPremiumPanelProps {
   mode: PanelMode;
+  onValuesChange?: (values: Partial<StudioSliderValues>) => void;
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────
@@ -30,21 +38,27 @@ interface SliderProps {
 }
 
 function GoldSlider({ label, value, onValueChange, min = 0, max = 100, step = 1 }: SliderProps) {
-  const trackWidth = 100;
-  const percent = ((value - min) / (max - min)) * trackWidth;
+  const [measuredWidth, setMeasuredWidth] = useState(120);
+  const percent = ((value - min) / (max - min)) * 100;
 
   const handlePress = (evt: { nativeEvent: { locationX: number } }) => {
     const { locationX } = evt.nativeEvent;
-    const ratio = Math.max(0, Math.min(1, locationX / (trackWidth * 2.8)));
-    const snapped = Math.round((min + ratio * (max - min)) / step) * step;
-    onValueChange(Math.max(min, Math.min(max, snapped)));
+    const ratio = Math.max(0, Math.min(1, locationX / measuredWidth));
+    const raw = min + ratio * (max - min);
+    const snapped = Math.round(raw / step) * step;
+    const clamped = Math.max(min, Math.min(max, Number.isFinite(snapped) ? snapped : min));
+    onValueChange(clamped);
   };
 
   return (
     <View style={styles.sliderRow}>
       <Text style={styles.sliderLabel}>{label}</Text>
       <View style={styles.sliderContainer}>
-        <Pressable style={styles.sliderTrack} onPress={handlePress}>
+        <Pressable
+          style={styles.sliderTrack}
+          onPress={handlePress}
+          onLayout={(e) => setMeasuredWidth(e.nativeEvent.layout.width || 120)}
+        >
           <View style={[styles.sliderFill, { width: `${percent}%` }]} />
           <View style={[styles.sliderHandle, { left: `${percent}%` }]} />
         </Pressable>
@@ -103,11 +117,26 @@ function GoldChip({ label, selected, onPress, icon }: ChipProps) {
 
 // ─── CASE A: auto-3d (입체컷 오토) ──────────────────────────────────
 
-function Auto3DPanel() {
+function Auto3DPanel({ onValuesChange }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void }) {
   const [facetSparkle, setFacetSparkle] = useState(60);
   const [fabricDetail, setFabricDetail] = useState(45);
   const [smartFit, setSmartFit] = useState(true);
   const [macroShots, setMacroShots] = useState<string[]>(['setting']);
+
+  const handleSmartFit = useCallback((v: boolean) => {
+    setSmartFit(v);
+    onValuesChange?.({ smartFit: v });
+  }, [onValuesChange]);
+
+  const handleFacetSparkle = useCallback((v: number) => {
+    setFacetSparkle(v);
+    onValuesChange?.({ facetSparkle: v });
+  }, [onValuesChange]);
+
+  const handleFabricDetail = useCallback((v: number) => {
+    setFabricDetail(v);
+    onValuesChange?.({ fabricDetail: v });
+  }, [onValuesChange]);
 
   const macroOptions = [
     { id: 'setting', label: '세팅면' },
@@ -132,12 +161,12 @@ function Auto3DPanel() {
         <GoldSlider
           label="주얼리 컷 팩싯 강화"
           value={facetSparkle}
-          onValueChange={setFacetSparkle}
+          onValueChange={handleFacetSparkle}
         />
         <GoldSlider
           label="패브릭 텍스처 디테일"
           value={fabricDetail}
-          onValueChange={setFabricDetail}
+          onValueChange={handleFabricDetail}
         />
       </View>
 
@@ -152,7 +181,7 @@ function Auto3DPanel() {
           label="스마트 핏 앤 드레이프"
           hint="의류 착용 시 자연스러운 주름과 핏을 자동 보정"
           value={smartFit}
-          onToggle={() => setSmartFit((v) => !v)}
+          onToggle={() => handleSmartFit(!smartFit)}
         />
       </View>
 
@@ -195,10 +224,15 @@ const LOOKBOOK_PRESETS = [
   { id: 'terrace', label: '테라스 뷰' },
 ];
 
-function AIBlendPanel() {
+function AIBlendPanel({ onValuesChange }: { onValuesChange?: (values: Partial<StudioSliderValues>) => void }) {
   const [lighting, setLighting] = useState('pin-spot');
   const [lookbook, setLookbook] = useState<string[]>(['marble']);
   const [blendStrength, setBlendStrength] = useState(70);
+
+  const handleBlendStrength = useCallback((v: number) => {
+    setBlendStrength(v);
+    onValuesChange?.({ blendStrength: v });
+  }, [onValuesChange]);
 
   const toggleLookbook = (id: string) => {
     setLookbook((prev) =>
@@ -268,7 +302,7 @@ function AIBlendPanel() {
         <GoldSlider
           label="의류·주얼리 경계면 블렌딩 강도"
           value={blendStrength}
-          onValueChange={setBlendStrength}
+          onValueChange={handleBlendStrength}
         />
       </View>
     </View>
@@ -277,7 +311,7 @@ function AIBlendPanel() {
 
 // ─── Main Panel ──────────────────────────────────────────────────────
 
-export function StudioPremiumPanel({ mode }: StudioPremiumPanelProps) {
+export function StudioPremiumPanel({ mode, onValuesChange }: StudioPremiumPanelProps) {
   return (
     <View style={styles.panelContainer}>
       <View style={styles.panelHeader}>
@@ -286,7 +320,7 @@ export function StudioPremiumPanel({ mode }: StudioPremiumPanelProps) {
         </View>
         <Text style={styles.panelTitle}>스튜디오 프리미엄 · 패션·주얼리 특화</Text>
       </View>
-      {mode === 'auto-3d' ? <Auto3DPanel /> : <AIBlendPanel />}
+      {mode === 'auto-3d' ? <Auto3DPanel onValuesChange={onValuesChange} /> : <AIBlendPanel onValuesChange={onValuesChange} />}
     </View>
   );
 }
@@ -296,9 +330,10 @@ export function StudioPremiumPanel({ mode }: StudioPremiumPanelProps) {
 interface StudioPremiumAccordionProps {
   visible: boolean;
   mode: PanelMode;
+  onValuesChange?: (values: Partial<StudioSliderValues>) => void;
 }
 
-export function StudioPremiumAccordion({ visible, mode }: StudioPremiumAccordionProps) {
+export function StudioPremiumAccordion({ visible, mode, onValuesChange }: StudioPremiumAccordionProps) {
   const animateLayout = useCallback(() => {
     if (Platform.OS === 'android') return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -309,7 +344,7 @@ export function StudioPremiumAccordion({ visible, mode }: StudioPremiumAccordion
       style={[styles.accordionWrap, visible ? styles.accordionOpen : styles.accordionClosed]}
       onLayout={animateLayout}
     >
-      {visible && <StudioPremiumPanel mode={mode} />}
+      {visible && <StudioPremiumPanel mode={mode} onValuesChange={onValuesChange} />}
     </View>
   );
 }

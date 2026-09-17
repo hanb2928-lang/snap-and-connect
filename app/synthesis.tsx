@@ -184,6 +184,7 @@ export default function SynthesisScreen() {
         selectedMode: genMode,
         enableOrbit360: genMode === 'auto_3d' ? enableOrbit360 : undefined,
         enableCaustics: genMode === 'auto_3d' ? enableCaustics : undefined,
+        orbitSpeed: genMode === 'auto_3d' && enableOrbit360 ? cameraSpeed : undefined,
         enableVirtualFitting: genMode === 'universal_synthesis' ? enableVirtualFitting : undefined,
         enableFabricPhysics: genMode === 'universal_synthesis' ? enableFabricPhysics : undefined,
         draft: true,
@@ -195,7 +196,7 @@ export default function SynthesisScreen() {
       setVideoProgress(null);
       setError(err instanceof Error ? err.message : 'AI 영상 생성 요청에 실패했습니다.');
     }
-  }, [productImages, outputMode, genMode, modelImage, enableOrbit360, enableCaustics, enableVirtualFitting, enableFabricPhysics, manualPrompt, captionText, platform]);
+  }, [productImages, outputMode, genMode, modelImage, enableOrbit360, enableCaustics, enableVirtualFitting, enableFabricPhysics, cameraSpeed, manualPrompt, captionText, platform]);
 
   const polling = useResultPolling(jobId, {
     scanId: scanIdRef.current,

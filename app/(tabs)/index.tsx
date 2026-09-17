@@ -41,12 +41,18 @@ import { pickImageWeb, isWebPlatform } from '@/lib/webImagePicker';
 import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { MultiAngleCaptureGuide, type AngleShot, type AngleGuide } from '@/components/MultiAngleCaptureGuide';
 import { TriggerBanner } from '@/components/TriggerBanner';
-import { StudioPremiumAccordion } from '@/components/StudioPremiumPanel';
+import { StudioPremiumAccordion, type StudioSliderValues } from '@/components/StudioPremiumPanel';
 import { PostCaptureWorkflow } from '@/components/PostCaptureWorkflow';
 import type { ShortFormEditPlan } from '@/lib/shortFormEditEngine';
 import { runStereoPipeline, createScanFromAngleShots, makeInitialProgress, type StereoPipelineProgress } from '@/lib/stereoPipeline';
 
-async function runFittingPipeline(shots: AngleShot[], scanId: string, customPrompt?: string, cleanMode = false): Promise<void> {
+async function runFittingPipeline(
+  shots: AngleShot[],
+  scanId: string,
+  customPrompt?: string,
+  cleanMode = false,
+  studioSliders?: StudioSliderValues,
+): Promise<void> {
   const sorted = [...shots].sort((a, b) => a.orderIndex - b.orderIndex);
   const productShot = sorted.find((s) => s.id.startsWith('product')) ?? sorted[0];
   const bgShot = sorted.find((s) => !s.id.startsWith('product')) ?? sorted[sorted.length - 1];
@@ -58,6 +64,10 @@ async function runFittingPipeline(shots: AngleShot[], scanId: string, customProm
         productImage: buildDataUrl(productShot.base64, productShot.mimeType || 'image/jpeg'),
         modelImage: buildDataUrl(bgShot.base64, bgShot.mimeType || 'image/jpeg'),
         customPrompt: customPrompt?.trim() || undefined,
+        facetSparkle: studioSliders?.facetSparkle,
+        fabricDetail: studioSliders?.fabricDetail,
+        blendStrength: studioSliders?.blendStrength,
+        smartFit: studioSliders?.smartFit,
       },
     });
     if (error || !data?.image) return;
@@ -147,6 +157,7 @@ export default function CameraScreen() {
   const [contentTone, setContentTone] = useState<ContentTone>('raw');
   const [cleanMode, setCleanMode] = useState(false);
   const [studioMode, setStudioMode] = useState<PanelMode>(null);
+  const [studioSliders, setStudioSliders] = useState<StudioSliderValues>({ facetSparkle: 60, fabricDetail: 45, blendStrength: 70, smartFit: true });
 
   // Virtual fitting state
   const [fittingGuideVisible, setFittingGuideVisible] = useState(false);
@@ -375,7 +386,7 @@ export default function CameraScreen() {
     }
 
     // Background: run synthesis/directing/publish pipeline without blocking UI
-    runStereoPipeline(sorted, () => {}, cleanMode, scanId, contentTone).catch(() => {});
+    runStereoPipeline(sorted, () => {}, cleanMode, scanId, contentTone, studioSliders).catch(() => {});
   };
 
   const handleMultiAngleCapture = async (_angleId: string): Promise<{ base64: string; mimeType: string } | null> => {
@@ -529,8 +540,8 @@ export default function CameraScreen() {
     }
 
     // Background: run virtual fitting pipeline without blocking UI
-    runFittingPipeline(sorted, scanId, undefined, cleanMode).catch(() => {});
-  }, [router, cleanMode]);
+    runFittingPipeline(sorted, scanId, undefined, cleanMode, studioSliders).catch(() => {});
+  }, [router, cleanMode, studioSliders]);
 
   const handleModeSelect = useCallback((mode: CaptureMode) => {
     setCaptureMode(mode);
@@ -597,6 +608,7 @@ export default function CameraScreen() {
         <StudioPremiumAccordion
           visible={contentTone === 'studio' && studioMode !== null}
           mode={studioMode === 'ai-blend' ? 'ai-blend' : 'auto-3d'}
+          onValuesChange={(values) => setStudioSliders((prev) => ({ ...prev, ...values }))}
         />
 
         {contentTone === 'studio' && studioMode !== null && (

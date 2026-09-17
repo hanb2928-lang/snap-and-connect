@@ -231,7 +231,7 @@ Deno.serve(async (req: Request) => {
 });
 
 async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
-  const modeTokens = buildModeRenderingTokens(body.selectedMode, body.enableOrbit360, body.enableCaustics, body.enableVirtualFitting, body.enableFabricPhysics);
+  const modeTokens = buildModeRenderingTokens(body.selectedMode, body.enableOrbit360, body.enableCaustics, body.enableVirtualFitting, body.enableFabricPhysics, typeof body.orbitSpeed === 'number' ? body.orbitSpeed : undefined);
   console.log("[generate-video] Submit payload:", JSON.stringify({
     promptLength: body.prompt?.length ?? 0,
     durationSec: body.durationSec,
@@ -242,6 +242,7 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     hasProductVision: !!body.productVision,
     selectedMode: body.selectedMode ?? 'none',
     enableOrbit360: body.enableOrbit360 === true,
+    orbitSpeed: typeof body.orbitSpeed === 'number' && body.orbitSpeed > 0 ? body.orbitSpeed : undefined,
     enableCaustics: body.enableCaustics === true,
     enableVirtualFitting: body.enableVirtualFitting === true,
     enableFabricPhysics: body.enableFabricPhysics === true,
@@ -257,17 +258,8 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
 
   let effectivePrompt = body.prompt ?? "";
   if (effectivePrompt.trim().length === 0) {
-    effectivePrompt = buildAutoPrompt(sanitizedProductName, body.productVision, sanitizedCaptionText, body.isCleanVideoMode === true, requestedDuration);
+    effectivePrompt = buildAutoPrompt(sanitizedProductName, body.productVision, sanitizedCaptionText, body.isCleanVideoMode === true, requestedDuration, body.enableOrbit360 === true, typeof body.orbitSpeed === 'number' ? body.orbitSpeed : undefined);
   }
-  const resolvedProductName = sanitizedProductName || body.productVision?.productName || "";
-  if (!resolvedProductName) {
-    console.log("[generate-video] Fallback guard: productName was empty, using ecommerce fallback copy '지금 가장 핫한 추천 아이템'");
-  }
-  const resolvedCaption = sanitizedCaptionText && sanitizedCaptionText.trim() ? sanitizedCaptionText : "";
-  if (!resolvedCaption) {
-    console.log("[generate-video] Fallback guard: captionText was empty, frontend will use '시선 집중! 지금 바로 확인하세요'");
-  }
-
   const aspectRatio = body.aspectRatio ?? "9:16";
   const variationSeed = body.variationSeed ?? 0;
 
@@ -299,6 +291,7 @@ async function handleSubmit(body: GenerateVideoRequest): Promise<Response> {
     fps,
     selectedMode: body.selectedMode,
     enableOrbit360: body.enableOrbit360,
+    orbitSpeed: typeof body.orbitSpeed === 'number' && body.orbitSpeed > 0 ? body.orbitSpeed : undefined,
     enableCaustics: body.enableCaustics,
     enableVirtualFitting: body.enableVirtualFitting,
     enableFabricPhysics: body.enableFabricPhysics,
@@ -1352,14 +1345,25 @@ function buildAutoPrompt(
   captionText: string | undefined,
   isCleanVideoMode: boolean,
   durationSec: number,
+  enableOrbit360?: boolean,
+  orbitSpeed?: number,
 ): string {
   const parts: string[] = [];
 
   const name = sanitizeVideoProductName(productName) || sanitizeVideoProductName(vision?.productName) || VIDEO_FALLBACK_PRODUCT_NAME;
 
+  const speedLabel = orbitSpeed != null
+    ? orbitSpeed >= 2.0 ? 'fast' : orbitSpeed <= 0.5 ? 'slow' : 'smooth'
+    : 'smooth';
+
   if (isCleanVideoMode) {
     parts.push(`Top-tier luxury commercial for ${name}, ultra-premium 3D product showcase, cinematic quality rivaling high-end brand films`);
-    parts.push("professional 3-point studio lighting with softboxes, rim light for edge definition, macro detail of surface texture, smooth gimbal camera movement, shallow depth of field, color-graded filmic look, no text overlays, no captions, no marketing elements, pure luxury product cinematography");
+    if (enableOrbit360) {
+      parts.push(`${speedLabel} 360-degree orbit rotation around product core, continuous circular camera path maintaining focal lock on product centroid, parallax depth shift across orbit arc`);
+    } else {
+      parts.push("smooth gimbal dolly + gentle macro push-in");
+    }
+    parts.push("professional 3-point studio lighting with softboxes, rim light for edge definition, macro detail of surface texture, shallow depth of field, color-graded filmic look, no text overlays, no captions, no marketing elements, pure luxury product cinematography");
     return parts.join(". ");
   }
 
@@ -1404,6 +1408,7 @@ type CompactPromptParams = {
   fps: number;
   selectedMode?: 'auto_3d' | 'universal_synthesis' | 'manual';
   enableOrbit360?: boolean;
+  orbitSpeed?: number;
   enableCaustics?: boolean;
   enableVirtualFitting?: boolean;
   enableFabricPhysics?: boolean;
@@ -1667,11 +1672,15 @@ function buildModeRenderingTokens(
   enableCaustics?: boolean,
   enableVirtualFitting?: boolean,
   enableFabricPhysics?: boolean,
+  orbitSpeed?: number,
 ): string[] {
   const tokens: string[] = [];
   if (selectedMode === 'auto_3d') {
     if (enableOrbit360) {
-      tokens.push('orbit_camera=360-degree smooth horizontal orbit around product core, continuous circular camera path maintaining focal lock on product centroid, parallax depth shift across orbit arc');
+      const speedLabel = orbitSpeed != null
+        ? orbitSpeed >= 2.0 ? 'fast' : orbitSpeed <= 0.5 ? 'slow' : 'smooth'
+        : 'smooth';
+      tokens.push(`orbit_camera=${speedLabel} 360-degree orbit rotation around product core, continuous circular camera path maintaining focal lock on product centroid, parallax depth shift across orbit arc`);
     }
     if (enableCaustics) {
       tokens.push('ray_traced_caustics=dynamic light dispersion and specular reflections shifting across facets and metallic surfaces during rotation, real-time caustic pooling on adjacent surfaces, dispersion rainbow refraction on crystal and gem facets, anisotropic specular sweep on polished metal during orbit');
@@ -1721,7 +1730,7 @@ function buildCompactRunwayPrompt(p: CompactPromptParams): string {
   // Transition effect
   const transTag = p.transitionEffect && TRANSITION_MAP[p.transitionEffect] ? `transitions=${TRANSITION_MAP[p.transitionEffect]}` : "";
 
-  const modeTokens = buildModeRenderingTokens(p.selectedMode, p.enableOrbit360, p.enableCaustics, p.enableVirtualFitting, p.enableFabricPhysics);
+  const modeTokens = buildModeRenderingTokens(p.selectedMode, p.enableOrbit360, p.enableCaustics, p.enableVirtualFitting, p.enableFabricPhysics, p.orbitSpeed);
 
   if (p.isCleanVideoMode) {
     const v = p.productVision;
