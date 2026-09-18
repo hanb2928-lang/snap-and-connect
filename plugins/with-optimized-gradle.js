@@ -22,9 +22,8 @@ function withGradleProps(config) {
     set('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
     set('reactNativeArchitectures', 'arm64-v8a,x86_64');
     set('EX_DEV_CLIENT_NETWORK_INSPECTOR', 'false');
-    // Enable R8 minification and resource shrinking in release builds
-    set('android.enableMinifyInReleaseBuilds', 'true');
-    set('android.enableShrinkResourcesInReleaseBuilds', 'true');
+    set('android.enableMinifyInReleaseBuilds', 'false');
+    set('android.enableShrinkResourcesInReleaseBuilds', 'false');
 
     return cfg;
   });
