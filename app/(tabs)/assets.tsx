@@ -647,10 +647,6 @@ export default function AssetsScreen() {
                 </View>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.modalRemixBtn} onPress={() => { setRemixAsset(previewAsset); setPreviewAsset(null); }} activeOpacity={0.8}>
-                    <Repeat2 size={16} color={theme.colors.accent[400]} strokeWidth={2} />
-                    <Text style={styles.modalRemixText}>리믹스</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity style={styles.modalKarrotBtn} onPress={() => { Linking.openURL('https://www.daangn.com/').catch(() => {}); }} activeOpacity={0.8}>
                     <Store size={16} color={theme.colors.warning[400]} strokeWidth={2} />
                     <Text style={styles.modalKarrotText}>당근배포</Text>
@@ -662,10 +658,6 @@ export default function AssetsScreen() {
                   <TouchableOpacity style={styles.modalDownloadBtn} onPress={() => handleDownload(previewAsset)} activeOpacity={0.8}>
                     <Download size={16} color="#fff" strokeWidth={2} />
                     <Text style={styles.modalDownloadText}>다운로드</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.modalDeleteBtn} onPress={() => { handleDelete(previewAsset); setPreviewAsset(null); }} activeOpacity={0.7}>
-                    <Trash2 size={16} color={theme.colors.error[400]} strokeWidth={2} />
-                    <Text style={styles.modalDeleteText}>삭제</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -1032,16 +1024,12 @@ const styles = StyleSheet.create({
   previewSnsBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: theme.radius.md, borderWidth: 1.5, backgroundColor: theme.colors.dark.surfaceLight },
   previewSnsText: { fontSize: 12, fontFamily: theme.typography.fontFamily.semiBold },
   modalActions: { flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' },
-  modalRemixBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.accent[500] + '15' },
-  modalRemixText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.accent[400] },
   modalKarrotBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.warning[500] + '15' },
   modalKarrotText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.warning[400] },
   modalQrBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.success[500] + '15' },
   modalQrText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.success[400] },
   modalDownloadBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.primary[500] },
   modalDownloadText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.bold, color: '#fff' },
-  modalDeleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, backgroundColor: theme.colors.error[500] + '15' },
-  modalDeleteText: { fontSize: theme.typography.caption, fontFamily: theme.typography.fontFamily.semiBold, color: theme.colors.error[400] },
   // Re-export modal
   reexportModalContent: { width: '100%', maxWidth: 400, backgroundColor: theme.colors.dark.surface, borderRadius: theme.radius.xl, padding: theme.spacing.lg, ...theme.shadows.elevated },
   reexportHeader: { alignItems: 'center', gap: 8, marginBottom: theme.spacing.lg },
