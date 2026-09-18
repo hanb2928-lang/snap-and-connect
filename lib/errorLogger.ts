@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import { supabase } from '@/lib/supabase';
 
 // App version from app.json — kept in sync manually
 const APP_VERSION = '1.0.0';
@@ -45,6 +44,8 @@ async function flushQueue(): Promise<void> {
   isFlushing = true;
   const batch = pendingQueue.splice(0, 10);
   try {
+    // Lazy import so errorLogger doesn't depend on supabase at module-eval time
+    const { supabase } = await import('@/lib/supabase');
     const rows = batch.map((item) => ({
       level: item.level,
       message: item.message,
@@ -105,23 +106,32 @@ export function logWarning(message: string, context?: LogContext): void {
 // Install global unhandled promise rejection handler.
 // Call once from the app root (e.g. _layout.tsx).
 export function installGlobalErrorHandlers(): void {
-  // Unhandled promise rejections
-  const origHandler = (global as any).onunhandledrejection;
-  (global as any).onunhandledrejection = (event: PromiseRejectionEvent) => {
-    logFatal(event.reason, { action: 'unhandledrejection' });
-    if (origHandler) origHandler(event);
-  };
+  try {
+    // Unhandled promise rejections — guard against Hermes not having
+    // the promise polyfill initialized at module-eval time
+    const origHandler = (global as any).onunhandledrejection;
+    (global as any).onunhandledrejection = (event: PromiseRejectionEvent) => {
+      logFatal(event.reason, { action: 'unhandledrejection' });
+      if (origHandler) origHandler(event);
+    };
+  } catch {
+    // global not writable or not initialized
+  }
 
-  // React Native global error handler
-  const prevHandler = (global as any).ErrorUtils?.getGlobalHandler?.();
-  (global as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
-    if (isFatal) {
-      logFatal(error, { action: 'globalHandler', extra: { isFatal: true } });
-    } else {
-      logError(error, { action: 'globalHandler', extra: { isFatal: false } });
-    }
-    prevHandler?.(error, isFatal);
-  });
+  try {
+    // React Native global error handler
+    const prevHandler = (global as any).ErrorUtils?.getGlobalHandler?.();
+    (global as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
+      if (isFatal) {
+        logFatal(error, { action: 'globalHandler', extra: { isFatal: true } });
+      } else {
+        logError(error, { action: 'globalHandler', extra: { isFatal: false } });
+      }
+      prevHandler?.(error, isFatal);
+    });
+  } catch {
+    // ErrorUtils not available at this point
+  }
 }
 
 // Retrieve recent error logs for the in-app viewer
@@ -136,6 +146,7 @@ export async function fetchRecentLogs(limit = 50): Promise<{
   session_id: string | null;
   created_at: string;
 }[]> {
+  const { supabase } = await import('@/lib/supabase');
   const { data, error } = await supabase
     .from('error_logs')
     .select('id, level, message, stack, context, platform, app_version, session_id, created_at')
