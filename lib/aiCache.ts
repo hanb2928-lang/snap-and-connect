@@ -149,7 +149,7 @@ export async function findSimilarCachedResult<T>(
       // Bump hit count for the matched entry
       supabase
         .from('ai_content_cache')
-        .update({ hit_count: (row as { hit_count?: number }).hit_count ?? 0 + 1, updated_at: new Date().toISOString() })
+        .update({ hit_count: ((row as { hit_count?: number }).hit_count ?? 0) + 1, updated_at: new Date().toISOString() })
         .eq('id', (row as { id: string }).id)
         .then(() => {}, () => {});
 

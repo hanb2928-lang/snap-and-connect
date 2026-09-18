@@ -1,5 +1,10 @@
 # Add project specific ProGuard rules here.
 
+# ── Critical: prevent R8 from renaming classes loaded by reflection ──
+# Autolinking and TurboModule discovery use reflection by class name.
+# Without this, R8 renames *Package classes and the app crashes on boot.
+-dontobfuscate
+
 # ── React Native core ──
 -keep class com.facebook.react.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }

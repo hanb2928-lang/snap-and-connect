@@ -261,7 +261,29 @@ function extractBrandFromUrl(url: string, platform: string): string {
   }
 }
 
+function isSafeFetchUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") return false;
+    if (host.startsWith("10.") || host.startsWith("192.168.")) return false;
+    if (host.startsWith("172.")) {
+      const octet = parseInt(host.split(".")[1], 10);
+      if (octet >= 16 && octet <= 31) return false;
+    }
+    if (host.startsWith("169.254.")) return false;
+    if (host === "metadata.google.internal") return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchAndParse(url: string): Promise<ProductMeta> {
+  if (!isSafeFetchUrl(url)) {
+    throw new Error("URL not allowed");
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 

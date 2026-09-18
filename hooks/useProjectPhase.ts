@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 
 export type ProjectStep = 'idle' | 'uploading' | 'rendering' | 'completed' | 'failed';
 
@@ -18,40 +17,50 @@ export function useProjectPhase(jobId: string | null) {
 
   useEffect(() => {
     if (!jobId) return;
+    let cancelled = false;
 
-    supabase
-      .from('video_jobs')
-      .select('*')
-      .eq('id', jobId)
-      .maybeSingle()
-      .then(({ data: res }) => {
-        if (res) {
+    (async () => {
+      const { supabase } = await import('@/lib/supabase');
+      if (cancelled) return;
+
+      supabase
+        .from('video_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .maybeSingle()
+        .then(({ data: res }) => {
+          if (cancelled || !res) return;
           const row = res as VideoJobRow;
           setStep(row.step);
           setData(row);
-        }
-      });
+        }, () => {});
 
-    const channel = supabase
-      .channel(`project-phase-${jobId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'video_jobs',
-          filter: `id=eq.${jobId}`,
-        },
-        (payload) => {
-          const updated = payload.new as VideoJobRow;
-          setStep(updated.step);
-          setData(updated);
-        },
-      )
-      .subscribe();
+      const channel = supabase
+        .channel(`project-phase-${jobId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'video_jobs',
+            filter: `id=eq.${jobId}`,
+          },
+          (payload) => {
+            if (cancelled) return;
+            const updated = payload.new as VideoJobRow;
+            setStep(updated.step);
+            setData(updated);
+          },
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
     };
   }, [jobId]);
 

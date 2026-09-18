@@ -3,7 +3,7 @@ const { wrapWithReanimatedMetroConfig } = require('react-native-reanimated/metro
 
 const config = getDefaultConfig(__dirname);
 
-config.resolver.resolverMainFields = ['browser', 'main', 'react-native'];
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
 config.transformer.minifierConfig = {
   ...(config.transformer.minifierConfig || {}),

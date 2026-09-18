@@ -17,7 +17,7 @@ function waitForOnline(): Promise<boolean> {
   if (isOnline()) return Promise.resolve(true);
   // Fail fast if definitively offline — don't block the user for 30 seconds
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(false), OFFLINE_WAIT_MAX_MS);
+    const timer = setTimeout(() => { clearInterval(poll); resolve(false); }, OFFLINE_WAIT_MAX_MS);
     const poll = setInterval(() => {
       if (isOnline()) {
         clearInterval(poll);

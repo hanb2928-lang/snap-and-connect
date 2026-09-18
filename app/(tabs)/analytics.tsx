@@ -128,7 +128,7 @@ export default function AnalyticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadData();

@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
-import { supabase } from '@/lib/supabase';
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
@@ -44,6 +43,8 @@ export function useWebPush(): UseWebPushResult {
       return;
     }
 
+    let cancelled = false;
+
     // Check current permission
     if ('Notification' in window) {
       setPermission(Notification.permission as PermissionState);
@@ -51,7 +52,7 @@ export function useWebPush(): UseWebPushResult {
 
     // Fetch VAPID public key from server
     fetchVapidKey().then((key) => {
-      if (key) setVapidPublicKey(key);
+      if (!cancelled && key) setVapidPublicKey(key);
     }).catch(() => {
       // VAPID key not configured yet — push won't work until it is
     });
@@ -60,13 +61,18 @@ export function useWebPush(): UseWebPushResult {
     (async () => {
       try {
         const reg = await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
+        if (cancelled) return;
         registrationRef.current = reg;
         const sub = await reg.pushManager.getSubscription();
-        setIsSubscribed(!!sub);
+        if (!cancelled) setIsSubscribed(!!sub);
       } catch {
         // SW registration failed — push won't work
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [supported]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
@@ -95,6 +101,7 @@ export function useWebPush(): UseWebPushResult {
       });
 
       // Save subscription to database
+      const { supabase } = await import('@/lib/supabase');
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (!userId) {
@@ -135,6 +142,7 @@ export function useWebPush(): UseWebPushResult {
         await sub.unsubscribe();
       }
 
+      const { supabase } = await import('@/lib/supabase');
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
       if (userId) {
@@ -158,6 +166,7 @@ export function useWebPush(): UseWebPushResult {
 
 async function fetchVapidKey(): Promise<string | null> {
   try {
+    const { supabase } = await import('@/lib/supabase');
     const { data, error } = await supabase.functions.invoke('send-push', {
       method: 'GET',
     });

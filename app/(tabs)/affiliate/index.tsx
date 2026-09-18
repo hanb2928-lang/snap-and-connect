@@ -53,7 +53,7 @@ import type { StockVideoClip } from '@/lib/pexelsVideo';
 import type { EditPlan } from '@/lib/videoEditPlan';
 import { MessageSquare } from 'lucide-react-native';
 import type { UserSettings, RevenueRecord } from '@/types/database';
-import { GENERATE_IMAGE_URL } from '@/lib/supabase';
+import { GENERATE_IMAGE_URL, supabaseAnonKey } from '@/lib/supabase';
 
 const PLATFORMS = [
   { key: 'Coupang', label: '쿠팡 파트너스', icon: ShoppingBag, color: '#FF3E3E', signupUrl: 'https://partners.coupang.com/', desc: '쿠팡 상품 링크를 공유하고 수수료를 받으세요' },
@@ -700,7 +700,11 @@ export default function AffiliateScreen() {
         try {
           const resp = await fetch(`${GENERATE_IMAGE_URL}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'apikey': supabaseAnonKey,
+            },
             body: JSON.stringify({ prompt, size: '1024x1024', quality: 'hd', style: 'vivid' }),
           });
           if (resp.ok) {
@@ -1211,7 +1215,7 @@ export default function AffiliateScreen() {
       setAutoEditing(false);
       setAutoEditStep('');
     }
-  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo, selectedPacing, customPrompt]);
+  }, [autoEditing, selectedUploadPlatform, selectedBoard, affiliateUrl, productMeta, generatePreviewVideo, selectedPacing, customPrompt, selectedStrategy]);
 
   return (
     <View style={styles.container}>

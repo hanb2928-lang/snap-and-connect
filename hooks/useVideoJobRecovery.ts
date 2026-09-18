@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
-import { supabase } from '@/lib/supabase';
 import { getActiveVideoJob, clearActiveVideoJob } from '@/lib/videoJobPersistence';
 
 export type RecoveryState = 'idle' | 'checking' | 'in_progress' | 'completed' | 'failed' | 'not_found';
@@ -32,6 +31,7 @@ export function useVideoJobRecovery() {
     setInfo({ state: 'checking', jobId, step: null, videoUrl: null, errorMsg: null });
 
     try {
+      const { supabase } = await import('@/lib/supabase');
       const { data, error } = await supabase
         .from('video_jobs')
         .select('status, step, video_url, error_message')

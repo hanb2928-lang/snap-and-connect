@@ -85,11 +85,15 @@ export function useVoiceRecording(): MediaRecorderLike {
       }
       streamRef.current = stream;
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      const preferredMime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = preferredMime
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       stoppingRef.current = false;
 
@@ -110,8 +114,10 @@ export function useVoiceRecording(): MediaRecorderLike {
         durationRef.current += 1;
         setDuration(durationRef.current);
       }, 1000);
-    } catch {
-      setError('마이크 권한을 허용해주세요.');
+    } catch (err) {
+      setError(err instanceof Error && err.name === 'NotReadableError'
+        ? '마이크가 다른 앱에서 사용 중입니다.'
+        : '마이크 권한을 허용해주세요.');
       setState('error');
     }
   }, [cleanup]);

@@ -227,18 +227,22 @@ export default function AssetsScreen() {
   const handleStatusChange = useCallback(async (status: UploadStatus) => {
     if (!statusPickerAsset) return;
     const shareUrl = status === 'uploaded' ? shareUrlInput.trim() || null : null;
-    const success = await updateAssetUploadStatus(statusPickerAsset.id, status, shareUrl);
-    if (success) {
-      setAssets((prev) =>
-        prev.map((a) =>
-          a.id === statusPickerAsset.id
-            ? { ...a, upload_status: status, share_url: shareUrl }
-            : a,
-        ),
-      );
-      setStatusPickerAsset(null);
-      setShareUrlInput('');
-    } else {
+    try {
+      const success = await updateAssetUploadStatus(statusPickerAsset.id, status, shareUrl);
+      if (success) {
+        setAssets((prev) =>
+          prev.map((a) =>
+            a.id === statusPickerAsset.id
+              ? { ...a, upload_status: status, share_url: shareUrl }
+              : a,
+          ),
+        );
+        setStatusPickerAsset(null);
+        setShareUrlInput('');
+      } else {
+        Alert.alert(t('common.error'), t('assets.alert.statusError'));
+      }
+    } catch {
       Alert.alert(t('common.error'), t('assets.alert.statusError'));
     }
   }, [statusPickerAsset, shareUrlInput, t]);
