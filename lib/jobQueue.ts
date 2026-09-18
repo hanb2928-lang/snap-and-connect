@@ -31,22 +31,39 @@ const POLL_INTERVAL_MS = 3000;
 const DEFAULT_TIMEOUT_MS = 300000;
 const MAX_POLL_ERRORS = 5;
 
+const ENQUEUE_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} 시간이 초과되었습니다. 네트워크 연결을 확인해주세요.`)), ms)
+    ),
+  ]);
+}
+
 export async function enqueueJob(
   jobType: JobType,
   payload: Record<string, unknown>,
   options: { priority?: number; scanId?: string } = {},
 ): Promise<string> {
-  const { data, error } = await supabase
-    .from('render_jobs')
-    .insert({
-      job_type: jobType,
-      status: 'queued',
-      priority: options.priority ?? 5,
-      payload,
-      scan_id: options.scanId ?? null,
-    })
-    .select('id')
-    .single();
+  const { data, error } = await withTimeout(
+    Promise.resolve(
+      supabase
+        .from('render_jobs')
+        .insert({
+          job_type: jobType,
+          status: 'queued',
+          priority: options.priority ?? 5,
+          payload,
+          scan_id: options.scanId ?? null,
+        })
+        .select('id')
+        .single()
+    ),
+    ENQUEUE_TIMEOUT_MS,
+    '작업 등록',
+  );
 
   if (error) throw new Error(`Job enqueue failed: ${error.message}`);
 

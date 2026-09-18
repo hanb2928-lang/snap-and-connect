@@ -39,7 +39,7 @@ async function getL2<T>(cacheKey: string): Promise<T | null> {
 
     supabase
       .from('ai_content_cache')
-      .update({ hit_count: (data as { hit_count?: number }).hit_count ?? 0 + 1, updated_at: new Date().toISOString() })
+      .update({ hit_count: ((data as { hit_count?: number }).hit_count ?? 0) + 1, updated_at: new Date().toISOString() })
       .eq('cache_key', cacheKey)
       .then(() => {}, () => {});
 
@@ -110,6 +110,9 @@ export async function aiCachedCall<T>(
   if (cached) return { data: cached.data, cached: true };
 
   const fresh = await fetcher();
+  if (fresh == null) {
+    throw new Error('서버 응답이 비어 있습니다. 잠시 후 다시 시도해주세요.');
+  }
   await aiCacheSet(taskType, inputHash, fresh, modelUsed);
   return { data: fresh, cached: false };
 }

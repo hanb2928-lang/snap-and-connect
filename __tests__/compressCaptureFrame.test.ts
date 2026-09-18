@@ -90,7 +90,7 @@ describe('compressCaptureFrameToBlob', () => {
     expect(result.mimeType).toBe('image/jpeg');
     expect(result.base64).toBe('/9j/compressed123');
     expect(result.blob).toBeInstanceOf((global as any).Blob);
-    expect(result.blob.type).toBe('image/jpeg');
+    expect((result.blob as Blob).type).toBe('image/jpeg');
     expect(mockCanvas.width).toBe(0); // canvas was cleaned up
   });
 

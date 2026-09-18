@@ -11,21 +11,20 @@ interface SafeFetchOptions extends RequestInit {
 
 const MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 800;
-const OFFLINE_POLL_MS = 1000;
-const OFFLINE_WAIT_MAX_MS = 30000;
+const OFFLINE_WAIT_MAX_MS = 8000;
 
 function waitForOnline(): Promise<boolean> {
   if (isOnline()) return Promise.resolve(true);
+  // Fail fast if definitively offline — don't block the user for 30 seconds
   return new Promise((resolve) => {
-    const deadline = Date.now() + OFFLINE_WAIT_MAX_MS;
-    const check = () => {
-      if (isOnline() || Date.now() >= deadline) {
-        resolve(isOnline());
-        return;
+    const timer = setTimeout(() => resolve(false), OFFLINE_WAIT_MAX_MS);
+    const poll = setInterval(() => {
+      if (isOnline()) {
+        clearInterval(poll);
+        clearTimeout(timer);
+        resolve(true);
       }
-      setTimeout(check, OFFLINE_POLL_MS);
-    };
-    check();
+    }, 500);
   });
 }
 
@@ -192,11 +191,14 @@ export async function safeSupabaseCall<T>(
     try {
       const result = await operation();
       if (result.error) {
-        const msg = result.error.message;
+        const msg = result.error?.message ?? String(result.error);
         if (msg.includes('JWT') || msg.includes('token') || msg.includes('auth')) {
           throw new ApiError('인증 세션이 만료되었습니다. 앱을 새로고침해주세요.', 401);
         }
         throw new Error(msg);
+      }
+      if (result.data == null) {
+        throw new Error('데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
       }
       return result.data as T;
     } catch (err) {

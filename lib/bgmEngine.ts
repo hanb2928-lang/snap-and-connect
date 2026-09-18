@@ -10,6 +10,7 @@ import {
 import { aiCachedCall } from './aiCache';
 import { hashObject } from './contentHash';
 import { cleanBase64 } from './base64';
+import { supabase } from './supabase';
 
 /**
  * Web Audio API BGM engine — supports both bundled audio files and FM synthesis fallback.
@@ -776,7 +777,6 @@ export async function fetchBgmRecommendation(imageDataUrl: string, mimeType: str
       'bgm-recommend',
       cacheInput,
       async () => {
-        const { supabase } = await import('@/lib/supabase');
         const { data, error } = await supabase.functions.invoke('recommend-bgm', { body: { imageDataUrl, mimeType } });
         if (error || !data) return FALLBACK_RECOMMENDATION;
         const raw = data as Record<string, unknown>;

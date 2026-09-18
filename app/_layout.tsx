@@ -25,6 +25,10 @@ import { I18nProvider, useI18n } from '@/hooks/useI18n';
 import { AppThemeProvider } from '@/hooks/useAppTheme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { installGlobalErrorHandlers } from '@/lib/errorLogger';
+
+// Install as early as possible, before any async work
+installGlobalErrorHandlers();
 
 SplashScreen.preventAutoHideAsync();
 

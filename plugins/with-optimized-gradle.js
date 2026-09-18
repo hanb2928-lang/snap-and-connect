@@ -9,7 +9,7 @@ function withOptimizedGradle(config) {
         prop.value = '-Xmx4096m -XX:MaxMetaspaceSize=1024m';
       }
       if (prop.type === 'property' && prop.key === 'reactNativeArchitectures') {
-        prop.value = 'arm64-v8a';
+        prop.value = 'arm64-v8a,x86_64';
       }
       if (prop.type === 'property' && prop.key === 'EX_DEV_CLIENT_NETWORK_INSPECTOR') {
         prop.value = 'false';

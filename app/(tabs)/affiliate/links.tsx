@@ -32,6 +32,7 @@ import { validateAffiliateUrl } from '@/lib/affiliate';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { ErrorRetryBanner } from '@/components/ErrorRetryBanner';
 import { friendlyError } from '@/lib/errors';
+import * as Clipboard from 'expo-clipboard';
 import type { LinkBookmark } from '@/types/database';
 
 const PLATFORM_OPTIONS = [

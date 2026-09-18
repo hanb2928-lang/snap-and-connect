@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export function cleanBase64(base64: string): string {
   if (!base64) return '';
@@ -61,6 +62,46 @@ function decodeBase64Native(base64: string): Uint8Array {
   return bytes;
 }
 
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+  if (Platform.OS !== 'web' && typeof btoa === 'undefined') {
+    return encodeBase64Native(bytes);
+  }
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function encodeBase64Native(bytes: Uint8Array): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const len = bytes.length;
+  let result = '';
+
+  for (let i = 0; i < len; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < len ? bytes[i + 1] : 0;
+    const b2 = i + 2 < len ? bytes[i + 2] : 0;
+
+    result += chars[b0 >> 2];
+    result += chars[((b0 & 0x03) << 4) | (b1 >> 4)];
+    if (i + 1 < len) {
+      result += chars[((b1 & 0x0f) << 2) | (b2 >> 6)];
+    } else {
+      result += '=';
+    }
+    if (i + 2 < len) {
+      result += chars[b2 & 0x3f];
+    } else {
+      result += '=';
+    }
+  }
+
+  return result;
+}
+
 /**
  * Converts an image URL to a data URL so WebView canvas can use it
  * without cross-origin tainting. On web, uses fetch + FileReader.
@@ -89,19 +130,19 @@ export async function urlToDataUrl(url: string, timeoutMs = 15000): Promise<stri
       return await imageElementToDataUrl(url, timeoutMs);
     }
   }
-  // Native: fetch as blob, convert to base64 data URL
+  // Native: download to cache, read as base64 via FileSystem
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('blob read failed'));
-      reader.readAsDataURL(blob);
+    const localPath = `${FileSystem.cacheDirectory}url-to-data-${Date.now()}.tmp`;
+    const downloadRes = await FileSystem.downloadAsync(url, localPath);
+    if (downloadRes.status !== 200) throw new Error(`fetch ${downloadRes.status}`);
+    const base64 = await FileSystem.readAsStringAsync(downloadRes.uri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
+    const mimeType = downloadRes.headers['Content-Type'] || 'image/jpeg';
+    await FileSystem.deleteAsync(downloadRes.uri, { idempotent: true }).catch(() => {});
+    return `data:${mimeType};base64,${base64}`;
   } catch (err) {
     throw new Error(`이미지 로드 실패: ${err instanceof Error ? err.message : 'unknown'}`);
   } finally {

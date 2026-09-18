@@ -16,6 +16,8 @@ import { theme } from '@/lib/theme';
 import { detectAffiliatePlatform, generateMarketingCopy, isKnownAffiliateUrl, validateAffiliateUrl } from '@/lib/affiliateLinkSmart';
 import type { AffiliatePlatformKey } from '@/components/AffiliatePlatformSwitch';
 import { useAffiliateToast } from '@/components/AffiliateToast';
+import * as Clipboard from 'expo-clipboard';
+import { createShortLink } from '@/lib/shortUrl';
 import type { ShoppingMatch, AffiliateLink, CustomAffiliateLink } from '@/types/database';
 
 interface ShoppingMatchCardProps {
@@ -123,7 +125,6 @@ export function ShoppingMatchCard({
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(effectiveShortUrl);
       } else {
-        const { default: Clipboard } = await import('expo-clipboard');
         await Clipboard.setStringAsync(effectiveShortUrl);
       }
       setLinkCopied(true);

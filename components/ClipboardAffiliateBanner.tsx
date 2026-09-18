@@ -8,6 +8,7 @@ import {
   LayoutAnimation,
 } from 'react-native';
 import { ClipboardPaste, Check, X } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { theme } from '@/lib/theme';
 
 interface ClipboardAffiliateBannerProps {
@@ -70,7 +71,6 @@ export function ClipboardAffiliateBanner({ onInsert, currentUrl }: ClipboardAffi
           text = await navigator.clipboard.readText().catch(() => null);
         }
       } else {
-        const { default: Clipboard } = await import('expo-clipboard');
         text = await Clipboard.getStringAsync();
       }
       if (text && isAffiliateUrl(text) && text.trim() !== currentUrl.trim()) {

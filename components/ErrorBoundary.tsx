@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertTriangle, RefreshCw } from 'lucide-react-native';
 import { theme } from '@/lib/theme';
+import { logFatal } from '@/lib/errorLogger';
 
 interface Props {
   children: React.ReactNode;
@@ -17,6 +18,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    logFatal(error, { action: 'ErrorBoundary', extra: { componentStack: info.componentStack ?? '' } });
   }
 
   handleReset = () => {

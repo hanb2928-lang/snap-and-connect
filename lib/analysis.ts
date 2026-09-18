@@ -11,6 +11,7 @@ import { compressForEdgeFunction, compressBase64ArrayForEdgeFunction } from '@/l
 import { aiCachedCall } from '@/lib/aiCache';
 import { hashObject } from '@/lib/contentHash';
 import { cleanBase64 } from '@/lib/base64';
+import { getOpenAiVoiceParams } from '@/lib/ttsVoices';
 
 export async function uploadImage(
   base64: string,
@@ -34,15 +35,15 @@ export async function uploadImage(
 }
 
 export async function uploadImageBlob(
-  blob: Blob,
+  blob: Blob | Uint8Array,
   mimeType: string,
 ): Promise<string> {
   // If the blob is already small enough, upload as-is to avoid double-compression
   const MAX_RAW_BLOB_BYTES = 800_000; // ~800KB threshold
-  let uploadBlob = blob;
+  let uploadBlob: Blob | Uint8Array = blob;
   let uploadMime = mimeType;
 
-  if (blob.size > MAX_RAW_BLOB_BYTES && mimeType.startsWith('image/')) {
+  if (blob instanceof Blob && blob.size > MAX_RAW_BLOB_BYTES && mimeType.startsWith('image/')) {
     try {
       const dataUrl = await blobToDataUrl(blob);
       const compressed = await prepareImageForApi(dataUrl, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY);
@@ -108,8 +109,8 @@ export async function analyzeImage(
       throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
     }
 
-    const respData = await response.json();
-    if (respData.error) throw new Error(respData.error);
+    const respData = await response.json().catch(() => ({} as Record<string, unknown>));
+    if (respData?.error) throw new Error(respData.error);
 
     return normalizeAnalysis(respData);
   },
@@ -149,8 +150,8 @@ export async function analyzeMultiShot(
         throw new Error(errData.error || `AI 다각도 분석 실패 (${response.status})`);
       }
 
-      const respData = await response.json();
-      if (respData.error) throw new Error(respData.error);
+      const respData = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (respData?.error) throw new Error(respData.error);
 
       return normalizeAnalysis(respData);
     },
@@ -289,7 +290,6 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
   try {
     const settings = await getUserSettings();
     if (settings?.default_tts_voice) {
-      const { getOpenAiVoiceParams } = await import('@/lib/ttsVoices');
       const params = getOpenAiVoiceParams(settings.default_tts_voice, settings.tts_speed);
       voice = params.voice;
       speed = params.speed;
@@ -312,8 +312,13 @@ async function generateAndUploadTTS(scanId: string, text: string): Promise<void>
   });
   clearTimeout(timeoutId);
   if (!response.ok) return;
-  const data = await response.json();
-  if (!data.audioBase64) return;
+  let data: { audioBase64?: string };
+  try {
+    data = await response.json();
+  } catch {
+    return;
+  }
+  if (!data?.audioBase64) return;
 
   const audioBytes = base64ToUint8Array(data.audioBase64);
   const fileName = `tts-${scanId}-${Date.now()}.mp3`;
@@ -457,8 +462,8 @@ export async function analyzeImageWithProductContext(
         throw new Error(errData.error || `AI 분석 실패 (${response.status})`);
       }
 
-      const respData = await response.json();
-      if (respData.error) throw new Error(respData.error);
+      const respData = await response.json().catch(() => ({} as Record<string, unknown>));
+      if (respData?.error) throw new Error(respData.error);
 
       return normalizeAnalysis(respData);
     },
@@ -502,8 +507,9 @@ export async function extractProductMeta(
     throw new Error(errData.error || `상품 정보 추출 실패 (${response.status})`);
   }
 
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
+  const data = await response.json().catch(() => ({}));
+  if (data?.error) throw new Error(data.error);
+  if (!data?.productMeta) throw new Error('상품 정보를 불러오지 못했습니다.');
   return data.productMeta;
 }
 

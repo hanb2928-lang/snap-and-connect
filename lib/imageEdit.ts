@@ -71,21 +71,24 @@ export async function removeBackground(
     throw new Error(errData.error || `배경 제거 실패 (${response.status})`);
   }
 
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
+  const data = await response.json().catch(() => ({}));
+  if (data?.error) throw new Error(data.error);
 
-  if (data.imageUrl) {
+  if (data?.imageUrl) {
     return data.imageUrl;
   }
 
   // Fallback for older deployments still returning base64
-  const base64 = cleanBase64(data.imageBase64);
-  return `data:${data.mimeType || 'image/png'};base64,${base64}`;
+  const base64 = cleanBase64(data?.imageBase64 ?? '');
+  return `data:${data?.mimeType || 'image/png'};base64,${base64}`;
 }
 
-export function base64ToBlob(base64: string, mimeType: string): any {
+export function base64ToBlob(base64: string, mimeType: string): Blob | Uint8Array {
   const bytes = base64ToUint8Array(base64);
-  return new (global as any).Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
+  if (Platform.OS !== 'web') {
+    return bytes;
+  }
+  return new Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
 }
 
 export async function compressImage(uri: string, maxWidth = 1080, quality = 0.8): Promise<string> {
@@ -105,7 +108,7 @@ const CAPTURE_QUALITY = 0.78;
 export async function compressCaptureFrameToBlob(
   base64: string,
   mimeType: string,
-): Promise<{ blob: Blob; base64: string; mimeType: string }> {
+): Promise<{ blob: Blob | Uint8Array; base64: string; mimeType: string }> {
   const dataUrl = `data:${mimeType};base64,${base64}`;
   try {
     const compressed = await prepareImageForApi(dataUrl, CAPTURE_MAX_DIMENSION, CAPTURE_QUALITY);

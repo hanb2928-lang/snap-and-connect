@@ -56,6 +56,7 @@ import {
   deleteCustomAffiliatePlatform,
   type ManagedAffiliatePlatform,
 } from '@/lib/affiliatePlatformManager';
+import { fetchRecentLogs, SESSION_ID } from '@/lib/errorLogger';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -76,6 +77,11 @@ export default function SettingsScreen() {
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
+
+  const [errorLogs, setErrorLogs] = useState<Awaited<ReturnType<typeof fetchRecentLogs>>>([]);
+  const [errorLogsLoading, setErrorLogsLoading] = useState(false);
+  const [errorLogsVisible, setErrorLogsVisible] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<Awaited<ReturnType<typeof fetchRecentLogs>>[0] | null>(null);
 
   const [revenues, setRevenues] = useState<RevenueRecord[]>([]);
   const [revModalVisible, setRevModalVisible] = useState(false);
@@ -2316,6 +2322,86 @@ export default function SettingsScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      {/* ── Error Log Viewer ── */}
+      <SectionCard title="원격 에러 로그" icon={<Activity size={18} color={theme.colors.error?.[400] ?? '#ef4444'} strokeWidth={2} />}>
+        <Text style={styles.sectionDesc}>
+          APK 빌드에서 발생한 크래시 및 JS 에러를 실시간으로 확인할 수 있습니다.{'\n'}
+          세션 ID: <Text style={{ color: theme.colors.dark.textDim, fontFamily: theme.typography.fontFamily.regular }}>{SESSION_ID}</Text>
+        </Text>
+        <TouchableOpacity
+          style={[styles.saveIdButton, { marginTop: 8, flexDirection: 'row', gap: 6, alignItems: 'center' }]}
+          onPress={async () => {
+            setErrorLogsLoading(true);
+            setErrorLogsVisible(true);
+            try {
+              const logs = await fetchRecentLogs(50);
+              setErrorLogs(logs);
+            } catch {
+              setErrorLogs([]);
+            } finally {
+              setErrorLogsLoading(false);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Activity size={16} color="#fff" strokeWidth={2} />
+          <Text style={styles.saveIdButtonText}>최근 에러 로그 불러오기</Text>
+        </TouchableOpacity>
+      </SectionCard>
+
+      {/* Error log list modal */}
+      <Modal visible={errorLogsVisible} animationType="slide" onRequestClose={() => setErrorLogsVisible(false)}>
+        <View style={[styles.modalOverlay, { paddingTop: insets.top + 8 }]}>
+          <View style={styles.errorModalHeader}>
+            <Text style={styles.errorModalTitle}>에러 로그 (최근 50건)</Text>
+            <TouchableOpacity onPress={() => { setErrorLogsVisible(false); setSelectedLog(null); }} activeOpacity={0.7}>
+              <X size={22} color={theme.colors.dark.text} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+          {errorLogsLoading ? (
+            <ActivityIndicator size="large" color={theme.colors.primary[400]} style={{ marginTop: 40 }} />
+          ) : errorLogs.length === 0 ? (
+            <View style={styles.errorEmptyWrap}>
+              <Text style={styles.errorEmptyText}>기록된 에러가 없습니다.</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, gap: 8 }}>
+              {errorLogs.map((log) => (
+                <TouchableOpacity
+                  key={log.id}
+                  style={[
+                    styles.errorLogRow,
+                    log.level === 'fatal' && styles.errorLogFatal,
+                    log.level === 'warning' && styles.errorLogWarning,
+                  ]}
+                  onPress={() => setSelectedLog(selectedLog?.id === log.id ? null : log)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.errorLogTop}>
+                    <View style={[styles.errorLevelBadge, log.level === 'fatal' ? styles.badgeFatal : log.level === 'warning' ? styles.badgeWarning : styles.badgeError]}>
+                      <Text style={styles.errorLevelText}>{log.level.toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.errorLogTime} numberOfLines={1}>
+                      {new Date(log.created_at).toLocaleString('ko-KR')}
+                    </Text>
+                    <Text style={styles.errorLogPlatform}>{log.platform ?? ''}</Text>
+                  </View>
+                  <Text style={styles.errorLogMessage} numberOfLines={selectedLog?.id === log.id ? undefined : 2}>
+                    {log.message}
+                  </Text>
+                  {selectedLog?.id === log.id && log.stack ? (
+                    <Text style={styles.errorLogStack} selectable>{log.stack}</Text>
+                  ) : null}
+                  {selectedLog?.id === log.id && log.context ? (
+                    <Text style={styles.errorLogStack} selectable>{JSON.stringify(log.context, null, 2)}</Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -3887,6 +3973,89 @@ const styles = StyleSheet.create({
     color: staticTheme.colors.dark.textDim,
     marginTop: 3,
     lineHeight: 15,
+  },
+  errorModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: staticTheme.colors.dark.border,
+  },
+  errorModalTitle: {
+    fontSize: 17,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: staticTheme.colors.dark.text,
+  },
+  errorEmptyWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorEmptyText: {
+    fontSize: 14,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
+  },
+  errorLogRow: {
+    backgroundColor: staticTheme.colors.dark.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: staticTheme.colors.error[500],
+    gap: 4,
+  },
+  errorLogFatal: {
+    borderLeftColor: '#ff3333',
+    backgroundColor: '#2a1010',
+  },
+  errorLogWarning: {
+    borderLeftColor: '#f59e0b',
+    backgroundColor: '#1e1a0e',
+  },
+  errorLogTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  errorLevelBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeFatal: { backgroundColor: '#ff3333' },
+  badgeError: { backgroundColor: staticTheme.colors.error[500] },
+  badgeWarning: { backgroundColor: '#f59e0b' },
+  errorLevelText: {
+    fontSize: 10,
+    fontFamily: staticTheme.typography.fontFamily.bold,
+    color: '#fff',
+  },
+  errorLogTime: {
+    fontSize: 11,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
+    flex: 1,
+  },
+  errorLogPlatform: {
+    fontSize: 10,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
+  },
+  errorLogMessage: {
+    fontSize: 13,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.text,
+    lineHeight: 18,
+  },
+  errorLogStack: {
+    fontSize: 10,
+    fontFamily: staticTheme.typography.fontFamily.regular,
+    color: staticTheme.colors.dark.textDim,
+    lineHeight: 15,
+    marginTop: 4,
   },
   toggleDivider: {
     height: 1,

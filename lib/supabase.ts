@@ -1,36 +1,39 @@
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// These values are inlined by Metro at bundle time from the .env file.
+// The fallbacks ensure the app always has a valid URL even if the build
+// environment didn't have the .env file present (e.g. a misconfigured CI run).
 const FALLBACK_URL = 'https://fzvvriycfiqecherbhli.supabase.co';
 const FALLBACK_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs';
 
-function resolveEnvVars(): { url: string; anonKey: string } {
-  if (typeof process !== 'undefined' && process.env) {
-    const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-    if (url && anonKey) return { url, anonKey };
-  }
+// Metro inlines EXPO_PUBLIC_ vars as string literals — no runtime lookup needed.
+// We still guard with || to handle the case where the var was undefined at bundle time.
+export const supabaseUrl: string =
+  (process.env.EXPO_PUBLIC_SUPABASE_URL || FALLBACK_URL).trim();
 
-  try {
-    const Constants = require('expo-constants').default;
-    const extra = Constants?.expoConfig?.extra;
-    if (extra?.supabaseUrl && extra?.supabaseAnonKey) {
-      return { url: extra.supabaseUrl, anonKey: extra.supabaseAnonKey };
-    }
-  } catch {
-    // Constants not available
-  }
+export const supabaseAnonKey: string =
+  (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_KEY).trim();
 
-  return { url: FALLBACK_URL, anonKey: FALLBACK_KEY };
-}
-
-const { url: supabaseUrl, anonKey: supabaseAnonKey } = resolveEnvVars();
-
-export { supabaseUrl, supabaseAnonKey };
+// On native (Android/iOS), use AsyncStorage so auth sessions survive app restarts.
+// On web, use the default localStorage-backed storage.
+const authStorage =
+  Platform.OS !== 'web'
+    ? {
+        getItem: (key: string) => AsyncStorage.getItem(key),
+        setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+        removeItem: (key: string) => AsyncStorage.removeItem(key),
+      }
+    : undefined;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false,
+    persistSession: true,
+    storage: authStorage,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
   },
 });
 

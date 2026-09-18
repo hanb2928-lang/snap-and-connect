@@ -54,7 +54,7 @@ import { uploadAssetBlobWithProgress, uploadAssetFromFileUriWithProgress, saveAs
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { readUriAsBase64 } from '@/lib/imageEdit';
-import { cleanBase64 } from '@/lib/base64';
+import { cleanBase64, uint8ArrayToBase64 } from '@/lib/base64';
 import { Share as RNShare } from 'react-native';
 import type { Scan, UserSettings, AffiliateLink, CustomAffiliateLink, DetectedProduct, PlatformKey, CustomReview } from '@/types/database';
 import { STICKER_POSITIONS, TEXT_POSITIONS } from '@/components/TemplateCard';
@@ -998,7 +998,7 @@ export default function ResultScreen() {
               const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
               binary += String.fromCharCode(...chunk);
             }
-            const rawBase64 = btoa(binary);
+            const rawBase64 = uint8ArrayToBase64(bytes);
             const rawDataUrl = `data:image/jpeg;base64,${rawBase64}`;
             const compressed = await compressForEdgeFunction(rawDataUrl);
             referenceImageBase64 = compressed.base64;

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Link2, Copy, Check, CircleAlert as AlertCircle } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { theme } from '@/lib/theme';
 import { createShortLink } from '@/lib/shortUrl';
 
@@ -52,7 +53,6 @@ export function ShortLinkCopyBar({ url, scanId, label = '단축 링크' }: Short
       if (Platform.OS === 'web' && navigator.clipboard) {
         await navigator.clipboard.writeText(shortUrl);
       } else {
-        const { default: Clipboard } = await import('expo-clipboard');
         await Clipboard.setStringAsync(shortUrl);
       }
       setCopied(true);

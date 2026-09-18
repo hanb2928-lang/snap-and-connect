@@ -4,8 +4,10 @@ import { enqueueJob } from '@/lib/jobQueue';
 import { uploadImage } from '@/lib/analysis';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
-import { buildDataUrl } from '@/lib/base64';
+import { buildDataUrl, base64ToUint8Array } from '@/lib/base64';
 import { hashImage, hashMultiAngle } from '@/lib/contentHash';
+import { TTS_FUNCTION_URL, supabaseAnonKey } from '@/lib/supabase';
+import { getOpenAiVoiceParams } from '@/lib/ttsVoices';
 
 const SUPABASE_TIMEOUT_MS = 30000;
 
@@ -269,8 +271,6 @@ async function createScanWithAnalysis(
 }
 
 export async function triggerTTS(scanId: string, text: string): Promise<void> {
-  const { TTS_FUNCTION_URL, supabaseAnonKey } = await import('@/lib/supabase');
-  const { base64ToUint8Array } = await import('@/lib/base64');
   let voice = 'alloy';
   let speed = 1.0;
   let pitch = 0;
@@ -278,7 +278,6 @@ export async function triggerTTS(scanId: string, text: string): Promise<void> {
   try {
     const settings = await getUserSettings();
     if (settings?.default_tts_voice) {
-      const { getOpenAiVoiceParams } = await import('@/lib/ttsVoices');
       const params = getOpenAiVoiceParams(settings.default_tts_voice, settings.tts_speed);
       voice = params.voice;
       speed = params.speed;
@@ -304,8 +303,13 @@ export async function triggerTTS(scanId: string, text: string): Promise<void> {
     const errorBody = await response.text().catch(() => '');
     throw new Error(`TTS 생성 실패 (${response.status}): ${errorBody || response.statusText}`);
   }
-  const data = await response.json();
-  if (!data.audioBase64) {
+  let data: { audioBase64?: string };
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('TTS 응답을 파싱하지 못했습니다');
+  }
+  if (!data?.audioBase64) {
     throw new Error('TTS 응답에 오디오 데이터가 없습니다');
   }
 

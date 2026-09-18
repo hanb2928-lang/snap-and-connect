@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Setter = (key: string, value: string) => Promise<void> | void;
 type Getter = (key: string) => Promise<string | null> | string | null;
@@ -26,7 +27,6 @@ export function initStorage(): Promise<void> {
     }
 
     try {
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
       nativeGetItem = (key: string) => AsyncStorage.getItem(key);
       nativeSetItem = (key: string, value: string) => AsyncStorage.setItem(key, value);
       nativeRemoveItem = (key: string) => AsyncStorage.removeItem(key);

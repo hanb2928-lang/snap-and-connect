@@ -7,7 +7,7 @@
  * so the user can always paste their content manually.
  */
 
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
 export interface PlatformLink {
@@ -123,34 +123,32 @@ export async function smartRedirect(
   // Step 2: Try the native URL scheme with a 100ms timeout
   const appLaunchPromise = new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => resolve(false), 100);
-    import('react-native').then(({ Linking }) => {
-      if (!link.appUrl) {
-        clearTimeout(timeout);
-        resolve(false);
-        return;
-      }
-      Linking.canOpenURL(link.appUrl)
-        .then((canOpen) => {
-          if (canOpen) {
-            Linking.openURL(link.appUrl)
-              .then(() => {
-                clearTimeout(timeout);
-                resolve(true);
-              })
-              .catch(() => {
-                clearTimeout(timeout);
-                resolve(false);
-              });
-          } else {
-            clearTimeout(timeout);
-            resolve(false);
-          }
-        })
-        .catch(() => {
+    if (!link.appUrl) {
+      clearTimeout(timeout);
+      resolve(false);
+      return;
+    }
+    Linking.canOpenURL(link.appUrl)
+      .then((canOpen) => {
+        if (canOpen) {
+          Linking.openURL(link.appUrl)
+            .then(() => {
+              clearTimeout(timeout);
+              resolve(true);
+            })
+            .catch(() => {
+              clearTimeout(timeout);
+              resolve(false);
+            });
+        } else {
           clearTimeout(timeout);
           resolve(false);
-        });
-    });
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        resolve(false);
+      });
   });
 
   const appLaunched = await appLaunchPromise;
@@ -168,7 +166,6 @@ export async function smartRedirect(
 
   // Step 3: Fallback to web URL
   options?.onFallback?.(link.webUrl);
-  const { Linking } = await import('react-native');
   try {
     await Linking.openURL(link.webUrl);
   } catch {
