@@ -8,14 +8,14 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Android APK (EAS)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
 
     env:
       EXPO_NO_TELEMETRY: 1
+      EAS_NO_VCS: "1"
       NODE_OPTIONS: "--max-old-space-size=4096"
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.workers.max=2"
 
     steps:
       - name: Checkout code
@@ -26,54 +26,31 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
-      - name: Install Android NDK 27.2.12479018
-        run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
-          test -d "$ANDROID_HOME/ndk/27.2.12479018"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Verify node_modules
+        run: |
+          test -d node_modules/expo-router || { echo "expo-router missing from node_modules"; exit 1; }
+          test -d node_modules/expo || { echo "expo missing from node_modules"; exit 1; }
+          echo "node_modules verification passed"
 
       - name: Create .env file
         run: |
           echo "EXPO_PUBLIC_SUPABASE_URL=https://fzvvriycfiqecherbhli.supabase.co" >> .env
           echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs" >> .env
-          echo "RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}" >> .env
 
-      - name: Prebuild native Android project
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Gradle cache
-        uses: actions/cache@v4
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-arm64-v8a-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            gradle-arm64-v8a-
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build APK with Gradle
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon -x lint -x lintDebug --stacktrace --max-workers=2
+      - name: Build APK with EAS
+        run: eas build --platform android --profile preview --non-interactive --no-wait
 
-      - name: Upload APK artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: shortconnect-android-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+      - name: Output build URL
+        run: |
+          echo "APK build started on EAS servers."
+          echo "Check status at: https://expo.dev → Builds"
+          echo "APK will be available for download once build completes."
