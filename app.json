@@ -89,7 +89,8 @@
             "buildArchs": ["arm64-v8a"]
           }
         }
-      ]
+      ],
+      "./plugins/with-optimized-gradle"
     ],
     "experiments": {
       "typedRoutes": true

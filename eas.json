@@ -11,13 +11,12 @@
       "android": {
         "buildType": "apk",
         "image": "latest",
-        "env": {
-          "reactNativeArchitectures": "arm64-v8a"
-        }
+        "resourceClass": "large"
       },
       "env": {
         "EAS_NO_VCS": "1",
         "NODE_OPTIONS": "--max-old-space-size=8192",
+        "GRADLE_OPTS": "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx6144m -Dorg.gradle.workers.max=2",
         "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
@@ -28,13 +27,12 @@
       "android": {
         "buildType": "apk",
         "image": "latest",
-        "env": {
-          "reactNativeArchitectures": "arm64-v8a"
-        }
+        "resourceClass": "large"
       },
       "env": {
         "EAS_NO_VCS": "1",
         "NODE_OPTIONS": "--max-old-space-size=8192",
+        "GRADLE_OPTS": "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx6144m -Dorg.gradle.workers.max=2",
         "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
@@ -45,15 +43,14 @@
       "android": {
         "buildType": "apk",
         "image": "latest",
-        "env": {
-          "reactNativeArchitectures": "arm64-v8a"
-        }
+        "resourceClass": "large"
       },
       "env": {
         "EAS_NO_VCS": "1",
         "NODE_OPTIONS": "--max-old-space-size=8192",
+        "GRADLE_OPTS": "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx6144m -Dorg.gradle.workers.max=2",
         "EXPO_PUBLIC_SUPABASE_URL": "https://fzvvriycfiqecherbhli.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJibGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6dnZyaXljZmlxZWNoZXJiaGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0NzU4MDUsImV4cCI6MjEwMzA1MTgwNX0.0eAASvxwmKsPamXPukjvnzJrz5DnDoznoDCCm2SV2Vs"
       }
     }
   },
