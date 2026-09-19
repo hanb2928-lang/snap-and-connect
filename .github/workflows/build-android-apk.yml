@@ -68,12 +68,12 @@ jobs:
 
       - name: Build APK with Gradle
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon -x lint -x lintRelease --stacktrace --max-workers=2
+        run: ./gradlew assembleDebug --no-daemon -x lint -x lintDebug --stacktrace --max-workers=2
 
       - name: Upload APK artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shortconnect-android-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 30

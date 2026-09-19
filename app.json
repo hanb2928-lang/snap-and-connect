@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "snapconnect",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.snapconnect.app",
@@ -81,13 +81,7 @@
           "savePhotosPermission": "Allow ShortConnect to save template cards to your photo gallery."
         }
       ],
-      [
-        "expo-system-ui",
-        {
-          "edgeToEdge": true
-        }
-      ],
-      "./plugins/with-optimized-gradle"
+      "expo-system-ui"
     ],
     "experiments": {
       "typedRoutes": true

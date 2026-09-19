@@ -72,7 +72,7 @@ echo.
 echo [6/6] Android APK 빌드 시작... (약 10~15분 소요)
 echo EAS 서버에서 빌드합니다. 컴퓨터 성능과 무관합니다.
 echo.
-call eas build --platform android --profile preview --clear-cache --non-interactive
+call eas build --platform android --profile development --clear-cache --non-interactive
 if %ERRORLEVEL% neq 0 (
     echo.
     echo ============================================

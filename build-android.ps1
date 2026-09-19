@@ -68,7 +68,7 @@ Write-Host ""
 Write-Host "[6/6] Android APK 빌드 시작... (약 10~15분 소요)" -ForegroundColor Yellow
 Write-Host "EAS 서버에서 빌드합니다. 컴퓨터 성능과 무관합니다." -ForegroundColor DarkGray
 Write-Host ""
-eas build --platform android --profile preview --clear-cache --non-interactive
+eas build --platform android --profile development --clear-cache --non-interactive
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "============================================" -ForegroundColor Red

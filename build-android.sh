@@ -80,7 +80,7 @@ echo "[6/6] Android APK 빌드 시작... (약 10~15분 소요)"
 echo "EAS 서버에서 빌드합니다. 컴퓨터 성능과 무관합니다."
 echo ""
 
-eas build --platform android --profile preview --clear-cache --non-interactive || {
+eas build --platform android --profile development --clear-cache --non-interactive || {
     echo ""
     echo "============================================"
     echo "  빌드 실패."
