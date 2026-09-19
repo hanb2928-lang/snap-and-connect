@@ -24,8 +24,9 @@ function withGradleProps(config) {
       if (idx >= 0) props.splice(idx, 1);
     }
 
-    set('org.gradle.jvmargs', '-Xmx6144m -XX:MaxMetaspaceSize=1024m');
+    set('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
     set('reactNativeArchitectures', 'arm64-v8a');
+    set('hermesEnabled', 'false');
     set('EX_DEV_CLIENT_NETWORK_INSPECTOR', 'false');
     set('android.enableMinifyInReleaseBuilds', 'false');
     set('android.enableShrinkResourcesInReleaseBuilds', 'false');

@@ -21,6 +21,7 @@
       "package": "com.snapconnect.app",
       "versionCode": 1,
       "softInputMode": "resize",
+      "jsEngine": "jsc",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#0a0f1e"
