@@ -81,7 +81,15 @@
           "savePhotosPermission": "Allow ShortConnect to save template cards to your photo gallery."
         }
       ],
-      "expo-system-ui"
+      "expo-system-ui",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["arm64-v8a"]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
