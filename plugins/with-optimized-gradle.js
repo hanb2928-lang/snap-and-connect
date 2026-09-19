@@ -19,11 +19,17 @@ function withGradleProps(config) {
       }
     }
 
+    function remove(key) {
+      const idx = props.findIndex((p) => p.type === 'property' && p.key === key);
+      if (idx >= 0) props.splice(idx, 1);
+    }
+
     set('org.gradle.jvmargs', '-Xmx4096m -XX:MaxMetaspaceSize=1024m');
     set('reactNativeArchitectures', 'arm64-v8a,x86_64');
     set('EX_DEV_CLIENT_NETWORK_INSPECTOR', 'false');
     set('android.enableMinifyInReleaseBuilds', 'false');
     set('android.enableShrinkResourcesInReleaseBuilds', 'false');
+    remove('expo.edgeToEdgeEnabled');
 
     return cfg;
   });
