@@ -6,6 +6,7 @@ echo "============================================"
 echo ""
 
 export EAS_NO_VCS=1
+export EAS_NO_GIT=1
 
 echo "[1/6] Node.js 확인 중..."
 if ! command -v node &> /dev/null; then
