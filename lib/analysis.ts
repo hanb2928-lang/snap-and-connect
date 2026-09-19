@@ -1,9 +1,10 @@
+import { Platform } from 'react-native';
 import type { AnalysisResult } from '@/types/database';
 import { supabase, ANALYSIS_FUNCTION_URL, TTS_FUNCTION_URL, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { safeFetch } from '@/lib/apiClient';
 import { generateAffiliateLinks } from '@/lib/affiliate';
 import { getUserSettings } from '@/lib/settings';
-import { base64ToUint8Array, buildDataUrl } from '@/lib/base64';
+import { base64ToUint8Array, buildDataUrl, uint8ArrayToBase64 } from '@/lib/base64';
 import { enqueueAndWait } from '@/lib/jobQueue';
 import { deductCredits } from '@/lib/credits';
 import { compressBase64ForUpload, prepareImageForApi, base64ToBlob, UPLOAD_MAX_DIMENSION, UPLOAD_QUALITY } from '@/lib/imageEdit';
@@ -69,13 +70,21 @@ export async function uploadImageBlob(
   return urlData.publicUrl;
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Blob 변환 실패'));
-    reader.readAsDataURL(blob);
-  });
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Blob 변환 실패'));
+      reader.readAsDataURL(blob);
+    });
+  }
+  // Native: FileReader doesn't exist on Hermes/JSC
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const base64 = uint8ArrayToBase64(bytes);
+  const mimeType = blob.type || 'image/jpeg';
+  return `data:${mimeType};base64,${base64}`;
 }
 
 export async function analyzeImage(

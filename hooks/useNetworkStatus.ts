@@ -20,7 +20,7 @@ function init() {
     if (typeof navigator !== 'undefined') {
       currentStatus = navigator.onLine ? 'online' : 'offline';
     }
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('online', () => notify('online'));
       window.addEventListener('offline', () => notify('offline'));
     }
@@ -46,6 +46,8 @@ export function useNetworkStatus(): NetworkStatus {
 
   return status;
 }
+
+init();
 
 export function isOnline(): boolean {
   if (!initialized) init();

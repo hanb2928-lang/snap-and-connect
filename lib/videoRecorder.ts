@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { uint8ArrayToBase64 } from '@/lib/base64';
 
 export interface VideoRecordingOptions {
   maxDurationMs?: number;
@@ -112,18 +113,26 @@ export function getRecordingTimeMs(recorder: MediaRecorder | null): number {
   return recorder && recorder.state === 'recording' ? Date.now() - (recorder as any)._startTime : 0;
 }
 
-export function blobToBase64(blob: Blob): Promise<{ base64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const commaIdx = result.indexOf(',');
-      const header = result.slice(5, commaIdx);
-      const mimeType = header.split(';')[0] || 'video/webm';
-      const base64 = result.slice(commaIdx + 1);
-      resolve({ base64, mimeType });
-    };
-    reader.onerror = () => reject(new Error('비디오 변환 실패'));
-    reader.readAsDataURL(blob);
-  });
+export async function blobToBase64(blob: Blob): Promise<{ base64: string; mimeType: string }> {
+  if (Platform.OS === 'web') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const commaIdx = result.indexOf(',');
+        const header = result.slice(5, commaIdx);
+        const mimeType = header.split(';')[0] || 'video/webm';
+        const base64 = result.slice(commaIdx + 1);
+        resolve({ base64, mimeType });
+      };
+      reader.onerror = () => reject(new Error('비디오 변환 실패'));
+      reader.readAsDataURL(blob);
+    });
+  }
+  // Native: FileReader doesn't exist on Hermes/JSC
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const base64 = uint8ArrayToBase64(bytes);
+  const mimeType = blob.type || 'video/webm';
+  return { base64, mimeType };
 }
