@@ -10,8 +10,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          node-version: '22'
+        # (여기에 있던 잘못된 node-version 설정은 완전히 제거했습니다)
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
